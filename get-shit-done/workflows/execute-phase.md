@@ -1558,6 +1558,78 @@ gsd-sdk query commit "docs(phase-{X}): evolve PROJECT.md after phase completion"
 **Skip this step if** `.planning/PROJECT.md` does not exist.
 </step>
 
+<step name="sme_refresh">
+**Refresh SME documents affected by this phase's changes.**
+
+> Skip if `workflow.use_sme_agents` is not `true`.
+
+```bash
+SME_AGENTS=$(gsd-sdk query config-get workflow.use_sme_agents --raw 2>/dev/null || echo "false")
+```
+
+**If `SME_AGENTS` is not `true`:** Skip this step entirely.
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► SME REFRESH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Detecting which processes this phase touched...
+```
+
+Collect changed files from PLAN.md frontmatter and detect affected processes:
+
+```bash
+CHANGED_FILES=$(grep -h "files_modified:" "${PHASE_DIR}"/*-PLAN.md 2>/dev/null \
+  | tr ' ' '\n' | grep "^\s*-" | sed 's/^\s*-\s*//' | tr '\n' ' ')
+PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${PHASE_NUMBER}" --pick goal 2>/dev/null || echo "")
+
+SME_DETECT=$(gsd-sdk query sme.detect-processes \
+  --file-paths ${CHANGED_FILES} \
+  --goal "${PHASE_GOAL}" 2>/dev/null \
+  || echo '{"data":{"enabled":false,"matches":[]}}')
+```
+
+Parse `SME_DETECT`: extract `enabled` and `matches[]`.
+
+**If `enabled` is false OR `matches` is empty:** Display "No SME processes affected by this phase." Skip this step.
+
+Resolve creator model and skills:
+```bash
+CREATOR_MODEL=$(gsd-sdk query resolve-model gsd-sme-creator --raw 2>/dev/null || echo "inherit")
+AGENT_SKILLS_CREATOR=$(gsd-sdk query agent-skills gsd-sme-creator 2>/dev/null || echo "")
+```
+
+For each process in `matches[]` (sequentially — one Task at a time, block before next):
+
+```
+Task(
+  subagent_type="gsd-sme-creator",
+  model="{CREATOR_MODEL}",
+  description="Refresh SME for {PROCESS_NAME} after phase ${PHASE_NUMBER}",
+  prompt="Process: {PROCESS_NAME}
+Today: {today}
+
+UPDATE MODE: An SME already exists at .planning/smes/{PROCESS_NAME}-SME.md.
+Refresh it with the current code state after Phase ${PHASE_NUMBER} execution.
+Preserve historical findings that still apply.
+
+{AGENT_SKILLS_CREATOR}"
+)
+```
+
+After each Task: check for `## SME Creation Complete` marker. On failure: log warning and continue to next process (never block phase completion).
+
+After all refreshes complete, commit updated SME files (if `commit_docs` is true):
+
+```bash
+gsd-sdk query commit "docs(phase-${PHASE_NUMBER}): refresh SME documents after execution" \
+  --files .planning/smes/${PROCESS_NAME}-SME.md || true
+```
+
+Display: `◆ SME Refresh Complete — {N} document(s) updated.`
+</step>
+
 <step name="offer_next">
 
 **Exception:** If `gaps_found`, the `verify_phase_goal` step already presents the gap-closure path (`/gsd-plan-phase {X} --gaps`). No additional routing needed — skip auto-advance.

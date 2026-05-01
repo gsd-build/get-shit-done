@@ -1361,6 +1361,35 @@ for match in matches; do
 done
 ```
 
+### Staleness Pre-Flight Check
+
+Compare `last_analyzed_commit` for each matched SME against current HEAD (REFRESH-04 — warning only, never blocks):
+
+```bash
+CURRENT_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+STALE_SMES=""
+
+# Reuse $SME_LIST if available (fetched above for CONFIG-04 / GATE-07)
+# Otherwise fetch: SME_LIST=$(gsd-sdk query sme.list 2>/dev/null || echo '{"data":{"enabled":true,"smes":[]}}')
+for match in matches; do
+  PROCESS_NAME=$(extract process_name from match)
+  LAST_COMMIT=$(extract last_analyzed_commit for PROCESS_NAME from SME_LIST)
+  if [ -n "$LAST_COMMIT" ] && [ "$CURRENT_HEAD" != "unknown" ] && [ "$LAST_COMMIT" != "$CURRENT_HEAD" ]; then
+    STALE_SMES="${STALE_SMES}${PROCESS_NAME} (analyzed at ${LAST_COMMIT:0:8}) "
+  fi
+done
+```
+
+**If `STALE_SMES` is non-empty (warning only — never blocks):**
+```
+◆ Stale SME(s): ${STALE_SMES}
+  These documents were analyzed at an older commit. The audit proceeds but
+  findings may not reflect code changes since last analysis.
+  SME documents are automatically refreshed after each phase execution.
+```
+
+Proceed to Spawn Auditor regardless of staleness.
+
 ### Spawn Auditor
 
 Construct auditor prompt with SME context blocks injected FIRST (GATE-08 — prevents context window saturation from hiding BLOCKERs):
