@@ -180,7 +180,15 @@ jobs:
                       echo "Failed at: \`${SHA}\` — \`${SUBJECT}\`"
                       echo ""
                       if [ "$DRY_RUN" = "true" ]; then
-                        echo "**Dry run:** branch was not pushed. Re-run a real hotfix with \`auto_cherry_pick=false\` and resolve \`${SHA}\` manually on \`${BRANCH}\`."
+                        echo "**Dry run:** branch was not pushed, so the picks below were discarded with the runner."
+                        if [ -n "$INCLUDED" ]; then
+                          echo ""
+                          echo "Already-applied picks (lost — must be re-applied before resolving \`${SHA}\`):"
+                          echo ""
+                          echo "$INCLUDED"
+                        fi
+                        echo ""
+                        echo "**To resolve:** re-run a real hotfix with \`auto_cherry_pick=true\` to materialize the partial branch on origin, then resolve \`${SHA}\` manually. Re-running with \`auto_cherry_pick=false\` would recreate the branch from \`${BASE_TAG}\` and lose every pick listed above."
                       else
                         echo "Branch \`${BRANCH}\` was pushed with picks applied up to (but not including) the conflicting commit."
                         echo ""
