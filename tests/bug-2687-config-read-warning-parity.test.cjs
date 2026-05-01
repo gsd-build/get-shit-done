@@ -1,5 +1,9 @@
 'use strict';
 
+// allow-test-rule: pre-existing-text-matching
+// Pre-dates the no-raw-text-matching rule (CONTRIBUTING.md, 2026-05-01).
+// Tracked for migration to typed-IR assertions; do not copy this pattern.
+
 /**
  * Regression test for #2687 — loadConfig must not emit "unknown config key"
  * warnings for keys that are registered in DYNAMIC_KEY_PATTERNS (e.g. review,

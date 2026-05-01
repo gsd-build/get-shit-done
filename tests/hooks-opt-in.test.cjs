@@ -1,3 +1,7 @@
+// allow-test-rule: pre-existing-text-matching
+// Pre-dates the no-raw-text-matching rule (CONTRIBUTING.md, 2026-05-01).
+// Tracked for migration to typed-IR assertions; do not copy this pattern.
+
 /**
  * GSD Tools Tests - Community Hooks (opt-in)
  *

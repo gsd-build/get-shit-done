@@ -8,14 +8,17 @@ process.env.GSD_TEST_MODE = '1';
  * "verified: yes" without actually checking content presence.
  *
  * Fix: deterministic verifier script (scripts/verify-reapply-patches.cjs)
- * that the workflow calls. The script computes user-added lines from a real
- * diff against the pristine baseline and asserts each significant line is
- * present in the merged installed file. Exits non-zero on any miss.
+ * that the workflow calls.
  *
- * Tests fixture the three relevant directories (patches/pristine/installed)
- * in a tmp dir, run the script with --json, and assert via deepEqual on the
- * parsed structured report. No substring matching against script output —
- * the script's own --json mode is the structured contract we test against.
+ * Per the repo's no-source-grep testing standard (CONTRIBUTING.md):
+ * tests must assert on TYPED structured fields — not regex/substring
+ * matching against script output, formatter prose, or file content.
+ *
+ * The script's --json mode emits a structured report whose `reason`
+ * field is a stable enum (exposed as REASON), and whose `missing` field
+ * is an array of typed strings (exact set membership, not substring).
+ * Every assertion below is a deepEqual / equal / Array.includes against
+ * those typed fields. Zero regex, zero String#includes on text.
  */
 
 const { test, describe, before, after } = require('node:test');
@@ -27,6 +30,7 @@ const cp = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const SCRIPT = path.join(ROOT, 'scripts', 'verify-reapply-patches.cjs');
+const { REASON } = require(SCRIPT);
 
 let tmpRoot;
 let patchesDir;
@@ -47,25 +51,20 @@ function resetFixture({ withPristine = true } = {}) {
   if (withPristine) fs.mkdirSync(pristineDir);
 }
 
-/** Runs the verifier with --json and returns { status, report, stderr }. */
-function runVerifier({ includePristine = true, extraArgs = [] } = {}) {
+/** Runs the verifier with --json. Returns parsed structured report. */
+function runVerifier({ includePristine = true } = {}) {
   const args = [
     SCRIPT,
     '--patches-dir', patchesDir,
     '--config-dir',  configDir,
     ...(includePristine ? ['--pristine-dir', pristineDir] : []),
     '--json',
-    ...extraArgs,
   ];
   const r = cp.spawnSync(process.execPath, args, { encoding: 'utf8' });
-  let report = null;
-  if (r.stdout && r.stdout.length) {
-    // The script writes ONLY the JSON document to stdout under --json (stderr
-    // for diagnostics). If parse fails, surface the raw output for debugging
-    // — but the test author should never depend on a non-JSON stdout.
-    try { report = JSON.parse(r.stdout); } catch { /* leave null */ }
-  }
-  return { status: r.status, report, stderr: r.stderr || '' };
+  return {
+    status: r.status,
+    report: r.stdout && r.stdout.length ? JSON.parse(r.stdout) : null,
+  };
 }
 
 before(() => {
@@ -81,7 +80,23 @@ after(() => {
 });
 
 describe('Bug #2969: deterministic Step 5 verification gate', () => {
-  test('exits 0 with empty failures when every user-added line is present in the merged file', () => {
+  test('REASON enum exposes the documented set of stable codes', () => {
+    // Locks the public diagnostic surface — adding a code requires updating
+    // this assertion, removing one breaks consumers that switch on the enum.
+    assert.deepEqual(
+      Object.keys(REASON).sort(),
+      [
+        'FAIL_INSTALLED_MISSING',
+        'FAIL_INSTALLED_NOT_REGULAR_FILE',
+        'FAIL_READ_ERROR',
+        'FAIL_USER_LINES_MISSING',
+        'OK_NO_SIGNIFICANT_BACKUP_LINES',
+        'OK_NO_USER_LINES_VS_PRISTINE',
+      ],
+    );
+  });
+
+  test('exits 0 with status=ok when every user-added line is present in the merged file', () => {
     resetFixture();
     const pristine = 'line one of stock content here\nline two of stock content here\nline three of stock content here\n';
     const userAdded = 'a custom line the user added for behavior X\nanother substantial line that the user inserted\n';
@@ -90,89 +105,77 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
     writeFile(path.join(patchesDir, 'skills', 'foo', 'SKILL.md'), pristine + userAdded);
     writeFile(path.join(configDir, 'skills', 'foo', 'SKILL.md'), pristine + userAdded);
 
-    const { status, report, stderr } = runVerifier();
-    assert.equal(status, 0, `expected pass; stderr=${stderr}`);
+    const { status, report } = runVerifier();
+    assert.equal(status, 0);
     assert.equal(report.failures, 0);
     assert.equal(report.checked, 1);
     assert.equal(report.results[0].status, 'ok');
     assert.deepEqual(report.results[0].missing, []);
   });
 
-  test('exits 1 with a structured failure entry when a user-added significant line is missing', () => {
+  test('reason=FAIL_USER_LINES_MISSING with the exact dropped line in .missing[]', () => {
     resetFixture();
     const pristine = 'first stock line in the original file here\nsecond stock line in the original file here\n';
     const lostLine = 'this is the visual companion block that must survive';
-    const backup = `${pristine}${lostLine}\n`;
-    const merged = pristine; // simulate the bug: line dropped
-
     writeFile(path.join(pristineDir, 'skills', 'discuss-phase', 'SKILL.md'), pristine);
-    writeFile(path.join(patchesDir, 'skills', 'discuss-phase', 'SKILL.md'), backup);
-    writeFile(path.join(configDir, 'skills', 'discuss-phase', 'SKILL.md'), merged);
+    writeFile(path.join(patchesDir, 'skills', 'discuss-phase', 'SKILL.md'), `${pristine}${lostLine}\n`);
+    writeFile(path.join(configDir, 'skills', 'discuss-phase', 'SKILL.md'), pristine);
 
     const { status, report } = runVerifier();
     assert.equal(status, 1);
     assert.equal(report.failures, 1);
-    assert.equal(report.results[0].file, 'skills/discuss-phase/SKILL.md');
-    assert.equal(report.results[0].status, 'fail');
+    const r0 = report.results[0];
+    assert.equal(r0.file, 'skills/discuss-phase/SKILL.md');
+    assert.equal(r0.status, 'fail');
+    assert.equal(r0.reason, REASON.FAIL_USER_LINES_MISSING);
     assert.ok(
-      report.results[0].missing.includes(lostLine),
-      `dropped line should be reported in .missing[]; got ${JSON.stringify(report.results[0].missing)}`,
+      r0.missing.includes(lostLine),
+      `dropped line should be in .missing[]; got ${JSON.stringify(r0.missing)}`,
     );
   });
 
-  test('reports a structured fail (no crash) when the installed path is a directory, not a file', () => {
+  test('reason=FAIL_INSTALLED_NOT_REGULAR_FILE when installed path is a directory', () => {
     resetFixture();
     writeFile(path.join(pristineDir, 'a.md'), 'pristine line of substantial content here\n');
     writeFile(path.join(patchesDir, 'a.md'), 'pristine line of substantial content here\nuser added line that is substantial\n');
     fs.mkdirSync(path.join(configDir, 'a.md')); // EISDIR trap
 
-    const { status, report, stderr } = runVerifier();
-    assert.equal(status, 1, 'directory at installed path should fail the gate');
-    assert.equal(report.failures, 1);
+    const { status, report } = runVerifier();
+    assert.equal(status, 1);
     assert.equal(report.results[0].status, 'fail');
-    assert.ok(
-      /not a regular file/.test(report.results[0].reason || ''),
-      `reason should explain the directory case; got ${report.results[0].reason}`,
-    );
-    // The gate must produce a structured diagnostic, not crash with a stack trace.
-    // We assert this on the script's own report rather than stderr, since stderr
-    // is a separate channel reserved for diagnostics.
-    assert.equal(report.checked, 1);
+    assert.equal(report.results[0].reason, REASON.FAIL_INSTALLED_NOT_REGULAR_FILE);
   });
 
-  test('reports a structured fail when the merged installed file has been deleted entirely', () => {
+  test('reason=FAIL_INSTALLED_MISSING when the merged file has been deleted', () => {
     resetFixture();
     const pristine = 'stock line one with substantial content for the test\n';
     writeFile(path.join(pristineDir, 'workflow.md'), pristine);
-    writeFile(path.join(patchesDir, 'workflow.md'), `${pristine}this user customisation should never be lost\n`);
+    writeFile(path.join(patchesDir, 'workflow.md'), `${pristine}user line that should survive but does not\n`);
     // configDir intentionally missing the file.
 
     const { status, report } = runVerifier();
     assert.equal(status, 1);
-    assert.equal(report.failures, 1);
     assert.equal(report.results[0].status, 'fail');
-    assert.equal(report.results[0].reason, 'installed file missing after merge');
+    assert.equal(report.results[0].reason, REASON.FAIL_INSTALLED_MISSING);
   });
 
   test('--json report has the documented shape: { checked, failures, results: [{ file, status, missing, reason }] }', () => {
     resetFixture();
     const pristine = 'pristine line that is sufficiently long to be significant\n';
-    const lostLine = 'extra line the user wrote for their workflow customisation';
+    const userAdded = 'extra line the user wrote for their workflow customisation';
     writeFile(path.join(pristineDir, 'a.md'), pristine);
-    writeFile(path.join(patchesDir, 'a.md'), `${pristine}${lostLine}\n`);
-    writeFile(path.join(configDir, 'a.md'), pristine); // dropped
+    writeFile(path.join(patchesDir, 'a.md'), `${pristine}${userAdded}\n`);
+    writeFile(path.join(configDir, 'a.md'), pristine);
 
     const { status, report } = runVerifier();
     assert.equal(status, 1);
-    assert.equal(typeof report.checked, 'number');
-    assert.equal(typeof report.failures, 'number');
-    assert.ok(Array.isArray(report.results));
+    assert.deepEqual(Object.keys(report).sort(), ['checked', 'failures', 'results']);
     const r0 = report.results[0];
     assert.deepEqual(Object.keys(r0).sort(), ['file', 'missing', 'reason', 'status']);
-    assert.equal(r0.file, 'a.md');
-    assert.equal(r0.status, 'fail');
+    assert.equal(typeof r0.file, 'string');
+    assert.equal(typeof r0.status, 'string');
+    assert.equal(typeof r0.reason, 'string');
     assert.ok(Array.isArray(r0.missing));
-    assert.ok(r0.missing.length >= 1);
   });
 
   test('ignores backup-meta.json — it is metadata, not a patched file', () => {
@@ -191,18 +194,12 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
     const presentLine = 'this is a substantial line of user content here';
     const droppedLine = 'another substantial line that should survive';
     writeFile(path.join(patchesDir, 'b.md'), `${presentLine}\n${droppedLine}\n`);
-    writeFile(path.join(configDir, 'b.md'), `${presentLine}\n`); // dropped second line
+    writeFile(path.join(configDir, 'b.md'), `${presentLine}\n`);
 
     const { status, report } = runVerifier({ includePristine: false });
     assert.equal(status, 1);
-    assert.equal(report.failures, 1);
-    assert.ok(
-      report.results[0].missing.includes(droppedLine),
-      `over-broad mode must catch the dropped line; got ${JSON.stringify(report.results[0].missing)}`,
-    );
-    assert.ok(
-      !report.results[0].missing.includes(presentLine),
-      'present line must NOT appear in .missing[]',
-    );
+    assert.equal(report.results[0].reason, REASON.FAIL_USER_LINES_MISSING);
+    assert.ok(report.results[0].missing.includes(droppedLine));
+    assert.ok(!report.results[0].missing.includes(presentLine));
   });
 });

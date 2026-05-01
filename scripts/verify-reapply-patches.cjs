@@ -100,6 +100,23 @@ function computeUserAddedLines(backupContent, pristineContent) {
   return backupLines.filter((line) => isSignificantLine(line) && !pristineSet.has(line));
 }
 
+/**
+ * Stable reason codes for the per-file result. Tests assert via
+ * `assert.equal(result.reason, REASON.X)` rather than regex-matching prose,
+ * so the diagnostic surface is a typed enum, not free text.
+ *
+ * Adding a new reason requires updating the REASON map AND the tests'
+ * shape assertion that locks the documented set of codes.
+ */
+const REASON = Object.freeze({
+  OK_NO_USER_LINES_VS_PRISTINE: 'ok_no_user_lines_vs_pristine',
+  OK_NO_SIGNIFICANT_BACKUP_LINES: 'ok_no_significant_backup_lines',
+  FAIL_INSTALLED_MISSING: 'fail_installed_missing',
+  FAIL_INSTALLED_NOT_REGULAR_FILE: 'fail_installed_not_regular_file',
+  FAIL_READ_ERROR: 'fail_read_error',
+  FAIL_USER_LINES_MISSING: 'fail_user_lines_missing',
+});
+
 function verifyFile({ relPath, patchesDir, configDir, pristineDir }) {
   const backupPath = path.join(patchesDir, relPath);
   const installedPath = path.join(configDir, relPath);
@@ -117,12 +134,12 @@ function verifyFile({ relPath, patchesDir, configDir, pristineDir }) {
     installedStat = fs.statSync(installedPath);
   } catch {
     result.status = 'fail';
-    result.reason = 'installed file missing after merge';
+    result.reason = REASON.FAIL_INSTALLED_MISSING;
     return result;
   }
   if (!installedStat.isFile()) {
     result.status = 'fail';
-    result.reason = `installed path is not a regular file (mode ${installedStat.mode.toString(8)})`;
+    result.reason = REASON.FAIL_INSTALLED_NOT_REGULAR_FILE;
     return result;
   }
 
@@ -131,9 +148,9 @@ function verifyFile({ relPath, patchesDir, configDir, pristineDir }) {
   try {
     backupContent = fs.readFileSync(backupPath, 'utf8');
     installedContent = fs.readFileSync(installedPath, 'utf8');
-  } catch (err) {
+  } catch {
     result.status = 'fail';
-    result.reason = `read failure: ${err.code || err.message}`;
+    result.reason = REASON.FAIL_READ_ERROR;
     return result;
   }
 
@@ -153,10 +170,10 @@ function verifyFile({ relPath, patchesDir, configDir, pristineDir }) {
   const userAdded = computeUserAddedLines(backupContent, pristineContent);
   if (userAdded.length === 0) {
     // Backup and pristine match exactly (or no significant content) — nothing
-    // to verify but also nothing to lose. Report as ok with diagnostic.
+    // to verify but also nothing to lose. Report as ok with diagnostic code.
     result.reason = pristineContent
-      ? 'no significant user-added lines vs pristine'
-      : 'no significant lines in backup';
+      ? REASON.OK_NO_USER_LINES_VS_PRISTINE
+      : REASON.OK_NO_SIGNIFICANT_BACKUP_LINES;
     return result;
   }
 
@@ -167,6 +184,7 @@ function verifyFile({ relPath, patchesDir, configDir, pristineDir }) {
   }
   if (result.missing.length > 0) {
     result.status = 'fail';
+    result.reason = REASON.FAIL_USER_LINES_MISSING;
   }
   return result;
 }
@@ -226,4 +244,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { computeUserAddedLines, isSignificantLine, verifyFile, walk };
+module.exports = { computeUserAddedLines, isSignificantLine, verifyFile, walk, REASON };

@@ -11,6 +11,10 @@
 
 'use strict';
 
+// allow-test-rule: pre-existing-text-matching
+// Pre-dates the no-raw-text-matching rule (CONTRIBUTING.md, 2026-05-01).
+// Tracked for migration to typed-IR assertions; do not copy this pattern.
+
 const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

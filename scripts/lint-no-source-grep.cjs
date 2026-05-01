@@ -39,6 +39,29 @@ const READ_WITH_CONST_RE = /readFileSync\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,/gm;
 // Matches readFileSync with an inline path.join(.cjs) as first arg
 const READ_WITH_INLINE_CJS_RE = /readFileSync\s*\([^,)]*path\.join\s*\([^)]*(?:'bin'|"bin"|'lib'|"lib"|'get-shit-done'|"get-shit-done")[^)]*['"][^'"]*\.cjs['"]/;
 
+/**
+ * #2962-class violations: raw text matching against process output or file
+ * content. The rule from CONTRIBUTING.md "Prohibited: Raw Text Matching on
+ * Test Outputs": tests assert on typed structured fields, never on rendered
+ * text. Patterns below are the obvious anti-patterns; subtler hidden forms
+ * (e.g. wrapping the same logic in a parser function) are still forbidden
+ * by the prose rule but cannot be detected lexically without an AST.
+ */
+const RAW_MATCH_PATTERNS = [
+  {
+    re: /assert\.(?:match|doesNotMatch)\s*\(\s*[A-Za-z_$][A-Za-z0-9_$]*\.(?:stdout|stderr)\b/,
+    label: 'assert.match/doesNotMatch on .stdout/.stderr (emit --json from the SUT and assert on typed fields)',
+  },
+  {
+    re: /\.(?:stdout|stderr)\.(?:includes|startsWith|endsWith)\s*\(/,
+    label: '.stdout/.stderr substring match (emit --json and assert on typed fields)',
+  },
+  {
+    re: /readFileSync\s*\([^)]*\)\s*\.(?:includes|startsWith|endsWith)\s*\(/,
+    label: 'readFileSync(...).<includes|startsWith|endsWith> (expose an IR from production code; assert on its fields)',
+  },
+];
+
 function setFromMatches(content, re) {
   const found = new Set();
   let m;
@@ -53,13 +76,14 @@ function check(filepath) {
 
   if (ALLOW_ANNOTATION.test(content)) return null;
 
+  const violations = [];
+
   // Pattern A: readFileSync(path.join(..., 'foo.cjs'), ...)
   if (READ_WITH_INLINE_CJS_RE.test(content)) {
-    return {
-      file: rel,
+    violations.push({
       reason: 'readFileSync with inline .cjs path literal',
       fix: 'Replace with runGsdTools() behavioral test, or add // allow-test-rule: <reason>',
-    };
+    });
   }
 
   // Pattern B: const FOO_PATH = path.join(..., 'foo.cjs')  +  readFileSync(FOO_PATH, ...)
@@ -68,15 +92,26 @@ function check(filepath) {
     const readConsts = setFromMatches(content, READ_WITH_CONST_RE);
     const overlap = [...cjsConsts].filter(c => readConsts.has(c));
     if (overlap.length > 0) {
-      return {
-        file: rel,
+      violations.push({
         reason: `source .cjs path constant(s) used in readFileSync: ${overlap.join(', ')}`,
         fix: 'Replace with runGsdTools() behavioral test, or add // allow-test-rule: <reason>',
-      };
+      });
     }
   }
 
-  return null;
+  // Patterns C..E: raw text matching against process output or file content.
+  // See CONTRIBUTING.md "Prohibited: Raw Text Matching on Test Outputs".
+  for (const { re, label } of RAW_MATCH_PATTERNS) {
+    if (re.test(content)) {
+      violations.push({
+        reason: label,
+        fix: 'Expose typed IR from production code; assert on structured fields. Or add // allow-test-rule: <reason>',
+      });
+    }
+  }
+
+  if (violations.length === 0) return null;
+  return { file: rel, violations };
 }
 
 function findTestFiles(dir) {
@@ -101,12 +136,17 @@ if (violations.length === 0) {
   process.exit(0);
 }
 
-process.stderr.write(`\nERROR lint-no-source-grep: ${violations.length} violation(s) found\n\n`);
-for (const v of violations) {
-  process.stderr.write(`  ${v.file}\n`);
-  process.stderr.write(`    Problem : ${v.reason}\n`);
-  process.stderr.write(`    Fix     : ${v.fix}\n\n`);
+const totalIssues = violations.reduce((n, v) => n + v.violations.length, 0);
+process.stderr.write(`\nERROR lint-no-source-grep: ${totalIssues} violation(s) across ${violations.length} file(s)\n\n`);
+for (const f of violations) {
+  process.stderr.write(`  ${f.file}\n`);
+  for (const v of f.violations) {
+    process.stderr.write(`    Problem : ${v.reason}\n`);
+    process.stderr.write(`    Fix     : ${v.fix}\n`);
+  }
+  process.stderr.write('\n');
 }
-process.stderr.write('See CONTRIBUTING.md "Prohibited: Source-Grep Tests" for guidance.\n');
+process.stderr.write('See CONTRIBUTING.md "Prohibited: Source-Grep Tests" and\n');
+process.stderr.write('"Prohibited: Raw Text Matching on Test Outputs" for guidance.\n');
 process.stderr.write('Structural tests that legitimately read source files: add // allow-test-rule: <reason>\n\n');
 process.exit(1);

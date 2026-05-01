@@ -281,6 +281,7 @@ Some tests legitimately read source files. There are six recognized categories:
 | `docs-parity` | A reference doc must stay in sync with source-defined constants (e.g., `CONFIG_DEFAULTS`). The source is the canonical list; there is no runtime API to enumerate it. |
 | `integration-test-input` | A source file is used as a real fixture input to a transformation function under test — the file is not inspected for strings but passed as data. |
 | `structural-implementation-guard` | A feature's interception or wiring point is not reachable end-to-end via `runGsdTools`. Used temporarily until a behavioral path exists. |
+| `pre-existing-text-matching` | **Transitional.** Test was written before the "Prohibited: Raw Text Matching on Test Outputs" rule landed (2026-05-01). New tests must NOT use this category — refactor production to expose typed IR instead. Existing tests carrying this label are tracked for migration. |
 
 Annotate with a standalone `//` comment before the file's opening block comment:
 
@@ -295,6 +296,68 @@ Annotate with a standalone `//` comment before the file's opening block comment:
 ```
 
 The annotation **must** be a standalone `// allow-test-rule:` line, not inside a `/** */` block comment — the CI linter scans for the pattern `// allow-test-rule:`.
+
+### Prohibited: Raw Text Matching on Test Outputs (file content, stdout, stderr)
+
+**Source-grep is not just `readFileSync` of a `.cjs` file.** The same anti-pattern shows up wherever a test pattern-matches against text that a system-under-test produced, regardless of whether that text came from a source file, a rendered shim, a child process's stdout, or a free-form `reason` string. **All forms are forbidden.**
+
+The following are all violations of the same rule:
+
+```javascript
+// BAD — substring match on text written by the code under test
+const cmdContent = fs.readFileSync(path.join(tmpDir, 'gsd-sdk.cmd'), 'utf8');
+assert.ok(cmdContent.includes(`@node ${jsonQuoted} %*`), '.cmd embeds shim path');
+
+// BAD — regex match on a child process's human-readable stdout formatter
+const r = cp.spawnSync(SCRIPT, ['--patches-dir', dir]);
+assert.match(r.stdout, /Failures: 1/);
+assert.match(r.stdout, /not a regular file/);
+
+// BAD — "structured parser" that hides string ops behind a function wrapper
+function parseCmdShim(content) {
+  const lines = content.split('\r\n').filter((l) => l.length > 0);
+  return { header: lines[0], usesCRLF: content.includes('\r\n') };
+}
+
+// BAD — assert.match on a free-form `reason` string from a JSON report
+assert.ok(/not a regular file/.test(report.results[0].reason));
+```
+
+Each of these passes on accidental near-matches (a comment containing `@node` somewhere, a stack trace that happens to say `Failures: 1`, a mis-typed reason that still contains the substring you're matching) and fails on harmless reformatting (changing `Failures: 1` to `1 failure`, swapping CRLF rendering style, rewording the error prose).
+
+#### The rule
+
+> **Tests assert on typed structured values. If the code under test produces text, the code under test must also expose a structured intermediate representation, and the test must assert on that IR — never on the rendered text.**
+
+Concretely: for any system-under-test that produces text output (a file renderer, a CLI formatter, an error-message builder), the production code MUST expose a typed alternative that the test consumes:
+
+| Output kind | Required structured surface | What the test asserts on |
+|---|---|---|
+| Rendered file (shim, template, generated code) | A pure builder function returning the IR (`{ invocation, eol, fileNames, render }`) | `triple.invocation.target === expected`, `triple.eol.cmd === '\r\n'` |
+| CLI human-formatter output | A `--json` mode that emits the same data structurally | `report.results[0].reason === REASON.FAIL_INSTALLED_NOT_REGULAR_FILE` |
+| Error / status / reason | A frozen enum (`Object.freeze({ FAIL_X: 'fail_x', ... })`) | `assert.equal(result.reason, REASON.FAIL_X)` |
+| File presence after a write | `fs.statSync().isFile()`, `.size > 0`, `.mtimeMs` advances | Filesystem facts; never read the file content back |
+
+#### Concrete examples from this repo
+
+`buildWindowsShimTriple(shimSrc)` in `bin/install.js` is the canonical IR pattern: pure function, no I/O, returns `{ invocation, eol, fileNames, render }`. `trySelfLinkGsdSdkWindows` calls it and writes `triple.render[kind]()` to disk. Tests assert on `triple.invocation.target`, `triple.eol.cmd`, `Object.keys(triple).sort()` — never on the rendered text. Filesystem-level tests assert `fs.statSync(target).size === Buffer.byteLength(triple.render.cmd())` to prove the writer writes what the renderer produces, **without comparing content**.
+
+`scripts/verify-reapply-patches.cjs` exposes a frozen `REASON` enum and emits it through `--json`. Tests assert `report.results[0].reason === REASON.FAIL_USER_LINES_MISSING`. The human formatter exists for operator console output only — tests must not depend on its prose. Adding a new reason code requires updating the `REASON` enum, the `--json` output, AND the test that locks `Object.keys(REASON).sort()` — three coordinated changes that prevent the code surface from drifting from the test surface.
+
+#### Hiding grep behind a function is still grep
+
+`parseCmdShim`, `parsePs1Invocation`, etc. that internally do `content.split(...)`, `lines[1].trim()`, `content.includes(...)` are still string manipulation. The fact that the entry point looks like a parser doesn't change what's happening underneath — the test is still asserting on the lexical shape of rendered text. The fix is not "wrap the grep in a function with a typed-looking return value." The fix is to **eliminate the rendered text from the test path entirely** by surfacing the IR.
+
+#### When you cannot eliminate text matching
+
+There are exactly two cases where text content is the legitimate object of a test, both already covered by the existing exemption matrix:
+
+1. `source-text-is-the-product` — workflow `.md` / agent `.md` / command `.md` files where the deployed text IS what the runtime loads.
+2. `docs-parity` — a reference doc must mirror source-defined constants and there is no runtime enumeration API.
+
+For everything else, if a test reaches for `.includes()` / `.startsWith()` / `assert.match(text, /…/)`, the production code is missing a typed surface. **Add the typed surface; do not work around it.**
+
+**CI enforcement:** `scripts/lint-no-source-grep.cjs` is being extended (see issue tracker for the latest scope) to flag `String#includes`/`String#startsWith`/`String#endsWith`/`assert.match` on `readFileSync` results and on `cp.spawnSync` stdout/stderr in test files, with the same `// allow-test-rule:` exemption mechanism.
 
 ### Node.js Version Compatibility
 
