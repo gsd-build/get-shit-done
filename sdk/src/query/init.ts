@@ -25,6 +25,7 @@ import { homedir } from 'node:os';
 
 import { loadConfig, type GSDConfig } from '../config.js';
 import { resolveModel, MODEL_PROFILES } from './config-query.js';
+import { maskIfSecret } from './secrets.js';
 import { findPhase } from './phase.js';
 import { roadmapGetPhase, getMilestoneInfo, extractCurrentMilestone, extractPhasesFromSection } from './roadmap.js';
 import { planningPaths, normalizePhaseName, toPosixPath, resolveAgentsDir, detectRuntime } from './helpers.js';
@@ -670,9 +671,14 @@ export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) =>
 
   const result: Record<string, unknown> = {
     commit_docs: config.commit_docs,
-    brave_search: config.brave_search,
-    firecrawl: config.firecrawl,
-    exa_search: config.exa_search,
+    // #2997: secret config keys (brave_search, firecrawl, exa_search) may be
+    // either boolean availability flags OR string API keys depending on how the
+    // user configured them. Pass booleans through; mask string values so the
+    // init bundle never echoes plaintext credentials. Mirrors the masking added
+    // to config-get/config-set in the same fix.
+    brave_search: typeof config.brave_search === 'string' ? maskIfSecret('brave_search', config.brave_search) : config.brave_search,
+    firecrawl: typeof config.firecrawl === 'string' ? maskIfSecret('firecrawl', config.firecrawl) : config.firecrawl,
+    exa_search: typeof config.exa_search === 'string' ? maskIfSecret('exa_search', config.exa_search) : config.exa_search,
     phase_found: phaseFound,
     phase_dir: (phaseInfo?.directory as string) ?? null,
     phase_number: phaseNumber,

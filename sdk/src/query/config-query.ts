@@ -20,6 +20,7 @@ import { readFile } from 'node:fs/promises';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { loadConfig } from '../config.js';
 import { planningPaths } from './helpers.js';
+import { maskIfSecret } from './secrets.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── MODEL_PROFILES ─────────────────────────────────────────────────────────
@@ -129,7 +130,10 @@ export const configGet: QueryHandler = async (args, projectDir, workstream) => {
     throw new GSDError(`Key not found: ${keyPath}`, ErrorClassification.Execution);
   }
 
-  return { data: current };
+  // Mask plaintext for keys in SECRET_CONFIG_KEYS to match CJS behavior at
+  // config.cjs:440-441 — without this, `gsd-sdk query config-get brave_search`
+  // would echo the plaintext credential into machine-readable output. (#2997)
+  return { data: maskIfSecret(keyPath, current) };
 };
 
 // ─── configPath ─────────────────────────────────────────────────────────────

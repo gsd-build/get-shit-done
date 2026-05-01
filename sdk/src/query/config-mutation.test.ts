@@ -492,3 +492,54 @@ describe('configEnsureSection', () => {
     expect(raw.workflow).toEqual({ research: true });
   });
 });
+
+// ─── #2997: Secret masking in configSet response ────────────────────────────
+
+describe('configSet secret masking (#2997)', () => {
+  it('masks the response value for SECRET_CONFIG_KEYS, leaving on-disk plaintext intact', async () => {
+    const { configSet } = await import('./config-mutation.js');
+    const apiKey = 'BSA-1234567890abcdef';
+    const result = await configSet(['brave_search', apiKey], tmpDir);
+    const data = result.data as { value: string };
+    // Response is masked
+    expect(data.value).toBe('****cdef');
+    expect(data.value).not.toContain(apiKey);
+    // On-disk plaintext is intact (the key is usable)
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    expect(raw.brave_search).toBe(apiKey);
+  });
+
+  it('masks previousValue when overwriting an existing secret', async () => {
+    const { configSet } = await import('./config-mutation.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ brave_search: 'OLD-KEY-1234567890' }),
+    );
+    const result = await configSet(['brave_search', 'NEW-KEY-abcdef9999'], tmpDir);
+    const data = result.data as { value: string; previousValue: string };
+    expect(data.value).toBe('****9999');
+    expect(data.previousValue).toBe('****7890');
+    expect(data.previousValue).not.toContain('OLD-KEY');
+  });
+
+  it('does NOT mask non-secret keys', async () => {
+    const { configSet } = await import('./config-mutation.js');
+    const result = await configSet(['model_profile', 'quality'], tmpDir);
+    const data = result.data as { value: string };
+    expect(data.value).toBe('quality');
+  });
+
+  it('renders short secret values as **** (no tail leak)', async () => {
+    const { configSet } = await import('./config-mutation.js');
+    const result = await configSet(['firecrawl', 'short'], tmpDir);
+    const data = result.data as { value: string };
+    expect(data.value).toBe('****');
+  });
+
+  it('renders unset/empty as (unset) in the response', async () => {
+    const { configSet } = await import('./config-mutation.js');
+    const result = await configSet(['exa_search', ''], tmpDir);
+    const data = result.data as { value: string };
+    expect(data.value).toBe('(unset)');
+  });
+});

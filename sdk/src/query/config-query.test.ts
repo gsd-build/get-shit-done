@@ -219,3 +219,50 @@ describe('VALID_PROFILES', () => {
     expect(VALID_PROFILES).toEqual(['quality', 'balanced', 'budget', 'adaptive']);
   });
 });
+
+// ─── #2997: Secret masking in configGet response ────────────────────────────
+
+describe('configGet secret masking (#2997)', () => {
+  it('masks the response data for SECRET_CONFIG_KEYS', async () => {
+    const { configGet } = await import('./config-query.js');
+    const apiKey = 'BSA-1234567890abcdef';
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ brave_search: apiKey }),
+    );
+    const result = await configGet(['brave_search'], tmpDir);
+    expect(result.data).toBe('****cdef');
+    expect(result.data).not.toBe(apiKey);
+  });
+
+  it('does NOT mask non-secret keys', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    const result = await configGet(['model_profile'], tmpDir);
+    expect(result.data).toBe('quality');
+  });
+
+  it('renders short secret values as **** (no tail leak)', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ firecrawl: 'abc' }),
+    );
+    const result = await configGet(['firecrawl'], tmpDir);
+    expect(result.data).toBe('****');
+  });
+
+  it('does not mask the user-supplied --default value (it is the user\'s own input, not a stored secret)', async () => {
+    const { configGet } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' }),
+    );
+    const result = await configGet(['brave_search', '--default', 'placeholder'], tmpDir);
+    // Default flows through unchanged: the user typed it, the SDK echoed it.
+    expect(result.data).toBe('placeholder');
+  });
+});
