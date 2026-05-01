@@ -637,13 +637,20 @@ if [ "${USE_WORKTREES}" != "false" ]; then
   COMMIT_DOCS=$(gsd-sdk query config-get commit_docs 2>/dev/null || echo "true")
   if [ "$COMMIT_DOCS" != "false" ]; then
     git add "${QUICK_DIR}/${quick_id}-PLAN.md"
-    # Run hooks normally (#2924). If a project opts out via
-    # workflow.worktree_skip_hooks=true, honor that opt-in only.
-    SKIP_HOOKS=$(gsd-sdk query config-get workflow.worktree_skip_hooks 2>/dev/null || echo "false")
-    if [ "$SKIP_HOOKS" = "true" ]; then
-      git commit --no-verify -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" || true
+    # No-op skip if nothing actually staged (idempotent re-runs).
+    if git diff --cached --quiet -- "${QUICK_DIR}/${quick_id}-PLAN.md"; then
+      echo "ℹ Pre-dispatch PLAN.md commit skipped (no staged changes)"
     else
-      git commit -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" || true
+      # Run hooks normally (#2924). If a project opts out via
+      # workflow.worktree_skip_hooks=true, honor that opt-in only.
+      SKIP_HOOKS=$(gsd-sdk query config-get workflow.worktree_skip_hooks 2>/dev/null || echo "false")
+      if [ "$SKIP_HOOKS" = "true" ]; then
+        git commit --no-verify -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" \
+          || { echo "ERROR: pre-dispatch PLAN.md commit failed (--no-verify path). Aborting before executor dispatch." >&2; exit 1; }
+      else
+        git commit -m "docs(${quick_id}): pre-dispatch plan for ${DESCRIPTION}" -- "${QUICK_DIR}/${quick_id}-PLAN.md" \
+          || { echo "ERROR: pre-dispatch PLAN.md commit failed — likely a pre-commit hook failure. Fix the hook output above (or set workflow.worktree_skip_hooks=true to bypass) and re-run." >&2; exit 1; }
+      fi
     fi
   fi
 fi
@@ -677,6 +684,11 @@ Step 1 — HEAD attachment assertion (MANDATORY, runs before any reset/commit):
     echo "FATAL: worktree HEAD is on '$ACTUAL_BRANCH' (expected per-agent branch like worktree-agent-*)." >&2
     echo "Refusing to commit/reset on a protected ref. DO NOT self-recover via 'git update-ref refs/heads/$ACTUAL_BRANCH' — that destroys concurrent work (#2924)." >&2
     echo "Aborting before any commits. Surface as a blocker for human review." >&2
+    exit 1
+  fi
+  if ! echo "$ACTUAL_BRANCH" | grep -Eq '^worktree-agent-[A-Za-z0-9._/-]+$'; then
+    echo "FATAL: worktree HEAD '$ACTUAL_BRANCH' is not in the worktree-agent-* namespace (Claude Code's per-agent worktree branch namespace)." >&2
+    echo "Refusing to commit; surface as blocker (#2924)." >&2
     exit 1
   fi
 

@@ -168,14 +168,35 @@ describe('bug #2924: worktree HEAD attachment + destructive recovery', () => {
       const scripts = codeBlocks.map(({ body }) => body).join('\n');
       // Look for an assignment whose value is a regex/list naming protected refs.
       // Acceptable forms: PROTECTED_BRANCHES_RE='...' or grep -Eq '^(main|...)$'
-      const required = ['main', 'master', 'develop'];
+      // Parse the alternation list out of the grep -E pattern so we assert
+      // structurally on the protected-branch enumeration rather than via
+      // raw substring matching (release/* contains regex-special chars and
+      // can't be safely tested with `\b...\b`).
+      const altMatch = scripts.match(/grep\s+-Eq?\s+'\^\(([^)]+)\)\$'/);
+      assert.ok(
+        altMatch,
+        'worktree_branch_check must contain a `grep -Eq` protected-branch alternation pattern'
+      );
+      const branches = altMatch[1].split('|').map((b) => b.trim());
+      const required = ['main', 'master', 'develop', 'trunk', 'release/.*'];
       for (const name of required) {
-        const re = new RegExp(`\\b${name}\\b`);
         assert.ok(
-          re.test(scripts),
-          `worktree_branch_check must reference '${name}' in its protected-branch list`
+          branches.includes(name),
+          `worktree_branch_check protected-branch alternation must include '${name}' (found: ${branches.join(', ')})`
         );
       }
+    });
+
+    test('block enforces positive worktree-agent-* allow-list (#2924 hardening)', () => {
+      const codeBlocks = extractFencedCodeBlocks(block);
+      const scripts = codeBlocks.map(({ body }) => body).join('\n');
+      // Allow-list must reference the canonical Claude Code worktree-agent-<id>
+      // namespace via a regex assertion (grep -Eq '^worktree-agent-...').
+      const allowListRe = /grep\s+-Eq?\s+'\^worktree-agent-/;
+      assert.ok(
+        allowListRe.test(scripts),
+        'worktree_branch_check must enforce a positive allow-list matching ^worktree-agent-* (#2924 hardening)'
+      );
     });
 
     test('block forbids `git update-ref` self-recovery in its guidance text', () => {
@@ -290,6 +311,14 @@ describe('bug #2924: worktree HEAD attachment + destructive recovery', () => {
         'quick.md worktree_branch_check must explicitly forbid `git update-ref` self-recovery'
       );
     });
+
+    test('block enforces positive worktree-agent-* allow-list (#2924 hardening)', () => {
+      const allowListRe = /grep\s+-Eq?\s+'\^worktree-agent-/;
+      assert.ok(
+        allowListRe.test(block),
+        'quick.md worktree_branch_check must enforce a positive allow-list matching ^worktree-agent-* (#2924 hardening)'
+      );
+    });
   });
 
   describe('quick.md pre-dispatch plan commit no longer hard-codes --no-verify', () => {
@@ -355,11 +384,31 @@ describe('bug #2924: worktree HEAD attachment + destructive recovery', () => {
     });
   });
 
+  describe('gsd-executor.md task_commit_protocol enforces worktree-agent-* allow-list', () => {
+    const content = fs.readFileSync(EXECUTOR_AGENT_PATH, 'utf-8');
+    const block = extractNamedBlock(content, 'task_commit_protocol');
+
+    test('task_commit_protocol block exists', () => {
+      assert.ok(block, 'gsd-executor.md must contain a <task_commit_protocol> block');
+    });
+
+    test('step 0 enforces positive worktree-agent-* allow-list (#2924 hardening)', () => {
+      const codeBlocks = extractFencedCodeBlocks(block);
+      const scripts = codeBlocks.map(({ body }) => body).join('\n');
+      const allowListRe = /grep\s+-Eq?\s+'\^worktree-agent-/;
+      assert.ok(
+        allowListRe.test(scripts),
+        'task_commit_protocol step 0 must enforce a positive allow-list matching ^worktree-agent-* in addition to the protected-ref deny-list (#2924 hardening)'
+      );
+    });
+  });
+
   describe('no workflow file performs unconditional update-ref on a protected branch', () => {
+    const workflowsDir = path.join(REPO_ROOT, 'get-shit-done', 'workflows');
     const workflowFiles = fs
-      .readdirSync(path.join(REPO_ROOT, 'get-shit-done', 'workflows'))
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => path.join(REPO_ROOT, 'get-shit-done', 'workflows', f));
+      .readdirSync(workflowsDir, { recursive: true })
+      .filter((f) => typeof f === 'string' && f.endsWith('.md'))
+      .map((f) => path.join(workflowsDir, f));
 
     for (const filePath of workflowFiles) {
       test(`${path.basename(filePath)} contains no update-ref of a protected ref`, () => {

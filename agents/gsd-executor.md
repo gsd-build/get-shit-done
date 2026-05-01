@@ -364,10 +364,19 @@ When running inside a Claude Code worktree (`.git` is a file, not a directory), 
 if [ -f .git ]; then  # worktree
   HEAD_REF=$(git symbolic-ref --quiet HEAD || echo "DETACHED")
   ACTUAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  # Deny-list: never commit on a protected ref.
   if [ "$HEAD_REF" = "DETACHED" ] || \
      echo "$ACTUAL_BRANCH" | grep -Eq '^(main|master|develop|trunk|release/.*)$'; then
     echo "FATAL: refusing to commit — worktree HEAD is on '$ACTUAL_BRANCH' (expected per-agent branch)." >&2
     echo "DO NOT use 'git update-ref' to rewind the protected branch — surface as blocker (#2924)." >&2
+    exit 1
+  fi
+  # Positive allow-list: HEAD must be on the canonical Claude Code worktree-agent
+  # branch namespace (`worktree-agent-<id>`). This catches feature/* and any other
+  # arbitrary branch that the deny-list would silently allow (#2924).
+  if ! echo "$ACTUAL_BRANCH" | grep -Eq '^worktree-agent-[A-Za-z0-9._/-]+$'; then
+    echo "FATAL: refusing to commit — worktree HEAD '$ACTUAL_BRANCH' is not in the worktree-agent-* namespace." >&2
+    echo "Agent commits must live on per-agent branches; surface as blocker (#2924)." >&2
     exit 1
   fi
 fi

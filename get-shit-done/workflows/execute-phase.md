@@ -519,6 +519,10 @@ increases monotonically across waves. `{status}` is `complete` (success),
          echo "FATAL: worktree HEAD on '$ACTUAL_BRANCH' (expected worktree-agent-*); refusing to self-recover via 'git update-ref' (#2924)." >&2
          exit 1
        fi
+       if ! echo "$ACTUAL_BRANCH" | grep -Eq '^worktree-agent-[A-Za-z0-9._/-]+$'; then
+         echo "FATAL: worktree HEAD '$ACTUAL_BRANCH' is not in the worktree-agent-* namespace; refusing to commit (#2924)." >&2
+         exit 1
+       fi
        ACTUAL_BASE=$(git merge-base HEAD {EXPECTED_BASE})
        if [ "$ACTUAL_BASE" != "{EXPECTED_BASE}" ]; then
          git reset --hard {EXPECTED_BASE}
@@ -649,17 +653,15 @@ increases monotonically across waves. `{status}` is `complete` (success),
    **This fallback applies automatically to all runtimes.** Claude Code's Task() normally
    returns synchronously, but the fallback ensures resilience if it doesn't.
 
-5. **Post-wave hook validation (parallel mode only):**
-
-   Hooks now run on every executor commit by default (#2924). This post-wave run is
-   only required when the project opted out of per-commit hooks via the
-   `workflow.worktree_skip_hooks=true` config flag:
+5. **Post-wave hook validation (parallel mode only):** Hooks run on every executor commit by default (#2924); this post-wave run only fires when `workflow.worktree_skip_hooks=true` opted out of per-commit hooks:
    ```bash
    SKIP_HOOKS=$(gsd-sdk query config-get workflow.worktree_skip_hooks 2>/dev/null || echo "false")
    if [ "$SKIP_HOOKS" = "true" ]; then
-     # Run project's pre-commit hooks on the current state
-     git diff --cached --quiet || git stash  # stash any unstaged changes
+     # Stash uncommitted changes under a named ref so we always pop (bare `git stash` strands them on hook/script failure).
+     STASHED=false
+     if (! git diff --quiet || ! git diff --cached --quiet) && git stash push -u -m "gsd-post-wave-hook-$$" >/dev/null 2>&1; then STASHED=true; fi
      git hook run pre-commit 2>&1 || echo "⚠ Pre-commit hooks failed — review before continuing"
+     [ "$STASHED" = "true" ] && (git stash pop >/dev/null 2>&1 || echo "⚠ Could not pop gsd-post-wave-hook stash — recover manually")
    fi
    ```
    If hooks fail: report the failure and ask "Fix hook issues now?" or "Continue to next wave?"
