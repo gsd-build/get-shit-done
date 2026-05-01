@@ -25,50 +25,224 @@ name: Release SDK Bundle
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'npm dist-tag to publish under'
+      action:
+        description: 'publish = normal dev/next/latest publish; hotfix = create hotfix/X.YY.Z branch from latest vX.YY.* tag, cherry-pick fix:/chore: from main, publish to @latest'
         required: true
         type: choice
+        default: publish
+        options:
+          - publish
+          - hotfix
+      tag:
+        description: 'npm dist-tag (publish action only; hotfix forces latest)'
+        required: false
+        type: choice
+        default: latest
         options:
           - dev
           - next
           - latest
       version:
-        description: 'Explicit version (e.g. 1.50.0-dev.3, 1.50.0-rc.2, 1.50.0). Empty = derive from package.json base + tag-appropriate suffix.'
+        description: 'Version. publish: explicit (e.g. 1.50.0-dev.3) or empty to derive. hotfix: REQUIRED patch (e.g. 1.27.1, Z>0).'
         required: false
         type: string
       ref:
-        description: 'Branch or ref to build from (default: the workflow-dispatch ref, typically dev)'
+        description: 'Branch or ref to build from. Ignored for hotfix (workflow uses hotfix/X.YY.Z).'
         required: false
         type: string
+      auto_cherry_pick:
+        description: 'Hotfix only: auto-cherry-pick fix:/chore: commits from origin/main since base tag.'
+        required: false
+        type: boolean
+        default: true
       dry_run:
-        description: 'Dry run (skip npm publish, git tag, and push)'
+        description: 'Dry run (skip npm publish, git tag, and push). Hotfix branch creation/push also skipped.'
         required: false
         type: boolean
         default: false
 
-# Per dist-tag, no concurrent publishes for the same stream. Different streams
-# can publish in parallel because they target different dist-tags.
+# Per stream (dist-tag for publish, version for hotfix) — no concurrent publishes for the same stream.
 concurrency:
-  group: release-sdk-${{ inputs.tag }}
+  group: release-sdk-${{ inputs.action == 'hotfix' && format('hotfix-{0}', inputs.version) || inputs.tag }}
   cancel-in-progress: false
 
 env:
   NODE_VERSION: 24
 
 jobs:
+  # Resolves the effective git ref for this run.
+  #
+  # action=publish  → outputs inputs.ref verbatim (may be empty = workflow ref)
+  # action=hotfix   → branches hotfix/X.YY.Z from highest existing vX.YY.* tag,
+  #                   auto-cherry-picks fix:/chore: from origin/main, pushes,
+  #                   and outputs the new branch as ref. Idempotent: if branch
+  #                   already exists (operator pre-prepared it via hotfix.yml),
+  #                   we just check it out and re-run the cherry-pick step
+  #                   no-ops since `git cherry` will report nothing new.
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.out.outputs.ref }}
+      base_tag: ${{ steps.hotfix.outputs.base_tag }}
+    steps:
+      - name: Validate hotfix inputs
+        if: inputs.action == 'hotfix'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ -z "$VERSION" ]; then
+            echo "::error::action=hotfix requires the 'version' input (e.g. 1.27.1)"
+            exit 1
+          fi
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[1-9][0-9]*$'; then
+            echo "::error::Hotfix version must match X.YY.Z with Z>0 (got: $VERSION)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        if: inputs.action == 'hotfix'
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        if: inputs.action == 'hotfix'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare hotfix branch
+        id: hotfix
+        if: inputs.action == 'hotfix'
+        env:
+          VERSION: ${{ inputs.version }}
+          AUTO_CHERRY_PICK: ${{ inputs.auto_cherry_pick }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
+          TARGET_TAG="v${VERSION}"
+          BRANCH="hotfix/${VERSION}"
+          BASE_TAG=$(git tag -l "v${MAJOR_MINOR}.*" \
+            | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" \
+            | sort -V \
+            | awk -v target="$TARGET_TAG" '$1 < target { last=$1 } END { if (last != "") print last }')
+          if [ -z "$BASE_TAG" ]; then
+            echo "::error::No prior stable tag found for ${MAJOR_MINOR}.x before $TARGET_TAG"
+            exit 1
+          fi
+          echo "base_tag=$BASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "DRY RUN — would branch $BRANCH from $BASE_TAG"
+            # For dry-run, point ref at BASE_TAG so install-smoke + release
+            # exercise the same content the hotfix would publish (minus picks).
+            echo "DRY_RUN_REF=$BASE_TAG" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          # Idempotent branch creation — operator may have pre-prepared via hotfix.yml.
+          git fetch origin main:refs/remotes/origin/main
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists on origin; checking out"
+            git fetch origin "$BRANCH"
+            git checkout "$BRANCH"
+          else
+            git checkout -b "$BRANCH" "$BASE_TAG"
+          fi
+
+          if [ "$AUTO_CHERRY_PICK" = "true" ]; then
+            CANDIDATES=$(git cherry HEAD origin/main | awk '/^\+ / {print $2}')
+            if [ -n "$CANDIDATES" ]; then
+              ORDERED=$(git log --reverse --format='%H' "${BASE_TAG}..origin/main" \
+                | grep -F -f <(echo "$CANDIDATES") || true)
+              INCLUDED=""
+              SKIPPED=""
+              while IFS= read -r SHA; do
+                [ -z "$SHA" ] && continue
+                SUBJECT=$(git log -1 --format='%s' "$SHA")
+                if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
+                  echo "→ cherry-picking $SHA  $SUBJECT"
+                  if ! git cherry-pick -x "$SHA"; then
+                    echo "::error::Cherry-pick of $SHA failed. Resolve on $BRANCH manually, then re-run with auto_cherry_pick=false."
+                    git cherry-pick --abort || true
+                    exit 1
+                  fi
+                  INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
+                else
+                  SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
+                fi
+              done <<< "$ORDERED"
+              {
+                echo "## Cherry-pick summary"
+                echo ""
+                echo "Base: \`$BASE_TAG\` → Branch: \`$BRANCH\`"
+                echo ""
+                if [ -n "$INCLUDED" ]; then
+                  echo "### Included (fix/chore)"
+                  echo ""
+                  echo "$INCLUDED"
+                else
+                  echo "_No fix/chore commits to include._"
+                fi
+                if [ -n "$SKIPPED" ]; then
+                  echo "### Skipped (feat/refactor/etc — not auto-included)"
+                  echo ""
+                  echo "$SKIPPED"
+                fi
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+          # Bump version on the branch (committed) so downstream install-smoke +
+          # release jobs build the correct version. The release job's own in-tree
+          # bump becomes a no-op when the file already has the right version.
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "$VERSION" ]; then
+            npm version "$VERSION" --no-git-tag-version
+            git add package.json package-lock.json
+            if [ -f sdk/package.json ]; then
+              (cd sdk && npm version "$VERSION" --no-git-tag-version)
+              git add sdk/package.json
+              [ -f sdk/package-lock.json ] && git add sdk/package-lock.json
+            fi
+            git commit -m "chore: bump version to $VERSION for hotfix"
+          fi
+          git push origin "$BRANCH"
+
+      - name: Determine effective ref
+        id: out
+        env:
+          ACTION: ${{ inputs.action }}
+          INPUT_REF: ${{ inputs.ref }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          BASE_TAG: ${{ steps.hotfix.outputs.base_tag }}
+          BRANCH: ${{ steps.hotfix.outputs.branch }}
+        run: |
+          if [ "$ACTION" = "hotfix" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "ref=$BASE_TAG" >> "$GITHUB_OUTPUT"
+            else
+              echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "ref=$INPUT_REF" >> "$GITHUB_OUTPUT"
+          fi
+
   # Cross-platform install validation gate (parity with release.yml).
-  # Publish job depends on this — won't proceed if the package fails to
-  # install cleanly across the supported matrix.
   install-smoke:
+    needs: prepare
     permissions:
       contents: read
     uses: ./.github/workflows/install-smoke.yml
     with:
-      ref: ${{ inputs.ref }}
+      ref: ${{ needs.prepare.outputs.ref }}
 
   release:
-    needs: install-smoke
+    needs: [prepare, install-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -79,7 +253,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.prepare.outputs.ref }}
 
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
         with:
@@ -90,10 +264,24 @@ jobs:
       - name: Determine version
         id: ver
         env:
+          ACTION: ${{ inputs.action }}
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_OVERRIDE: ${{ inputs.version }}
         run: |
           set -e
+          # Hotfix forces version=inputs.version and dist-tag=latest.
+          if [ "$ACTION" = "hotfix" ]; then
+            if [ -z "$INPUT_OVERRIDE" ]; then
+              echo "::error::action=hotfix requires the 'version' input"
+              exit 1
+            fi
+            VERSION="$INPUT_OVERRIDE"
+            EFFECTIVE_TAG="latest"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=$EFFECTIVE_TAG" >> "$GITHUB_OUTPUT"
+            echo "→ Hotfix: will publish v${VERSION} to dist-tag '${EFFECTIVE_TAG}'"
+            exit 0
+          fi
           RAW=$(node -p "require('./package.json').version")
           BASE=$(echo "$RAW" | sed 's/-.*//')
           if [ -n "$INPUT_OVERRIDE" ]; then
@@ -294,6 +482,26 @@ jobs:
           fi
           echo "✅ GitHub Release v${VERSION} created"
 
+      - name: Open merge-back PR (hotfix only)
+        if: ${{ !inputs.dry_run && inputs.action == 'hotfix' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.prepare.outputs.ref }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            gh pr edit "$EXISTING_PR" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          fi
+
       - name: Verify publish landed on registry
         if: ${{ !inputs.dry_run }}
         env:
@@ -322,23 +530,38 @@ jobs:
 
       - name: Summary
         env:
+          ACTION: ${{ inputs.action }}
           VERSION: ${{ steps.ver.outputs.version }}
           TAG: ${{ steps.ver.outputs.tag }}
+          BASE_TAG: ${{ needs.prepare.outputs.base_tag }}
+          BRANCH: ${{ needs.prepare.outputs.ref }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "## Release SDK Bundle: v${VERSION} → @${TAG}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "**DRY RUN** — npm publish, git tag, push, and GitHub Release were skipped." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- Published \`get-shit-done-cc@${VERSION}\` to dist-tag \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "- SDK bundled inside the CC tarball at:" >> "$GITHUB_STEP_SUMMARY"
-            echo "  - \`sdk/dist/cli.js\` (loose tree, consumed by \`bin/gsd-sdk.js\` shim)" >> "$GITHUB_STEP_SUMMARY"
-            echo "  - \`sdk-bundle/gsd-sdk.tgz\` (npm-installable artifact)" >> "$GITHUB_STEP_SUMMARY"
-            echo "- Git tag \`v${VERSION}\` pushed" >> "$GITHUB_STEP_SUMMARY"
-            echo "- GitHub Release \`v${VERSION}\` created" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$TAG" = "latest" ]; then
-              echo "- \`next\` dist-tag re-pointed at \`v${VERSION}\` (kept current with \`latest\`)" >> "$GITHUB_STEP_SUMMARY"
+          {
+            if [ "$ACTION" = "hotfix" ]; then
+              echo "## Release SDK Bundle (hotfix): v${VERSION} → @${TAG}"
+              echo ""
+              echo "- Base (cumulative-fix anchor): \`${BASE_TAG}\`"
+              echo "- Branch: \`${BRANCH}\`"
+            else
+              echo "## Release SDK Bundle: v${VERSION} → @${TAG}"
             fi
-            echo "- Install: \`npm install -g get-shit-done-cc@${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
-          fi
+            echo ""
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "**DRY RUN** — npm publish, git tag, push, and GitHub Release were skipped."
+            else
+              echo "- Published \`get-shit-done-cc@${VERSION}\` to dist-tag \`${TAG}\`"
+              echo "- SDK bundled inside the CC tarball at:"
+              echo "  - \`sdk/dist/cli.js\` (loose tree, consumed by \`bin/gsd-sdk.js\` shim)"
+              echo "  - \`sdk-bundle/gsd-sdk.tgz\` (npm-installable artifact)"
+              echo "- Git tag \`v${VERSION}\` pushed"
+              echo "- GitHub Release \`v${VERSION}\` created"
+              if [ "$TAG" = "latest" ]; then
+                echo "- \`next\` dist-tag re-pointed at \`v${VERSION}\` (kept current with \`latest\`)"
+              fi
+              if [ "$ACTION" = "hotfix" ]; then
+                echo "- Merge-back PR opened against main"
+              fi
+              echo "- Install: \`npm install -g get-shit-done-cc@${TAG}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

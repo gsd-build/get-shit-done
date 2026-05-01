@@ -1,5 +1,27 @@
 name: Hotfix Release
 
+# Hotfix flow for X.YY.Z patch releases (Z > 0).
+#
+# create:
+#   - Branches hotfix/X.YY.Z from the highest existing vX.YY.* tag (1.27.2 from
+#     v1.27.1, 1.27.1 from v1.27.0). The base IS the cumulative-fix anchor for
+#     the previous patch.
+#   - Auto-cherry-picks every fix:/chore: commit on origin/main that isn't
+#     already in the base, oldest-first. Patch-equivalents (already applied)
+#     are skipped via `git cherry`. feat:/refactor: are NEVER auto-included.
+#   - Conflicts fail the workflow with the offending SHA so the operator can
+#     resolve manually on the branch and re-run finalize with auto_cherry_pick=false.
+#   - Step summary lists every included SHA so the eventual vX.YY.Z tag
+#     self-documents what shipped.
+#
+# finalize:
+#   - install-smoke gate (cross-platform, parity with release.yml/release-sdk.yml)
+#   - Bundles SDK as both loose tree (sdk/dist/cli.js) and recoverable tarball
+#     (sdk-bundle/gsd-sdk.tgz) — parity with release-sdk.yml so a hotfix shipped
+#     during the @gsd-build-token outage carries the same payload shape.
+#   - Publishes to @latest, tags vX.YY.Z, re-points @next → vX.YY.Z, opens
+#     merge-back PR.
+
 on:
   workflow_dispatch:
     inputs:
@@ -14,6 +36,11 @@ on:
         description: 'Patch version (e.g., 1.27.1)'
         required: true
         type: string
+      auto_cherry_pick:
+        description: 'Auto-cherry-pick fix:/chore: commits from origin/main since base tag (create only)'
+        required: false
+        type: boolean
+        default: true
       dry_run:
         description: 'Dry run (skip npm publish, tagging, and push)'
         required: false
@@ -95,29 +122,118 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Create hotfix branch
-        if: inputs.dry_run != 'true'
+      - name: Create hotfix branch from base tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
+        run: git checkout -b "$BRANCH" "$BASE_TAG"
+
+      - name: Cherry-pick fix/chore commits from origin/main since base tag
+        if: ${{ !inputs.dry_run && inputs.auto_cherry_pick }}
+        env:
+          BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+
+          # `git cherry $BASE_TAG origin/main` lists every commit on main not
+          # patch-equivalent in BASE_TAG. + means needs picking, - means
+          # already applied (skipped silently).
+          CANDIDATES=$(git cherry "$BASE_TAG" origin/main | awk '/^\+ / {print $2}')
+
+          if [ -z "$CANDIDATES" ]; then
+            echo "No commits on origin/main beyond $BASE_TAG."
+            echo "## Cherry-pick summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Base: \`$BASE_TAG\` — no commits to consider." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Re-order chronologically (oldest first) for predictable application.
+          ORDERED=$(git log --reverse --format='%H' "$BASE_TAG..origin/main" \
+            | grep -F -f <(echo "$CANDIDATES") || true)
+
+          INCLUDED=""
+          SKIPPED=""
+          while IFS= read -r SHA; do
+            [ -z "$SHA" ] && continue
+            SUBJECT=$(git log -1 --format='%s' "$SHA")
+            # fix: or chore:, optional scope, optional ! breaking marker
+            if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
+              echo "→ cherry-picking $SHA  $SUBJECT"
+              if ! git cherry-pick -x "$SHA"; then
+                echo "::error::Cherry-pick of $SHA failed. Resolve on branch manually, then re-run finalize with auto_cherry_pick=false."
+                git cherry-pick --abort || true
+                exit 1
+              fi
+              INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
+            else
+              echo "  skip $SHA  $SUBJECT  (not fix/chore)"
+              SKIPPED="${SKIPPED}- \`${SHA}\` ${SUBJECT}"$'\n'
+            fi
+          done <<< "$ORDERED"
+
+          {
+            echo "## Cherry-pick summary"
+            echo ""
+            echo "Base: \`$BASE_TAG\`"
+            echo ""
+            if [ -n "$INCLUDED" ]; then
+              echo "### Included (fix/chore)"
+              echo ""
+              echo "$INCLUDED"
+            else
+              echo "_No fix/chore commits to include._"
+              echo ""
+            fi
+            if [ -n "$SKIPPED" ]; then
+              echo "### Skipped (feat/refactor/etc — not auto-included)"
+              echo ""
+              echo "$SKIPPED"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bump version and push
+        if: ${{ !inputs.dry_run }}
         env:
           BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
           VERSION: ${{ inputs.version }}
         run: |
-          git checkout -b "$BRANCH" "$BASE_TAG"
-          # Bump version in package.json
+          set -euo pipefail
           npm version "$VERSION" --no-git-tag-version
           git add package.json package-lock.json
+          # Keep sdk/package.json in lockstep (parity with release-sdk.yml).
+          if [ -f sdk/package.json ]; then
+            (cd sdk && npm version "$VERSION" --no-git-tag-version)
+            git add sdk/package.json
+            [ -f sdk/package-lock.json ] && git add sdk/package-lock.json
+          fi
           git commit -m "chore: bump version to $VERSION for hotfix"
           git push origin "$BRANCH"
-          echo "## Hotfix branch created" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Branch: \`$BRANCH\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Based on: \`$BASE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Apply your fix, push, then run this workflow again with \`finalize\`" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Hotfix branch created"
+            echo ""
+            echo "- Branch: \`$BRANCH\`"
+            echo "- Based on: \`$BASE_TAG\`"
+            echo "- Apply additional manual fixes if needed, then run \`finalize\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  finalize:
+  install-smoke:
     needs: validate-version
     if: inputs.action == 'finalize'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/install-smoke.yml
+    with:
+      ref: ${{ needs.validate-version.outputs.branch }}
+
+  finalize:
+    needs: [validate-version, install-smoke]
+    if: inputs.action == 'finalize'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
       pull-requests: write
@@ -140,31 +256,80 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Refuse if version already on npm
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXISTING=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            echo "::error::get-shit-done-cc@${VERSION} is already published."
+            exit 1
+          fi
+
       - name: Install and test
         run: |
           npm ci
           npm run test:coverage
 
-      - name: Create PR to merge hotfix back to main
-        if: ${{ !inputs.dry_run }}
+      - name: Build SDK dist for tarball
+        run: npm run build:sdk
+
+      - name: Verify CC tarball ships sdk/dist/cli.js (bug #2647 guard)
+        run: bash scripts/verify-tarball-sdk-dist.sh
+
+      - name: Pack SDK as tarball and bundle into CC source tree
         env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ needs.validate-version.outputs.branch }}
           VERSION: ${{ inputs.version }}
         run: |
-          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
-          if [ -n "$EXISTING_PR" ]; then
-            echo "PR #$EXISTING_PR already exists; updating"
-            gh pr edit "$EXISTING_PR" \
-              --title "chore: merge hotfix v${VERSION} back to main" \
-              --body "Merge hotfix changes back to main after v${VERSION} release."
-          else
-            gh pr create \
-              --base main \
-              --head "$BRANCH" \
-              --title "chore: merge hotfix v${VERSION} back to main" \
-              --body "Merge hotfix changes back to main after v${VERSION} release."
+          set -e
+          cd sdk
+          npm pack
+          TARBALL="gsd-build-sdk-${VERSION}.tgz"
+          if [ ! -f "$TARBALL" ]; then
+            echo "::error::Expected $TARBALL but npm pack did not produce it."
+            ls -la
+            exit 1
           fi
+          mkdir -p ../sdk-bundle
+          mv "$TARBALL" ../sdk-bundle/gsd-sdk.tgz
+          cd ..
+          ls -la sdk-bundle/
+
+      - name: Add sdk-bundle to CC files whitelist (in-tree, not committed)
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (!Array.isArray(pkg.files)) {
+            console.error('::error::package.json files is not an array');
+            process.exit(1);
+          }
+          if (!pkg.files.includes('sdk-bundle')) {
+            pkg.files.push('sdk-bundle');
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Added sdk-bundle/ to package.json files whitelist');
+          }
+          NODE
+
+      - name: Verify CC tarball will contain sdk-bundle/gsd-sdk.tgz
+        run: |
+          set -e
+          TARBALL=$(npm pack --ignore-scripts 2>/dev/null | tail -1)
+          if [ -z "$TARBALL" ] || [ ! -f "$TARBALL" ]; then
+            echo "::error::npm pack produced no tarball"
+            exit 1
+          fi
+          if ! tar -tzf "$TARBALL" | grep -q "package/sdk-bundle/gsd-sdk.tgz"; then
+            echo "::error::CC tarball is missing package/sdk-bundle/gsd-sdk.tgz"
+            exit 1
+          fi
+          echo "✅ CC tarball contains sdk-bundle/gsd-sdk.tgz"
+          rm -f "$TARBALL"
+
+      - name: Dry-run publish validation
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --dry-run --tag latest
 
       - name: Tag and push
         if: ${{ !inputs.dry_run }}
@@ -186,9 +351,18 @@ jobs:
 
       - name: Publish to npm (latest)
         if: ${{ !inputs.dry_run }}
-        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public --tag latest
+
+      - name: Re-point next dist-tag at this hotfix
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm dist-tag add "get-shit-done-cc@${VERSION}" next
+          echo "✅ next dist-tag re-pointed to v${VERSION} (matches latest)"
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
@@ -198,42 +372,71 @@ jobs:
         run: |
           gh release create "v${VERSION}" \
             --title "v${VERSION} (hotfix)" \
-            --generate-notes
+            --generate-notes \
+            --latest
 
-      - name: Clean up next dist-tag
+      - name: Create PR to merge hotfix back to main
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            gh pr edit "$EXISTING_PR" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: merge hotfix v${VERSION} back to main" \
+              --body "Merge hotfix changes back to main after v${VERSION} release."
+          fi
+
+      - name: Verify publish landed on registry
         if: ${{ !inputs.dry_run }}
         env:
           VERSION: ${{ inputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Point next to the stable release so @next never returns something
-          # older than @latest. This prevents stale pre-release installs.
-          npm dist-tag add "get-shit-done-cc@${VERSION}" next 2>/dev/null || true
-          echo "✓ next dist-tag updated to v${VERSION}"
-
-      - name: Verify publish
-        if: ${{ !inputs.dry_run }}
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          sleep 10
-          PUBLISHED=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || echo "NOT_FOUND")
+          PUBLISHED="NOT_FOUND"
+          for delay in 5 10 20 30 45; do
+            PUBLISHED=$(npm view get-shit-done-cc@"$VERSION" version 2>/dev/null || echo "NOT_FOUND")
+            if [ "$PUBLISHED" = "$VERSION" ]; then
+              break
+            fi
+            echo "Waiting ${delay}s for registry to catch up (saw: $PUBLISHED)..."
+            sleep "$delay"
+          done
           if [ "$PUBLISHED" != "$VERSION" ]; then
-            echo "::error::Published version verification failed. Expected $VERSION, got $PUBLISHED"
+            echo "::error::Version $VERSION did not appear on the registry within timeout"
             exit 1
           fi
-          echo "✓ Verified: get-shit-done-cc@$VERSION is live on npm"
+          LATEST_VER=$(npm view get-shit-done-cc dist-tags.latest 2>/dev/null || echo "NOT_FOUND")
+          if [ "$LATEST_VER" != "$VERSION" ]; then
+            echo "::error::dist-tag 'latest' resolves to '$LATEST_VER', expected '$VERSION'"
+            exit 1
+          fi
+          echo "✓ Verified: get-shit-done-cc@$VERSION is live on @latest"
 
       - name: Summary
         env:
           VERSION: ${{ inputs.version }}
+          BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "## Hotfix v${VERSION}" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "**DRY RUN** — npm publish, tagging, and push skipped" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- Published to npm as \`latest\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "- Tagged \`v${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "- PR created to merge back to main" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          {
+            echo "## Hotfix v${VERSION}"
+            echo ""
+            echo "- Base (cumulative-fix anchor): \`${BASE_TAG}\`"
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "- **DRY RUN** — npm publish, tagging, and push skipped"
+            else
+              echo "- Published to npm as \`latest\`"
+              echo "- \`next\` dist-tag re-pointed to v${VERSION}"
+              echo "- Tagged \`v${VERSION}\` (anchor for the next hotfix's cherry-pick base)"
+              echo "- SDK bundled at \`sdk-bundle/gsd-sdk.tgz\` inside CC tarball"
+              echo "- Merge-back PR opened against main"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -67,15 +67,38 @@ main                              ← stable, always deployable
 
 ### Patch Release (Hotfix)
 
-For critical bugs that can't wait for the next minor release.
+For fixes that need to ship without waiting for the next minor.
 
-1. Trigger `hotfix.yml` with version (e.g., `1.27.1`)
-2. Workflow creates `hotfix/1.27.1` branch from the latest patch tag for that minor version (e.g., `v1.27.0` or `v1.27.1`)
-3. Cherry-pick or apply fix on the hotfix branch
-4. Push — CI runs tests automatically
-5. Trigger `hotfix.yml` finalize action
-6. Workflow runs full test suite, bumps version, tags, publishes to `latest`
-7. Merge hotfix branch back to main
+A hotfix `vX.YY.Z` cumulatively includes everything in `vX.YY.{Z-1}` plus every `fix:`/`chore:` commit landed on `main` since that base. The base tag is the anchor — `git cherry $BASE_TAG main` reveals exactly which commits are still unshipped, and the new `vX.YY.Z` tag becomes the next hotfix's base, so the cycle is self-documenting.
+
+#### Two paths
+
+**Path A — `hotfix.yml` (canonical, two-step):**
+
+1. Trigger `hotfix.yml` with `action=create`, `version=1.27.1`, `auto_cherry_pick=true` (default).
+   - Workflow detects `BASE_TAG` = highest `v1.27.*` < `v1.27.1` (so `1.27.1` branches from `v1.27.0`; `1.27.2` would branch from `v1.27.1`).
+   - Branches `hotfix/1.27.1` from `BASE_TAG`.
+   - Auto-cherry-picks every `fix:`/`chore:` commit on `origin/main` not already in the base, oldest-first. Patch-equivalents are skipped via `git cherry`. `feat:`/`refactor:` are **never** auto-included.
+   - On conflict the workflow halts with the offending SHA. Resolve manually on the branch, then re-run finalize with `auto_cherry_pick=false`.
+   - Bumps `package.json` (and `sdk/package.json`), pushes the branch, and lists every included SHA in the run summary.
+2. (Optional) push additional manual commits to `hotfix/1.27.1`.
+3. Trigger `hotfix.yml` with `action=finalize`. The workflow:
+   - Runs `install-smoke` cross-platform gate.
+   - Runs full test suite + coverage.
+   - Builds SDK, bundles `sdk-bundle/gsd-sdk.tgz` inside the CC tarball (parity with `release-sdk.yml`).
+   - Tags `v1.27.1`, publishes to `@latest`, re-points `@next → v1.27.1`.
+   - Opens merge-back PR against `main`.
+
+**Path B — `release-sdk.yml` (stopgap, one-shot):**
+
+Active while the `@gsd-build/sdk` npm token is unavailable; bundles the SDK inside the CC tarball.
+
+1. Trigger `release-sdk.yml` with `action=hotfix`, `version=1.27.1`, `auto_cherry_pick=true`.
+   - The `prepare` job creates the branch and cherry-picks (same logic as Path A).
+   - `install-smoke` runs against the new branch.
+   - The `release` job tags, publishes to `@latest`, re-points `@next`, opens merge-back PR.
+   - Idempotent: if `hotfix/1.27.1` already exists (e.g. you ran `hotfix.yml create` first), the prepare job checks it out and re-runs cherry-pick as a no-op.
+2. `dry_run=true` exercises the full pipeline without pushing the branch or publishing.
 
 ### Minor Release (Standard Cycle)
 
