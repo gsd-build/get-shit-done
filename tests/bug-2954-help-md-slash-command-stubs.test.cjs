@@ -77,6 +77,32 @@ function extractSlashReferences(contents) {
   return names;
 }
 
+/**
+ * For every shipped command with an `argument-hint:` frontmatter entry,
+ * collect the `--flag` tokens it advertises. Returns a Map<slashBaseName,
+ * Set<flagName>>. Flags are recorded without their leading `--`.
+ */
+function listShippedFlagsByCommand() {
+  const out = new Map();
+  for (const entry of fs.readdirSync(COMMANDS_DIR, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+    const content = fs.readFileSync(path.join(COMMANDS_DIR, entry.name), 'utf8');
+    const fm = parseFrontmatter(content);
+    if (!fm || !fm.name || !fm['argument-hint']) continue;
+    const fmName = fm.name;
+    let base = null;
+    if (fmName.startsWith('gsd:')) base = fmName.slice(4);
+    else if (fmName.startsWith('gsd-')) base = fmName.slice(4);
+    if (!base || !/^[a-z][a-z0-9-]*$/.test(base)) continue;
+    const flags = new Set();
+    for (const m of fm['argument-hint'].matchAll(/--([a-z][a-z0-9-]*)/g)) {
+      flags.add(m[1]);
+    }
+    if (flags.size) out.set(base, flags);
+  }
+  return out;
+}
+
 describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
   test('every /gsd-<name> referenced in help.md is a shipped command', () => {
     const helpContents = fs.readFileSync(HELP_MD, 'utf8');
@@ -111,6 +137,29 @@ describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
       dangling,
       [],
       `do.md routing table references /gsd-<name> that is not shipped: ${dangling.join(', ')}`,
+    );
+  });
+
+  test('every --flag in a command\'s argument-hint appears in help.md', () => {
+    const helpContents = fs.readFileSync(HELP_MD, 'utf8');
+    const flagsByCommand = listShippedFlagsByCommand();
+    const gaps = [];
+    for (const [command, flags] of flagsByCommand) {
+      for (const flag of flags) {
+        // Accept `/gsd-<command> --<flag>` (precise) OR a bare `--<flag>` token
+        // anywhere in help.md (good enough for shared flags like `--force` that
+        // appear under multiple commands' descriptions).
+        const preciseToken = `/gsd-${command} --${flag}`;
+        const flagToken = `--${flag}`;
+        if (!helpContents.includes(preciseToken) && !helpContents.includes(flagToken)) {
+          gaps.push(`/gsd-${command} --${flag}`);
+        }
+      }
+    }
+    assert.deepEqual(
+      gaps.sort(),
+      [],
+      `commands ship --flag(s) in argument-hint that are absent from help.md: ${gaps.join(', ')}`,
     );
   });
 });

@@ -48,8 +48,12 @@ Creates all `.planning/` artifacts:
 
 Usage: `/gsd-new-project`
 
-**`/gsd-map-codebase`**
+**`/gsd-map-codebase [--fast] [--focus <area>] [--query <term>]`**
 Map an existing codebase for brownfield projects.
+
+- `--fast` — rapid lightweight assessment (replaces the former `gsd-scan`)
+- `--focus <area>` — scope the map to a specific area
+- `--query <term>` — query the codebase intelligence index in `.planning/intel/` (replaces the former `gsd-intel`)
 
 - Analyzes codebase with parallel Explore agents
 - Creates `.planning/codebase/` with 7 focused documents
@@ -60,8 +64,12 @@ Usage: `/gsd-map-codebase`
 
 ### Phase Planning
 
-**`/gsd-discuss-phase <number>`**
+**`/gsd-discuss-phase <number> [--chain | --analyze | --power]`**
 Help articulate your vision for a phase before planning.
+
+- `--chain` — chained-prompt discuss flow
+- `--analyze` — deep assumption analysis pass
+- `--power` — power-user mode with extended question set
 
 - Captures how you imagine this phase working
 - Creates CONTEXT.md with your vision, essentials, and boundaries
@@ -72,8 +80,14 @@ Usage: `/gsd-discuss-phase 2`
 Usage: `/gsd-discuss-phase 2 --batch`
 Usage: `/gsd-discuss-phase 2 --batch=3`
 
-**`/gsd-plan-phase <number>`**
+**`/gsd-plan-phase <number> [--skip-research] [--gaps] [--skip-verify] [--tdd] [--mvp]`**
 Create detailed execution plan for a specific phase.
+
+- `--skip-research` — bypass the research subagent
+- `--gaps` — focus only on closing gaps from a prior plan-check
+- `--skip-verify` — skip the post-plan verifier loop
+- `--tdd` — plan in test-driven order (tests before code)
+- `--mvp` — vertical-slice MVP planning mode
 
 - Generates `.planning/phases/XX-phase-name/XX-YY-PLAN.md`
 - Breaks phase into concrete, actionable tasks
@@ -87,8 +101,12 @@ Result: Creates `.planning/phases/01-foundation/01-01-PLAN.md`
 
 ### Execution
 
-**`/gsd-execute-phase <phase-number>`**
+**`/gsd-execute-phase <phase-number> [--wave N] [--gaps-only] [--tdd]`**
 Execute all plans in a phase, or run a specific wave.
+
+- `--wave N` — execute only wave N (see *Plans within each wave* below)
+- `--gaps-only` — re-run only plans flagged as gaps by a prior verifier
+- `--tdd` — enforce test-driven order during execution
 
 - Groups plans by wave (from frontmatter), executes waves sequentially
 - Plans within each wave run in parallel via Task tool
@@ -183,6 +201,12 @@ Remove a future phase and renumber subsequent phases.
 Usage: `/gsd-phase --remove 17`
 Result: Phase 17 deleted, phases 18-20 become 17-19
 
+**`/gsd-phase --edit <number> [--force]`**
+Edit any field of an existing roadmap phase in place, preserving number and position.
+
+- Updates title, description, requirements, dependencies in `ROADMAP.md`
+- `--force` allows editing already-started phases (use with caution)
+
 ### Milestone Management
 
 **`/gsd-new-milestone <name>`**
@@ -211,7 +235,7 @@ Usage: `/gsd-complete-milestone 1.0.0`
 
 ### Progress Tracking
 
-**`/gsd-progress`**
+**`/gsd-progress [--next | --forensic | --do "<description>"]`**
 Check project status and intelligently route to next action.
 
 - Shows visual progress bar and completion percentage
@@ -221,7 +245,15 @@ Check project status and intelligently route to next action.
 - Offers to execute next plan or create it if missing
 - Detects 100% milestone completion
 
+Modes:
+- **default** — progress report + intelligent routing
+- **`--next`** — auto-advance to the next logical step (use `--next --force` to bypass safety gates)
+- **`--forensic`** — append a 6-check integrity audit after the progress report
+- **`--do "<text>"`** — smart router: dispatch freeform intent to the matching `/gsd-*` command (see *Smart Router* above)
+
 Usage: `/gsd-progress`
+Usage: `/gsd-progress --next`
+Usage: `/gsd-progress --forensic`
 
 ### Session Management
 
@@ -245,8 +277,10 @@ Usage: `/gsd-pause-work`
 
 ### Debugging
 
-**`/gsd-debug [issue description]`**
+**`/gsd-debug [issue description] [--diagnose]`**
 Systematic debugging with persistent state across context resets.
+
+- `--diagnose` — run a one-shot diagnostic pass without opening a persistent debug session
 
 - Gathers symptoms through adaptive questioning
 - Creates `.planning/debug/[slug].md` to track investigation
@@ -408,6 +442,15 @@ Capture a forward-looking idea with trigger conditions for automatic surfacing.
 
 Usage: `/gsd-capture --seed "add real-time notifications when we build the events system"`
 
+**`/gsd-capture --backlog [description]`**
+Add an idea to the backlog parking lot for future milestones.
+
+- Creates a backlog item under 999.x numbering in ROADMAP.md
+- Reserves ideas without committing to the current milestone
+- Surface and promote later via `/gsd-review-backlog`
+
+Usage: `/gsd-capture --backlog "real-time notifications when events ship"`
+
 ---
 
 **`/gsd-audit-uat`**
@@ -442,8 +485,12 @@ Configure workflow toggles and model profile interactively.
 
 Usage: `/gsd-settings`
 
-**`/gsd-config --profile <profile>`**
-Quick switch model profile for GSD agents.
+**`/gsd-config [--profile <profile> | --advanced | --integrations]`**
+Configure GSD beyond the basic settings: model profile, advanced tuning, and third-party integrations.
+
+- `--profile <profile>` — quick switch model profile (`quality | balanced | budget | inherit`)
+- `--advanced` — power-user tuning: plan bounce, timeouts, branch templates, cross-AI execution (replaces the former `gsd-settings-advanced`)
+- `--integrations` — third-party API keys, code-review CLI routing, agent-skill injection (replaces the former `gsd-settings-integrations`)
 
 - `quality` — Opus everywhere except verification
 - `balanced` — Opus for planning, Sonnet for execution (default)
@@ -467,8 +514,11 @@ Usage: `/gsd-cleanup`
 **`/gsd-help`**
 Show this command reference.
 
-**`/gsd-update`**
+**`/gsd-update [--sync] [--reapply]`**
 Update GSD to latest version with changelog preview.
+
+- `--sync` — sync managed GSD skills across runtime roots (replaces the former `gsd-sync-skills`)
+- `--reapply` — reapply local modifications after an update (replaces the former `gsd-reapply-patches`)
 
 - Shows installed vs latest version comparison
 - Displays changelog entries for versions you've missed
@@ -494,7 +544,7 @@ The commands above cover the most common day-to-day flows. Every command listed 
 ### Planning & Execution
 
 - **`/gsd-ultraplan-phase [phase]`** — [BETA] Offload plan phase to Claude Code's ultraplan cloud; review in browser and import back.
-- **`/gsd-plan-review-convergence <phase> [--codex] [--gemini] [--claude] [--opencode] [--all] [--max-cycles N]`** — Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain.
+- **`/gsd-plan-review-convergence <phase> [--codex] [--gemini] [--claude] [--opencode] [--ollama] [--lm-studio] [--llama-cpp] [--all] [--text] [--ws <name>] [--max-cycles N]`** — Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain. Supports both cloud reviewers (Codex/Gemini/Claude/OpenCode) and local model runtimes (Ollama, LM Studio, llama.cpp).
 - **`/gsd-autonomous [--from N] [--to N] [--only N] [--interactive]`** — Run all remaining phases autonomously: discuss → plan → execute per phase.
 
 ### Quality, Review & Verification
@@ -671,10 +721,12 @@ Example config:
 **Capturing ideas during work:**
 
 ```
-/gsd-capture                    # Capture from conversation context
-/gsd-capture Fix modal z-index  # Capture with explicit description
-/gsd-capture --list             # Review and work on todos
-/gsd-capture --list api         # Filter by area
+/gsd-capture                                  # Capture from conversation context
+/gsd-capture Fix modal z-index                # Capture with explicit description
+/gsd-capture --note refactor auth system      # Quick friction-free note
+/gsd-capture --seed "real-time notifications" # Forward-looking idea with triggers
+/gsd-capture --list                           # Review and work on todos
+/gsd-capture --list api                       # Filter by area
 ```
 
 **Debugging an issue:**
