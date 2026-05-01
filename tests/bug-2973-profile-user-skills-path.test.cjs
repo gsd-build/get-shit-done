@@ -1,0 +1,138 @@
+'use strict';
+
+process.env.GSD_TEST_MODE = '1';
+
+/**
+ * Bug #2973: /gsd-profile-user --refresh writes dev-preferences.md to the
+ * legacy ~/.claude/commands/gsd/ directory, contradicting v1.39.0's
+ * skills-only migration claim that "Legacy commands/gsd/ directory removed
+ * (replaced by skills/)".
+ *
+ * Root cause: the writer at get-shit-done/bin/lib/profile-output.cjs
+ * fell back to commands/gsd/dev-preferences.md when no --output was passed.
+ * The /gsd-profile-user workflow does not pass --output, so every refresh
+ * deterministically re-creates the legacy directory.
+ *
+ * Fix:
+ *   1. profile-output.cjs default targets skills/gsd-dev-preferences/SKILL.md
+ *   2. profile-user.md confirmation message references the new path
+ *   3. install.js migrates any existing legacy file into the new skill
+ *      location during install (no-op if SKILL.md already exists)
+ *
+ * This test exercises the runtime behavior of the writer (writes to the
+ * skills path) and the structural shape of the workflow message. No
+ * source-grep on the .cjs body — assertions go against the writer's
+ * actual output and the parsed workflow message.
+ */
+
+const { test, describe } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+
+const ROOT = path.join(__dirname, '..');
+const PROFILE_OUTPUT = path.join(ROOT, 'get-shit-done', 'bin', 'lib', 'profile-output.cjs');
+const WORKFLOW = path.join(ROOT, 'get-shit-done', 'workflows', 'profile-user.md');
+const INSTALL = path.join(ROOT, 'bin', 'install.js');
+
+describe('Bug #2973: dev-preferences default writer path is skills/gsd-dev-preferences/SKILL.md', () => {
+  test('exercise the writer in a subprocess with HOME pointed at a tmp dir; assert the artifact lands at the skills path', () => {
+    // Subprocess so fs.writeSync(1, ...) in core.cjs goes to a pipe we can
+    // capture (the parent process's fd 1 bypasses any in-process stubbing).
+    const cp = require('node:child_process');
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2973-'));
+    try {
+      const analysisPath = path.join(tmpHome, 'analysis.json');
+      fs.writeFileSync(analysisPath, JSON.stringify({
+        data_source: 'questionnaire',
+        dimensions: { rigor: { score: 7 } },
+      }));
+      const driver = path.join(tmpHome, 'driver.js');
+      fs.writeFileSync(driver, `
+        const m = require(${JSON.stringify(PROFILE_OUTPUT)});
+        m.cmdGenerateDevPreferences(${JSON.stringify(tmpHome)}, { analysis: ${JSON.stringify(analysisPath)} }, false);
+      `);
+      const result = cp.spawnSync(process.execPath, [driver], {
+        env: Object.assign({}, process.env, { HOME: tmpHome, USERPROFILE: tmpHome }),
+        encoding: 'utf-8',
+      });
+      assert.equal(result.status, 0, `writer subprocess failed: ${result.stderr}`);
+      const parsed = JSON.parse(result.stdout);
+
+      const expectedPath = path.join(tmpHome, '.claude', 'skills', 'gsd-dev-preferences', 'SKILL.md');
+      assert.equal(parsed.command_path, expectedPath,
+        `writer emitted ${parsed.command_path}; expected skills path ${expectedPath} (#2973)`);
+      assert.equal(fs.existsSync(expectedPath), true,
+        `expected SKILL.md at ${expectedPath} after writer ran`);
+      const legacyPath = path.join(tmpHome, '.claude', 'commands', 'gsd', 'dev-preferences.md');
+      assert.equal(fs.existsSync(legacyPath), false,
+        `writer must not create ${legacyPath} (#2973)`);
+    } finally {
+      fs.rmSync(tmpHome, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Bug #2973: profile-user.md confirmation message references the skills path', () => {
+  test('the Display message points at $HOME/.claude/skills/gsd-dev-preferences/SKILL.md', () => {
+    const md = fs.readFileSync(WORKFLOW, 'utf-8');
+    // Match the structured Display: line; capture the path value.
+    const m = md.match(/Display:\s*"[^"]*Generated\s*\/gsd-dev-preferences\s*at\s*([^"]+)"/);
+    assert.notEqual(m, null, 'expected a Display: "Generated /gsd-dev-preferences at <path>" line');
+    const referencedPath = m[1].trim();
+    assert.equal(referencedPath, '$HOME/.claude/skills/gsd-dev-preferences/SKILL.md',
+      `workflow references ${referencedPath}; expected skills path (#2973)`);
+  });
+
+  test('no occurrence of the legacy commands/gsd/dev-preferences.md path remains in profile-user.md', () => {
+    const md = fs.readFileSync(WORKFLOW, 'utf-8');
+    assert.equal(md.includes('commands/gsd/dev-preferences.md'), false,
+      'profile-user.md still references legacy commands/gsd/dev-preferences.md (#2973)');
+  });
+});
+
+describe('Bug #2973: installer migrates existing legacy dev-preferences.md to skills/gsd-dev-preferences/SKILL.md', () => {
+  test('migrateLegacyDevPreferencesToSkill is exported and writes to the skills path', () => {
+    const inst = require(INSTALL);
+    // Module exports the migration helper for direct testing.
+    // Note: this is the structural assertion — the helper exists with the
+    // documented signature. End-to-end install testing is covered by
+    // tests/install-*.test.cjs which already exercise legacy preservation.
+    assert.equal(typeof inst.migrateLegacyDevPreferencesToSkill, 'function',
+      'expected migrateLegacyDevPreferencesToSkill in install.js exports (#2973)');
+  });
+
+  test('migration writes to skills/gsd-dev-preferences/SKILL.md when no skill exists yet', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2973-mig-'));
+    try {
+      const inst = require(INSTALL);
+      const saved = new Map([['dev-preferences.md', '# my legacy preferences\n']]);
+      const migrated = inst.migrateLegacyDevPreferencesToSkill(tmpDir, saved);
+      assert.equal(migrated, true, 'expected migration to succeed when no SKILL.md exists');
+      const skillFile = path.join(tmpDir, 'skills', 'gsd-dev-preferences', 'SKILL.md');
+      assert.equal(fs.existsSync(skillFile), true, `expected SKILL.md at ${skillFile}`);
+      assert.equal(fs.readFileSync(skillFile, 'utf-8'), '# my legacy preferences\n');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('migration is a no-op when a SKILL.md already exists at the new location (do not clobber user-customized skill content)', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2973-skip-'));
+    try {
+      const inst = require(INSTALL);
+      const skillDir = path.join(tmpDir, 'skills', 'gsd-dev-preferences');
+      const skillFile = path.join(skillDir, 'SKILL.md');
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(skillFile, '# user-customized skill\n');
+      const saved = new Map([['dev-preferences.md', '# legacy content\n']]);
+      const migrated = inst.migrateLegacyDevPreferencesToSkill(tmpDir, saved);
+      assert.equal(migrated, false, 'expected migration to skip when SKILL.md exists');
+      // Existing content untouched.
+      assert.equal(fs.readFileSync(skillFile, 'utf-8'), '# user-customized skill\n');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});

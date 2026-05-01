@@ -5520,6 +5520,33 @@ function restoreUserArtifacts(destDir, saved) {
 }
 
 /**
+ * Migrate a legacy dev-preferences.md (saved from commands/gsd/) into the
+ * skills/gsd-dev-preferences/SKILL.md location used by the writer after #2973.
+ *
+ * Skips silently if no legacy file was preserved, or if a SKILL.md already
+ * exists at the new location (don't clobber user-customized skill content
+ * — they may have edited the new file directly). Returns true on actual
+ * migration so callers can log a one-line confirmation.
+ *
+ * @param {string} targetDir - Resolved runtime config directory (e.g. ~/.claude)
+ * @param {Map<string, string>} saved - Map returned by preserveUserArtifacts
+ * @returns {boolean} - true if a file was migrated, false otherwise
+ */
+function migrateLegacyDevPreferencesToSkill(targetDir, saved) {
+  if (!saved || !saved.has('dev-preferences.md')) return false;
+  const skillDir = path.join(targetDir, 'skills', 'gsd-dev-preferences');
+  const skillFile = path.join(skillDir, 'SKILL.md');
+  if (fs.existsSync(skillFile)) return false;
+  try {
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(skillFile, saved.get('dev-preferences.md'), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Recursively copy directory, replacing paths in .md files
  * Deletes existing destDir first to remove orphaned files from previous versions
  * @param {string} srcDir - Source directory
@@ -6038,7 +6065,14 @@ function uninstall(isGlobal, runtime = 'claude') {
       fs.rmSync(legacyCommandsDir, { recursive: true });
       removedCount++;
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
+      // #2973: also migrate dev-preferences.md content into the new
+      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
+      // This prevents the legacy file from being orphaned after the writer
+      // starts targeting the skills path. No-op if SKILL.md already exists.
       restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
+      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
+        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
+      }
     }
   } else if (isHermes) {
     // Hermes Agent: skills live under skills/gsd/ as a single category (per
@@ -6076,7 +6110,14 @@ function uninstall(isGlobal, runtime = 'claude') {
       fs.rmSync(legacyCommandsDir, { recursive: true });
       removedCount++;
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
+      // #2973: also migrate dev-preferences.md content into the new
+      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
+      // This prevents the legacy file from being orphaned after the writer
+      // starts targeting the skills path. No-op if SKILL.md already exists.
       restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
+      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
+        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
+      }
     }
   } else if (isGemini) {
     // Gemini: still uses commands/gsd/
@@ -7096,7 +7137,14 @@ function install(isGlobal, runtime = 'claude') {
       const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
       fs.rmSync(legacyCommandsDir, { recursive: true });
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
+      // #2973: also migrate dev-preferences.md content into the new
+      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
+      // This prevents the legacy file from being orphaned after the writer
+      // starts targeting the skills path. No-op if SKILL.md already exists.
       restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
+      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
+        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
+      }
     }
   } else if (isHermes) {
     // Hermes Agent: nests all GSD skills under skills/gsd/ as a single
@@ -7138,7 +7186,14 @@ function install(isGlobal, runtime = 'claude') {
       const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
       fs.rmSync(legacyCommandsDir, { recursive: true });
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
+      // #2973: also migrate dev-preferences.md content into the new
+      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
+      // This prevents the legacy file from being orphaned after the writer
+      // starts targeting the skills path. No-op if SKILL.md already exists.
       restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
+      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
+        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
+      }
     }
   } else if (isCodebuddy) {
     const skillsDir = path.join(targetDir, 'skills');
@@ -7189,7 +7244,14 @@ function install(isGlobal, runtime = 'claude') {
       const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
       fs.rmSync(legacyCommandsDir, { recursive: true });
       console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
+      // #2973: also migrate dev-preferences.md content into the new
+      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
+      // This prevents the legacy file from being orphaned after the writer
+      // starts targeting the skills path. No-op if SKILL.md already exists.
       restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
+      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
+        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
+      }
     }
   } else {
     // Claude Code local: commands/gsd/ format — Claude Code reads local project
@@ -9071,6 +9133,7 @@ if (process.env.GSD_TEST_MODE) {
     validateHookFields,
     preserveUserArtifacts,
     restoreUserArtifacts,
+    migrateLegacyDevPreferencesToSkill,
     USER_OWNED_ARTIFACTS,
     finishInstall,
     trySelfLinkGsdSdk,
