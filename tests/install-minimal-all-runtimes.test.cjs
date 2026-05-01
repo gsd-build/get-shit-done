@@ -108,6 +108,13 @@ function runInstall({ runtime, scope, extraArgs = [] }) {
       encoding: 'utf8',
     });
 
+    assert.strictEqual(
+      result.status,
+      0,
+      `installer exited with status ${result.status} for ${runtime} --${scope}` +
+        `\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+    );
+
     const manifestPath = path.join(configDir, MANIFEST_NAME);
     let manifest = null;
     if (fs.existsSync(manifestPath)) {
@@ -257,6 +264,10 @@ describe('install: directory-on-disk matches manifest for --minimal', () => {
           extraArgs: ['--minimal'],
         });
         try {
+          assert.ok(
+            manifest,
+            `${runtime} ${scope} --minimal: manifest must exist before parity check`,
+          );
           const onDisk = collectSkillBasenamesOnDisk(configDir);
           const inManifest = manifestSkillSet(manifest);
           assert.deepStrictEqual(
