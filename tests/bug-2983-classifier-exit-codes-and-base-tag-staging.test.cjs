@@ -230,24 +230,89 @@ describe('bug-2983: workflow stages the classifier and dispatches on exit code',
     // The pre-#2983 form was `if ! ... | node ...; then skip; fi` which
     // collapses every non-zero exit (including missing-script and
     // uncaught-throw cases) into the skip path. The required new shape
-    // is: run the pipeline, capture PIPESTATUS[1], dispatch via case.
+    // is: run the pipeline, snapshot $PIPESTATUS into a local array
+    // immediately, dispatch via case.
+    //
+    // CodeRabbit on PR #2984 caught a subtler bug in the first iteration
+    // of this fix: `pipeline || true; RC=${PIPESTATUS[1]}` doesn't work
+    // because `|| true` runs `true` as a one-command pipeline when the
+    // pipeline fails (exit 1 or 2 — exactly the cases we care about),
+    // overwriting PIPESTATUS to (0). The hardened form snapshots
+    // PIPESTATUS into a local array on the line immediately after the
+    // pipeline, with no intervening commands.
     assert.match(
       script,
-      /\$\{PIPESTATUS\[1\]\}/,
-      'cherry-pick loop must read the classifier exit via ${PIPESTATUS[1]} so error codes (2+) are distinguishable from "not shipped" (1) (#2983)'
+      /PIPE_RC=\("\$\{PIPESTATUS\[@\]\}"\)/,
+      'cherry-pick loop must snapshot the entire $PIPESTATUS array via `PIPE_RC=("${PIPESTATUS[@]}")` immediately after the classifier pipeline — `${PIPESTATUS[1]}` direct-read is unsafe under any subsequent simple command, and `|| true; ${PIPESTATUS[1]}` is broken because `|| true` runs `true` as its own pipeline on the failure paths (CodeRabbit on PR #2984)'
     );
-    // Must NOT use the old `if ! ... | node ...; then` shape on the
-    // classifier pipeline — that shape conflates exit 1 and exit 2.
+    // The pipeline must run under `set +e` to allow the snapshot — at
+    // the workflow's top-level `set -euo pipefail`, a non-zero exit
+    // from the pipeline would otherwise terminate the step before the
+    // snapshot line runs.
+    assert.match(
+      script,
+      /set \+e[\s\S]{0,200}node "\$CLASSIFIER"[\s\S]{0,80}PIPE_RC=\("\$\{PIPESTATUS\[@\]\}"\)[\s\S]{0,40}set -e/,
+      'classifier pipeline must be wrapped `set +e` ... pipeline ... `PIPE_RC=("${PIPESTATUS[@]}")` ... `set -e` — any other shape either misses the snapshot or terminates the step early (#2983, CodeRabbit on PR #2984)'
+    );
+    // Must NOT use the broken `pipeline || true; RC=${PIPESTATUS[1]}` form.
+    // The `|| true` rewrites PIPESTATUS on the failure paths.
+    assert.doesNotMatch(
+      script,
+      /node "\$CLASSIFIER"\s*\|\|\s*true\s*\n\s*CLASSIFIER_RC="\$\{PIPESTATUS\[1\]\}"/,
+      'classifier pipeline must NOT use `|| true` followed by `${PIPESTATUS[1]}` — `|| true` runs `true` as a one-command pipeline on the failure paths and overwrites PIPESTATUS to (0), so PIPESTATUS[1] becomes unset (CodeRabbit on PR #2984)'
+    );
+    // Must NOT use the original `if ! ... | node ...; then` shape either.
     assert.doesNotMatch(
       script,
       /if ! git diff-tree[\s\S]{0,200}node[\s\S]{0,200}\.cjs[^|\n]*; then/,
-      'cherry-pick loop must NOT use `if ! ... | node classifier; then skip`—that shape silently treats classifier errors as skips (#2983)'
+      'cherry-pick loop must NOT use `if ! ... | node classifier; then skip` — that shape silently treats classifier errors as skips (#2983)'
     );
     // The case dispatch must explicitly handle 0, 1, and a default branch.
     assert.match(
       script,
       /case "\$CLASSIFIER_RC" in[\s\S]+?0\)[\s\S]+?1\)[\s\S]+?\*\)/,
       'case dispatch on $CLASSIFIER_RC must list 0, 1, and a default-error branch in that order so each is handled explicitly (#2983)'
+    );
+  });
+
+  test('git diff-tree failure is also fail-fast (not silently classified as not-shipped)', () => {
+    // The new array-snapshot form gives us $DIFFTREE_RC for free.
+    // git diff-tree is unlikely to fail on a known-good $SHA, but if
+    // it does (e.g., $SHA is corrupt or fetch was incomplete), we must
+    // not pipe partial/empty output into the classifier and call it
+    // "not shipped." Fail-fast with ::error:: instead.
+    const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+    const script = extractStepRun(yaml, 'Prepare hotfix branch');
+
+    assert.match(
+      script,
+      /DIFFTREE_RC="\$\{PIPE_RC\[0\]\}"/,
+      'workflow must extract git diff-tree\'s exit from PIPE_RC[0] so a partial-pipeline failure can be distinguished from a clean classifier result (CodeRabbit on PR #2984)'
+    );
+    assert.match(
+      script,
+      /if \[ "\$DIFFTREE_RC" -ne 0 \][\s\S]{0,200}::error::git diff-tree failed/,
+      'workflow must emit ::error:: and exit when git diff-tree itself fails — silently passing partial input to the classifier would defeat the whole point of #2983 (CodeRabbit on PR #2984)'
+    );
+  });
+
+  test('hotfix run summary no longer falsely advertises a merge-back PR', () => {
+    // CodeRabbit on PR #2984: the Summary block still printed
+    // "Merge-back PR opened against main" even though the merge-back
+    // step was removed. Operators reading the summary would expect a PR
+    // that was never opened. Replace with explicit non-action text so
+    // the summary accurately describes what happened.
+    const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+
+    assert.doesNotMatch(
+      yaml,
+      /echo "- Merge-back PR opened against main"/,
+      'run summary must NOT advertise a merge-back PR — the step was removed in #2983 and the line is stale (CodeRabbit on PR #2984)'
+    );
+    assert.match(
+      yaml,
+      /No merge-back PR \(auto-picked commits are already on main\)/,
+      'run summary must explicitly state that no merge-back PR exists, with the rationale, so operators understand it\'s intentional rather than missing (CodeRabbit on PR #2984)'
     );
   });
 
@@ -305,8 +370,10 @@ describe('bug-2983: workflow stages the classifier and dispatches on exit code',
     // base-tag-missing bug.
     const loopAnchor = script.indexOf('CANDIDATES=$(git cherry HEAD origin/main');
     assert.ok(loopAnchor !== -1, 'cherry-pick loop sentinel not found');
-    // 6 KB window matching the bug-2964 test's bound.
-    const window = script.slice(loopAnchor, loopAnchor + 6000);
+    // 8 KB window matching the bug-2964 test's bound (raised from 6 KB
+    // when the PIPESTATUS-snapshot hardening on PR for #2984's CR
+    // findings pushed the cherry-pick call further past the loop anchor).
+    const window = script.slice(loopAnchor, loopAnchor + 8000);
     assert.match(
       window,
       /node "\$CLASSIFIER"/,

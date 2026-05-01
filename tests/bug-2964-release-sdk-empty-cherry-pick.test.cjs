@@ -73,13 +73,15 @@ describe('bug-2964: release-sdk hotfix cherry-pick survives empty commits', () =
     // The cherry-pick call lives within the auto_cherry_pick loop. Bound
     // the slice generously after the anchor so future pre-skip guards /
     // classification scaffolding (e.g. the merge-commit pre-skip added
-    // on PR #2970, the workflow-file pre-skip added on PR for #2980)
-    // don't push the call out of range, but still tight enough to avoid
-    // matching unrelated cherry-pick refs elsewhere in the workflow file.
+    // on PR #2970, the workflow-file pre-skip added on PR for #2980,
+    // the PIPESTATUS-snapshot hardening added on PR for #2984's CR
+    // findings) don't push the call out of range, but still tight
+    // enough to avoid matching unrelated cherry-pick refs elsewhere in
+    // the workflow file.
     // Allow arbitrary git options between `git` and `cherry-pick` (e.g.
     // `git -c merge.conflictStyle=merge cherry-pick ...` added for #2966)
     // so this test doesn't false-fail on legitimate option additions.
-    const window = yaml.slice(loopAnchor, loopAnchor + 6000);
+    const window = yaml.slice(loopAnchor, loopAnchor + 8000);
     const pickMatch = /git\b[^\n]*?cherry-pick[^\n]*"\$SHA"/.exec(window);
     assert.ok(
       pickMatch,

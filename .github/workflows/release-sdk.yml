@@ -239,9 +239,27 @@ jobs:
                   # dispatch on it: 0 = shipped, 1 = not shipped, 2+ =
                   # classifier error → fail-fast (don't silently treat
                   # tooling errors as informational skips). Bug #2983.
+                  #
+                  # PIPESTATUS capture must happen IMMEDIATELY after the
+                  # pipeline — the previous form (`pipeline || true; RC=
+                  # ${PIPESTATUS[1]}`) had a subtle bug: when the
+                  # pipeline fails (exit 1 or 2 — exactly the cases we
+                  # care about), `|| true` runs `true` as a one-command
+                  # pipeline, overwriting PIPESTATUS to (0). The fix is
+                  # to wrap the pipeline in `set +e`/`set -e` and snapshot
+                  # PIPESTATUS into a local array on the very next line.
+                  # CodeRabbit on PR #2984.
+                  set +e
                   git diff-tree --no-commit-id --name-only -r "$SHA" \
-                    | node "$CLASSIFIER" || true
-                  CLASSIFIER_RC="${PIPESTATUS[1]}"
+                    | node "$CLASSIFIER"
+                  PIPE_RC=("${PIPESTATUS[@]}")
+                  set -e
+                  DIFFTREE_RC="${PIPE_RC[0]}"
+                  CLASSIFIER_RC="${PIPE_RC[1]}"
+                  if [ "$DIFFTREE_RC" -ne 0 ]; then
+                    echo "::error::git diff-tree failed for $SHA (exit $DIFFTREE_RC) — refusing to classify on incomplete input."
+                    exit "$DIFFTREE_RC"
+                  fi
                   case "$CLASSIFIER_RC" in
                     0) ;;
                     1)
@@ -751,7 +769,12 @@ jobs:
                 echo "- \`next\` dist-tag re-pointed at \`v${VERSION}\` (kept current with \`latest\`)"
               fi
               if [ "$ACTION" = "hotfix" ]; then
-                echo "- Merge-back PR opened against main"
+                # Auto-cherry-pick hotfixes only pick commits already on
+                # main, so there's nothing to merge back. The merge-back
+                # PR step was removed in #2983; this line surfaces the
+                # explicit non-action so operators don't expect a PR
+                # that was never opened.
+                echo "- No merge-back PR (auto-picked commits are already on main)"
               fi
               echo "- Install: \`npm install -g get-shit-done-cc@${TAG}\`"
             fi
