@@ -300,9 +300,18 @@ Concrete steps:
 # user to inspect/merge manually. We deliberately resolve the main repo
 # path via `git worktree list --porcelain` rather than assuming $PWD,
 # because the agent ran inside $wt.
-main_repo="$(git worktree list --porcelain | awk '/^worktree / { if (!found) { print $2; found=1 } }')"
+# Strip the literal "worktree " prefix and print the rest of the line, then
+# exit on the first match. This preserves paths that contain spaces
+# (awk '$2' would truncate "/path/with spaces/repo" to "/path/with").
+main_repo="$(git worktree list --porcelain | awk '/^worktree / { sub(/^worktree /, ""); print; exit }')"
 ff_status=0
-if ! git -C "$main_repo" merge --ff-only "$reviewfix_branch" 2>&1; then
+# Capture the exit code of `git merge` directly. `if ! cmd; then ff_status=$?`
+# captures the exit code of the `!` operator (always 1 when the inner cmd
+# failed) — masking the real merge exit code. Use the success/else split
+# instead so $? in the else-branch is the merge command's exit code.
+if git -C "$main_repo" merge --ff-only "$reviewfix_branch" 2>&1; then
+  ff_status=0
+else
   ff_status=$?
   echo "WARN: could not fast-forward $branch to $reviewfix_branch (exit $ff_status)."
   echo "      The temp branch $reviewfix_branch is preserved for manual merge."
