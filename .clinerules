@@ -5,9 +5,9 @@ GSD is a structured AI development workflow system. It coordinates AI agents thr
 
 ## Core Rule: Never Edit Outside a GSD Workflow
 Do not make direct repo edits. All changes must go through a GSD workflow:
-- `/gsd:plan-phase` → plan the work
-- `/gsd:execute-phase` → build it
-- `/gsd:verify-work` → verify results
+- `/gsd-plan-phase` → plan the work
+- `/gsd-execute-phase` → build it
+- `/gsd-verify-work` → verify results
 
 ## Architecture
 - `get-shit-done/bin/lib/` — Core Node.js library (CommonJS .cjs, no external deps)
