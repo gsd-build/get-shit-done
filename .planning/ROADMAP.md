@@ -135,7 +135,7 @@ Plans:
   5. Selected SME names are queued in `STATE.md` under `milestone.active_smes` so downstream steps can find them
 **Plans:** 1 plan
 Plans:
-- [ ] 08-01-PLAN.md — TDD: Structural tests (RED) then sme-step.md new-milestone detection + dispatch reference (GREEN)
+- [x] 08-01-PLAN.md — TDD: Structural tests (RED) then sme-step.md new-milestone detection + dispatch reference (GREEN)
 
 ### Phase 9: Post-Execution Refresh
 **Goal**: SME documents stay current — they are refreshed after phase execution and the gate warns when they are stale
@@ -146,7 +146,9 @@ Plans:
   2. The creator runs in refresh mode and updates affected SME documents with knowledge of the new code changes
   3. Updated SME documents are committed as the final step of phase completion
   4. The plan-phase gate warns the user when an SME's `last_analyzed_commit` is behind the current HEAD before running the audit
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 09-01-PLAN.md — TDD: Structural tests (RED) then sme_refresh step + staleness pre-flight check (GREEN)
 
 ## Progress
 
@@ -163,4 +165,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 6. Plan-Phase Gate | 0/1 | Not started | - |
 | 7. Discuss-Phase Integration | 0/1 | Not started | - |
 | 8. New-Milestone Process Detection | 0/1 | Not started | - |
-| 9. Post-Execution Refresh | 0/TBD | Not started | - |
+| 9. Post-Execution Refresh | 0/1 | Not started | - |
