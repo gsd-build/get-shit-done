@@ -125,10 +125,11 @@ jobs:
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
           TARGET_TAG="v${VERSION}"
           BRANCH="hotfix/${VERSION}"
-          BASE_TAG=$(git tag -l "v${MAJOR_MINOR}.*" \
-            | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" \
+          # Semver-correct selection: append TARGET_TAG, sort -V, take preceding entry.
+          # Plain lexicographic compare mis-orders multi-digit patches (v1.27.10 vs v1.27.9).
+          BASE_TAG=$( ( git tag -l "v${MAJOR_MINOR}.*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$"; echo "$TARGET_TAG" ) \
             | sort -V \
-            | awk -v target="$TARGET_TAG" '$1 < target { last=$1 } END { if (last != "") print last }')
+            | awk -v target="$TARGET_TAG" '$1 == target { print prev; exit } { prev = $1 }')
           if [ -z "$BASE_TAG" ]; then
             echo "::error::No prior stable tag found for ${MAJOR_MINOR}.x before $TARGET_TAG"
             exit 1
@@ -136,22 +137,22 @@ jobs:
           echo "base_tag=$BASE_TAG" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "DRY RUN — would branch $BRANCH from $BASE_TAG"
-            # For dry-run, point ref at BASE_TAG so install-smoke + release
-            # exercise the same content the hotfix would publish (minus picks).
-            echo "DRY_RUN_REF=$BASE_TAG" >> "$GITHUB_ENV"
-            exit 0
-          fi
-
           # Idempotent branch creation — operator may have pre-prepared via hotfix.yml.
           git fetch origin main:refs/remotes/origin/main
           if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
             echo "Branch $BRANCH already exists on origin; checking out"
             git fetch origin "$BRANCH"
             git checkout "$BRANCH"
+            BRANCH_PRE_EXISTED=1
           else
             git checkout -b "$BRANCH" "$BASE_TAG"
+            BRANCH_PRE_EXISTED=0
+            # Push the skeleton up-front (real runs only) so cherry-pick conflicts
+            # leave a remote artefact the operator can resolve. Dry-run keeps
+            # everything local — no orphan branch created on origin.
+            if [ "$DRY_RUN" != "true" ]; then
+              git push -u origin "$BRANCH"
+            fi
           fi
 
           if [ "$AUTO_CHERRY_PICK" = "true" ]; then
@@ -167,8 +168,26 @@ jobs:
                 if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
                   echo "→ cherry-picking $SHA  $SUBJECT"
                   if ! git cherry-pick -x "$SHA"; then
-                    echo "::error::Cherry-pick of $SHA failed. Resolve on $BRANCH manually, then re-run with auto_cherry_pick=false."
                     git cherry-pick --abort || true
+                    # On real runs: push the partial-pick state so the operator
+                    # can fetch + resolve $SHA + push + re-run with auto_cherry_pick=false.
+                    if [ "$DRY_RUN" != "true" ]; then
+                      git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH" || true
+                    fi
+                    {
+                      echo "## Cherry-pick conflict"
+                      echo ""
+                      echo "Failed at: \`${SHA}\` — \`${SUBJECT}\`"
+                      echo ""
+                      if [ "$DRY_RUN" = "true" ]; then
+                        echo "**Dry run:** branch was not pushed. Re-run a real hotfix with \`auto_cherry_pick=false\` and resolve \`${SHA}\` manually on \`${BRANCH}\`."
+                      else
+                        echo "Branch \`${BRANCH}\` was pushed with picks applied up to (but not including) the conflicting commit."
+                        echo ""
+                        echo "**To resolve:** \`git fetch origin && git checkout ${BRANCH} && git cherry-pick -x ${SHA}\`, fix the conflict, push, then re-run with \`auto_cherry_pick=false\`."
+                      fi
+                    } >> "$GITHUB_STEP_SUMMARY"
+                    echo "::error::Cherry-pick of $SHA failed. See run summary."
                     exit 1
                   fi
                   INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
@@ -179,7 +198,7 @@ jobs:
               {
                 echo "## Cherry-pick summary"
                 echo ""
-                echo "Base: \`$BASE_TAG\` → Branch: \`$BRANCH\`"
+                echo "Base: \`$BASE_TAG\` → Branch: \`$BRANCH\`$([ "$DRY_RUN" = "true" ] && echo " (DRY RUN — local only)")"
                 echo ""
                 if [ -n "$INCLUDED" ]; then
                   echo "### Included (fix/chore)"
@@ -211,7 +230,11 @@ jobs:
             fi
             git commit -m "chore: bump version to $VERSION for hotfix"
           fi
-          git push origin "$BRANCH"
+          if [ "$DRY_RUN" != "true" ]; then
+            git push origin "$BRANCH"
+          else
+            echo "DRY RUN — cherry-picks applied locally; branch not pushed. Downstream install-smoke will run against \`$BASE_TAG\` (the cherry-pick verification above is the dry-run signal)."
+          fi
 
       - name: Determine effective ref
         id: out
@@ -248,6 +271,7 @@ jobs:
     permissions:
       contents: write       # tag + push + GitHub Release
       id-token: write       # provenance
+      pull-requests: write  # hotfix mode opens merge-back PR via gh pr create
     environment: npm-publish
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2

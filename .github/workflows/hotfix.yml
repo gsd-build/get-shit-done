@@ -81,10 +81,13 @@ jobs:
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
           TARGET_TAG="v${VERSION}"
           BRANCH="hotfix/${VERSION}"
-          BASE_TAG=$(git tag -l "v${MAJOR_MINOR}.*" \
-            | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" \
+          # Append TARGET_TAG to the candidate list, then sort -V, then walk the
+          # sorted list and print whatever immediately precedes TARGET_TAG. This
+          # is semver-correct for multi-digit patches (v1.27.10 > v1.27.9) where
+          # a plain `awk '$1 < target'` lexicographic compare would mis-order.
+          BASE_TAG=$( ( git tag -l "v${MAJOR_MINOR}.*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$"; echo "$TARGET_TAG" ) \
             | sort -V \
-            | awk -v target="$TARGET_TAG" '$1 < target { last=$1 } END { if (last != "") print last }')
+            | awk -v target="$TARGET_TAG" '$1 == target { print prev; exit } { prev = $1 }')
           if [ -z "$BASE_TAG" ]; then
             echo "::error::No prior stable tag found for ${MAJOR_MINOR}.x before $TARGET_TAG"
             exit 1
@@ -122,16 +125,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Create hotfix branch from base tag
+      - name: Create hotfix branch from base tag and push (skeleton)
         if: ${{ !inputs.dry_run }}
         env:
           BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
-        run: git checkout -b "$BRANCH" "$BASE_TAG"
+        run: |
+          set -euo pipefail
+          git checkout -b "$BRANCH" "$BASE_TAG"
+          # Push the skeleton branch up-front so any subsequent cherry-pick
+          # conflict leaves a remote artefact the operator can fetch, resolve,
+          # and re-push. Without this, conflicts strand state on the runner.
+          git push -u origin "$BRANCH"
 
       - name: Cherry-pick fix/chore commits from origin/main since base tag
         if: ${{ !inputs.dry_run && inputs.auto_cherry_pick }}
         env:
+          BRANCH: ${{ needs.validate-version.outputs.branch }}
           BASE_TAG: ${{ needs.validate-version.outputs.base_tag }}
         run: |
           set -euo pipefail
@@ -163,8 +173,21 @@ jobs:
             if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
               echo "→ cherry-picking $SHA  $SUBJECT"
               if ! git cherry-pick -x "$SHA"; then
-                echo "::error::Cherry-pick of $SHA failed. Resolve on branch manually, then re-run finalize with auto_cherry_pick=false."
+                # Abort restores HEAD to the last successful pick. Push that
+                # state so the operator can fetch, resolve $SHA manually, and
+                # finalize with auto_cherry_pick=false.
                 git cherry-pick --abort || true
+                git push --force-with-lease origin "$BRANCH" || git push origin "$BRANCH" || true
+                {
+                  echo "## Cherry-pick conflict"
+                  echo ""
+                  echo "Failed at: \`${SHA}\` — \`${SUBJECT}\`"
+                  echo ""
+                  echo "Branch \`${BRANCH}\` was pushed with picks applied up to (but not including) the conflicting commit."
+                  echo ""
+                  echo "**To resolve:** \`git fetch origin && git checkout ${BRANCH} && git cherry-pick -x ${SHA}\`, fix the conflict, push, then re-run \`finalize\` with \`auto_cherry_pick=false\`."
+                } >> "$GITHUB_STEP_SUMMARY"
+                echo "::error::Cherry-pick of $SHA failed. See summary; resolve on $BRANCH and re-run finalize with auto_cherry_pick=false."
                 exit 1
               fi
               INCLUDED="${INCLUDED}- \`${SHA}\` ${SUBJECT}"$'\n'
