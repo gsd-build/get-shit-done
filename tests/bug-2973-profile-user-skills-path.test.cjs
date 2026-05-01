@@ -56,7 +56,14 @@ describe('Bug #2973: dev-preferences default writer path is skills/gsd-dev-prefe
       const result = cp.spawnSync(process.execPath, [driver], {
         env: Object.assign({}, process.env, { HOME: tmpHome, USERPROFILE: tmpHome }),
         encoding: 'utf-8',
+        // Bound the subprocess so a regression that hangs the writer
+        // (or the dispatcher) cannot deadlock CI (PR #3003 CR feedback).
+        // 30s is generous for what should complete in <1s; if it trips,
+        // surface that as a clear test failure rather than CI hanging.
+        timeout: 30_000,
       });
+      assert.equal(result.signal, null,
+        `writer subprocess was killed by signal ${result.signal} (likely timeout): ${result.stderr}`);
       assert.equal(result.status, 0, `writer subprocess failed: ${result.stderr}`);
       const parsed = JSON.parse(result.stdout);
 
