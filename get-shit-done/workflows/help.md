@@ -478,6 +478,73 @@ Update GSD to latest version with changelog preview.
 
 Usage: `/gsd-update`
 
+## Additional Commands
+
+The commands above cover the most common day-to-day flows. Every command listed here is also a live `/gsd-*` slash command and is grouped by purpose.
+
+### Discovery & Specification
+
+- **`/gsd-explore`** — Socratic ideation and idea routing. Think through ideas before committing to plans.
+- **`/gsd-spec-phase <phase> [--auto] [--text]`** — Clarify WHAT a phase delivers with ambiguity scoring; produces a SPEC.md before discuss-phase.
+- **`/gsd-ai-integration-phase [phase]`** — Generate an AI-SPEC.md design contract for phases that involve building AI systems.
+- **`/gsd-ui-phase [phase]`** — Generate UI design contract (UI-SPEC.md) for frontend phases.
+- **`/gsd-import --from <filepath>`** — Ingest external plans with conflict detection against project decisions before writing anything.
+- **`/gsd-ingest-docs [path] [--mode new|merge] [--manifest <file>] [--resolve auto|interactive]`** — Bootstrap or merge a `.planning/` setup from existing ADRs, PRDs, SPECs, and docs in a repo.
+
+### Planning & Execution
+
+- **`/gsd-ultraplan-phase [phase]`** — [BETA] Offload plan phase to Claude Code's ultraplan cloud; review in browser and import back.
+- **`/gsd-plan-review-convergence <phase> [--codex] [--gemini] [--claude] [--opencode] [--all] [--max-cycles N]`** — Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain.
+- **`/gsd-autonomous [--from N] [--to N] [--only N] [--interactive]`** — Run all remaining phases autonomously: discuss → plan → execute per phase.
+
+### Quality, Review & Verification
+
+- **`/gsd-code-review <phase> [--depth=quick|standard|deep] [--files file1,file2,...] [--fix [--all] [--auto]]`** — Review source files changed during a phase for bugs, security issues, and code quality problems.
+- **`/gsd-secure-phase [phase]`** — Retroactively verify threat mitigations for a completed phase.
+- **`/gsd-validate-phase [phase]`** — Retroactively audit and fill Nyquist validation gaps for a completed phase.
+- **`/gsd-ui-review [phase]`** — Retroactive 6-pillar visual audit of implemented frontend code.
+- **`/gsd-eval-review [phase]`** — Audit an executed AI phase's evaluation coverage and produce an EVAL-REVIEW.md remediation plan.
+- **`/gsd-audit-fix --source <audit-uat> [--severity medium|high|all] [--max N] [--dry-run]`** — Autonomous audit-to-fix pipeline: find issues, classify, fix, test, commit.
+- **`/gsd-add-tests <phase> [additional instructions]`** — Generate tests for a completed phase based on UAT criteria and implementation.
+
+### Diagnostics & Maintenance
+
+- **`/gsd-health [--repair] [--context]`** — Diagnose planning directory health and optionally repair issues.
+- **`/gsd-forensics [problem description]`** — Post-mortem investigation for failed GSD workflows; diagnoses what went wrong.
+- **`/gsd-undo --last N | --phase NN | --plan NN-MM`** — Safe git revert. Roll back phase or plan commits using the phase manifest with dependency checks.
+- **`/gsd-docs-update [--force] [--verify-only]`** — Generate or update project documentation verified against the codebase.
+- **`/gsd-extract-learnings <phase>`** — Extract decisions, lessons, patterns, and surprises from completed phase artifacts.
+
+### Knowledge & Context
+
+- **`/gsd-graphify [build|query <term>|status|diff]`** — Build, query, and inspect the project knowledge graph in `.planning/graphs/`.
+- **`/gsd-thread [list [--open|--resolved] | close <slug> | status <slug> | name | description]`** — Manage persistent context threads for cross-session work.
+- **`/gsd-profile-user [--questionnaire] [--refresh]`** — Generate developer behavioral profile and create Claude-discoverable artifacts.
+- **`/gsd-stats`** — Display project statistics: phases, plans, requirements, git metrics, and timeline.
+
+### Workflow & Orchestration
+
+- **`/gsd-manager`** — Interactive command center for managing multiple phases from one terminal.
+- **`/gsd-workspace [--new | --list | --remove] [name]`** — Manage GSD workspaces: create, list, or remove isolated workspace environments.
+- **`/gsd-workstreams`** — Manage parallel workstreams: list, create, switch, status, progress, complete, and resume.
+- **`/gsd-review-backlog`** — Review and promote backlog items to active milestone.
+- **`/gsd-milestone-summary [version]`** — Generate a comprehensive project summary from milestone artifacts for team onboarding and review.
+
+### Repository Integration
+
+- **`/gsd-inbox [--issues] [--prs] [--label] [--close-incomplete] [--repo owner/repo]`** — Triage and review open GitHub issues and PRs against project templates and contribution guidelines.
+
+### Namespace Routers (model-facing meta-skills)
+
+These six skills exist primarily for the model to perform two-stage hierarchical routing across 60+ skills. You can invoke them directly when you want to browse a category interactively.
+
+- **`/gsd-context`** — Codebase intelligence routing (map, graphify, docs, learnings).
+- **`/gsd-ideate`** — Exploration / capture routing (explore, sketch, spike, spec, capture).
+- **`/gsd-manage`** — Configuration and workspace routing (workstreams, thread, update, ship, inbox).
+- **`/gsd-project`** — Project-lifecycle routing (milestones, audits, summary).
+- **`/gsd-review`** — Quality-gate routing (code review, debug, audit, security, eval, ui).
+- **`/gsd-workflow`** — Phase-pipeline routing (discuss, plan, execute, verify, phase, progress).
+
 ## Files & Structure
 
 ```
