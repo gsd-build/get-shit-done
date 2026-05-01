@@ -21,11 +21,11 @@ describe('extract-learnings command', () => {
 
   test('command file has correct name frontmatter', () => {
     const content = fs.readFileSync(COMMAND_PATH, 'utf-8');
-    assert.ok(content.includes('name: gsd:extract-learnings'), 'Command must have name: gsd:extract-learnings');
+    assert.ok(content.includes('name: gsd-extract-learnings'), 'Command must have name: gsd-extract-learnings');
   });
 
   test('command file has description frontmatter', () => {
-    const content = fs.readFileSync(COMMAND_PATH, 'utf-8');
+
     assert.ok(content.includes('description:'), 'Command must have description frontmatter');
   });
 
