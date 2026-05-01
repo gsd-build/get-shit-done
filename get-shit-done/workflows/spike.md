@@ -1,7 +1,7 @@
 <purpose>
 Spike an idea through experiential exploration — build focused experiments to feel the pieces
 of a future app, validate feasibility, and produce verified knowledge for the real build.
-Saves artifacts to `.planning/spikes/`. Companion to `/gsd-spike-wrap-up`.
+Saves artifacts to `.planning/spikes/`. Companion to `/gsd-spike --wrap-up`.
 
 Supports two modes:
 - **Idea mode** (default) — user describes an idea to spike
@@ -421,7 +421,7 @@ gsd-sdk query commit "docs(spikes): update conventions" --files .planning/spikes
 
 **Package findings** — wrap spike knowledge into an implementation blueprint
 
-`/gsd-spike-wrap-up`
+`/gsd-spike --wrap-up`
 
 ───────────────────────────────────────────────────────────────
 

@@ -45,7 +45,7 @@ Parse current values (default to `true` if not present):
 - `workflow.ui_safety_gate` — prompt to run /gsd-ui-phase before planning frontend phases (default: true if absent)
 - `workflow.ai_integration_phase` — framework selection + eval strategy for AI phases (default: true if absent)
 - `workflow.tdd_mode` — enforce RED/GREEN/REFACTOR gate sequence during execute-phase (default: false if absent)
-- `workflow.code_review` — enable /gsd-code-review and /gsd-code-review-fix commands (default: true if absent)
+- `workflow.code_review` — enable /gsd-code-review and /gsd-code-review --fix commands (default: true if absent)
 - `workflow.code_review_depth` — default depth for /gsd-code-review: `quick`, `standard`, or `deep` (default: `"standard"` if absent; only relevant when `code_review` is on)
 - `workflow.ui_review` — run visual quality audit (/gsd-ui-review) in autonomous mode (default: true if absent)
 - `commit_docs` — whether `.planning/` files are committed to git (default: true if absent)
@@ -150,7 +150,7 @@ AskUserQuestion([
     ]
   },
   {
-    question: "Enable Code Review? (/gsd-code-review and /gsd-code-review-fix commands)",
+    question: "Enable Code Review? (/gsd-code-review and /gsd-code-review --fix commands)",
     header: "Code Review",
     multiSelect: false,
     options: [
@@ -457,12 +457,12 @@ Display:
 These settings apply to future /gsd-plan-phase and /gsd-execute-phase runs.
 
 Quick commands:
-- /gsd-settings-integrations — configure API keys (Brave/Firecrawl/Exa), review.models CLI routing, and agent_skills injection
-- /gsd-set-profile <profile> — switch model profile
+- /gsd-config --integrations — configure API keys (Brave/Firecrawl/Exa), review.models CLI routing, and agent_skills injection
+- /gsd-config --profile <profile> — switch model profile
 - /gsd-plan-phase --research — force research
 - /gsd-plan-phase --skip-research — skip research
 - /gsd-plan-phase --skip-verify — skip plan check
-- /gsd-settings-advanced — power-user tuning (plan bounce, timeouts, branch templates, cross-AI, context window)
+- /gsd-config --advanced — power-user tuning (plan bounce, timeouts, branch templates, cross-AI, context window)
 ```
 </step>
 
