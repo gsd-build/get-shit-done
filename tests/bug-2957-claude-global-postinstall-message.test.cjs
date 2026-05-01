@@ -47,6 +47,11 @@ describe('Bug #2957: claude+global post-install message', () => {
     assert.match(output, /restart claude code/i, 'should mention restart');
     assert.match(output, /\/gsd-new-project/, 'should still mention /gsd-new-project');
     assert.match(output, /gsd-new-project skill/i, 'should mention the skill name fallback');
+    assert.doesNotMatch(
+      output,
+      /open a blank directory/i,
+      'global claude install should replace, not extend, the legacy generic instruction',
+    );
   });
 
   test('claude+local message keeps the original /gsd-new-project instruction', () => {
