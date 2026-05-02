@@ -39,11 +39,16 @@ const SDK_CLI = path.join(__dirname, '..', 'sdk', 'dist', 'cli.js');
 const fs = require('node:fs');
 
 describe('bug #3026 (CR Major outside-diff): SDK forwards plain-text help from gsd-tools fallback', () => {
-  test('gsd-sdk query phase --help (fallback path) returns usage, not a JSON parse error', () => {
+  test('gsd-sdk query phase --help (fallback path) returns usage, not a JSON parse error', (t) => {
     if (!fs.existsSync(SDK_CLI)) {
-      // SDK not built in this checkout; the unit-level fallback fix is
-      // covered by sdk/src/cli.ts changes + vitest. This integration test
-      // only runs when sdk/dist/cli.js exists.
+      // CR feedback (#3026): a bare `return` here silent-passes the test
+      // when sdk/dist/cli.js is absent (CI checkouts that haven't run
+      // `npm run build`), giving no signal that the integration check
+      // was skipped. Use t.skip() so the omission is visible in the
+      // test report. The unit-level fix is covered by vitest on
+      // sdk/src/cli.ts; this integration test only runs when the
+      // built SDK is on disk.
+      t.skip('sdk/dist/cli.js not built — run `npm run build` in sdk/ to enable this integration test');
       return;
     }
     // `query phase --help` (no further subcommand) is NOT in the native
