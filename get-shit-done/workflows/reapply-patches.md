@@ -275,7 +275,7 @@ Two layered gates. Both must pass before proceeding to cleanup.
 
 Run the deterministic verifier script. Do NOT rely solely on the free-text `verified: yes/no` Hunk Verification Table from Step 4 — bug #2969 traced repeated false-positive `verified: yes` reports to that table being filled in without an actual content-presence check. The script performs the check structurally and exits non-zero on any miss.
 
-Run the verifier as a child process (the gsd-tools binary directory is not required — the script ships under `scripts/` in the source repo and is also exposed via the SDK at `sdk/dist/cli.js verify-reapply` when present):
+Run the verifier as a child process (the gsd-tools binary directory is not required — the script ships under `get-shit-done/bin/` in the source repo and is installed to `${GSD_HOME}/get-shit-done/bin/`; it is also exposed via the SDK at `sdk/dist/cli.js verify-reapply` when present):
 
 ```bash
 PRISTINE_DIR="${CONFIG_DIR}/gsd-pristine"
