@@ -219,3 +219,69 @@ describe('Bug #2979 (#3002 CR): resolveNodeRunner returns null when execPath una
     }
   });
 });
+
+// ─── #3002 CR follow-up #2: null-command guards in settings.json ──────────
+
+describe('Bug #2979 (#3002 CR follow-up): registration sites guard on null command before push', () => {
+  // The settings-mutation registration sites (configureSettings) check both
+  // file existence AND that the resolved *Command variable is truthy before
+  // calling settings.hooks.<event>.push({ type: 'command', command: cmd }).
+  // Without the truthy guard, when resolveNodeRunner returns null, every
+  // dependent *Command becomes null and we'd write `command: null` entries
+  // that the runtime hook schema would reject. This test parses install.js
+  // for each of the 6 managed JS hook push-site `if` clauses and asserts
+  // the corresponding `&& <command>` guard is present.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const installSrc = fs.readFileSync(
+    path.join(__dirname, '..', 'bin', 'install.js'),
+    'utf8',
+  );
+
+  // Each entry: the file-existence check we expect followed by the && <command>
+  // guard we expect on the same `if` line. The check anchors on the file
+  // variable name (e.g. checkUpdateFile) and the *Command variable name; the
+  // guard token between them ensures both are required for registration.
+  const guardSites = [
+    { hook: 'gsd-check-update.js',           fileVar: 'checkUpdateFile',           cmdVar: 'updateCheckCommand' },
+    { hook: 'gsd-context-monitor.js',        fileVar: 'contextMonitorFile',        cmdVar: 'contextMonitorCommand' },
+    { hook: 'gsd-prompt-guard.js',           fileVar: 'promptGuardFile',           cmdVar: 'promptGuardCommand' },
+    { hook: 'gsd-read-guard.js',             fileVar: 'readGuardFile',             cmdVar: 'readGuardCommand' },
+    { hook: 'gsd-read-injection-scanner.js', fileVar: 'readInjectionScannerFile',  cmdVar: 'readInjectionScannerCommand' },
+    { hook: 'gsd-workflow-guard.js',         fileVar: 'workflowGuardFile',         cmdVar: 'workflowGuardCommand' },
+  ];
+
+  for (const { hook, fileVar, cmdVar } of guardSites) {
+    test(`${hook} registration if-clause includes && ${cmdVar} guard`, () => {
+      // Match: `if (...fs.existsSync(<fileVar>) && <cmdVar>)`
+      const pattern = new RegExp(
+        `fs\\.existsSync\\(${fileVar}\\)\\s*&&\\s*${cmdVar}\\b`,
+      );
+      assert.ok(
+        pattern.test(installSrc),
+        `expected \`fs.existsSync(${fileVar}) && ${cmdVar}\` guard for ${hook} (#3002 CR)`,
+      );
+    });
+  }
+
+  test('statusline registration includes a null-command early-skip branch', () => {
+    // The CR fix added an `else if (!statuslineCommand)` clause between the
+    // local-skip guard and the `settings.statusLine = { ... }` write.
+    // Match the structural shape: an else-if guard on !statuslineCommand
+    // somewhere in the file. The clause's body content is allowed to vary;
+    // the structural invariant is the guard itself.
+    assert.ok(
+      /else if \(!statuslineCommand\)/.test(installSrc),
+      'expected `else if (!statuslineCommand)` guard somewhere in the statusline registration block (#3002 CR)',
+    );
+    // Verify the guard precedes the statusLine write (otherwise the guard
+    // doesn't help). The statusLine write must come AFTER the !statuslineCommand
+    // guard's location in the source.
+    const guardIdx = installSrc.indexOf('else if (!statuslineCommand)');
+    const writeIdx = installSrc.indexOf('settings.statusLine = {');
+    assert.ok(
+      guardIdx >= 0 && writeIdx > guardIdx,
+      `statusLine write at ${writeIdx} must come after !statuslineCommand guard at ${guardIdx}`,
+    );
+  });
+});

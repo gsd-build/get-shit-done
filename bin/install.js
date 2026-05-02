@@ -7879,6 +7879,21 @@ function install(isGlobal, runtime = 'claude') {
     ? buildHookCommand(targetDir, 'gsd-read-injection-scanner.js', hookOpts)
     : localCmd('gsd-read-injection-scanner.js');
 
+  // #3002 CR: when resolveNodeRunner() returns null, every dependent JS-hook
+  // command is null too. Emit one warning here so the operator sees the cause
+  // ONCE instead of per-hook. Each registration site below also guards on its
+  // own *Command variable being truthy, so we never write `command: null`
+  // entries to settings.json (which the runtime's hook schema would reject).
+  const anyJsHookCommandNull = !statuslineCommand
+    || !updateCheckCommand
+    || !contextMonitorCommand
+    || !promptGuardCommand
+    || !readGuardCommand
+    || !readInjectionScannerCommand;
+  if (anyJsHookCommandNull) {
+    console.warn(`  ${yellow}⚠${reset}  Skipping managed JS hook registration — Node executable path unavailable (process.execPath is empty). See #2979 / #3002.`);
+  }
+
   // Enable experimental agents for Gemini CLI (required for custom sub-agents)
   if (isGemini) {
     if (!settings.experimental) {
@@ -7908,7 +7923,7 @@ function install(isGlobal, runtime = 'claude') {
     // copy step produces no files but the registration step ran unconditionally,
     // causing "hook error" on every tool invocation.
     const checkUpdateFile = path.join(targetDir, 'hooks', 'gsd-check-update.js');
-    if (!hasGsdUpdateHook && fs.existsSync(checkUpdateFile)) {
+    if (!hasGsdUpdateHook && fs.existsSync(checkUpdateFile) && updateCheckCommand) {
       settings.hooks.SessionStart.push({
         hooks: [
           {
@@ -7932,7 +7947,7 @@ function install(isGlobal, runtime = 'claude') {
     );
 
     const contextMonitorFile = path.join(targetDir, 'hooks', 'gsd-context-monitor.js');
-    if (!hasContextMonitorHook && fs.existsSync(contextMonitorFile)) {
+    if (!hasContextMonitorHook && fs.existsSync(contextMonitorFile) && contextMonitorCommand) {
       settings.hooks[postToolEvent].push({
         matcher: 'Bash|Edit|Write|MultiEdit|Agent|Task',
         hooks: [
@@ -7980,7 +7995,7 @@ function install(isGlobal, runtime = 'claude') {
     );
 
     const promptGuardFile = path.join(targetDir, 'hooks', 'gsd-prompt-guard.js');
-    if (!hasPromptGuardHook && fs.existsSync(promptGuardFile)) {
+    if (!hasPromptGuardHook && fs.existsSync(promptGuardFile) && promptGuardCommand) {
       settings.hooks[preToolEvent].push({
         matcher: 'Write|Edit',
         hooks: [
@@ -8004,7 +8019,7 @@ function install(isGlobal, runtime = 'claude') {
     );
 
     const readGuardFile = path.join(targetDir, 'hooks', 'gsd-read-guard.js');
-    if (!hasReadGuardHook && fs.existsSync(readGuardFile)) {
+    if (!hasReadGuardHook && fs.existsSync(readGuardFile) && readGuardCommand) {
       settings.hooks[preToolEvent].push({
         matcher: 'Write|Edit',
         hooks: [
@@ -8028,7 +8043,7 @@ function install(isGlobal, runtime = 'claude') {
     );
 
     const readInjectionScannerFile = path.join(targetDir, 'hooks', 'gsd-read-injection-scanner.js');
-    if (!hasReadInjectionScannerHook && fs.existsSync(readInjectionScannerFile)) {
+    if (!hasReadInjectionScannerHook && fs.existsSync(readInjectionScannerFile) && readInjectionScannerCommand) {
       settings.hooks[postToolEvent].push({
         matcher: 'Read',
         hooks: [
@@ -8060,7 +8075,7 @@ function install(isGlobal, runtime = 'claude') {
     );
 
     const workflowGuardFile = path.join(targetDir, 'hooks', 'gsd-workflow-guard.js');
-    if (!hasWorkflowGuardHook && fs.existsSync(workflowGuardFile)) {
+    if (!hasWorkflowGuardHook && fs.existsSync(workflowGuardFile) && workflowGuardCommand) {
       settings.hooks[preToolEvent].push({
         matcher: 'Write|Edit',
         hooks: [
@@ -8173,6 +8188,11 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
       // any profile-level statusLine the user has configured (#2248).
       // Pass --force-statusline to override this guard.
       console.log(`  ${yellow}⚠${reset} Skipping statusLine for local install (avoids overriding profile-level settings; use --force-statusline to override)`);
+    } else if (!statuslineCommand) {
+      // #3002 CR: don't write { type: 'command', command: null } — the
+      // runtime's settings schema rejects null commands and the failure
+      // surfaces as a confusing parse error rather than a usable diagnostic.
+      console.warn(`  ${yellow}⚠${reset}  Skipped statusline registration — Node executable path unavailable (process.execPath is empty). See #2979 / #3002.`);
     } else {
       settings.statusLine = {
         type: 'command',
