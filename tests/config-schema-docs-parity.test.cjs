@@ -1,5 +1,9 @@
 'use strict';
 
+// allow-test-rule: source-text-is-the-product
+// Reads .md/.json/.yml product files whose deployed text IS what the
+// runtime loads — testing text content tests the deployed contract.
+
 /**
  * Asserts every exact-match key in config-schema.cjs appears at least once
  * in docs/CONFIGURATION.md. A key present in the validator but absent from

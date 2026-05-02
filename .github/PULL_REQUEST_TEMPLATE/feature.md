@@ -94,7 +94,7 @@ Closes #
 - [ ] Implementation scope matches the approved spec exactly
 - [ ] All existing tests pass (`npm test`)
 - [ ] New tests cover the happy path, error cases, and edge cases
-- [ ] CHANGELOG.md updated with a user-facing description of the feature
+- [ ] `.changeset/` fragment added with a user-facing description of the feature (`npm run changeset -- --type Added --pr <NNN> --body "..."`)
 - [ ] Documentation updated — commands, workflows, references, README if applicable
 - [ ] No unnecessary external dependencies added
 - [ ] Works on Windows (backslash paths handled)

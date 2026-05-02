@@ -73,7 +73,7 @@ Closes #
 - [ ] Changes are scoped to the approved enhancement — nothing extra included
 - [ ] All existing tests pass (`npm test`)
 - [ ] New or updated tests cover the enhanced behavior
-- [ ] CHANGELOG.md updated
+- [ ] `.changeset/` fragment added (`npm run changeset -- --type Changed --pr <NNN> --body "..."`) — or `no-changelog` label applied if not user-facing
 - [ ] Documentation updated if behavior or output changed
 - [ ] No unnecessary dependencies added
 

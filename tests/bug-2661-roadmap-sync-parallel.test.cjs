@@ -1,3 +1,7 @@
+// allow-test-rule: source-text-is-the-product
+// Reads .md/.json/.yml product files whose deployed text IS what the
+// runtime loads — testing text content tests the deployed contract.
+
 /**
  * Regression tests for bug #2661:
  *   `/gsd-execute-phase N --auto` with parallelization: true, use_worktrees: false
