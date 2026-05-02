@@ -106,6 +106,13 @@ function runInstall({ runtime, scope, extraArgs = [] }) {
     const result = spawnSync(process.execPath, args, {
       cwd,
       encoding: 'utf8',
+      // #3037: isolate HOME so the developer's real ~/.gemini/commands/gsd/
+      // doesn't leak into Gemini local-install conflict detection. The
+      // installer reads os.homedir() to detect prior global GSD installs;
+      // without this, the dev's existing global install causes the local
+      // install to skip (correct behavior for end users, wrong for tests
+      // that want to assert the local install path).
+      env: { ...process.env, HOME: root, USERPROFILE: root },
     });
 
     assert.strictEqual(

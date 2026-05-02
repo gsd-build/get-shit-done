@@ -136,17 +136,34 @@ describe('Gemini Markdown Processor', () => {
 
 describe('Gemini Install (Behavioral)', () => {
   let tmpDir;
+  let tmpHome;
   let previousCwd;
+  let previousHome;
+  let previousUserprofile;
 
   beforeEach(() => {
     tmpDir = createTempDir('gsd-gemini-test-');
+    tmpHome = createTempDir('gsd-gemini-home-');
     previousCwd = process.cwd();
+    previousHome = process.env.HOME;
+    previousUserprofile = process.env.USERPROFILE;
     process.chdir(tmpDir);
+    // #3037: isolate HOME so the developer's real ~/.gemini/commands/gsd/
+    // doesn't trigger the local-install conflict-avoidance skip path. This
+    // test wants to assert that the local install populates commands/gsd/
+    // when no global GSD is present at the user scope.
+    process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
   });
 
   afterEach(() => {
     process.chdir(previousCwd);
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousUserprofile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = previousUserprofile;
     cleanup(tmpDir);
+    cleanup(tmpHome);
   });
 
   test('install creates correct directory structure for Gemini', () => {
