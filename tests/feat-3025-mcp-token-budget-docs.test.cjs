@@ -85,37 +85,45 @@ function parseMcpBudgetSection(section) {
       crossLinksContextBudget: false,
     };
   }
-  const lower = section.toLowerCase();
+  // CR follow-up: strip inline markdown emphasis (`**`, `*`, `~~`) and
+  // backticks before phrase-matching so e.g. "GSD does **not** manage"
+  // is caught by the primary `gsd does not manage` alternative below.
+  // WITHOUT this, the markdown-bold breaks the contiguous match and the
+  // test only passes via the fallback branch (silent dead code).
+  // Underscores are intentionally NOT stripped — `model_profile` and
+  // other snake_case identifiers must survive intact so the
+  // model_profile interaction check still finds them.
+  const stripped = section.replace(/\*{1,3}|~{2}|`/g, '');
   // (1) Explains MCP as budget concern — must mention BOTH "MCP" / "tool
   // schema" AND a token/cost framing.
   const explainsMcpAsBudgetConcern =
-    /\bmcp\b|tool schema|tool schemas/i.test(section) &&
-    /\btoken|context budget|per[- ]turn|cost\b/i.test(section);
+    /\bmcp\b|tool schema|tool schemas/i.test(stripped) &&
+    /\btoken|context budget|per[- ]turn|cost\b/i.test(stripped);
   // (2) Names the harness keys verbatim
-  const namesEnabledMcpjsonServers = /enabledMcpjsonServers/.test(section);
-  const namesDisabledMcpjsonServers = /disabledMcpjsonServers/.test(section);
+  const namesEnabledMcpjsonServers = /enabledMcpjsonServers/.test(stripped);
+  const namesDisabledMcpjsonServers = /disabledMcpjsonServers/.test(stripped);
   // (3) Names the settings file location
-  const namesClaudeSettingsJson = /\.claude\/settings\.json/.test(section);
+  const namesClaudeSettingsJson = /\.claude\/settings\.json/.test(stripped);
   // (4) Audit checklist — must mention all three classes the issue
   // calls out, plus a "before this phase / pre-phase" framing
   const includesPrePhaseAudit =
-    /audit|checklist|review (your )?mcp|before (starting|beginning) (a |the )?phase/i.test(section);
-  const auditMentionsBrowserOrPlaywright = /\bbrowser\b|playwright/i.test(section);
-  const auditMentionsPlatformSpecific = /platform[- ]specific|mac[- ]?tools|windows[- ]?tools|os[- ]specific/i.test(section);
-  const auditMentionsCrossProject = /(other|different|cross[- ])\s*project|stale (project )?mcp/i.test(section);
+    /audit|checklist|review (your )?mcp|before (starting|beginning) (a |the )?phase/i.test(stripped);
+  const auditMentionsBrowserOrPlaywright = /\bbrowser\b|playwright/i.test(stripped);
+  const auditMentionsPlatformSpecific = /platform[- ]specific|mac[- ]?tools|windows[- ]?tools|os[- ]specific/i.test(stripped);
+  const auditMentionsCrossProject = /(other|different|cross[- ])\s*project|stale (project )?mcp/i.test(stripped);
   // (5) Harness vs GSD distinction — must explicitly state GSD doesn't
   // own this knob and point at the harness
   const explainsHarnessNotGsd =
-    /(gsd does(?:n[''’]t| not) (own|manage|control)|harness (concern|setting|controlled)|not a gsd (setting|knob))/i.test(section);
+    /(gsd does(?:n[''’]t| not) (own|manage|control)|harness (concern|setting|controlled)|not a gsd (setting|knob))/i.test(stripped);
   // (6) Compounding with model_profile
   const mentionsModelProfileInteraction =
-    /model[_ ]profile/i.test(section) &&
-    /compound|multiplier|stack|every[- ]turn|regardless of (which )?model|in addition/i.test(section);
+    /model[_ ]profile/i.test(stripped) &&
+    /compound|multiplier|stack|every[- ]turn|regardless of (which )?model|in addition/i.test(stripped);
   // (7) Cross-link to the canonical reference doc — task-guide section
   // must point readers at context-budget.md for the full audit. Encoded
   // as a named flag (CR follow-up) so the assertion sits alongside the
   // other parsed invariants rather than as a one-off inline regex.
-  const crossLinksContextBudget = /context-budget/i.test(section);
+  const crossLinksContextBudget = /context-budget/i.test(stripped);
   return {
     ok: true,
     sectionLength: section.length,
