@@ -902,7 +902,7 @@ continues. Drift detection cannot fail verification.
 - REQ-UPDATE-02: System MUST display changelog for new version before updating
 - REQ-UPDATE-03: System MUST be runtime-aware and target the correct directory
 - REQ-UPDATE-04: System MUST back up locally modified files to `gsd-local-patches/`
-- REQ-UPDATE-05: `/gsd-reapply-patches` MUST restore local modifications after update
+- REQ-UPDATE-05: `/gsd-update --reapply` MUST restore local modifications after update
 
 ---
 
@@ -2255,7 +2255,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 103. Post-Merge Hunk Verification
 
-**Command:** `/gsd-reapply-patches`
+**Command:** `/gsd-update --reapply`
 
 **Purpose:** After applying local patches post-update, verify that all hunks were actually applied by comparing the expected patch content against the live filesystem. Surface any dropped or partial hunks immediately rather than silently accepting incomplete merges.
 

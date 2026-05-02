@@ -439,7 +439,7 @@ UI-SPEC.md (per phase) ───────────────────
    - Antigravity: Google 모델 등가물을 사용한 skills-first 방식
 5. **경로 정규화** — `~/.claude/` 경로를 런타임별 경로로 교체
 6. **설정 통합** — 런타임의 `settings.json`에 훅 등록
-7. **패치 백업** — v1.17부터 로컬 수정 파일을 `gsd-local-patches/`에 백업하여 `/gsd-reapply-patches`에 사용
+7. **패치 백업** — v1.17부터 로컬 수정 파일을 `gsd-local-patches/`에 백업하여 `/gsd-update --reapply`에 사용
 8. **매니페스트 추적** — 깔끔한 제거를 위해 `gsd-file-manifest.json` 작성
 9. **제거 모드** — `--uninstall`로 모든 GSD 파일, 훅, 설정 제거
 

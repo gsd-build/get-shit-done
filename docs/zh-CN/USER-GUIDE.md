@@ -234,7 +234,7 @@
 | `/gsd-check-todos` | 列出待处理事项 | 查看捕获的想法 |
 | `/gsd-settings` | 配置工作流开关和模型配置 | 更改模型、切换代理 |
 | `/gsd-set-profile <profile>` | 快速切换配置 | 更改成本/质量权衡 |
-| `/gsd-reapply-patches` | 更新后恢复本地修改 | 如果你有本地编辑，在 `/gsd-update` 后 |
+| `/gsd-update --reapply` | 更新后恢复本地修改 | 如果你有本地编辑，在 `/gsd-update` 后 |
 
 ---
 
@@ -466,7 +466,7 @@ node gsd-tools.cjs state sync              # 从磁盘重建 STATE.md
 
 ### GSD 更新覆盖了我的本地更改
 
-从 v1.17 开始，安装程序将本地修改的文件备份到 `gsd-local-patches/`。运行 `/gsd-reapply-patches` 将你的更改合并回来。
+从 v1.17 开始，安装程序将本地修改的文件备份到 `gsd-local-patches/`。运行 `/gsd-update --reapply` 将你的更改合并回来。
 
 ### 子代理似乎失败但工作已完成
 
@@ -487,7 +487,7 @@ node gsd-tools.cjs state sync              # 从磁盘重建 STATE.md
 | 快速针对性修复 | `/gsd-quick` |
 | 计划与你的愿景不符 | `/gsd-discuss-phase [N]` 然后重新规划 |
 | 成本过高 | `/gsd-set-profile budget` 和 `/gsd-settings` 关闭代理 |
-| 更新破坏了本地更改 | `/gsd-reapply-patches` |
+| 更新破坏了本地更改 | `/gsd-update --reapply` |
 
 ---
 

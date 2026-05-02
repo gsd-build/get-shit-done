@@ -800,7 +800,7 @@
 - REQ-UPDATE-02: 업데이트 전에 새 버전의 변경 로그를 표시해야 합니다.
 - REQ-UPDATE-03: 런타임을 인식하고 올바른 디렉토리를 대상으로 해야 합니다.
 - REQ-UPDATE-04: 로컬에서 수정된 파일을 `gsd-local-patches/`에 백업해야 합니다.
-- REQ-UPDATE-05: `/gsd-reapply-patches`는 업데이트 후 로컬 수정사항을 복원해야 합니다.
+- REQ-UPDATE-05: `/gsd-update --reapply`는 업데이트 후 로컬 수정사항을 복원해야 합니다.
 
 ---
 

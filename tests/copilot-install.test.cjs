@@ -1078,7 +1078,7 @@ describe('Copilot manifest and patches fixes', () => {
       console.log = originalLog;
     });
 
-    test('reportLocalPatches shows /gsd-reapply-patches for Copilot', () => {
+    test('reportLocalPatches shows /gsd-update --reapply for Copilot', () => {
       // Create patches directory with metadata
       const patchesDir = path.join(tmpDir, 'gsd-local-patches');
       fs.mkdirSync(patchesDir, { recursive: true });
@@ -1091,11 +1091,15 @@ describe('Copilot manifest and patches fixes', () => {
 
       assert.ok(result.length > 0, 'returns patched files list');
       const output = logs.join('\n');
-      assert.ok(output.includes('/gsd-reapply-patches'), 'uses dash format for Copilot');
+      // Asserts the consolidated form. /gsd-reapply-patches was removed in
+      // 1.39 (PR #2824) and folded into a flag on /gsd-update — see #3010.
+      // Negative assertion guards against regression to the dead command.
+      assert.ok(output.includes('/gsd-update --reapply'), 'uses consolidated /gsd-update --reapply form for Copilot');
+      assert.ok(!output.includes('/gsd-reapply-patches'), 'does not reference removed /gsd-reapply-patches command');
       assert.ok(!output.includes('/gsd:reapply-patches'), 'does not use colon format');
     });
 
-    test('reportLocalPatches shows /gsd-reapply-patches for Claude', () => {
+    test('reportLocalPatches shows /gsd-update --reapply for Claude', () => {
       // Create patches directory with metadata
       const patchesDir = path.join(tmpDir, 'gsd-local-patches');
       fs.mkdirSync(patchesDir, { recursive: true });
@@ -1108,7 +1112,8 @@ describe('Copilot manifest and patches fixes', () => {
 
       assert.ok(result.length > 0, 'returns patched files list');
       const output = logs.join('\n');
-      assert.ok(output.includes('/gsd-reapply-patches'), 'uses hyphen format for Claude');
+      assert.ok(output.includes('/gsd-update --reapply'), 'uses consolidated /gsd-update --reapply form for Claude');
+      assert.ok(!output.includes('/gsd-reapply-patches'), 'does not reference removed /gsd-reapply-patches command');
       assert.ok(!output.includes('/gsd:reapply-patches'), 'does not use colon format for Claude');
     });
   });
