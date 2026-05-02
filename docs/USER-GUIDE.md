@@ -18,6 +18,11 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 - [Troubleshooting](#troubleshooting)
 - [Recovery Quick Reference](#recovery-quick-reference)
 
+For driving GSD directly from a GitHub / Linear / Jira issue, see the
+[Issue-Driven Orchestration guide](issue-driven-orchestration.md) — a
+recipe that maps tracker issues onto the workspace → discuss → plan →
+execute → verify → review → ship loop using existing GSD primitives.
+
 ---
 
 ## End-to-End Walkthrough
