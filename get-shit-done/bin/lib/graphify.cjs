@@ -45,6 +45,17 @@ function disabledResponse() {
  * @param {{ timeout?: number }} [options={}] - Options (timeout in ms, default 30000)
  * @returns {{ exitCode: number, stdout: string, stderr: string }}
  */
+/**
+ * Frozen enum of typed reason codes for execGraphify failures (#2974).
+ * Tests assert on result.reason instead of grepping stderr text.
+ */
+const GRAPHIFY_REASON = Object.freeze({
+  OK: 'ok',
+  ENOENT: 'graphify_not_found',
+  TIMEOUT: 'graphify_timed_out',
+  EXIT_NONZERO: 'graphify_exit_nonzero',
+});
+
 function execGraphify(cwd, args, options = {}) {
   const timeout = options.timeout ?? 30000;
   const result = childProcess.spawnSync('graphify', args, {
@@ -57,7 +68,12 @@ function execGraphify(cwd, args, options = {}) {
 
   // ENOENT -- graphify binary not found on PATH
   if (result.error && result.error.code === 'ENOENT') {
-    return { exitCode: 127, stdout: '', stderr: 'graphify not found on PATH' };
+    return {
+      exitCode: 127,
+      stdout: '',
+      stderr: 'graphify not found on PATH',
+      reason: GRAPHIFY_REASON.ENOENT,
+    };
   }
 
   // Timeout -- subprocess killed via SIGTERM
@@ -66,13 +82,17 @@ function execGraphify(cwd, args, options = {}) {
       exitCode: 124,
       stdout: (result.stdout ?? '').toString().trim(),
       stderr: 'graphify timed out after ' + timeout + 'ms',
+      reason: GRAPHIFY_REASON.TIMEOUT,
+      timeout_ms: timeout,
     };
   }
 
+  const exitCode = result.status ?? 1;
   return {
-    exitCode: result.status ?? 1,
+    exitCode,
     stdout: (result.stdout ?? '').toString().trim(),
     stderr: (result.stderr ?? '').toString().trim(),
+    reason: exitCode === 0 ? GRAPHIFY_REASON.OK : GRAPHIFY_REASON.EXIT_NONZERO,
   };
 }
 
@@ -504,6 +524,7 @@ module.exports = {
   disabledResponse,
   // Subprocess
   execGraphify,
+  GRAPHIFY_REASON,
   // Presence and version
   checkGraphifyInstalled,
   checkGraphifyVersion,

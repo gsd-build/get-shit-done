@@ -8944,6 +8944,85 @@ function classifySdkInstall(sdkDir) {
   return { mode, npxCache, readOnly };
 }
 
+/**
+ * #2974: pure builder for the SDK fail-fast report. Returns a structured IR
+ * with everything the renderer needs PLUS everything tests need to assert
+ * on. Tests can call `buildSdkFailFastReport(sdkDir, sdkCliPath)` directly
+ * and assert on `report.reason`, `report.context`, `report.fix_command`
+ * etc. without intercepting console.error or matching against rendered
+ * text.
+ *
+ * Shape (frozen contract — extending requires a new test):
+ *   {
+ *     ok: false,
+ *     reason: 'sdk_fail_fast',                 // ERROR_REASON.SDK_FAIL_FAST
+ *     context: 'npx-cache' | 'tarball' | 'dev-clone',
+ *     missing_path: '<path>/sdk/dist/cli.js',
+ *     missing_artifact: 'sdk/dist',
+ *     fix_command: 'npm install -g get-shit-done-cc@latest' | 'cd sdk && npm install && npm run build',
+ *     attempted_nested_install: false,         // contract: never true
+ *   }
+ */
+function buildSdkFailFastReport(sdkDir, sdkCliPath) {
+  const ctx = classifySdkInstall(sdkDir);
+  let context, fix_command;
+  if (ctx.mode === 'tarball') {
+    context = ctx.npxCache ? 'npx-cache' : 'tarball';
+    fix_command = 'npm install -g get-shit-done-cc@latest';
+  } else {
+    context = 'dev-clone';
+    fix_command = 'cd sdk && npm install && npm run build';
+  }
+  return {
+    ok: false,
+    reason: 'sdk_fail_fast',
+    context,
+    missing_path: sdkCliPath,
+    missing_artifact: 'sdk/dist',
+    fix_command,
+    attempted_nested_install: false,
+  };
+}
+
+/**
+ * Renderer for the structured fail-fast report. Text formatting only —
+ * tests never call this. Splits the IR fields back into the same human-
+ * readable lines the previous shape produced.
+ */
+function renderSdkFailFastReport(ir) {
+  const bar = '━'.repeat(72);
+  const redBold = `${red}${bold}`;
+  console.error('');
+  console.error(`${redBold}${bar}${reset}`);
+  console.error(`${redBold}  ✗ GSD SDK dist not found — /gsd-* commands will not work${reset}`);
+  console.error(`${redBold}${bar}${reset}`);
+  console.error(`  ${red}Reason:${reset} ${ir.missing_artifact}/cli.js not found at ${ir.missing_path}`);
+  console.error('');
+  if (ir.context === 'npx-cache') {
+    console.error(`  Detected read-only npx cache install (${dim}${path.dirname(ir.missing_path).replace(/\/dist$/, '')}${reset}).`);
+    console.error(`  The installer will ${bold}not${reset} attempt \`npm install\` inside the npx cache.`);
+    console.error('');
+    console.error(`  Fix: install a version that ships sdk/dist/ globally:`);
+    console.error(`    ${cyan}${ir.fix_command}${reset}`);
+    console.error(`  Or, if you prefer a one-shot run, clear the npx cache first:`);
+    console.error(`    ${cyan}npx --yes get-shit-done-cc@latest${reset}`);
+    console.error(`  Or build from source (git clone):`);
+    console.error(`    ${cyan}git clone https://github.com/gsd-build/get-shit-done && cd get-shit-done/sdk && npm install && npm run build${reset}`);
+  } else if (ir.context === 'tarball') {
+    console.error(`  The published tarball appears to be missing sdk/dist/ (see #2647).`);
+    console.error('');
+    console.error(`  Fix: install a version that ships sdk/dist/ globally:`);
+    console.error(`    ${cyan}${ir.fix_command}${reset}`);
+    console.error(`  Or build from source (git clone):`);
+    console.error(`    ${cyan}git clone https://github.com/gsd-build/get-shit-done && cd get-shit-done/sdk && npm install && npm run build${reset}`);
+  } else {
+    console.error(`  Running from a git clone — build the SDK first:`);
+    console.error(`    ${cyan}${ir.fix_command}${reset}`);
+  }
+  console.error(`${redBold}${bar}${reset}`);
+  console.error('');
+}
+
 function installSdkIfNeeded(opts) {
   opts = opts || {};
   if (hasNoSdk && !opts.sdkDir) {
@@ -8971,44 +9050,8 @@ function installSdkIfNeeded(opts) {
   }
 
   if (!fs.existsSync(sdkCliPath)) {
-    const ctx = classifySdkInstall(sdkDir);
-    const bar = '━'.repeat(72);
-    const redBold = `${red}${bold}`;
-    console.error('');
-    console.error(`${redBold}${bar}${reset}`);
-    console.error(`${redBold}  ✗ GSD SDK dist not found — /gsd-* commands will not work${reset}`);
-    console.error(`${redBold}${bar}${reset}`);
-    console.error(`  ${red}Reason:${reset} sdk/dist/cli.js not found at ${sdkCliPath}`);
-    console.error('');
-
-    if (ctx.mode === 'tarball') {
-      // User install (including `npx get-shit-done-cc@latest`, which stages
-      // a read-only tarball under the npx cache). The sdk/dist/ artifact
-      // should ship in the published tarball. If it's missing, the only
-      // sane fix from the user's side is a fresh global install of a
-      // version that includes dist/. Do NOT attempt a nested `npm install`
-      // inside the (read-only) npx cache — that's the #2649 failure mode.
-      if (ctx.npxCache) {
-        console.error(`  Detected read-only npx cache install (${dim}${sdkDir}${reset}).`);
-        console.error(`  The installer will ${bold}not${reset} attempt \`npm install\` inside the npx cache.`);
-        console.error('');
-      } else {
-        console.error(`  The published tarball appears to be missing sdk/dist/ (see #2647).`);
-        console.error('');
-      }
-      console.error(`  Fix: install a version that ships sdk/dist/ globally:`);
-      console.error(`    ${cyan}npm install -g get-shit-done-cc@latest${reset}`);
-      console.error(`  Or, if you prefer a one-shot run, clear the npx cache first:`);
-      console.error(`    ${cyan}npx --yes get-shit-done-cc@latest${reset}`);
-      console.error(`  Or build from source (git clone):`);
-      console.error(`    ${cyan}git clone https://github.com/gsd-build/get-shit-done && cd get-shit-done/sdk && npm install && npm run build${reset}`);
-    } else {
-      // Dev clone: keep the existing build-from-source hint.
-      console.error(`  Running from a git clone — build the SDK first:`);
-      console.error(`    ${cyan}cd sdk && npm install && npm run build${reset}`);
-    }
-    console.error(`${redBold}${bar}${reset}`);
-    console.error('');
+    const ir = buildSdkFailFastReport(sdkDir, sdkCliPath);
+    renderSdkFailFastReport(ir);
     process.exit(1);
   }
 
@@ -9370,6 +9413,8 @@ if (process.env.GSD_TEST_MODE) {
     install,
     uninstall,
     installSdkIfNeeded,
+    buildSdkFailFastReport,
+    renderSdkFailFastReport,
     classifySdkInstall,
     convertClaudeCommandToCodexSkill,
     convertClaudeToOpencodeFrontmatter,

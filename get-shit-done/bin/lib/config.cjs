@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, ERROR_REASON, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
 const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const {
   VALID_PROFILES,
@@ -33,7 +33,7 @@ const CONFIG_KEY_SUGGESTIONS = {
 function validateKnownConfigKeyPath(keyPath) {
   const suggested = CONFIG_KEY_SUGGESTIONS[keyPath];
   if (suggested) {
-    error(`Unknown config key: ${keyPath}. Did you mean ${suggested}?`);
+    error(`Unknown config key: ${keyPath}. Did you mean ${suggested}?`, ERROR_REASON.CONFIG_INVALID_KEY);
   }
 }
 
@@ -278,7 +278,7 @@ function setConfigValue(cwd, keyPath, parsedValue) {
         config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       }
     } catch (err) {
-      error('Failed to read config.json: ' + err.message);
+      error('Failed to read config.json: ' + err.message, ERROR_REASON.CONFIG_PARSE_FAILED);
     }
 
     // Set nested value using dot notation (e.g., "workflow.research")
@@ -319,7 +319,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   validateKnownConfigKeyPath(keyPath);
 
   if (!isValidConfigKey(keyPath)) {
-    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}, agent_skills.<agent-type>, features.<feature_name>`);
+    error(`Unknown config key: "${keyPath}". Valid keys: ${[...VALID_CONFIG_KEYS].sort().join(', ')}, agent_skills.<agent-type>, features.<feature_name>`, ERROR_REASON.CONFIG_INVALID_KEY);
   }
 
   // Parse value (handle booleans, numbers, and JSON arrays/objects)
@@ -402,11 +402,11 @@ function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
       output(defaultValue, raw, String(defaultValue));
       return;
     } else {
-      error('No config.json found at ' + configPath);
+      error('No config.json found at ' + configPath, ERROR_REASON.CONFIG_NO_FILE);
     }
   } catch (err) {
     if (err.message.startsWith('No config.json')) throw err;
-    error('Failed to read config.json: ' + err.message);
+    error('Failed to read config.json: ' + err.message, ERROR_REASON.CONFIG_PARSE_FAILED);
   }
 
   // Traverse dot-notation path (e.g., "workflow.auto_advance")
@@ -420,7 +420,7 @@ function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
         output(def, raw, String(def));
         return;
       }
-      error(`Key not found: ${keyPath}`);
+      error(`Key not found: ${keyPath}`, ERROR_REASON.CONFIG_KEY_NOT_FOUND);
     }
     current = current[key];
   }
@@ -432,7 +432,7 @@ function cmdConfigGet(cwd, keyPath, raw, defaultValue) {
       output(def, raw, String(def));
       return;
     }
-    error(`Key not found: ${keyPath}`);
+    error(`Key not found: ${keyPath}`, ERROR_REASON.CONFIG_KEY_NOT_FOUND);
   }
 
   // Never echo plaintext for sensitive keys via config-get. Plaintext lives

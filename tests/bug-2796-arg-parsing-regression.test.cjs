@@ -17,9 +17,6 @@
 
 'use strict';
 
-// allow-test-rule: pending-migration-to-typed-ir [#2974]
-// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
-// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -134,8 +131,11 @@ describe('bug-2796: roadmap update-plan-progress accepts --phase flag', () => {
   });
 
   test('flag form does not pass "--phase" as the phase value to findPhase', () => {
-    // Before fix: findPhase("--phase") returned found:false, causing updated:false
-    // This test confirms the phase value is not the flag name itself.
+    // Before fix: findPhase("--phase") returned found:false, causing updated:false.
+    // Migrated #2974: assert on the typed JSON outcome (updated:true, exit 0)
+    // instead of grepping stderr for the failure message. If the parser had
+    // mis-fed "--phase" as the value, updated would be false and the structured
+    // result would surface the failure typed.
     createRoadmap(tmpDir, '5', '01');
 
     const result = runSdkQuery(
@@ -144,14 +144,13 @@ describe('bug-2796: roadmap update-plan-progress accepts --phase flag', () => {
       tmpDir
     );
 
-    // If the phase was "--phase", we'd get an error like "Phase --phase not found"
-    assert.ok(
-      !result.stderr.includes('--phase not found'),
-      'stderr must not say "--phase not found"'
-    );
-    assert.ok(
-      !result.stderr.includes('"--phase"'),
-      'stderr must not treat "--phase" as the phase value'
-    );
+    assert.strictEqual(result.exitCode, 0,
+      `arg parser must accept --phase 5 cleanly; exitCode=${result.exitCode} stderr=${result.stderr}`);
+    assert.ok(result.json?.updated === true,
+      `expected updated:true (phase 5 found and progress updated); got json=${JSON.stringify(result.json)}`);
+    // The structured result also exposes the phase number that WAS resolved.
+    // It must be the numeric phase, not the flag name "--phase".
+    assert.strictEqual(String(result.json.phase), '5',
+      `result.phase must be the resolved phase value, not the flag literal; got ${result.json.phase}`);
   });
 });

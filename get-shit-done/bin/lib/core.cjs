@@ -201,8 +201,68 @@ function output(result, raw, rawValue) {
   fs.writeSync(1, data);
 }
 
-function error(message) {
-  fs.writeSync(2, 'Error: ' + message + '\n');
+/**
+ * Frozen enum of typed reason codes used by error() for structured errors.
+ * Each subcommand contributes its own codes; the enum exists so tests can
+ * assert against typed values instead of grepping stderr (#2974).
+ *
+ * Adding a new code:
+ *   - Pick a snake_case lowercase value (the JSON wire form)
+ *   - Group by subsystem prefix (CONFIG_*, SDK_*, etc)
+ *   - Pass it to error(msg, ERROR_REASON.NEW_CODE) at the call site
+ */
+const ERROR_REASON = Object.freeze({
+  // config-get / config-set
+  CONFIG_KEY_NOT_FOUND: 'config_key_not_found',
+  CONFIG_NO_FILE: 'config_no_file',
+  CONFIG_PARSE_FAILED: 'config_parse_failed',
+  CONFIG_INVALID_KEY: 'config_invalid_key',
+  // SDK / gsd-tools dispatch
+  SDK_FAIL_FAST: 'sdk_fail_fast',
+  SDK_UNKNOWN_COMMAND: 'sdk_unknown_command',
+  SDK_MISSING_ARG: 'sdk_missing_arg',
+  // workflow / phase
+  PHASE_NOT_FOUND: 'phase_not_found',
+  SUMMARY_NO_PLANNING: 'summary_no_planning',
+  // graphify
+  GRAPHIFY_NO_GRAPH: 'graphify_no_graph',
+  GRAPHIFY_INVALID_QUERY: 'graphify_invalid_query',
+  // hooks
+  HOOKS_OPT_OUT: 'hooks_opt_out',
+  // security-scan
+  SECURITY_SCAN_FAILED: 'security_scan_failed',
+  // generic
+  USAGE: 'usage',
+  UNKNOWN: 'unknown',
+});
+
+/**
+ * Process-level flag: when true, error() emits structured JSON to stderr
+ * instead of plain "Error: <message>" text. Set by gsd-tools.cjs when the
+ * CLI is invoked with `--json-errors`. Tests opt in to typed-IR error
+ * assertions by passing that flag and parsing the JSON.
+ *
+ * Default off so existing callers and human operators keep their plain-text
+ * diagnostics. The structured form is opt-in for tooling and tests (#2974).
+ */
+let _jsonErrorMode = false;
+function setJsonErrorMode(v) { _jsonErrorMode = !!v; }
+function getJsonErrorMode() { return _jsonErrorMode; }
+
+/**
+ * Emit an error and exit. When the second argument is provided it must be
+ * a value from ERROR_REASON; tests can assert on `result.reason`. When the
+ * process is in JSON-error mode, stderr receives `{ ok: false, reason,
+ * message }` so callers can parse it; otherwise stderr keeps the plain
+ * text form for human operators.
+ */
+function error(message, reason = ERROR_REASON.UNKNOWN) {
+  if (_jsonErrorMode) {
+    const payload = JSON.stringify({ ok: false, reason, message }) + '\n';
+    fs.writeSync(2, payload);
+  } else {
+    fs.writeSync(2, 'Error: ' + message + '\n');
+  }
   process.exit(1);
 }
 
@@ -1816,6 +1876,9 @@ function timeAgo(date) {
 module.exports = {
   output,
   error,
+  ERROR_REASON,
+  setJsonErrorMode,
+  getJsonErrorMode,
   safeReadFile,
   loadConfig,
   isGitIgnored,

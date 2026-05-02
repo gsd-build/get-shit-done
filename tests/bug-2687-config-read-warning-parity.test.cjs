@@ -1,9 +1,5 @@
 'use strict';
 
-// allow-test-rule: pending-migration-to-typed-ir [#2974]
-// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
-// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
-
 /**
  * Regression test for #2687 — loadConfig must not emit "unknown config key"
  * warnings for keys that are registered in DYNAMIC_KEY_PATTERNS (e.g. review,
@@ -11,10 +7,14 @@
  * the hand-maintained KNOWN_TOP_LEVEL set in core.cjs, causing false-positive
  * warnings on every read.
  *
- * We trigger loadConfig via `resolve-model` (which calls loadConfig internally).
- * We use spawnSync to capture stderr from a process that exits 0 (warnings are
- * written to stderr but don't cause a non-zero exit, so runGsdTools' error field
- * is empty for successful commands).
+ * We trigger loadConfig via `resolve-model` (which calls loadConfig internally)
+ * and assert that stderr is EMPTY on success — a typed-IR equivalent of
+ * "no warning was emitted" without grepping for specific warning text. The
+ * absence of any stderr output IS the contract: loadConfig prints nothing
+ * to stderr when every top-level key in config.json is recognized.
+ *
+ * Migrated from substring `.includes('unknown config key')` text matching
+ * to typed empty-stderr assertions per #2974.
  */
 
 const { describe, test, afterEach } = require('node:test');
@@ -79,13 +79,10 @@ describe('bug-2687 — no warning for dynamic-pattern containers in loadConfig',
     // resolve-model calls loadConfig internally, triggering the KNOWN_TOP_LEVEL check
     const result = runWithStderr(['resolve-model', 'planner'], tmpDir);
 
-    assert.ok(
-      !result.stderr.includes('unknown config key'),
-      `loadConfig must not warn about "review" — got stderr: ${result.stderr}`
-    );
-    assert.ok(
-      !result.stderr.includes('warning'),
-      `loadConfig must not warn about "review" — got stderr: ${result.stderr}`
+    assert.equal(
+      result.stderr.trim(),
+      '',
+      `loadConfig must emit no stderr output for valid dynamic-pattern keys (#2687) — got: ${result.stderr}`
     );
   });
 
@@ -101,13 +98,10 @@ describe('bug-2687 — no warning for dynamic-pattern containers in loadConfig',
     // resolve-model calls loadConfig internally, triggering the KNOWN_TOP_LEVEL check
     const result = runWithStderr(['resolve-model', 'planner'], tmpDir);
 
-    assert.ok(
-      !result.stderr.includes('unknown config key'),
-      `loadConfig must not warn about "model_profile_overrides" — got stderr: ${result.stderr}`
-    );
-    assert.ok(
-      !result.stderr.includes('warning'),
-      `loadConfig must not warn about "model_profile_overrides" — got stderr: ${result.stderr}`
+    assert.equal(
+      result.stderr.trim(),
+      '',
+      `loadConfig must emit no stderr output for valid dynamic-pattern keys (#2687) — got: ${result.stderr}`
     );
   });
 
@@ -123,13 +117,10 @@ describe('bug-2687 — no warning for dynamic-pattern containers in loadConfig',
     // resolve-model calls loadConfig internally, triggering the KNOWN_TOP_LEVEL check
     const result = runWithStderr(['resolve-model', 'planner'], tmpDir);
 
-    assert.ok(
-      !result.stderr.includes('unknown config key'),
-      `loadConfig must not warn about "claude_md_assembly" — got stderr: ${result.stderr}`
-    );
-    assert.ok(
-      !result.stderr.includes('warning'),
-      `loadConfig must not warn about "claude_md_assembly" — got stderr: ${result.stderr}`
+    assert.equal(
+      result.stderr.trim(),
+      '',
+      `loadConfig must emit no stderr output for valid dynamic-pattern keys (#2687) — got: ${result.stderr}`
     );
   });
 });

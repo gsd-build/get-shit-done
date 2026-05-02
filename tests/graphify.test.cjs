@@ -1,8 +1,9 @@
 'use strict';
 
-// allow-test-rule: pending-migration-to-typed-ir [#2974]
-// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
-// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
+// Migrated to typed-IR (#2974): execGraphify now returns a typed
+// `reason` field (GRAPHIFY_REASON enum) alongside exitCode/stdout/stderr.
+// Tests assert on result.reason instead of grepping stderr for failure
+// phrases like 'not found' or 'timed out'.
 
 /**
  * Tests for get-shit-done/bin/lib/graphify.cjs
@@ -23,6 +24,7 @@ const {
   isGraphifyEnabled,
   disabledResponse,
   execGraphify,
+  GRAPHIFY_REASON,
   checkGraphifyInstalled,
   checkGraphifyVersion,
   // Phase 2
@@ -185,7 +187,9 @@ describe('execGraphify', () => {
 
     const result = execGraphify('/tmp', ['build']);
     assert.strictEqual(result.exitCode, 127);
-    assert.ok(result.stderr.includes('not found'));
+    // Migrated #2974: assert on the typed `reason` field instead of
+    // grepping stderr for 'not found'.
+    assert.strictEqual(result.reason, GRAPHIFY_REASON.ENOENT);
   });
 
   test('returns exitCode 124 on timeout', () => {
@@ -199,7 +203,9 @@ describe('execGraphify', () => {
 
     const result = execGraphify('/tmp', ['build']);
     assert.strictEqual(result.exitCode, 124);
-    assert.ok(result.stderr.includes('timed out'));
+    // Migrated #2974: typed reason instead of stderr grep.
+    assert.strictEqual(result.reason, GRAPHIFY_REASON.TIMEOUT);
+    assert.strictEqual(result.timeout_ms, 30000);
   });
 
   test('passes PYTHONUNBUFFERED=1 in env', () => {

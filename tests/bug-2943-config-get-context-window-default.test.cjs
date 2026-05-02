@@ -12,9 +12,11 @@
 
 'use strict';
 
-// allow-test-rule: pending-migration-to-typed-ir [#2974]
-// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
-// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
+// Migrated to typed-IR (#2974): the previous shape grepped stderr/stdout for
+// "Key not found"; now the test passes `--json-errors` to gsd-tools and
+// asserts on the structured `reason` code (a frozen-enum value from
+// `core.cjs::ERROR_REASON`). Exit code is also a typed signal — together
+// they fully discriminate the failure class.
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -24,6 +26,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 
 const GSD_TOOLS = path.join(__dirname, '..', 'get-shit-done', 'bin', 'gsd-tools.cjs');
+const { ERROR_REASON } = require(path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'core.cjs'));
 
 describe('bug-2943: config-get returns schema default for context_window', () => {
   let tmpDir;
@@ -102,20 +105,27 @@ describe('bug-2943: config-get returns schema default for context_window', () =>
     assert.strictEqual(result.stdout, '123456', 'should return the --default value, not schema default');
   });
 
-  test('errors with "Key not found" (exit 1) for an unknown absent key — no regression', () => {
-    // An unrecognised key with no schema default still errors as before
+  test('errors with reason=CONFIG_KEY_NOT_FOUND (exit 1) for an unknown absent key — no regression', () => {
+    // An unrecognised key with no schema default still errors as before.
+    // Migrated #2974: assert on the structured reason code from --json-errors,
+    // not on substring presence in stderr/stdout text.
     fs.writeFileSync(
       path.join(planningDir, 'config.json'),
       JSON.stringify({ workflow: { auto_advance: false } })
     );
 
-    const result = runConfigGet('totally_unknown_key_xyz');
+    const result = runConfigGet('totally_unknown_key_xyz', ['--json-errors']);
 
     assert.strictEqual(result.exitCode, 1, 'should exit 1 for unknown absent key');
-    assert.ok(
-      result.stderr.includes('Key not found') || result.stdout.includes('Key not found'),
-      `expected "Key not found" in output, got stderr="${result.stderr}" stdout="${result.stdout}"`
-    );
+    let parsed;
+    try {
+      parsed = JSON.parse(result.stderr);
+    } catch (err) {
+      assert.fail(`expected JSON-shaped stderr from --json-errors; got: ${JSON.stringify(result.stderr)}`);
+    }
+    assert.strictEqual(parsed.ok, false);
+    assert.strictEqual(parsed.reason, ERROR_REASON.CONFIG_KEY_NOT_FOUND,
+      `expected reason=${ERROR_REASON.CONFIG_KEY_NOT_FOUND}, got=${parsed.reason}`);
   });
 
   test('--default flag still works for arbitrary absent keys', () => {

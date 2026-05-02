@@ -305,6 +305,18 @@ async function main() {
   const raw = rawIndex !== -1;
   if (rawIndex !== -1) args.splice(rawIndex, 1);
 
+  // --json-errors: when present, error() emits structured JSON to stderr
+  // ({ ok: false, reason: <ERROR_REASON code>, message }) instead of plain
+  // "Error: <text>". Lets test suites assert on typed reason codes per the
+  // CONTRIBUTING.md "Prohibited: Raw Text Matching on Test Outputs" rule
+  // (#2974). Default off — human operators see the original plain-text
+  // diagnostic.
+  const jsonErrorsIdx = args.indexOf('--json-errors');
+  if (jsonErrorsIdx !== -1) {
+    core.setJsonErrorMode(true);
+    args.splice(jsonErrorsIdx, 1);
+  }
+
   // --pick <name>: extract a single field from JSON output (replaces jq dependency).
   // Supports dot-notation (e.g., --pick workflow.research) and bracket notation
   // for arrays (e.g., --pick directories[-1]).

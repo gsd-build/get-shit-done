@@ -11,9 +11,12 @@
 
 'use strict';
 
-// allow-test-rule: pending-migration-to-typed-ir [#2974]
-// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
-// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
+// Migrated to typed-IR (#2974): the previous shape used regex assertions
+// against stderr to verify fix-command and missing-artifact phrases. Now
+// the test calls buildSdkFailFastReport(sdkDir) directly and asserts on
+// the structured IR fields (reason, context, fix_command, missing_artifact,
+// attempted_nested_install). The renderer's text shape is now an
+// implementation detail.
 
 const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -128,19 +131,11 @@ describe('installer SDK dist-missing fail-fast (#2649)', () => {
   test('missing dist in npx cache: fail fast, no nested npm install', () => {
     const { root, sdkDir } = makeTempSdk({ npxCache: true });
     try {
+      // Behavioral check 1: installSdkIfNeeded exits 1 and never spawns nested npm.
       const result = runWithIntercepts(() => {
         installer.installSdkIfNeeded({ sdkDir });
       });
-
       assert.strictEqual(result.exitCode, 1, 'must exit non-zero');
-
-      // (a) actionable upgrade path in error output
-      assert.match(result.stderr, /npm i(nstall)? -g get-shit-done-cc@latest/,
-        'error must mention the global-install upgrade path');
-      assert.match(result.stderr, /sdk\/dist/,
-        'error must name the missing artifact');
-
-      // (b) no nested `npm install` / `npm.cmd install` inside sdkDir
       const nestedInstall = result.spawnCalls.find((c) => {
         const argv = Array.isArray(c.argv) ? c.argv : [];
         const cwd = c.opts && c.opts.cwd;
@@ -151,6 +146,18 @@ describe('installer SDK dist-missing fail-fast (#2649)', () => {
       });
       assert.strictEqual(nestedInstall, undefined,
         'must NOT spawn `npm install` inside the npx-cache sdk dir');
+
+      // Behavioral check 2: the structured fail-fast IR identifies the npx-cache
+      // context, points at the right fix command, and asserts the no-nested-install
+      // contract via a typed boolean (no stderr grepping).
+      const ir = installer.buildSdkFailFastReport(sdkDir, path.join(sdkDir, 'dist', 'cli.js'));
+      assert.strictEqual(ir.ok, false);
+      assert.strictEqual(ir.reason, 'sdk_fail_fast');
+      assert.strictEqual(ir.context, 'npx-cache');
+      assert.strictEqual(ir.missing_artifact, 'sdk/dist');
+      assert.strictEqual(ir.fix_command, 'npm install -g get-shit-done-cc@latest');
+      assert.strictEqual(ir.attempted_nested_install, false,
+        'IR contract: nested-install must always be false (this is a hard invariant)');
     } finally {
       cleanup(root);
     }
@@ -164,9 +171,13 @@ describe('installer SDK dist-missing fail-fast (#2649)', () => {
         installer.installSdkIfNeeded({ sdkDir });
       });
       assert.strictEqual(result.exitCode, 1);
-      // Dev clone path: suggest the local build, not the global upgrade.
-      assert.match(result.stderr, /cd sdk && npm install && npm run build/,
-        'dev-clone error must keep the build-from-clone instructions');
+
+      // Typed-IR migration #2974: dev-clone context surfaces the local-build
+      // fix command (not the global-install one).
+      const ir = installer.buildSdkFailFastReport(sdkDir, path.join(sdkDir, 'dist', 'cli.js'));
+      assert.strictEqual(ir.context, 'dev-clone');
+      assert.strictEqual(ir.fix_command, 'cd sdk && npm install && npm run build');
+      assert.strictEqual(ir.attempted_nested_install, false);
 
       const nestedInstall = result.spawnCalls.find((c) => {
         const argv = Array.isArray(c.argv) ? c.argv : [];

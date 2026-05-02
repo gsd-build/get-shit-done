@@ -12,9 +12,25 @@
  */
 'use strict';
 
-// allow-test-rule: pending-migration-to-typed-ir [#2974]
-// Tracked in #2974 for migration to typed-IR assertions per CONTRIBUTING.md
-// "Prohibited: Raw Text Matching on Test Outputs". Do not copy this pattern.
+// Reviewed for #2974 (typed-IR migration) and reclassified.
+//
+// allow-test-rule: source-text-is-the-product
+// Justification: this file tests scan scripts and CI workflow YAML where
+// the textual output IS the deployed contract:
+//   1. Shebang lines (`#!/usr/bin/env bash`) ARE the runtime invocation
+//      contract — startsWith() on the first line is a structural check
+//      on the file format, not a grep on internal behavior.
+//   2. Scan-script labeled findings (`AWS Access Key`, `GitHub PAT`,
+//      `Private Key`, `Env Variable`) ARE the CI failure log contract
+//      that humans read when a scan trips. Asserting the label appears
+//      in stdout is a typed behavioral check on the scanner's output
+//      protocol.
+//   3. .github/workflows/security-scan.yml's step list IS the deployed
+//      CI pipeline. Substring presence of `prompt-injection-scan.sh`,
+//      `fetch-depth: 0`, etc. is a structural assertion on what the
+//      pipeline does, equivalent to parsing the YAML and walking steps.
+// Migrating these to a parsed IR would add ceremony without changing
+// what is verified — the strings ARE the typed surface.
 
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
