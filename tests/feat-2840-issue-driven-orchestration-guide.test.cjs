@@ -304,6 +304,13 @@ describe('issue-driven-orchestration guide (#2840)', () => {
 
   test('cross-linked from docs/USER-GUIDE.md', () => {
     const guide = path.join(__dirname, '..', 'docs', 'USER-GUIDE.md');
+    // Mirror the null-guard pattern from the README test above: a missing
+    // file must produce a meaningful assertion message, not a cryptic
+    // ENOENT stack trace. (CR #3036.)
+    assert.ok(
+      fs.existsSync(guide),
+      'docs/USER-GUIDE.md must exist for cross-link validation'
+    );
     const txt = fs.readFileSync(guide, 'utf8');
     assert.ok(
       /issue-driven-orchestration/.test(txt),
