@@ -348,12 +348,12 @@ describe('hook execution when enabled', { skip: isWindows ? 'bash hooks require 
     const parsed = JSON.parse(result.stdout);
     assert.strictEqual(parsed.decision, 'block',
       `expected typed decision: 'block', got: ${JSON.stringify(parsed)}`);
-    // The reason describes the failure category. Asserting the parsed string
-    // matches a stable substring of the canonical reason copy is acceptable
-    // here — the message IS the runtime contract surfaced to the user when
-    // a commit is blocked. The wrapping JSON shape is the typed-IR layer.
-    assert.ok(parsed.reason && parsed.reason.includes('Conventional Commits'),
-      `expected reason to mention Conventional Commits, got: ${parsed.reason}`);
+    // Assert on the typed `code` field (stable enum value), not the
+    // human-readable `reason` string. CR feedback (#3016): substring
+    // matching on `reason` is still text matching — the hook now emits
+    // a typed code alongside the prose so tests pin behavior, not copy.
+    assert.strictEqual(parsed.code, 'CONVENTIONAL_COMMITS_VIOLATION',
+      `expected typed code: 'CONVENTIONAL_COMMITS_VIOLATION', got: ${JSON.stringify(parsed)}`);
   });
 
   test('validate-commit allows non-commit commands', () => {

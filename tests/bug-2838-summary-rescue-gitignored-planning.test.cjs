@@ -223,12 +223,22 @@ describe('bug-2838: SUMMARY rescue handles gitignored .planning/', () => {
       fs.mkdirSync(mainDir, { recursive: true });
       const mainSummary = path.join(mainDir, 'x-SUMMARY.md');
       fs.writeFileSync(mainSummary, body);
-      // Capture mtime BEFORE the rescue runs. Idempotent contract:
-      // when content already matches, the rescue must not touch the file.
-      // Migrated from `assert.doesNotMatch(stdout+stderr, /Rescued/)` which
-      // grepped console output — the typed contract is that the file is
-      // bit-for-bit unchanged on disk.
-      const mtimeBefore = fs.statSync(mainSummary).mtimeMs;
+      // Capture a full filesystem snapshot BEFORE the rescue runs.
+      // Idempotent contract: when content already matches, the rescue must
+      // not touch the file. Migrated from a console-output grep
+      // (`stdout+stderr` did not contain "Rescued") to a typed on-disk
+      // check. mtimeMs alone is insufficient on coarse-grained filesystems
+      // (HFS+, FAT) where two rewrites within ~1s share an mtime — CR
+      // outside-diff finding (#3016). Snapshot includes mtime, ctime,
+      // size, ino, and a sha256 of contents so a rewrite is detectable
+      // even when the timestamp aliases.
+      const crypto = require('crypto');
+      const snapshotFile = (p) => {
+        const st = fs.statSync(p);
+        const hash = crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+        return { mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, size: st.size, ino: st.ino, hash };
+      };
+      const snapBefore = snapshotFile(mainSummary);
 
       const script = `
 set -u
@@ -243,9 +253,11 @@ ${block}
         0,
         `Rescue block failed unexpectedly.\nstdout: ${r.stdout}\nstderr: ${r.stderr}`
       );
-      // Typed-IR idempotency check (#2974): mtime unchanged AND content unchanged.
-      const mtimeAfter = fs.statSync(mainSummary).mtimeMs;
-      assert.equal(mtimeAfter, mtimeBefore,
+      // Typed-IR idempotency check (#2974): full snapshot unchanged. The
+      // sha256 hash catches rewrites that mtimeMs would miss on
+      // coarse-grained filesystems.
+      const snapAfter = snapshotFile(mainSummary);
+      assert.deepStrictEqual(snapAfter, snapBefore,
         'rescue must not touch the file when content already matches (idempotent)');
       assert.strictEqual(fs.readFileSync(mainSummary, 'utf-8'), body);
     } finally {

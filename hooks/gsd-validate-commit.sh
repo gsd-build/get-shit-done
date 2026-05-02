@@ -35,11 +35,13 @@ if [[ "$CMD" =~ ^git[[:space:]]+commit ]]; then
     SUBJECT=$(echo "$MSG" | head -1)
     # Validate Conventional Commits format
     if ! [[ "$SUBJECT" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\(.+\))?:[[:space:]].+ ]]; then
-      echo '{"decision": "block", "reason": "Commit message must follow Conventional Commits: <type>(<scope>): <subject>. Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore. Subject must be <=72 chars, lowercase, imperative mood, no trailing period."}'
+      # Emit a typed `code` field alongside `reason` (#2974). Tests assert
+      # on the stable code string; the reason is the human-readable copy.
+      echo '{"decision": "block", "code": "CONVENTIONAL_COMMITS_VIOLATION", "reason": "Commit message must follow Conventional Commits: <type>(<scope>): <subject>. Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore. Subject must be <=72 chars, lowercase, imperative mood, no trailing period."}'
       exit 2
     fi
     if [ ${#SUBJECT} -gt 72 ]; then
-      echo '{"decision": "block", "reason": "Commit subject must be 72 characters or less."}'
+      echo '{"decision": "block", "code": "COMMIT_SUBJECT_TOO_LONG", "reason": "Commit subject must be 72 characters or less."}'
       exit 2
     fi
   fi
