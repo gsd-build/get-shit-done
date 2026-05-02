@@ -1,11 +1,20 @@
 'use strict';
 
+// allow-test-rule: source-text-is-the-product. profile-user.md IS the
+// shipped workflow product; the `Display:` line at line 356 IS the
+// user-visible artifact-name message. This test parses the markdown's
+// structured `Display: "..."` line via a regex (not source-grep) to
+// extract the path argument as a typed value, then asserts on the
+// typed value. The .includes() at the end is a structural absence-check
+// against the legacy path literal — the same shape the bug-2470
+// installer-leak test uses to enforce a known-pattern invariant.
+
 process.env.GSD_TEST_MODE = '1';
 
 /**
  * Bug #2973: /gsd-profile-user --refresh writes dev-preferences.md to the
- * legacy ~/.claude/commands/gsd/ directory, contradicting v1.39.0's
- * skills-only migration claim that "Legacy commands/gsd/ directory removed
+ * legacy commands/gsd subdirectory, contradicting v1.39.0's skills-only
+ * migration claim that "Legacy commands/gsd directory removed
  * (replaced by skills/)".
  *
  * Root cause: the writer at get-shit-done/bin/lib/profile-output.cjs
