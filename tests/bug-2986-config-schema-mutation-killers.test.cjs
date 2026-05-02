@@ -65,19 +65,29 @@ describe('Bug #2986: M1/M4 -- isValidConfigKey returns true for EVERY static key
 
 describe('Bug #2986: M2 -- DYNAMIC_KEY_PATTERNS.some semantic, not .every', () => {
   // Each pattern has a representative key that matches ONLY that pattern
-  // (mutually exclusive with the others by design). If `.some` is mutated
-  // to `.every`, all four assertions fail because a single key cannot
-  // match every pattern simultaneously.
+  // (mutually exclusive with the others by design) AND is NOT a member of
+  // VALID_CONFIG_KEYS. The static-key fast-path returns true before
+  // DYNAMIC_KEY_PATTERNS.some() ever runs, so any rep key that's also in
+  // VALID_CONFIG_KEYS gives the M2 killer zero coverage for that pattern
+  // (#3005 CR: this caught features.thinking_partner, which IS in static).
+  // A reserved-prefix-style placeholder name is used for `features` so the
+  // dynamic path is the only way to reach `true`.
   const patternRepresentatives = [
     { key: 'agent_skills.gsd-planner',                           topLevel: 'agent_skills' },
     { key: 'review.models.claude',                               topLevel: 'review' },
-    { key: 'features.thinking_partner',                          topLevel: 'features' },
+    { key: 'features.some_dynamic_feature',                      topLevel: 'features' },
     { key: 'claude_md_assembly.blocks.intro',                    topLevel: 'claude_md_assembly' },
     { key: 'model_profile_overrides.codex.opus',                 topLevel: 'model_profile_overrides' },
   ];
 
   for (const { key, topLevel } of patternRepresentatives) {
-    test(`isValidConfigKey('${key}') === true (matches '${topLevel}' pattern, no other pattern)`, () => {
+    test(`isValidConfigKey('${key}') === true (matches '${topLevel}' pattern via dynamic path)`, () => {
+      // Invariant: the rep key MUST NOT be in the static set. Otherwise the
+      // static fast-path short-circuits and the dynamic-pattern .some() is
+      // never invoked, so a mutation removing this entry from
+      // DYNAMIC_KEY_PATTERNS would survive.
+      assert.strictEqual(VALID_CONFIG_KEYS.has(key), false,
+        `representative key '${key}' must NOT be in VALID_CONFIG_KEYS — otherwise the static fast-path masks the dynamic-pattern test (#3005 CR)`);
       assert.strictEqual(isValidConfigKey(key), true,
         `dynamic key '${key}' must be accepted via DYNAMIC_KEY_PATTERNS.some`);
       // Verify mutual exclusivity: only one pattern matches this key.
