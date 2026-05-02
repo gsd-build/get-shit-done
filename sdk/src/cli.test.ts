@@ -126,6 +126,49 @@ describe('parseCliArgs', () => {
     expect(result.queryArgv).toEqual(['audit-open', '--json']);
   });
 
+  // ─── #3019: --help inside `query <subcommand>` reaches the handler ────
+
+  it('forwards --help to queryArgv when a subcommand precedes it (#3019)', () => {
+    // gsd-sdk query phase add --help
+    // Previously: --help was harvested as global, queryArgv = ['phase', 'add'],
+    // help: true → main() short-circuits to top-level USAGE, never dispatching.
+    // Now: --help travels with the rest of queryArgv so the registry handler
+    // (or the gsd-tools.cjs fallback) can render contextual subcommand help.
+    const result = parseCliArgs(['query', 'phase', 'add', '--help']);
+    expect(result.command).toBe('query');
+    expect(result.queryArgv).toEqual(['phase', 'add', '--help']);
+    // The global help flag must NOT short-circuit dispatch when there is a
+    // subcommand to dispatch to.
+    expect(result.help).toBe(false);
+  });
+
+  it('forwards -h to queryArgv when a subcommand precedes it (#3019)', () => {
+    const result = parseCliArgs(['query', 'init', '-h']);
+    expect(result.queryArgv).toEqual(['init', '-h']);
+    expect(result.help).toBe(false);
+  });
+
+  it('treats bare `query --help` as a top-level help request (no subcommand to dispatch to)', () => {
+    // gsd-sdk query --help
+    // No subcommand follows, so the only useful response is the top-level
+    // USAGE. Preserve existing behavior: help: true.
+    const result = parseCliArgs(['query', '--help']);
+    expect(result.command).toBe('query');
+    expect(result.help).toBe(true);
+    // queryArgv may be empty or carry just the lone --help; either is fine
+    // because main() short-circuits on help when there is no subcommand.
+    expect((result.queryArgv ?? []).filter((x) => x !== '--help' && x !== '-h')).toEqual([]);
+  });
+
+  it('preserves --help position when intermixed with other query flags (#3019)', () => {
+    // gsd-sdk query phase --help --pick name
+    // The handler/fallback should see --help in argv so it can render help
+    // even when other flags are present.
+    const result = parseCliArgs(['query', 'phase', '--help', '--pick', 'name']);
+    expect(result.queryArgv).toEqual(['phase', '--help', '--pick', 'name']);
+    expect(result.help).toBe(false);
+  });
+
   // ─── Init command parsing ──────────────────────────────────────────────
 
   it('parses init with @file input', () => {

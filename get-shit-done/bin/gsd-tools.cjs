@@ -341,17 +341,36 @@ async function main() {
 
   const command = args[0];
 
+  // Top-level usage string — emitted by `gsd-tools` (no args) and by
+  // `gsd-tools --help` / any `--help` request below (#3019).
+  const TOP_LEVEL_USAGE = 'Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, config-new-project, init, workstream, docs-init\n\nFor command-specific argument requirements, invoke the command without args (e.g. `gsd-tools phase add`) — the resulting error lists what is required. Subcommand-level help printers are tracked at #3019.';
+
   if (!command) {
-    error('Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, config-new-project, init, workstream, docs-init');
+    error(TOP_LEVEL_USAGE);
   }
 
-  // Reject flags that are never valid for any gsd-tools command. AI agents
-  // sometimes hallucinate --help or --version on tool invocations; silently
-  // ignoring them can cause destructive operations to proceed unchecked.
-  const NEVER_VALID_FLAGS = new Set(['-h', '--help', '-?', '--h', '--version', '-v', '--usage']);
+  // #3019: a `--help` / `-h` flag in argv must render the top-level usage
+  // and exit 0 — not error out with "Unknown flag". The previous shape
+  // erred on agent-hallucinated flags, but it also blocked humans from
+  // discovering the command surface via subcommand help requests routed
+  // here from the SDK CLI's query dispatcher (after the cli.ts fix that
+  // stops harvesting --help as a global flag). Rendering top-level usage
+  // on --help is strictly better UX than the old short-circuit, which
+  // printed the SDK-level usage that doesn't mention any of these
+  // subcommands.
+  const HELP_FLAGS = new Set(['-h', '--help', '-?', '--h', '--usage']);
+  if (args.some((a) => HELP_FLAGS.has(a))) {
+    process.stdout.write(TOP_LEVEL_USAGE + '\n');
+    return;
+  }
+
+  // Reject version flags. AI agents sometimes hallucinate --version on tool
+  // invocations; silently ignoring it can cause destructive operations to
+  // proceed unchecked. (Help flags are handled above.)
+  const NEVER_VALID_FLAGS = new Set(['--version', '-v']);
   for (const arg of args) {
     if (NEVER_VALID_FLAGS.has(arg)) {
-      error(`Unknown flag: ${arg}\ngsd-tools does not accept help or version flags. Run "gsd-tools" with no arguments for usage.`);
+      error(`Unknown flag: ${arg}\ngsd-tools does not accept version flags. Run "gsd-tools" with no arguments for usage.`);
     }
   }
 

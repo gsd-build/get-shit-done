@@ -85,8 +85,17 @@ function parseCliArgsQueryPermissive(argv: string[]): ParsedCliArgs {
       i += 2;
       continue;
     }
+    // #3019: do NOT consume -h / --help here unconditionally. Pushing the
+    // flag onto queryArgv lets the registered handler (or the gsd-tools.cjs
+    // fallback) render contextual subcommand help. We still set the global
+    // `help` flag when the flag appears, but only short-circuit dispatch in
+    // main() when there is no real subcommand to dispatch to (i.e. the only
+    // tokens in queryArgv are the help flags themselves). That preserves
+    // `gsd-sdk query --help` → top-level USAGE while letting
+    // `gsd-sdk query phase add --help` reach the handler.
     if (a === '-h' || a === '--help') {
       help = true;
+      queryArgv.push(a);
       i += 1;
       continue;
     }
@@ -97,6 +106,14 @@ function parseCliArgsQueryPermissive(argv: string[]): ParsedCliArgs {
     }
     queryArgv.push(a);
     i += 1;
+  }
+
+  // If the user typed a real subcommand (anything other than help flags
+  // alone in queryArgv), do NOT short-circuit to top-level USAGE on help.
+  // The handler/fallback will render contextual help.
+  const nonHelpTokens = queryArgv.filter((t) => t !== '-h' && t !== '--help');
+  if (help && nonHelpTokens.length > 0) {
+    help = false;
   }
 
   return {
