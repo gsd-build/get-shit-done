@@ -1098,7 +1098,7 @@ Quick audit before a long phase:
 
 Each disabled server removes its schema from every subsequent turn for the rest of the session. Trimming MCPs **compounds** with `model_profile` tuning — both levers are additive, and MCP savings show up immediately across every subagent the orchestrator spawns.
 
-For the full audit, harness reference, and the composition note with `model_profile`, see [MCP Tool Schema Cost](https://github.com/gsd-build/get-shit-done/blob/main/get-shit-done/references/context-budget.md#mcp-tool-schema-cost-harness-concern) in the bundled `context-budget.md` reference.
+For the full audit, harness reference, and the composition note with `model_profile`, see [MCP Tool Schema Cost](../get-shit-done/references/context-budget.md#mcp-tool-schema-cost-harness-concern) in the bundled `context-budget.md` reference.
 
 ### Using Non-Claude Runtimes (Codex, OpenCode, Gemini CLI, Kilo)
 

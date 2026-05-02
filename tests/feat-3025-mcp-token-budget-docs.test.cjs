@@ -82,6 +82,7 @@ function parseMcpBudgetSection(section) {
       auditMentionsCrossProject: false,
       explainsHarnessNotGsd: false,
       mentionsModelProfileInteraction: false,
+      crossLinksContextBudget: false,
     };
   }
   const lower = section.toLowerCase();
@@ -110,6 +111,11 @@ function parseMcpBudgetSection(section) {
   const mentionsModelProfileInteraction =
     /model[_ ]profile/i.test(section) &&
     /compound|multiplier|stack|every[- ]turn|regardless of (which )?model|in addition/i.test(section);
+  // (7) Cross-link to the canonical reference doc — task-guide section
+  // must point readers at context-budget.md for the full audit. Encoded
+  // as a named flag (CR follow-up) so the assertion sits alongside the
+  // other parsed invariants rather than as a one-off inline regex.
+  const crossLinksContextBudget = /context-budget/i.test(section);
   return {
     ok: true,
     sectionLength: section.length,
@@ -123,6 +129,7 @@ function parseMcpBudgetSection(section) {
     auditMentionsCrossProject,
     explainsHarnessNotGsd,
     mentionsModelProfileInteraction,
+    crossLinksContextBudget,
   };
 }
 
@@ -229,9 +236,10 @@ describe('#3025 docs/USER-GUIDE.md: companion task section exists', () => {
     const parsed = parseMcpBudgetSection(section);
     assert.equal(parsed.namesEnabledMcpjsonServers, true,
       'task section must mention the harness key by name');
-    // Cross-link to the reference doc — section text must reference
-    // context-budget by name so readers can find the full audit.
-    assert.ok(/context-budget/i.test(section),
+    // Cross-link to the reference doc — assert on the parsed flag so
+    // the invariant lives alongside the other named flags (CR follow-up
+    // on the no-source-grep standard).
+    assert.equal(parsed.crossLinksContextBudget, true,
       'task section must cross-link to context-budget.md');
   });
 });
