@@ -231,19 +231,33 @@ test -n "$branch" || { echo "Detached HEAD is not supported for review-fix (#268
 sentinel="${phase_dir}/.review-fix-recovery-pending.json"
 if [ -f "$sentinel" ]; then
   echo "Detected pre-existing recovery sentinel from a prior interrupted run: $sentinel"
-  prior_wt=$(node -e '
+  # Recovery must extract BOTH worktree_path AND reviewfix_branch (#3001 CR):
+  # if a prior run died after `git worktree remove` but before
+  # `git branch -D`, the orphan branch survives and clutters `git branch`
+  # output forever. Emit both fields newline-separated so we can read them
+  # independently.
+  prior_recovery=$(node -e '
     const fs = require("fs");
     try {
       const parsed = JSON.parse(fs.readFileSync(process.argv[1], "utf-8"));
-      process.stdout.write(parsed.worktree_path || "");
+      process.stdout.write((parsed.worktree_path || "") + "\n" + (parsed.reviewfix_branch || ""));
     } catch (err) {
       process.stderr.write(`Warning: malformed recovery sentinel ${process.argv[1]}: ${err.message}\n`);
-      process.stdout.write("");
+      process.stdout.write("\n");
     }
   ' "$sentinel")
+  prior_wt="$(printf '%s' "$prior_recovery" | sed -n '1p')"
+  prior_branch="$(printf '%s' "$prior_recovery" | sed -n '2p')"
   if [ -n "$prior_wt" ] && git worktree list --porcelain | grep -q "^worktree $prior_wt$"; then
     echo "Removing orphan worktree from prior run: $prior_wt"
     git worktree remove "$prior_wt" --force || true
+  fi
+  if [ -n "$prior_branch" ]; then
+    # Best-effort: branch may already be gone (cleaned by an earlier
+    # partial recovery, or never created if `git worktree add -b` itself
+    # failed). `|| true` keeps recovery non-fatal.
+    echo "Removing orphan reviewfix branch from prior run: $prior_branch"
+    git branch -D "$prior_branch" 2>/dev/null || true
   fi
   rm -f "$sentinel"
 fi
