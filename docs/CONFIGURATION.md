@@ -777,6 +777,8 @@ Each agent in `MODEL_PROFILES` declares one of three default tiers. The resolver
 3. Hard failure (exception/crash) → bypass escalation, surface immediately
 ```
 
+If `dynamic_routing.escalate_on_failure: false`, soft failures do **not** advance the tier — every respawn keeps using `tier_models[default_tier]` regardless of the attempt counter. The kill-switch overrides the soft-failure branch above.
+
 `light → standard → heavy → heavy` (heavy stays at heavy; can't go further).
 
 #### Resolution precedence (highest → lowest)
