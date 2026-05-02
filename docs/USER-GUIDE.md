@@ -1077,6 +1077,29 @@ To turn it off, set `dynamic_routing.enabled: false` (the default) — behavior 
 
 For the full agent → tier mapping and resolution-precedence rules, see [Dynamic Routing](CONFIGURATION.md#dynamic-routing-with-failure-tier-escalation-dynamic_routing--added-in-v140) in the configuration reference.
 
+### Trim MCP servers to reduce per-turn cost (the biggest lever GSD doesn't own)
+
+Before tuning `model_profile` or `models.<phase_type>`, audit which **MCP servers** your harness has enabled. Every enabled MCP server injects its tool schema into every turn — heavyweight servers like browser/playwright tools or platform-specific helpers can cost 20k+ tokens each, often dwarfing whatever GSD's resolver can save.
+
+This is a **harness setting**, not a GSD setting. The toggle lives in `.claude/settings.json`:
+
+```json
+{
+  "enabledMcpjsonServers": ["context7"],
+  "disabledMcpjsonServers": ["playwright", "mac-tools"]
+}
+```
+
+Quick audit before a long phase:
+
+- Are any browser / playwright tools enabled when this phase has no UI work?
+- Are any platform-specific tools (Mac-tools, Windows-tools, OS-specific) enabled when not needed?
+- Are any project-specific MCPs from a different project still enabled here?
+
+Each disabled server removes its schema from every subsequent turn for the rest of the session. Trimming MCPs **compounds** with `model_profile` tuning — both levers are additive, and MCP savings show up immediately across every subagent the orchestrator spawns.
+
+For the full audit, harness reference, and the composition note with `model_profile`, see [MCP Tool Schema Cost](https://github.com/gsd-build/get-shit-done/blob/main/get-shit-done/references/context-budget.md#mcp-tool-schema-cost-harness-concern) in the bundled `context-budget.md` reference.
+
 ### Using Non-Claude Runtimes (Codex, OpenCode, Gemini CLI, Kilo)
 
 If you installed GSD for a non-Claude runtime, the installer already configured model resolution so all agents use the runtime's default model. No manual setup is needed. Specifically, the installer sets `resolve_model_ids: "omit"` in your config, which tells GSD to skip Anthropic model ID resolution and let the runtime choose its own default model.

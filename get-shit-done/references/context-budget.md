@@ -47,3 +47,39 @@ Quality degrades gradually before panic thresholds fire. Watch for these early s
 - **Skipped steps** -- agent omits protocol steps it would normally follow. If an agent's success criteria has 8 items but it only reports 5, suspect context pressure.
 
 When delegating to agents, the orchestrator cannot verify semantic correctness of agent output -- only structural completeness. This is a fundamental limitation. Mitigate with must_haves.truths and spot-check verification.
+
+## MCP Tool Schema Cost (Harness Concern)
+
+Every enabled MCP server injects its tool schema into **every turn**, regardless of whether you call any of its tools. Heavyweight servers can cost 20k+ tokens per turn each — often dwarfing whatever GSD itself can save through `model_profile` tuning. This is a Claude Code harness concern, not a GSD concern: GSD does **not** manage MCP enablement. The toggle lives in `.claude/settings.json` under `enabledMcpjsonServers` and `disabledMcpjsonServers`.
+
+### Why this is the biggest cost lever you don't own
+
+Tool schemas count against the same context budget as model context, prompts, and conversation history. If a project has 5 unused MCP servers averaging 5k tokens of schema each, every turn pays a 25k-token tax before the assistant reads a single project file. Trimming MCPs has a **multiplier effect** that compounds with whichever `model_profile` you've chosen — every-turn overhead drops regardless of which model is in use.
+
+### Pre-Phase MCP Audit
+
+Before starting a long phase (especially `/gsd-execute-phase`, `/gsd-plan-phase`, or anything that fans out across many subagents), run this audit:
+
+- [ ] **Browser / playwright tools enabled?** If this phase has no UI work, disable them. They're among the heaviest per-turn schemas.
+- [ ] **Platform-specific tools enabled?** Mac-tools / Windows-tools / OS-specific helpers should be disabled when not actively needed for the phase at hand.
+- [ ] **Cross-project / stale MCPs?** Servers added for a different project that are still enabled here. These are often forgotten and pay a per-turn tax for zero benefit.
+- [ ] **Duplicate or shadow servers?** Two MCPs offering similar tools (e.g. two different filesystem helpers). Keep one.
+
+Each item disabled removes its schema from every subsequent turn for the rest of the session.
+
+### How to toggle
+
+The keys live in `.claude/settings.json` (project) or `~/.claude/settings.json` (global) — **not** in `.planning/config.json`:
+
+```json
+{
+  "enabledMcpjsonServers": ["context7"],
+  "disabledMcpjsonServers": ["playwright", "mac-tools"]
+}
+```
+
+Either list works — `enabledMcpjsonServers` is an explicit allow-list, `disabledMcpjsonServers` is a block-list against the default. See the [Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp) for the canonical reference; this section just flags it as a context-budget lever GSD users routinely overlook.
+
+### Composition with model_profile
+
+Trimming MCPs and tuning `model_profile` are independent levers that **compound**. Disabling a 25k-token MCP saves 25k per turn whether you're running `quality` (opus everywhere) or `budget` (sonnet/haiku); the savings are additive, not in lieu of model tuning. Don't pick one — do both, and audit MCPs first because the per-turn savings show up immediately and stack across every subagent the orchestrator spawns.
