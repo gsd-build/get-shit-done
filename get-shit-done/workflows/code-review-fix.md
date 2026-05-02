@@ -223,7 +223,7 @@ Check if FIX_REPORT_PATH exists:
 Either way:
 ```
 Some fix commits may already exist in git history — check git log for fix(${PADDED_PHASE}) commits.
-You can retry with /gsd-code-review-fix ${PHASE_ARG}.
+You can retry with /gsd-code-review ${PHASE_ARG} --fix.
 ```
 
 Exit workflow (skip auto loop).
@@ -398,7 +398,7 @@ if [ ! -f "${FIX_REPORT_PATH}" ]; then
   echo "The fixer agent may have failed before completing."
   echo "Check git log for any fix(${PADDED_PHASE}) commits."
   echo ""
-  echo "Retry: /gsd-code-review-fix ${PHASE_ARG}"
+  echo "Retry: /gsd-code-review ${PHASE_ARG} --fix"
   echo ""
   echo "═══════════════════════════════════════════════════════════════"
   exit 1

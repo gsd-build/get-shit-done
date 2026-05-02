@@ -1,6 +1,6 @@
 # GSD Agent Reference
 
-> Full role cards for 21 primary agents plus concise stubs for 10 advanced/specialized agents (31 shipped agents total). The `agents/` directory and [`docs/INVENTORY.md`](INVENTORY.md) are the authoritative roster; see [Architecture](ARCHITECTURE.md) for context.
+> Full role cards for 21 primary agents plus concise stubs for 12 advanced/specialized agents (33 shipped agents total). The `agents/` directory and [`docs/INVENTORY.md`](INVENTORY.md) are the authoritative roster; see [Architecture](ARCHITECTURE.md) for context.
 
 ---
 
@@ -10,7 +10,7 @@ GSD uses a multi-agent architecture where thin orchestrators (workflow files) sp
 
 ### Agent Categories
 
-> The table below covers the **21 primary agents** detailed in this section. Ten additional shipped agents (pattern-mapper, debug-session-manager, code-reviewer, code-fixer, ai-researcher, domain-researcher, eval-planner, eval-auditor, framework-selector, intel-updater) have concise stubs in the [Advanced and Specialized Agents](#advanced-and-specialized-agents) section below. For the authoritative 31-agent roster, see [`docs/INVENTORY.md`](INVENTORY.md) and the `agents/` directory.
+> The table below covers the **21 primary agents** detailed in this section. Twelve additional shipped agents (pattern-mapper, debug-session-manager, code-reviewer, code-fixer, ai-researcher, domain-researcher, eval-planner, eval-auditor, framework-selector, intel-updater, doc-classifier, doc-synthesizer) have concise stubs in the [Advanced and Specialized Agents](#advanced-and-specialized-agents) section below. For the authoritative 33-agent roster, see [`docs/INVENTORY.md`](INVENTORY.md) and the `agents/` directory.
 
 | Category | Count | Agents |
 |----------|-------|--------|
@@ -480,7 +480,7 @@ Communication style, decision patterns, debugging approach, UX preferences, vend
 
 ## Advanced and Specialized Agents
 
-Ten additional agents ship under `agents/gsd-*.md` and are used by specialty workflows (`/gsd-ai-integration-phase`, `/gsd-eval-review`, `/gsd-code-review`, `/gsd-code-review-fix`, `/gsd-debug`, `/gsd-intel`, `/gsd-select-framework`) and by the planner pipeline. Each carries full frontmatter in its agent file; the stubs below are concise by design. The authoritative roster (with spawner and primary-doc status per agent) lives in [`docs/INVENTORY.md`](INVENTORY.md).
+Twelve additional agents ship under `agents/gsd-*.md` and are used by specialty workflows (`/gsd-ai-integration-phase`, `/gsd-eval-review`, `/gsd-code-review`, `/gsd-code-review --fix`, `/gsd-debug`, `/gsd-intel`, `/gsd-select-framework`, `/gsd-ingest-docs`) and by the planner pipeline. Each carries full frontmatter in its agent file; the stubs below are concise by design. The authoritative roster (with spawner and primary-doc status per agent) lives in [`docs/INVENTORY.md`](INVENTORY.md).
 
 ### gsd-pattern-mapper
 
@@ -548,7 +548,7 @@ Ten additional agents ship under `agents/gsd-*.md` and are used by specialty wor
 
 | Property | Value |
 |----------|-------|
-| **Spawned by** | `/gsd-code-review-fix` |
+| **Spawned by** | `/gsd-code-review --fix` |
 | **Parallelism** | Single instance |
 | **Tools** | Read, Edit, Write, Bash, Grep, Glob |
 | **Model (balanced)** | Sonnet |

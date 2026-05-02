@@ -471,7 +471,7 @@ If total findings > 0:
 Full report: ${REVIEW_PATH}
 
 Next steps:
-  /gsd-code-review-fix ${PHASE_NUMBER}  — Auto-fix issues
+  /gsd-code-review ${PHASE_NUMBER} --fix  — Auto-fix issues
   cat ${REVIEW_PATH}                     — View full report
 ```
 

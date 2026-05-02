@@ -1136,7 +1136,7 @@ REVIEW_STATUS=$(sed -n '/^---$/,/^---$/p' "$REVIEW_FILE" | grep "^status:" | hea
 If REVIEW_STATUS is not "clean" and not "skipped" and not empty, display:
 ```
 Code review found issues. Consider running:
-/gsd-code-review-fix ${PHASE_NUMBER}
+/gsd-code-review ${PHASE_NUMBER} --fix
 ```
 
 **Error handling:** If the Skill invocation fails or throws, catch the error, display "Code review encountered an error (non-blocking): {error}" and proceed to next step. Review failures must never block execution.
