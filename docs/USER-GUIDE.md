@@ -748,8 +748,8 @@ After executing a phase, run a structured code review before UAT:
 The reviewer scopes files automatically using SUMMARY.md (preferred) or git diff fallback. Findings are classified as Critical, Warning, or Info in `{phase}-REVIEW.md`.
 
 ```bash
-/gsd-code-review-fix 3           # Fix Critical + Warning findings atomically
-/gsd-code-review-fix 3 --auto    # Fix and re-review until clean (max 3 iterations)
+/gsd-code-review --fix 3           # Fix Critical + Warning findings atomically
+/gsd-code-review --fix 3 --auto    # Fix and re-review until clean (max 3 iterations)
 ```
 
 ### Autonomous Audit-to-Fix
@@ -766,7 +766,7 @@ To run an audit and fix all auto-fixable issues in one pass:
 The review step slots in after execution and before UAT:
 
 ```
-/gsd-execute-phase N   ->  /gsd-code-review N  ->  /gsd-code-review-fix N  ->  /gsd-verify-work N
+/gsd-execute-phase N   ->  /gsd-code-review N  ->  /gsd-code-review --fix N  ->  /gsd-verify-work N
 ```
 
 ---

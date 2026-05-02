@@ -480,7 +480,7 @@ Communication style, decision patterns, debugging approach, UX preferences, vend
 
 ## Advanced and Specialized Agents
 
-Ten additional agents ship under `agents/gsd-*.md` and are used by specialty workflows (`/gsd-ai-integration-phase`, `/gsd-eval-review`, `/gsd-code-review`, `/gsd-code-review-fix`, `/gsd-debug`, `/gsd-intel`, `/gsd-select-framework`) and by the planner pipeline. Each carries full frontmatter in its agent file; the stubs below are concise by design. The authoritative roster (with spawner and primary-doc status per agent) lives in [`docs/INVENTORY.md`](INVENTORY.md).
+Ten additional agents ship under `agents/gsd-*.md` and are used by specialty workflows (`/gsd-ai-integration-phase`, `/gsd-eval-review`, `/gsd-code-review`, `/gsd-code-review --fix`, `/gsd-debug`, `/gsd-intel`, `/gsd-select-framework`) and by the planner pipeline. Each carries full frontmatter in its agent file; the stubs below are concise by design. The authoritative roster (with spawner and primary-doc status per agent) lives in [`docs/INVENTORY.md`](INVENTORY.md).
 
 ### gsd-pattern-mapper
 
@@ -548,7 +548,7 @@ Ten additional agents ship under `agents/gsd-*.md` and are used by specialty wor
 
 | Property | Value |
 |----------|-------|
-| **Spawned by** | `/gsd-code-review-fix` |
+| **Spawned by** | `/gsd-code-review --fix` |
 | **Parallelism** | Single instance |
 | **Tools** | Read, Edit, Write, Bash, Grep, Glob |
 | **Model (balanced)** | Sonnet |

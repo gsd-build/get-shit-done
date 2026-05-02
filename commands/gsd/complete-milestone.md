@@ -43,7 +43,10 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 
    - Look for `.planning/v{{version}}-MILESTONE-AUDIT.md`
    - If missing or stale: recommend `/gsd-audit-milestone` first
-   - If audit status is `gaps_found`: recommend `/gsd-plan-milestone-gaps` first
+   - If audit status is `gaps_found`: recommend closing the gaps inline
+     (the audit output already enumerates them — insert closure phases
+     via `/gsd-phase --insert <N>` plus the standard
+     discuss/plan/execute chain) before proceeding.
    - If audit status is `passed`: proceed to step 1
 
    ```markdown
@@ -54,8 +57,11 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
    requirements coverage, cross-phase integration, and E2E flows.
 
    {If audit has gaps:}
-   ⚠ Milestone audit found gaps. Run `/gsd-plan-milestone-gaps` to create
-   phases that close the gaps, or proceed anyway to accept as tech debt.
+   ⚠ Milestone audit found gaps. The audit output already enumerates the
+   unsatisfied requirements, cross-phase issues, and broken flows — insert
+   a closure phase per gap with `/gsd-phase --insert <N>` and run the
+   standard `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase`
+   chain. Or proceed anyway to accept the gaps as tech debt.
 
    {If audit passed:}
    ✓ Milestone audit passed. Proceeding with completion.

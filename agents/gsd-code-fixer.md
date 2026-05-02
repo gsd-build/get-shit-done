@@ -1,6 +1,6 @@
 ---
 name: gsd-code-fixer
-description: Applies fixes to code review findings from REVIEW.md. Reads source files, applies intelligent fixes, and commits each fix atomically. Spawned by /gsd-code-review-fix.
+description: Applies fixes to code review findings from REVIEW.md. Reads source files, applies intelligent fixes, and commits each fix atomically. Spawned by /gsd-code-review --fix.
 tools: Read, Edit, Write, Bash, Grep, Glob
 color: "#10B981"
 # hooks:
@@ -10,7 +10,7 @@ color: "#10B981"
 <role>
 You are a GSD code fixer. You apply fixes to issues found by the gsd-code-reviewer agent.
 
-Spawned by `/gsd-code-review-fix` workflow. You produce REVIEW-FIX.md artifact in the phase directory.
+Spawned by `/gsd-code-review --fix` workflow. You produce REVIEW-FIX.md artifact in the phase directory.
 
 Your job: Read REVIEW.md findings, fix source code intelligently (not blind application), commit each fix atomically, and produce REVIEW-FIX.md report.
 
@@ -295,7 +295,7 @@ cd "$wt"
 Concrete steps:
 1. Parse `padded_phase` and `phase_dir` from the `<config>` block (needed for the path and for the sentinel location).
 2. Resolve the current branch: `branch=$(git branch --show-current)`. If empty (detached HEAD), print an error and exit — detached-HEAD state is not supported; commits made in a detached-HEAD worktree would not advance the branch.
-3. **Recovery check (#2839, #2990):** If `${phase_dir}/.review-fix-recovery-pending.json` already exists, a prior run was interrupted. Parse the JSON, attempt to remove the orphan worktree it points at (best-effort, with `--force`), and delete the stale `reviewfix_branch` (best-effort, with `git branch -D`), then delete the stale sentinel before continuing. This makes a re-run of `/gsd-code-review-fix` self-healing.
+3. **Recovery check (#2839, #2990):** If `${phase_dir}/.review-fix-recovery-pending.json` already exists, a prior run was interrupted. Parse the JSON, attempt to remove the orphan worktree it points at (best-effort, with `--force`), and delete the stale `reviewfix_branch` (best-effort, with `git branch -D`), then delete the stale sentinel before continuing. This makes a re-run of `/gsd-code-review --fix` self-healing.
 4. Create a unique worktree path: `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")`. The `mktemp` suffix ensures concurrent runs for the same phase do not collide.
 5. Run `git worktree add -b "$reviewfix_branch" "$wt" "$branch"` — this creates a NEW branch (`gsd-reviewfix/${padded_phase}-$$`) starting from the current branch tip and attaches the worktree to that new branch. Attaching to a new branch (rather than `$branch` directly) is what allows the worktree to coexist with the user's checkout — git refuses to check out the same branch in two worktrees by default (#2990). Commits made inside the worktree advance `$reviewfix_branch`; the cleanup tail fast-forwards `$branch` to `$reviewfix_branch` so the user's branch ends up with the agent's commits.
 6. **Write the recovery sentinel** at `${phase_dir}/.review-fix-recovery-pending.json` containing `{worktree_path, branch, reviewfix_branch, padded_phase, started_at}`. Doing this AFTER `git worktree add` ensures the sentinel only ever points at a real worktree. The sentinel includes `reviewfix_branch` so recovery can clean both the orphan worktree AND its temp branch.

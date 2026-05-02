@@ -2121,7 +2121,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 93. Code Review Pipeline
 
-**Commands:** `/gsd-code-review`, `/gsd-code-review-fix`
+**Commands:** `/gsd-code-review`, `/gsd-code-review --fix`
 
 **Purpose:** Structured review of source files changed during a phase, with a separate auto-fix pass that commits each fix atomically.
 
@@ -2129,7 +2129,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 - REQ-REVIEW-01: `gsd-code-review` MUST scope files to the phase using SUMMARY.md and git diff fallback
 - REQ-REVIEW-02: Review MUST support three depth levels: `quick`, `standard`, `deep`
 - REQ-REVIEW-03: Findings MUST be severity-classified: Critical, Warning, Info
-- REQ-REVIEW-04: `gsd-code-review-fix` MUST read REVIEW.md and fix Critical + Warning findings by default
+- REQ-REVIEW-04: `gsd-code-review --fix` MUST read REVIEW.md and fix Critical + Warning findings by default
 - REQ-REVIEW-05: Each fix MUST be committed atomically with a descriptive message
 - REQ-REVIEW-06: `--auto` flag MUST enable fix + re-review iteration loop, capped at 3 iterations
 - REQ-REVIEW-07: Feature MUST be gated by `workflow.code_review` config flag
