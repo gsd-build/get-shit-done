@@ -602,6 +602,100 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
 }
 
 /**
+ * Codex managed-hook filenames eligible for legacy-bare-node migration.
+ * Mirrors the settings.json allowlist in rewriteLegacyManagedNodeHookCommands.
+ * Centralized so the codex toml branch and the settings.json branch can't drift.
+ */
+const CODEX_MANAGED_HOOK_BASENAMES = new Set([
+  'gsd-check-update.js',
+]);
+
+/**
+ * Build the GSD-managed Codex SessionStart hook block for config.toml.
+ *
+ * Issue #3017: the previous shape inlined `command = "node ${path}"` which
+ * fails under GUI/minimal-PATH runtimes where bare `node` doesn't resolve
+ * (same failure mode as #2979 → fixed for settings.json by #3002, this
+ * helper closes the gap for Codex's TOML hook surface).
+ *
+ * Returns null when `absoluteRunner` is null so callers can warn-and-skip
+ * registration — emitting a broken bare-node hook is strictly worse than
+ * not registering one (the user can re-run install once node is on PATH).
+ *
+ * @param {string} targetDir - Resolved absolute Codex config dir (e.g. ~/.codex).
+ * @param {{ absoluteRunner: string|null, eol?: string }} opts
+ *   absoluteRunner: result of resolveNodeRunner() — a JSON-stringified
+ *   absolute node path with forward slashes (e.g. `"/usr/local/bin/node"`),
+ *   or null when process.execPath was unavailable.
+ *   eol: line ending to emit ('\n' or '\r\n') — caller passes
+ *   detectLineEnding(configContent) so existing CRLF files stay CRLF.
+ *   Defaults to '\n'.
+ * @returns {string|null} The toml block to append, or null on missing runner.
+ */
+function buildCodexHookBlock(targetDir, opts) {
+  const absoluteRunner = opts && opts.absoluteRunner;
+  if (!absoluteRunner) return null;
+  const eol = (opts && opts.eol) || '\n';
+  const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
+  // toml requires escaped interior quotes (\"). The runner is already a
+  // JSON-stringified token (with literal " around the absolute path); we
+  // need to escape those quotes so the toml parser sees them as part of
+  // the string value, not as the closing quote of the command field.
+  const runnerEscaped = absoluteRunner.replace(/"/g, '\\"');
+  const hookPathEscaped = updateCheckScript.replace(/"/g, '\\"');
+  return `${eol}# GSD Hooks${eol}` +
+    `[[hooks.SessionStart]]${eol}` +
+    `${eol}` +
+    `[[hooks.SessionStart.hooks]]${eol}` +
+    `type = "command"${eol}` +
+    `command = "${runnerEscaped} \\"${hookPathEscaped}\\""${eol}`;
+}
+
+/**
+ * Rewrite legacy bare-`node` managed-hook command lines in a Codex
+ * config.toml string to use the absolute Node runner. Mirror of
+ * rewriteLegacyManagedNodeHookCommands but for the toml surface (#3017).
+ *
+ * Only rewrites entries whose script basename matches CODEX_MANAGED_HOOK_BASENAMES
+ * (basename equality, not substring containment) — user-authored bare-node
+ * hooks pointing at scripts outside the managed allowlist are left alone.
+ *
+ * @param {string} content - Current config.toml contents.
+ * @param {string|null} absoluteRunner - Result of resolveNodeRunner().
+ * @returns {{ content: string, changed: boolean }}
+ */
+function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
+  if (!content || !absoluteRunner) return { content, changed: false };
+  let changed = false;
+  // Match `command = "node <scriptToken>"` lines where scriptToken is
+  // either an unquoted path (no spaces) or a toml-escaped quoted path.
+  // The whole RHS is a toml-double-quoted string; interior quotes are \".
+  // Examples we want to migrate:
+  //   command = "node /Users/x/.codex/hooks/gsd-check-update.js"
+  //   command = "node \"/Users/x/.codex/hooks/gsd-check-update.js\""
+  // Examples we must leave alone:
+  //   command = "\"/usr/local/bin/node\" \"/path/to/gsd-check-update.js\""  ← already absolute
+  //   command = "node /home/me/my-custom.js"                                ← user-owned filename
+  const updated = content.replace(
+    /^(command\s*=\s*")node\s+((?:\\"[^"]+\\"|\S+))("\s*)$/gm,
+    (full, prefix, scriptToken, suffix) => {
+      // Extract the underlying script path from the captured token —
+      // either the bare token or the inner content of \"...\".
+      const quoted = scriptToken.match(/^\\"(.+)\\"$/);
+      const scriptPath = quoted ? quoted[1] : scriptToken;
+      const base = scriptPath.split(/[\\/]/).pop() || '';
+      if (!CODEX_MANAGED_HOOK_BASENAMES.has(base)) return full;
+      changed = true;
+      const runnerEscaped = absoluteRunner.replace(/"/g, '\\"');
+      // Always re-quote the path on output for consistency with the new
+      // builder's shape.
+      return `${prefix}${runnerEscaped} \\"${scriptPath}\\"${suffix}`;
+    },
+  );
+  return { content: updated, changed };
+}
+
+/**
  * Build a hook command path using forward slashes for cross-platform compatibility.
  * On Windows, $HOME is not expanded by cmd.exe/PowerShell, so we use the actual path.
  *
@@ -7926,16 +8020,32 @@ function install(isGlobal, runtime = 'claude') {
       // two-level nested AoT schema: [[hooks.SessionStart]] for the event entry
       // (holds optional matcher) and [[hooks.SessionStart.hooks]] for the handler
       // (holds type, command, statusMessage, timeout). (#2637, #2760, #2773)
-      const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-      const hookBlock = `${eol}# GSD Hooks${eol}` +
-        `[[hooks.SessionStart]]${eol}` +
-        `${eol}` +
-        `[[hooks.SessionStart.hooks]]${eol}` +
-        `type = "command"${eol}` +
-        `command = "node ${updateCheckScript}"${eol}`;
+      //
+      // #3017: route through buildCodexHookBlock() so the absolute Node binary
+      // path is emitted (matching the settings.json branch via #3002), so the
+      // hook resolves under GUI/minimal-PATH runtimes where bare `node` doesn't.
+      const codexNodeRunner = resolveNodeRunner();
+      const hookBlock = buildCodexHookBlock(targetDir, { absoluteRunner: codexNodeRunner, eol });
 
-      if (hasEnabledCodexHooksFeature(configContent) && !configContent.includes('gsd-check-update')) {
-        configContent += hookBlock;
+      if (hasEnabledCodexHooksFeature(configContent)) {
+        // Reinstall path: rewrite a legacy bare-node managed-hook entry to the
+        // absolute runner. Mirrors rewriteLegacyManagedNodeHookCommands for the
+        // settings.json surface (#3002 CR).
+        const rewrite = rewriteLegacyCodexHookBlock(configContent, codexNodeRunner);
+        if (rewrite.changed) {
+          configContent = rewrite.content;
+          console.log(`  ${green}✓${reset} Migrated legacy bare-node Codex hook to absolute runner (#3017)`);
+        }
+        if (!configContent.includes('gsd-check-update')) {
+          if (hookBlock !== null) {
+            configContent += hookBlock;
+          } else {
+            // resolveNodeRunner() returned null — process.execPath unavailable.
+            // Match the settings.json branch's warn-and-skip behavior rather
+            // than emit a broken bare-node hook (the #2979 / #3017 failure mode).
+            console.warn(`  ${yellow}⚠${reset}  Skipping Codex SessionStart hook registration — Node executable path unavailable (process.execPath is empty). See #2979 / #3002 / #3017.`);
+          }
+        }
       }
 
       // #2760 fix 3 — post-write schema validation. Parse the bytes we are
@@ -9573,6 +9683,8 @@ if (process.env.GSD_TEST_MODE) {
     buildHookCommand,
     resolveNodeRunner,
     rewriteLegacyManagedNodeHookCommands,
+    buildCodexHookBlock,
+    rewriteLegacyCodexHookBlock,
   };
 } else {
 

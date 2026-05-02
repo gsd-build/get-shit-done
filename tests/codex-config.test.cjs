@@ -1434,10 +1434,19 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(parsed.hooks && Array.isArray(parsed.hooks.SessionStart), 'writes [[hooks.SessionStart]] AoT');
     assert.ok(Array.isArray(parsed.hooks.SessionStart[0].hooks), 'writes [[hooks.SessionStart.hooks]] sub-table');
     assert.strictEqual(parsed.hooks.SessionStart[0].hooks[0].type, 'command', 'handler type is "command"');
+    // #3017: handler command now uses the absolute Node binary path so
+    // GUI/minimal-PATH runtimes can resolve it. The shape is
+    //   "<absolute-node-path>" "<hook-path>"
+    // where <absolute-node-path> is process.execPath (forward-slashed)
+    // and the hook path is also quoted. Same Node process runs the test
+    // and the installer, so process.execPath matches at both ends.
+    const expectedRunner = process.execPath.replace(/\\/g, '/');
+    const expectedHookPath = path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
+    const expectedCommand = `"${expectedRunner}" "${expectedHookPath}"`;
     assert.strictEqual(
       parsed.hooks.SessionStart[0].hooks[0].command,
-      'node ' + path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/'),
-      'handler command must be the exact absolute path to gsd-check-update.js'
+      expectedCommand,
+      'handler command must use absolute node runner pointing at gsd-check-update.js (#3017)'
     );
     assert.ok(!Array.isArray(parsed.hooks), 'no flat [[hooks]] AoT emitted');
     assert.strictEqual(countMatches(content, /^codex_hooks = true$/gm), 1, 'writes one codex_hooks key');
