@@ -257,6 +257,10 @@ describe('#3025 docs/USER-GUIDE.md: companion task section exists', () => {
 describe('#3025 markdownlint pre-flight: MD040 + MD056', () => {
   test('every fenced code block in the new MCP section has a language tag (MD040)', () => {
     const section = extractSection(CONTEXT_BUDGET_MD, 'mcp');
+    // Guard: extractSection returns null when the section is missing.
+    // Without this, `section.match(...)` would throw a TypeError instead
+    // of producing a meaningful assertion failure (CR follow-up).
+    assert.ok(section, 'MCP section not found in context-budget.md — cannot check MD040');
     const fences = (section.match(/^```([a-zA-Z0-9_+-]*)?\s*$/gm) || []);
     // Pairs of fences open/close; odd-indexed ones close blocks. Every
     // OPENING fence must have a language tag. Closing fences are bare ```.
@@ -269,6 +273,8 @@ describe('#3025 markdownlint pre-flight: MD040 + MD056', () => {
 
   test('every markdown table row in the new MCP section has the same column count as its header (MD056)', () => {
     const section = extractSection(CONTEXT_BUDGET_MD, 'mcp');
+    // Guard: same null-section concern as MD040 above (CR follow-up).
+    assert.ok(section, 'MCP section not found in context-budget.md — cannot check MD056');
     const lines = section.split('\n');
     // Walk through and detect tables: header row followed by a separator
     // (--- pattern) followed by data rows. Count `|` per line.
