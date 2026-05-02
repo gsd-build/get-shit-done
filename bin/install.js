@@ -9282,7 +9282,12 @@ function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
     actionLines.push('Add that directory to your PATH and restart your shell.');
     if (isWin32) {
       actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', "${shimDir};" + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
-      actionLines.push(`cmd.exe   : setx PATH "${shimDir};%PATH%"`);
+      // setx PATH "...;%PATH%" silently truncates above 1024 chars and
+      // expands %PATH% / %SystemRoot% to literals (turning REG_EXPAND_SZ
+      // into REG_SZ), permanently breaking lazy variable references.
+      // Invoke PowerShell from cmd.exe with the same SetEnvironmentVariable
+      // call as the PowerShell line so cmd.exe users get a safe command.
+      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${shimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
       actionLines.push(`Git Bash  : echo 'export PATH="${shimDir.replace(/\\/g, '/')}:$PATH"' >> ~/.bashrc`);
     } else {
       actionLines.push(`export PATH="${shimDir}:$PATH"`);
