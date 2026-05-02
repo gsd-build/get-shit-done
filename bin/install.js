@@ -8202,9 +8202,15 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
     }
   }
 
-  // Write settings when runtime supports settings.json
+  // Write settings when runtime supports settings.json.
+  // #3002 CR: defense-in-depth — re-run validateHookFields right before
+  // serialization. The push-site guards above already skip null-command
+  // entries, but a future regression that bypasses them would still produce
+  // {type: 'command', command: null} items that the runtime hook schema
+  // rejects at parse time. validateHookFields filters those out so the file
+  // we write is always schema-valid.
   if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline) {
-    writeSettings(settingsPath, settings);
+    writeSettings(settingsPath, validateHookFields(settings));
   }
 
   // Configure OpenCode permissions

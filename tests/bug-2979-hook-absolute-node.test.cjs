@@ -222,66 +222,93 @@ describe('Bug #2979 (#3002 CR): resolveNodeRunner returns null when execPath una
 
 // ─── #3002 CR follow-up #2: null-command guards in settings.json ──────────
 
-describe('Bug #2979 (#3002 CR follow-up): registration sites guard on null command before push', () => {
-  // The settings-mutation registration sites (configureSettings) check both
-  // file existence AND that the resolved *Command variable is truthy before
-  // calling settings.hooks.<event>.push({ type: 'command', command: cmd }).
-  // Without the truthy guard, when resolveNodeRunner returns null, every
-  // dependent *Command becomes null and we'd write `command: null` entries
-  // that the runtime hook schema would reject. This test parses install.js
-  // for each of the 6 managed JS hook push-site `if` clauses and asserts
-  // the corresponding `&& <command>` guard is present.
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const installSrc = fs.readFileSync(
-    path.join(__dirname, '..', 'bin', 'install.js'),
-    'utf8',
-  );
+const { validateHookFields } = INSTALL;
 
-  // Each entry: the file-existence check we expect followed by the && <command>
-  // guard we expect on the same `if` line. The check anchors on the file
-  // variable name (e.g. checkUpdateFile) and the *Command variable name; the
-  // guard token between them ensures both are required for registration.
-  const guardSites = [
-    { hook: 'gsd-check-update.js',           fileVar: 'checkUpdateFile',           cmdVar: 'updateCheckCommand' },
-    { hook: 'gsd-context-monitor.js',        fileVar: 'contextMonitorFile',        cmdVar: 'contextMonitorCommand' },
-    { hook: 'gsd-prompt-guard.js',           fileVar: 'promptGuardFile',           cmdVar: 'promptGuardCommand' },
-    { hook: 'gsd-read-guard.js',             fileVar: 'readGuardFile',             cmdVar: 'readGuardCommand' },
-    { hook: 'gsd-read-injection-scanner.js', fileVar: 'readInjectionScannerFile',  cmdVar: 'readInjectionScannerCommand' },
-    { hook: 'gsd-workflow-guard.js',         fileVar: 'workflowGuardFile',         cmdVar: 'workflowGuardCommand' },
+describe('Bug #2979 (#3002 CR follow-up): no command:null hook entries survive serialization', () => {
+  // CR feedback: assert structurally on the resulting settings object, not by
+  // grepping bin/install.js source. The push-site guards (each `if` clause's
+  // `&& <command>` token) skip null-command pushes at the source. As a
+  // backstop, install.js now runs validateHookFields(settings) right before
+  // writeSettings; this test exercises that backstop directly.
+  //
+  // Construct a settings object that contains exactly the kind of null-command
+  // entries that the registration code would have written if my push-site
+  // guards regressed. Run validateHookFields on it. Assert the null entries
+  // are gone and the well-formed entries survive.
+
+  function nullCommandEntry(matcher) {
+    const entry = { hooks: [{ type: 'command', command: null }] };
+    if (matcher) entry.matcher = matcher;
+    return entry;
+  }
+  function realCommandEntry(matcher, command) {
+    const entry = { hooks: [{ type: 'command', command }] };
+    if (matcher) entry.matcher = matcher;
+    return entry;
+  }
+
+  const MANAGED_JS_HOOKS = [
+    { event: 'SessionStart',  matcher: undefined,                                       label: 'gsd-check-update.js' },
+    { event: 'PostToolUse',   matcher: 'Bash|Edit|Write|MultiEdit|Agent|Task',          label: 'gsd-context-monitor.js' },
+    { event: 'PreToolUse',    matcher: 'Write|Edit',                                    label: 'gsd-prompt-guard.js' },
+    { event: 'PreToolUse',    matcher: 'Write|Edit',                                    label: 'gsd-read-guard.js' },
+    { event: 'PostToolUse',   matcher: 'Read',                                          label: 'gsd-read-injection-scanner.js' },
+    { event: 'PreToolUse',    matcher: 'Bash|Edit|Write|MultiEdit',                     label: 'gsd-workflow-guard.js' },
   ];
 
-  for (const { hook, fileVar, cmdVar } of guardSites) {
-    test(`${hook} registration if-clause includes && ${cmdVar} guard`, () => {
-      // Match: `if (...fs.existsSync(<fileVar>) && <cmdVar>)`
-      const pattern = new RegExp(
-        `fs\\.existsSync\\(${fileVar}\\)\\s*&&\\s*${cmdVar}\\b`,
-      );
-      assert.ok(
-        pattern.test(installSrc),
-        `expected \`fs.existsSync(${fileVar}) && ${cmdVar}\` guard for ${hook} (#3002 CR)`,
-      );
+  for (const { event, matcher, label } of MANAGED_JS_HOOKS) {
+    test(`validateHookFields strips a null-command ${label} entry from settings.hooks.${event}`, () => {
+      const settings = {
+        hooks: {
+          [event]: [
+            nullCommandEntry(matcher),
+            realCommandEntry(matcher, '"/usr/local/bin/node" "/x/hooks/other.js"'),
+          ],
+        },
+      };
+      const out = validateHookFields(settings);
+      const survivors = out.hooks[event] || [];
+      // The well-formed entry must remain.
+      assert.equal(survivors.length, 1, `expected the real-command entry to survive`);
+      // No survivor entry contains a hook with command === null.
+      for (const e of survivors) {
+        for (const h of e.hooks || []) {
+          assert.notEqual(h.command, null, 'no surviving hook should have command:null');
+        }
+      }
     });
   }
 
-  test('statusline registration includes a null-command early-skip branch', () => {
-    // The CR fix added an `else if (!statuslineCommand)` clause between the
-    // local-skip guard and the `settings.statusLine = { ... }` write.
-    // Match the structural shape: an else-if guard on !statuslineCommand
-    // somewhere in the file. The clause's body content is allowed to vary;
-    // the structural invariant is the guard itself.
+  test('validateHookFields drops the entry entirely when all its hooks have null commands', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [nullCommandEntry()],
+      },
+    };
+    const out = validateHookFields(settings);
+    // Empty event arrays should be cleaned up (the entire SessionStart key
+    // gets removed when nothing valid remains).
     assert.ok(
-      /else if \(!statuslineCommand\)/.test(installSrc),
-      'expected `else if (!statuslineCommand)` guard somewhere in the statusline registration block (#3002 CR)',
+      !out.hooks.SessionStart || out.hooks.SessionStart.length === 0,
+      'expected SessionStart to be empty/removed after the only entry was dropped',
     );
-    // Verify the guard precedes the statusLine write (otherwise the guard
-    // doesn't help). The statusLine write must come AFTER the !statuslineCommand
-    // guard's location in the source.
-    const guardIdx = installSrc.indexOf('else if (!statuslineCommand)');
-    const writeIdx = installSrc.indexOf('settings.statusLine = {');
-    assert.ok(
-      guardIdx >= 0 && writeIdx > guardIdx,
-      `statusLine write at ${writeIdx} must come after !statuslineCommand guard at ${guardIdx}`,
-    );
+  });
+
+  test('validateHookFields preserves agent-type hooks while stripping command:null sibling hooks', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [
+            { type: 'command', command: null },
+            { type: 'agent', prompt: 'analyze the session' },
+            { type: 'command', command: '"/usr/local/bin/node" "/x/hooks/y.js"' },
+          ],
+        }],
+      },
+    };
+    const out = validateHookFields(settings);
+    const survivors = out.hooks.SessionStart[0].hooks;
+    assert.equal(survivors.length, 2, 'expected 2 of 3 hooks to survive (the null-command one is stripped)');
+    assert.equal(survivors.find(h => h.command === null), undefined, 'no surviving hook should have command:null');
   });
 });
