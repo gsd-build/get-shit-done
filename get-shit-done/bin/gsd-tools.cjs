@@ -342,8 +342,22 @@ async function main() {
   const command = args[0];
 
   // Top-level usage string — emitted by `gsd-tools` (no args) and by
-  // `gsd-tools --help` / any `--help` request below (#3019).
-  const TOP_LEVEL_USAGE = 'Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\nCommands: state, resolve-model, find-phase, commit, verify-summary, verify, frontmatter, template, generate-slug, current-timestamp, list-todos, verify-path-exists, config-ensure-section, config-new-project, init, workstream, docs-init\n\nFor command-specific argument requirements, invoke the command without args (e.g. `gsd-tools phase add`) — the resulting error lists what is required. Subcommand-level help printers are tracked at #3019.';
+  // `gsd-tools --help` / any `--help` request below.
+  // CR feedback: the command list must enumerate every top-level command
+  // supported by the dispatcher so `--help` is actually useful for
+  // discovery; previously it was a partial subset that didn't include
+  // phase / roadmap / milestone / progress / etc.
+  const TOP_LEVEL_USAGE = 'Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\n' +
+    'Commands: agent-skills, audit-open, audit-uat, check-commit, commit, commit-to-subrepo, ' +
+    'config-ensure-section, config-get, config-new-project, config-path, config-set, ' +
+    'current-timestamp, detect-custom-files, docs-init, extract-messages, find-phase, ' +
+    'from-gsd2, frontmatter, gap-analysis, generate-claude-md, generate-claude-profile, ' +
+    'generate-dev-preferences, generate-slug, graphify, history-digest, init, intel, ' +
+    'learnings, list-todos, milestone, phase, phase-plan-index, phases, profile-questionnaire, ' +
+    'profile-sample, progress, requirements, resolve-model, roadmap, scaffold, state, ' +
+    'template, validate, verify, verify-path-exists, verify-summary, workstream\n\n' +
+    'For command-specific argument requirements, invoke the command without args ' +
+    '(e.g. `gsd-tools phase add`) — the resulting error lists what is required.';
 
   if (!command) {
     error(TOP_LEVEL_USAGE);

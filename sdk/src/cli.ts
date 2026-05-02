@@ -447,7 +447,22 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
           args.ws,
         );
         if (stderr.trim()) console.error(stderr.trimEnd());
-        let output: unknown = await parseCliQueryJsonOutput(stdout, args.projectDir);
+        // #3026 CR (Major outside-diff): the gsd-tools.cjs fallback now
+        // emits plain-text usage on --help / -h with exit 0, instead of
+        // a JSON object. Wrap the JSON parse in a try/catch and forward
+        // non-JSON stdout verbatim so subcommand help reaches the user.
+        // (Previously this path JSON.parsed the help text and threw
+        // "Unexpected token 'U'" — exitCode=1 — a regression introduced
+        // alongside the --help passthrough fix.)
+        let output: unknown;
+        try {
+          output = await parseCliQueryJsonOutput(stdout, args.projectDir);
+        } catch {
+          if (stdout.trim()) {
+            process.stdout.write(stdout.endsWith('\n') ? stdout : stdout + '\n');
+          }
+          return;
+        }
         if (pickField) {
           output = extractField(output, pickField);
         }

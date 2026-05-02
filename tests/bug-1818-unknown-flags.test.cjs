@@ -27,12 +27,7 @@ const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
-
-function isUsageOutput(text) {
-  // The usage string starts with "Usage: gsd-tools" and lists "Commands:".
-  return /Usage:\s*gsd-tools/.test(text) && /Commands:/.test(text);
-}
+const { runGsdTools, createTempProject, cleanup, isUsageOutput } = require('./helpers.cjs');
 
 describe('unknown flag guard (bug #1818, updated for #3019)', () => {
   let tmpDir;

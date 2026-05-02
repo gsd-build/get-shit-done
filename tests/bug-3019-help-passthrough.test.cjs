@@ -24,11 +24,47 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const { runGsdTools } = require('./helpers.cjs');
+const { runGsdTools, isUsageOutput } = require('./helpers.cjs');
 
-function isUsageOutput(text) {
-  return /Usage:\s*gsd-tools/.test(text) && /Commands:/.test(text);
-}
+// #3026 CR (Major outside-diff): the SDK fallback wraps gsd-tools.cjs.
+// When gsd-tools emits plain-text help (exit 0), the SDK previously
+// JSON.parsed stdout and threw "Unexpected token 'U'". Verify the fix
+// by invoking the built SDK end-to-end and asserting:
+//   - exit 0
+//   - stdout contains the gsd-tools usage
+//   - stderr does NOT contain a JSON parse error
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const SDK_CLI = path.join(__dirname, '..', 'sdk', 'dist', 'cli.js');
+const fs = require('node:fs');
+
+describe('bug #3026 (CR Major outside-diff): SDK forwards plain-text help from gsd-tools fallback', () => {
+  test('gsd-sdk query phase --help (fallback path) returns usage, not a JSON parse error', () => {
+    if (!fs.existsSync(SDK_CLI)) {
+      // SDK not built in this checkout; the unit-level fallback fix is
+      // covered by sdk/src/cli.ts changes + vitest. This integration test
+      // only runs when sdk/dist/cli.js exists.
+      return;
+    }
+    // `query phase --help` (no further subcommand) is NOT in the native
+    // registry, so it routes through the gsd-tools.cjs fallback. That is
+    // the path that JSON.parsed the help text and threw before this fix.
+    const result = spawnSync(process.execPath, [SDK_CLI, 'query', 'phase', '--help'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 10000,
+    });
+    // The fallback gsd-tools.cjs emits exit 0 with usage on stdout.
+    assert.strictEqual(result.status, 0,
+      `must exit 0 — got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
+    // Negative: must NOT see the JSON parse error that was the regression.
+    assert.ok(!/Unexpected token|not valid JSON/i.test(result.stderr),
+      `must NOT JSON.parse the help text (stderr): ${result.stderr}`);
+    // Positive: the usage should reach the user via stdout.
+    assert.ok(/Usage:\s*gsd-tools/.test(result.stdout) && /Commands:/.test(result.stdout),
+      `usage must reach stdout: ${result.stdout}`);
+  });
+});
 
 describe('bug #3019: gsd-tools renders usage on --help instead of erroring', () => {
   test('bare gsd-tools (no args) renders usage', () => {
