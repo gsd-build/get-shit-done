@@ -53,9 +53,13 @@ function auditWorkflowScriptPaths({ workflowsDir, repoRoot, installedPrefixes })
     const workflow = path.basename(file);
     for (const ref of extractReferences(content)) {
       const firstSegment = ref.split('/')[0];
+      // #2996 CR: emit BOTH findings simultaneously when a reference is
+      // both outside an installed prefix AND missing from the repo. The
+      // earlier `continue` short-circuited MISSING_FROM_REPO, so a
+      // developer who moved a missing reference to an installed prefix
+      // would only discover the second issue on a subsequent CI run.
       if (!installedSet.has(firstSegment)) {
         findings.push({ workflow, path: ref, kind: AUDIT_FINDING.NOT_INSTALLED });
-        continue;
       }
       const sourceFile = path.join(repoRoot, ref);
       if (!fs.existsSync(sourceFile)) {

@@ -17,11 +17,14 @@ const { auditWorkflowScriptPaths, AUDIT_FINDING } = require(
 // structured report. Tests assert on the typed report — no regex on
 // console output.
 
+// #2996 CR: per-fixture repos are rooted under a single tmpRoot so the
+// after()-hook actually cleans them up. The previous shape created tmpRoot
+// in before() but never used it, leaking each fixture's mkdtempSync dir.
 let tmpRoot;
 function fixtureRepo({ workflows, files }) {
   // workflows: { 'foo.md': '...content with ${GSD_HOME}/...' }
   // files:     [ 'get-shit-done/bin/x.cjs', ... ]  — files to create in repo
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2995-'));
+  const repoRoot = fs.mkdtempSync(path.join(tmpRoot, 'repo-'));
   const workflowsDir = path.join(repoRoot, 'get-shit-done', 'workflows');
   fs.mkdirSync(workflowsDir, { recursive: true });
   for (const [name, body] of Object.entries(workflows || {})) {
@@ -35,7 +38,7 @@ function fixtureRepo({ workflows, files }) {
   return { repoRoot, workflowsDir };
 }
 
-before(() => { tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2995-root-')); });
+before(() => { tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2995-')); });
 after(() => { fs.rmSync(tmpRoot, { recursive: true, force: true }); });
 
 describe('Bug #2995: post-install script-paths audit (#2995)', () => {
@@ -200,6 +203,31 @@ describe('Bug #2995: real workflow audit', () => {
         `(if intentionally tracked) add an entry to KNOWN_GAPS with the issue reference.`,
       );
     }
+  });
+
+  // #2996 CR: a reference that is both outside an installed prefix AND
+  // missing from the repo must emit BOTH findings in one run. Previously
+  // the code short-circuited on NOT_INSTALLED, hiding MISSING_FROM_REPO
+  // until the developer fixed the prefix and re-ran CI.
+  test('a reference that is both not-installed AND missing-from-repo emits both findings (no short-circuit)', () => {
+    const { repoRoot, workflowsDir } = fixtureRepo({
+      workflows: {
+        'foo.md': '```bash\nnode "${GSD_HOME}/scripts/missing.cjs"\n```\n',
+      },
+      // Note: scripts/missing.cjs intentionally NOT created in the repo.
+    });
+    const r = auditWorkflowScriptPaths({
+      workflowsDir,
+      repoRoot,
+      installedPrefixes: ['get-shit-done', 'agents', 'hooks', 'commands'],
+    });
+    assert.equal(r.ok, false);
+    const kinds = r.findings.filter((f) => f.path === 'scripts/missing.cjs').map((f) => f.kind).sort();
+    assert.deepEqual(
+      kinds,
+      [AUDIT_FINDING.MISSING_FROM_REPO, AUDIT_FINDING.NOT_INSTALLED].sort(),
+      'expected both NOT_INSTALLED and MISSING_FROM_REPO findings for the same ref',
+    );
   });
 
   test('KNOWN_GAPS entries still match real findings — fixed gaps must be removed from the allow-list', () => {
