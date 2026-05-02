@@ -8813,6 +8813,12 @@ function installSdkIfNeeded(opts) {
   const shimSrc = path.resolve(__dirname, 'gsd-sdk.js');
   let onPath = isGsdSdkOnPath();
 
+  // Track WHERE we wrote the shim so the diagnostic can be specific even
+  // when isGsdSdkOnPath() returns false because the write target isn't on
+  // PATH (#3011: Windows users hit this when npm's global bin dir is
+  // populated but not on every shell's PATH — Git Bash vs PowerShell vs
+  // cmd.exe each read PATH from different sources).
+  let shimDir = null;
   if (!onPath) {
     // Try to materialize the shim into a user-writable PATH location so the
     // installer can deliver on the success message without requiring the user
@@ -8821,6 +8827,7 @@ function installSdkIfNeeded(opts) {
     // it's not on PATH (then a follow-up suggestion is printed).
     const linked = trySelfLinkGsdSdk(shimSrc);
     if (linked) {
+      shimDir = path.dirname(linked);
       onPath = isGsdSdkOnPath();
       if (onPath) {
         console.log(`  ${dim}↪ linked gsd-sdk → ${linked}${reset}`);
@@ -8831,12 +8838,23 @@ function installSdkIfNeeded(opts) {
   if (onPath) {
     console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
   } else {
+    // #3011: actionable diagnostic. The previous shape printed a generic
+    // "not on your PATH" message that didn't tell the user where to look.
+    // formatSdkPathDiagnostic produces a typed IR that we then render to
+    // stdout; tests assert on the IR (no source-grep, no console capture).
+    const ir = formatSdkPathDiagnostic({
+      shimDir,
+      platform: process.platform,
+      runDir: __dirname,
+    });
     console.log('');
     console.log(`  ${yellow}⚠${reset} GSD SDK files are present but ${bold}gsd-sdk${reset} is not on your PATH.`);
     console.log(`    Workflows that call ${cyan}gsd-sdk query …${reset} will fail with "command not found".`);
-    console.log(`    Install globally to materialize the bin symlink:`);
-    console.log(`      ${cyan}npm install -g get-shit-done-cc${reset}`);
-    console.log(`    Or add a directory containing the shim to your PATH manually.`);
+    if (ir.shimLocationLine) console.log(`    ${ir.shimLocationLine}`);
+    for (const line of ir.actionLines) console.log(`    ${line}`);
+    if (ir.npxNoteLines.length > 0) {
+      for (const line of ir.npxNoteLines) console.log(`    ${line}`);
+    }
     console.log('');
   }
 
@@ -9008,6 +9026,75 @@ function buildWindowsShimTriple(shimSrc) {
     fileNames: { cmd: 'gsd-sdk.cmd', ps1: 'gsd-sdk.ps1', sh: 'gsd-sdk' },
     render: { cmd: renderCmd, ps1: renderPs1, sh: renderSh },
   };
+}
+
+/**
+ * #3011: pure builder for the SDK-not-on-PATH diagnostic. Takes the
+ * resolved shim directory (or null if write failed), the current platform,
+ * and the install.js __dirname (used to detect npx-cache invocation).
+ * Returns a typed IR with:
+ *   - shimLocationLine: prose mentioning where the shim is (or empty if no
+ *     write happened)
+ *   - actionLines: ordered list of commands the user can run to add the
+ *     shim dir to their PATH (platform-specific shells), or fallback to
+ *     `npm install -g` advice when no shim was written
+ *   - npxNoteLines: ordered list of lines warning about npx persistence
+ *     when runDir is under an `_npx` cache segment
+ *
+ * Tests assert on the typed fields (paths/commands), not on rendered
+ * console output. Pure function — no fs, no spawn, no console.
+ */
+function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
+  const path = require('path');
+  const isWin32 = platform === 'win32';
+  // Detect either path separator — the test fixtures pass Windows-style
+  // paths while running on POSIX, and real users hit either depending on
+  // their npm/npx setup. Anchor on `_npx` between separators.
+  const isNpx = typeof runDir === 'string' &&
+    (runDir.includes('/_npx/') || runDir.includes('\\_npx\\'));
+
+  const shimLocationLine = shimDir ? `Shim written to: ${shimDir}` : '';
+  const actionLines = [];
+
+  if (shimDir) {
+    // Escape shimDir for each shell context. A path containing a single
+    // quote (e.g. C:\Users\O'Neil\AppData\...) would otherwise generate
+    // broken commands the user can't paste:
+    //   - PowerShell single-quoted string: '' escapes a literal single quote
+    //   - bash inside outer single quotes: '\'' (close, escaped quote, reopen)
+    //   - POSIX export inside double quotes: escape \ $ " ` so the path is
+    //     copied verbatim and $PATH (which is OUTSIDE the escaped substring)
+    //     still expands at paste time.
+    const psShimDir   = shimDir.replace(/'/g, "''");
+    const bashShimDir = shimDir.replace(/\\/g, '/').replace(/'/g, "'\\''");
+    const posixShimDir = shimDir.replace(/[\\$"`]/g, '\\$&');
+    actionLines.push('Add that directory to your PATH and restart your shell.');
+    if (isWin32) {
+      actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
+      // setx PATH "...;%PATH%" silently truncates above 1024 chars and
+      // expands %PATH% / %SystemRoot% to literals (turning REG_EXPAND_SZ
+      // into REG_SZ), permanently breaking lazy variable references.
+      // Invoke PowerShell from cmd.exe with the same SetEnvironmentVariable
+      // call as the PowerShell line so cmd.exe users get a safe command.
+      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
+      actionLines.push(`Git Bash  : echo 'export PATH="${bashShimDir}:$PATH"' >> ~/.bashrc`);
+    } else {
+      actionLines.push(`export PATH="${posixShimDir}:$PATH"`);
+    }
+  } else {
+    actionLines.push('Could not locate a writable PATH directory to install the shim.');
+    actionLines.push('Install globally to materialize the bin symlink:');
+    actionLines.push('npm install -g get-shit-done-cc');
+  }
+
+  const npxNoteLines = isNpx
+    ? [
+        "Note: you're running via npx. For a persistent shim,",
+        'install globally instead: npm install -g get-shit-done-cc',
+      ]
+    : [];
+
+  return { shimLocationLine, actionLines, npxNoteLines, isNpx, isWin32 };
 }
 
 function trySelfLinkGsdSdkWindows(shimSrc) {
@@ -9206,6 +9293,7 @@ if (process.env.GSD_TEST_MODE) {
     trySelfLinkGsdSdk,
     trySelfLinkGsdSdkWindows,
     buildWindowsShimTriple,
+    formatSdkPathDiagnostic,
     isGsdSdkOnPath,
     homePathCoveredByRc,
     maybeSuggestPathExport,
