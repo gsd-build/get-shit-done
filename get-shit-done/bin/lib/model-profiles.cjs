@@ -84,6 +84,66 @@ const VALID_PHASE_TYPES = new Set([
 ]);
 
 /**
+ * #3024 — Per-agent default tier for dynamic routing.
+ *
+ * Each agent declares a default routing tier (light/standard/heavy)
+ * that the dynamic-routing resolver uses to pick from
+ * `dynamic_routing.tier_models[tier]` on the first attempt. On
+ * orchestrator-detected soft failure, the resolver escalates to the
+ * next tier up (capped at `max_escalations`).
+ *
+ * Tier semantics:
+ *   - light:    cheap/fast — pure mappers/scanners, low-stakes verifiers
+ *   - standard: default workhorse — most researchers/writers/checkers
+ *   - heavy:    deep reasoning — planners/debuggers; can't escalate further
+ *
+ * Adding a new agent to MODEL_PROFILES requires adding an entry here too;
+ * tests/feat-3024-dynamic-routing.test.cjs asserts coverage.
+ */
+const AGENT_DEFAULT_TIERS = {
+  // Heavy — deep reasoning, planning, hard debugging
+  'gsd-planner':                'heavy',
+  'gsd-roadmapper':             'heavy',
+  'gsd-debugger':               'heavy',
+  // Standard — default workhorse: research, writing, primary verification
+  'gsd-executor':               'standard',
+  'gsd-phase-researcher':       'standard',
+  'gsd-project-researcher':     'standard',
+  'gsd-verifier':               'standard',
+  'gsd-doc-writer':             'standard',
+  'gsd-ui-researcher':          'standard',
+  // Light — fast scanners, structural mappers, low-stakes audits
+  'gsd-codebase-mapper':        'light',
+  'gsd-pattern-mapper':         'light',
+  'gsd-research-synthesizer':   'light',
+  'gsd-plan-checker':           'light',
+  'gsd-integration-checker':    'light',
+  'gsd-nyquist-auditor':        'light',
+  'gsd-ui-checker':             'light',
+  'gsd-ui-auditor':             'light',
+  'gsd-doc-verifier':           'light',
+};
+
+/**
+ * The three valid agent tier slots for dynamic routing. Used to
+ * validate `dynamic_routing.tier_models.<tier>` keys at config-set
+ * time and the AGENT_DEFAULT_TIERS values at startup.
+ */
+const VALID_AGENT_TIERS = new Set(['light', 'standard', 'heavy']);
+
+/**
+ * Tier escalation order: light → standard → heavy.
+ * `nextTier(currentTier)` returns the tier one step up. `heavy` stays
+ * at heavy (no tier above). Returns null for invalid input so callers
+ * can detect mis-config rather than silently degrade.
+ */
+const _TIER_ESCALATION = { light: 'standard', standard: 'heavy', heavy: 'heavy' };
+function nextTier(currentTier) {
+  if (typeof currentTier !== 'string') return null;
+  return _TIER_ESCALATION[currentTier] || null;
+}
+
+/**
  * Formats the agent-to-model mapping as a human-readable table (in string format).
  *
  * @param {Object<string, string>} agentToModelMap - A mapping from agent to model
@@ -125,6 +185,9 @@ module.exports = {
   VALID_PROFILES,
   AGENT_TO_PHASE_TYPE,
   VALID_PHASE_TYPES,
+  AGENT_DEFAULT_TIERS,
+  VALID_AGENT_TIERS,
+  nextTier,
   formatAgentToModelMapAsTable,
   getAgentToModelMapForProfile,
 };

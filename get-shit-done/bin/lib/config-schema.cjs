@@ -90,6 +90,11 @@ const DYNAMIC_KEY_PATTERNS = [
   // precedence over phase-type at resolve time.
   { topLevel: 'models', test: (k) => /^models\.(planning|discuss|research|execution|verification|completion)$/.test(k),
     description: 'models.<planning|discuss|research|execution|verification|completion>' },
+  // #3024 — dynamic routing block. Three top-level scalar settings
+  // plus a tier_models sub-block keyed by light/standard/heavy.
+  { topLevel: 'dynamic_routing',
+    test: (k) => /^dynamic_routing\.(enabled|escalate_on_failure|max_escalations|tier_models\.(light|standard|heavy))$/.test(k),
+    description: 'dynamic_routing.<enabled|escalate_on_failure|max_escalations|tier_models.<light|standard|heavy>>' },
 ];
 
 /**

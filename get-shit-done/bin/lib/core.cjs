@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execSync, execFileSync, spawnSync } = require('child_process');
-const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES } = require('./model-profiles.cjs');
+const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES, AGENT_DEFAULT_TIERS, VALID_AGENT_TIERS, nextTier } = require('./model-profiles.cjs');
 // Compatibility shim: new imports should use planning-workspace.cjs directly.
 const {
   planningDir,
@@ -506,6 +506,11 @@ function loadConfig(cwd) {
       // resolveModelInternal. Defaults to null so configs without it
       // behave exactly as today.
       models: parsed.models || null,
+      // #3024 — dynamic routing block. When `enabled: true`, the
+      // resolveModelForTier() resolver picks tier_models[default_tier]
+      // for the agent and escalates one tier per attempt up to
+      // max_escalations. Disabled by default for backward compat.
+      dynamic_routing: parsed.dynamic_routing || null,
       // #2517 — runtime-aware profiles. `runtime` defaults to null (back-compat).
       // When null, resolveModelInternal preserves today's Claude-native behavior.
       // NOTE: `runtime` and `model_profile_overrides` are intentionally read
@@ -567,6 +572,7 @@ function loadConfig(cwd) {
         subagent_timeout: globalDefaults.subagent_timeout ?? defaults.subagent_timeout,
         model_overrides: globalDefaults.model_overrides || null,
         models: globalDefaults.models || null,
+        dynamic_routing: globalDefaults.dynamic_routing || null,
         agent_skills: globalDefaults.agent_skills || {},
         response_language: globalDefaults.response_language || null,
       };
@@ -1600,6 +1606,85 @@ function resolveModelInternal(cwd, agentType) {
 }
 
 /**
+ * #3024 — Resolve a model for a specific dynamic-routing attempt.
+ *
+ * The orchestrator (workflow agent) tracks the attempt counter. On
+ * the first spawn, it calls with attempt=0. If the orchestrator detects
+ * a soft failure (verification inconclusive, plan-check FLAG, etc.),
+ * it re-spawns with attempt=1, which escalates the agent's tier one
+ * step up. `max_escalations` caps how many escalations are allowed.
+ *
+ * Resolution precedence (highest → lowest):
+ *   1. config.model_overrides[agent]              (full IDs accepted)
+ *   2. dynamic_routing.tier_models[escalated_tier] (when enabled)
+ *   3. models[phase_type] / model_profile          (existing chain via
+ *                                                    resolveModelInternal)
+ *
+ * When dynamic_routing is null/disabled, this function is identical
+ * to resolveModelInternal — orchestrators can call it unconditionally
+ * without breaking back-compat.
+ *
+ * @param {string} cwd - Project directory.
+ * @param {string} agentType - Agent name (e.g. 'gsd-verifier').
+ * @param {number} [attempt=0] - 0 for first spawn; 1+ for escalation.
+ *                               Capped internally at max_escalations.
+ * @returns {string} Model alias (opus/sonnet/haiku) or full ID.
+ */
+function resolveModelForTier(cwd, agentType, attempt) {
+  const config = loadConfig(cwd);
+  const attemptN = Number.isInteger(attempt) && attempt > 0 ? attempt : 0;
+
+  // Per-agent override always wins — same as resolveModelInternal step 1.
+  // User-supplied full IDs bypass the entire tier mechanism.
+  const override = config.model_overrides?.[agentType];
+  if (override) return override;
+
+  const dr = config.dynamic_routing;
+  // Disabled / missing / non-object → fall back to the existing resolver.
+  if (!dr || typeof dr !== 'object' || dr.enabled !== true) {
+    return resolveModelInternal(cwd, agentType);
+  }
+
+  const tierModels = dr.tier_models;
+  if (!tierModels || typeof tierModels !== 'object') {
+    // tier_models missing — can't dynamic-route; fall back.
+    return resolveModelInternal(cwd, agentType);
+  }
+
+  const defaultTier = AGENT_DEFAULT_TIERS[agentType];
+  if (!defaultTier || !VALID_AGENT_TIERS.has(defaultTier)) {
+    // Unmapped agent — no default tier; fall back so we don't silently
+    // pick the wrong model.
+    return resolveModelInternal(cwd, agentType);
+  }
+
+  // Cap effective escalation at max_escalations (default 1). Beyond
+  // the cap, the resolver returns the model for the cap level so the
+  // orchestrator can log "max escalations reached" without burning
+  // further budget.
+  const maxEscalations = Number.isInteger(dr.max_escalations) && dr.max_escalations >= 0
+    ? dr.max_escalations
+    : 1;
+  const effectiveAttempt = Math.min(attemptN, maxEscalations);
+
+  // Walk the escalation chain N times from the default tier.
+  let tier = defaultTier;
+  for (let i = 0; i < effectiveAttempt; i += 1) {
+    const next = nextTier(tier);
+    if (!next || next === tier) break; // already at top
+    tier = next;
+  }
+
+  const alias = tierModels[tier];
+  if (typeof alias !== 'string' || alias.length === 0) {
+    // Misconfigured tier_models — missing slot. Fall back rather
+    // than emit an empty model id.
+    return resolveModelInternal(cwd, agentType);
+  }
+  return alias;
+}
+
+/**
  * #2517 — Resolve runtime-specific reasoning_effort for an agent.
  * Returns null unless:
  *   - `runtime` is explicitly set in config,
@@ -1959,6 +2044,7 @@ module.exports = {
   getArchivedPhaseDirs,
   getRoadmapPhaseInternal,
   resolveModelInternal,
+  resolveModelForTier,
   resolveReasoningEffortInternal,
   RUNTIME_PROFILE_MAP,
   RUNTIMES_WITH_REASONING_EFFORT,

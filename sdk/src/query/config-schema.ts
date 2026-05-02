@@ -117,6 +117,12 @@ export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
     description: 'models.<planning|discuss|research|execution|verification|completion>',
     test: (k) => /^models\.(planning|discuss|research|execution|verification|completion)$/.test(k),
   },
+  // #3024 — dynamic routing with failure-tier escalation
+  {
+    source: '^dynamic_routing\\.(enabled|escalate_on_failure|max_escalations|tier_models\\.(light|standard|heavy))$',
+    description: 'dynamic_routing.<enabled|escalate_on_failure|max_escalations|tier_models.<light|standard|heavy>>',
+    test: (k) => /^dynamic_routing\.(enabled|escalate_on_failure|max_escalations|tier_models\.(light|standard|heavy))$/.test(k),
+  },
 ];
 
 /** Returns true if keyPath is a valid config key (exact or dynamic pattern). */

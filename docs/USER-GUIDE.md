@@ -1047,6 +1047,36 @@ That gives sonnet to all research agents *except* the codebase mapper, which run
 
 For the full mapping table and resolution-precedence rules, see [Per-Phase-Type Models](CONFIGURATION.md#per-phase-type-models-models--added-in-v140) in the configuration reference.
 
+### Cheap-by-default with `dynamic_routing` — added in v1.40
+
+If you've been paying Opus rates everywhere as insurance against a single hard verification, dynamic routing flips it: every agent starts on a cheaper tier and escalates only when the orchestrator marks a soft failure (verification inconclusive, plan-check FLAG, etc.).
+
+```json
+{
+  "dynamic_routing": {
+    "enabled": true,
+    "tier_models": {
+      "light":    "haiku",
+      "standard": "sonnet",
+      "heavy":    "opus"
+    },
+    "escalate_on_failure": true,
+    "max_escalations": 1
+  }
+}
+```
+
+Each agent has a default tier (`light`, `standard`, or `heavy`). On the first attempt, GSD picks `tier_models[default_tier]`. If the orchestrator detects a soft failure, it re-spawns once at the next tier up. `max_escalations` caps total retries so a runaway loop can't burn through your budget.
+
+Concretely:
+- `gsd-codebase-mapper` (default `light`) → first attempt = `haiku`. If escalated → `sonnet`.
+- `gsd-verifier` (default `standard`) → first attempt = `sonnet`. If escalated → `opus`.
+- `gsd-planner` (default `heavy`) → always `opus`. No tier above; can't escalate further.
+
+To turn it off, set `dynamic_routing.enabled: false` (the default) — behavior is identical to today.
+
+For the full agent → tier mapping and resolution-precedence rules, see [Dynamic Routing](CONFIGURATION.md#dynamic-routing-with-failure-tier-escalation-dynamic_routing--added-in-v140) in the configuration reference.
+
 ### Using Non-Claude Runtimes (Codex, OpenCode, Gemini CLI, Kilo)
 
 If you installed GSD for a non-Claude runtime, the installer already configured model resolution so all agents use the runtime's default model. No manual setup is needed. Specifically, the installer sets `resolve_model_ids: "omit"` in your config, which tells GSD to skip Anthropic model ID resolution and let the runtime choose its own default model.
