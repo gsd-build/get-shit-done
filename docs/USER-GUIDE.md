@@ -1090,7 +1090,7 @@ Set `commit_docs: false` during `/gsd-new-project` or via `/gsd-settings`. Add `
 
 ### GSD Update Overwrote My Local Changes
 
-Since v1.17, the installer backs up locally modified files to `gsd-local-patches/`. Run `/gsd-reapply-patches` to merge your changes back.
+Since v1.17, the installer backs up locally modified files to `gsd-local-patches/`. Run `/gsd-update --reapply` to merge your changes back.
 
 ### Cannot Update via npm
 
@@ -1249,7 +1249,7 @@ If the installer crashes with `EPERM: operation not permitted, scandir` on Windo
 | Quick targeted fix                   | `/gsd-quick`                                                             |
 | Plan doesn't match your vision       | `/gsd-discuss-phase [N]` then re-plan                                    |
 | Costs running high                   | `/gsd-set-profile budget` and `/gsd-settings` to toggle agents off       |
-| Update broke local changes           | `/gsd-reapply-patches`                                                   |
+| Update broke local changes           | `/gsd-update --reapply`                                                  |
 | Want session summary for stakeholder | `/gsd-session-report`                                                    |
 | Don't know what step is next         | `/gsd-next`                                                              |
 | Parallel execution build errors      | Update GSD or set `parallelization.enabled: false`                       |

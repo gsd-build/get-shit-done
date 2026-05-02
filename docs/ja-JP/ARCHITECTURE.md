@@ -439,7 +439,7 @@ UI-SPEC.md (per phase) ───────────────────
    - Antigravity: Googleモデル同等品によるスキルファースト
 5. **パス正規化** — `~/.claude/` パスをランタイム固有のパスに置換
 6. **設定統合** — ランタイムの `settings.json` にフックを登録
-7. **パッチバックアップ** — v1.17以降、ローカルで変更されたファイルを `/gsd-reapply-patches` 用に `gsd-local-patches/` へバックアップ
+7. **パッチバックアップ** — v1.17以降、ローカルで変更されたファイルを `/gsd-update --reapply` 用に `gsd-local-patches/` へバックアップ
 8. **マニフェスト追跡** — クリーンアンインストールのために `gsd-file-manifest.json` を書き込み
 9. **アンインストールモード** — `--uninstall` ですべてのGSDファイル、フック、設定を削除
 

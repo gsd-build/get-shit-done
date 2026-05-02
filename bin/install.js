@@ -7158,14 +7158,14 @@ function reportLocalPatches(configDir, runtime = 'claude') {
 
   if (meta.files && meta.files.length > 0) {
     const reapplyCommand = (runtime === 'opencode' || runtime === 'kilo' || runtime === 'copilot')
-      ? '/gsd-reapply-patches'
+      ? '/gsd-update --reapply'
       : runtime === 'gemini'
-        ? '/gsd:reapply-patches'
+        ? '/gsd:update --reapply'
         : runtime === 'codex'
-          ? '$gsd-reapply-patches'
+          ? '$gsd-update --reapply'
         : runtime === 'cursor'
-          ? 'gsd-reapply-patches (mention the skill name)'
-          : '/gsd-reapply-patches';
+          ? 'gsd-update --reapply (mention the skill name)'
+          : '/gsd-update --reapply';
     console.log('');
     console.log('  ' + yellow + 'Local patches detected' + reset + ' (from v' + meta.from_version + '):');
     for (const f of meta.files) {

@@ -59,4 +59,4 @@ The installer performs a clean wipe-and-replace of GSD-managed directories only:
 - Your `CLAUDE.md` files
 - Custom hooks
 
-Locally modified GSD files are automatically backed up to `gsd-local-patches/` before the install. Run `/gsd-reapply-patches` after updating to merge your modifications back in.
+Locally modified GSD files are automatically backed up to `gsd-local-patches/` before the install. Run `/gsd-update --reapply` after updating to merge your modifications back in.
