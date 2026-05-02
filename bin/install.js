@@ -9208,7 +9208,7 @@ function isGsdSdkOnPath(pathString) {
  * `bash -c "gsd-sdk …"`, and that bash inherits PATH from the user's
  * login shell.
  *
- * Uses `$SHELL -lc 'echo $PATH'` on POSIX. Returns null on Windows
+ * Uses `$SHELL -lc 'printf %s "$PATH"'` on POSIX. Returns null on Windows
  * (cross-shell PATH probing requires a different strategy — Git Bash
  * vs PowerShell vs cmd.exe each read PATH from different sources, and
  * a future revision can build a Windows-aware probe). Returns null

@@ -24,7 +24,7 @@
  *     - Pure: no spawn, no I/O beyond fs.statSync on candidates.
  *
  *   getUserShellPath() → string | null
- *     - Probes the user's login shell ($SHELL -lc 'echo $PATH') on
+ *     - Probes the user's login shell ($SHELL -lc 'printf %s "$PATH"') on
  *       POSIX so we can predict the runtime shell PATH.
  *     - Returns null on Windows or when the probe fails (caller falls
  *       back to process.env.PATH).
