@@ -29,6 +29,61 @@ const MODEL_PROFILES = {
 const VALID_PROFILES = [...Object.keys(MODEL_PROFILES['gsd-planner']), 'inherit'];
 
 /**
+ * #3023 — Phase-type → agent mapping table.
+ *
+ * Lets users tune model selection at the *phase-type* level (planning,
+ * research, execution, verification, ...) instead of per-agent. Maps
+ * each agent in MODEL_PROFILES to exactly one phase-type so resolution
+ * is deterministic.
+ *
+ * Adding a new agent to MODEL_PROFILES requires adding an entry here too;
+ * tests/feat-3023-phase-type-models.test.cjs asserts coverage.
+ *
+ * Phase-type semantics:
+ *   - planning:     produces the plan (PLAN.md, ROADMAP.md, patterns)
+ *   - discuss:      collaborative scoping (no subagent today; reserved
+ *                   for orchestrators that may spawn one)
+ *   - research:     gathers external/codebase context (RESEARCH.md)
+ *   - execution:    implements the plan or writes user-facing artifacts
+ *   - verification: checks correctness (VERIFICATION.md, audits)
+ *   - completion:   post-execution wrap-up (no subagent today; reserved)
+ */
+const AGENT_TO_PHASE_TYPE = {
+  // Planning — produces the plan / roadmap / pattern map
+  'gsd-planner':                'planning',
+  'gsd-roadmapper':             'planning',
+  'gsd-pattern-mapper':         'planning',
+  // Research — external/codebase information gathering
+  'gsd-phase-researcher':       'research',
+  'gsd-project-researcher':     'research',
+  'gsd-research-synthesizer':   'research',
+  'gsd-codebase-mapper':        'research',
+  'gsd-ui-researcher':          'research',
+  // Execution — implementation, debugging, doc writing
+  'gsd-executor':               'execution',
+  'gsd-debugger':               'execution',
+  'gsd-doc-writer':             'execution',
+  // Verification — correctness checks, audits, gap analysis
+  'gsd-verifier':               'verification',
+  'gsd-plan-checker':           'verification',
+  'gsd-integration-checker':    'verification',
+  'gsd-nyquist-auditor':        'verification',
+  'gsd-ui-checker':             'verification',
+  'gsd-ui-auditor':             'verification',
+  'gsd-doc-verifier':           'verification',
+};
+
+/**
+ * The six phase-type slots accepted in `.planning/config.json` `models`
+ * block. `discuss` and `completion` are reserved — no current agent maps
+ * to them today — so users can pre-configure those slots without
+ * breaking validation when an orchestrator starts honoring them.
+ */
+const VALID_PHASE_TYPES = new Set([
+  'planning', 'discuss', 'research', 'execution', 'verification', 'completion',
+]);
+
+/**
  * Formats the agent-to-model mapping as a human-readable table (in string format).
  *
  * @param {Object<string, string>} agentToModelMap - A mapping from agent to model
@@ -68,6 +123,8 @@ function getAgentToModelMapForProfile(normalizedProfile) {
 module.exports = {
   MODEL_PROFILES,
   VALID_PROFILES,
+  AGENT_TO_PHASE_TYPE,
+  VALID_PHASE_TYPES,
   formatAgentToModelMapAsTable,
   getAgentToModelMapForProfile,
 };

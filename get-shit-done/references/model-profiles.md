@@ -19,6 +19,53 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 | gsd-integration-checker | sonnet | sonnet | haiku | haiku | inherit |
 | gsd-nyquist-auditor | sonnet | sonnet | haiku | haiku | inherit |
 
+## Per-Phase-Type Model Map (#3023)
+
+`.planning/config.json` accepts a coarse per-**phase-type** map under the `models` key. Use this when you want tuning at the phase level ("Opus for planning and execution, Sonnet for the rest") without learning the agent taxonomy.
+
+```json
+{
+  "model_profile": "balanced",
+  "models": {
+    "planning": "opus",
+    "discuss": "opus",
+    "research": "sonnet",
+    "execution": "opus",
+    "verification": "sonnet",
+    "completion": "sonnet"
+  },
+  "model_overrides": {
+    "gsd-codebase-mapper": "haiku"
+  }
+}
+```
+
+### Phase-type → agent mapping
+
+| Phase type | Agents |
+|---|---|
+| `planning` | gsd-planner, gsd-roadmapper, gsd-pattern-mapper |
+| `discuss` | (reserved — no subagent today) |
+| `research` | gsd-phase-researcher, gsd-project-researcher, gsd-research-synthesizer, gsd-codebase-mapper, gsd-ui-researcher |
+| `execution` | gsd-executor, gsd-debugger, gsd-doc-writer |
+| `verification` | gsd-verifier, gsd-plan-checker, gsd-integration-checker, gsd-nyquist-auditor, gsd-ui-checker, gsd-ui-auditor, gsd-doc-verifier |
+| `completion` | (reserved — no subagent today) |
+
+### Resolution precedence (highest to lowest)
+
+1. **Per-agent `model_overrides[agent]`** — full IDs accepted; targeted exceptions
+2. **Phase-type `models[phase_type]`** — tier alias only (`opus` / `sonnet` / `haiku` / `inherit`)
+3. **Profile table** — the per-agent column from the active `model_profile`
+4. **Runtime default** — when nothing else applies
+
+### Why two layers above the profile?
+
+- **Profile** is a global tier strategy (everyone runs balanced).
+- **`models`** is coarse phase-level tuning without learning agent names.
+- **`model_overrides`** is per-agent precision (e.g. force `haiku` on `gsd-codebase-mapper` for a fan-out).
+
+The three layers compose: `models` defaults a phase, `model_overrides` carves an exception out of it.
+
 ## Profile Philosophy
 
 **quality** - Maximum reasoning power

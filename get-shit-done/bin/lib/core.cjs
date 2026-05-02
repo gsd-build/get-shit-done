@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execSync, execFileSync, spawnSync } = require('child_process');
-const { MODEL_PROFILES } = require('./model-profiles.cjs');
+const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES } = require('./model-profiles.cjs');
 // Compatibility shim: new imports should use planning-workspace.cjs directly.
 const {
   planningDir,
@@ -500,6 +500,12 @@ function loadConfig(cwd) {
       project_code: get('project_code') ?? defaults.project_code,
       subagent_timeout: get('subagent_timeout', { section: 'workflow', field: 'subagent_timeout' }) ?? defaults.subagent_timeout,
       model_overrides: parsed.model_overrides || null,
+      // #3023 — per-phase-type model map. Six named slots
+      // (planning/discuss/research/execution/verification/completion).
+      // Resolves between per-agent override and profile-derived tier in
+      // resolveModelInternal. Defaults to null so configs without it
+      // behave exactly as today.
+      models: parsed.models || null,
       // #2517 — runtime-aware profiles. `runtime` defaults to null (back-compat).
       // When null, resolveModelInternal preserves today's Claude-native behavior.
       // NOTE: `runtime` and `model_profile_overrides` are intentionally read
@@ -560,6 +566,7 @@ function loadConfig(cwd) {
         context_window: globalDefaults.context_window ?? defaults.context_window,
         subagent_timeout: globalDefaults.subagent_timeout ?? defaults.subagent_timeout,
         model_overrides: globalDefaults.model_overrides || null,
+        models: globalDefaults.models || null,
         agent_skills: globalDefaults.agent_skills || {},
         response_language: globalDefaults.response_language || null,
       };
@@ -1518,10 +1525,27 @@ function resolveModelInternal(cwd, agentType) {
     return override;
   }
 
-  // 2. Compute the tier (opus/sonnet/haiku) for this agent under the active profile.
+  // 2. Compute the tier (opus/sonnet/haiku/inherit) for this agent.
+  //
+  // #3023: phase-type slot can override the profile-derived tier.
+  // Precedence: per-agent override (above) > phase-type slot > profile.
+  // Phase-type values are tier aliases (opus/sonnet/haiku/inherit) — same
+  // shape as model_profile output — so the runtime-resolution chain
+  // (step 3), resolve_model_ids handling (step 4), and profile lookup
+  // (step 5) all stay correct without further branching.
   const profile = String(config.model_profile || 'balanced').toLowerCase();
   const agentModels = MODEL_PROFILES[agentType];
-  const tier = agentModels ? (agentModels[profile] || agentModels['balanced']) : null;
+  const phaseType = AGENT_TO_PHASE_TYPE[agentType];
+  const phaseTypeTier = (phaseType && config.models && typeof config.models === 'object')
+    ? config.models[phaseType]
+    : undefined;
+  // Only honor phase-type tier if it's one of the recognized aliases.
+  // Anything else falls through to profile lookup so a typo doesn't
+  // silently break tier resolution.
+  const VALID_TIERS = new Set(['opus', 'sonnet', 'haiku', 'inherit']);
+  const tier = (phaseTypeTier && VALID_TIERS.has(phaseTypeTier))
+    ? phaseTypeTier
+    : (agentModels ? (agentModels[profile] || agentModels['balanced']) : null);
 
   // 3. Runtime-aware resolution (#2517) — only when `runtime` is explicitly set
   // to a non-Claude runtime. `runtime: "claude"` is the implicit default and is
@@ -1530,7 +1554,7 @@ function resolveModelInternal(cwd, agentType) {
   // explicit opt-in beats `resolve_model_ids: "omit"` so users on Codex installs
   // that auto-set "omit" can still flip on tiered behavior by setting runtime
   // alone. inherit profile is preserved verbatim.
-  if (config.runtime && config.runtime !== 'claude' && profile !== 'inherit' && tier) {
+  if (config.runtime && config.runtime !== 'claude' && profile !== 'inherit' && tier && tier !== 'inherit') {
     const entry = _resolveRuntimeTier(config, tier);
     if (entry?.model) return entry.model;
     // Unknown runtime with no user-supplied overrides — fall through to Claude-safe

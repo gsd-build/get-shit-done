@@ -111,6 +111,12 @@ export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
     description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>',
     test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
   },
+  // #3023 — per-phase-type model map: models.<phase_type> = <tier>
+  {
+    source: '^models\\.(planning|discuss|research|execution|verification|completion)$',
+    description: 'models.<planning|discuss|research|execution|verification|completion>',
+    test: (k) => /^models\.(planning|discuss|research|execution|verification|completion)$/.test(k),
+  },
 ];
 
 /** Returns true if keyPath is a valid config key (exact or dynamic pattern). */
