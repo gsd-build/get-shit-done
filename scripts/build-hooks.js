@@ -22,6 +22,7 @@ const HOOKS_TO_COPY = [
   'gsd-read-guard.js',
   'gsd-read-injection-scanner.js',
   'gsd-statusline.js',
+  'gsd-update-banner.js',
   'gsd-workflow-guard.js',
   // Community hooks (bash, opt-in via .planning/config.json hooks.community)
   'gsd-session-state.sh',

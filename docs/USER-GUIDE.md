@@ -1184,6 +1184,30 @@ Since v1.17, the installer backs up locally modified files to `gsd-local-patches
 
 If `npx get-shit-done-cc` fails due to npm outages or network restrictions, see [docs/manual-update.md](manual-update.md) for a step-by-step manual update procedure that works without npm access.
 
+### Surface GSD Update Notifications Without GSD's Statusline
+
+GSD checks for new versions in the background and writes the result to `~/.cache/gsd/gsd-update-check.json`. By default, GSD's statusline (`hooks/gsd-statusline.js`) reads that cache and shows the update indicator. If you use a different statusline (for example `ccstatusline`) or none at all, the update info is invisible.
+
+**Opt-in fix:** during interactive install, when you decline (or keep your existing) statusline, the installer offers a one-time prompt:
+
+```text
+Optional: GSD update banner
+  1) No banner (default)
+  2) Install update banner
+```
+
+Choose `2` (or type `y`/`yes`) and the installer registers `hooks/gsd-update-banner.js` as a `SessionStart` hook. From the next session onward, GSD prints a one-line `systemMessage` only when the cache reports an update available:
+
+```text
+GSD update available: 1.39.0 → 1.40.0. Run /gsd-update.
+```
+
+The banner is silent when no update is available. If the cache file is corrupt, GSD emits one diagnostic line (`GSD update check failed.`) and stays silent for 24 hours so a broken cache does not nag every session.
+
+**Opt-out / removal:** delete the SessionStart hook entry that references `gsd-update-banner.js` from your runtime's `settings.json` (Claude Code: `~/.claude/settings.json`; Gemini: `~/.gemini/settings.json`). `npx get-shit-done-cc --uninstall` removes both the script and the registration in one pass.
+
+The banner is not offered when GSD's statusline is installed — that channel already surfaces update info, so re-prompting would be noise.
+
 ### Workflow Diagnostics (`/gsd-forensics`)
 
 When a workflow fails in a way that isn't obvious -- plans reference nonexistent files, execution produces unexpected results, or state seems corrupted -- run `/gsd-forensics` to generate a diagnostic report.

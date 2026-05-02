@@ -569,6 +569,7 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
     'gsd-prompt-guard.js',
     'gsd-read-guard.js',
     'gsd-read-injection-scanner.js',
+    'gsd-update-banner.js',
     'gsd-workflow-guard.js',
   ]);
   let changed = false;
@@ -6474,7 +6475,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   // 4. Remove GSD hooks
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
-    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-read-injection-scanner.js', 'gsd-workflow-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
+    const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-read-injection-scanner.js', 'gsd-update-banner.js', 'gsd-workflow-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
     let hookCount = 0;
     for (const hook of gsdHooks) {
       const hookPath = path.join(hooksDir, hook);
@@ -6530,6 +6531,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         cmd.includes('gsd-session-state') || cmd.includes('gsd-context-monitor') ||
         cmd.includes('gsd-phase-boundary') || cmd.includes('gsd-prompt-guard') ||
         cmd.includes('gsd-read-guard') || cmd.includes('gsd-read-injection-scanner') ||
+        cmd.includes('gsd-update-banner') ||
         cmd.includes('gsd-validate-commit') || cmd.includes('gsd-workflow-guard'));
 
     for (const eventName of ['SessionStart', 'PostToolUse', 'AfterTool', 'PreToolUse', 'BeforeTool']) {
@@ -8116,7 +8118,7 @@ function install(isGlobal, runtime = 'claude') {
       throw wrapped;
     }
 
-    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isCopilot) {
@@ -8129,22 +8131,22 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Generated copilot-instructions.md`);
     }
     // Copilot: no settings.json, no hooks, no statusline (like Codex)
-    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isCursor) {
     // Cursor uses skills — no config.toml, no settings.json hooks needed
-    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isWindsurf) {
     // Windsurf uses skills — no config.toml, no settings.json hooks needed
-    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isTrae) {
     // Trae uses skills — no settings.json hooks needed
-    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isCline) {
@@ -8164,7 +8166,7 @@ function install(isGlobal, runtime = 'claude') {
     ].join('\n') + '\n';
     fs.writeFileSync(clinerulesDest, clinerules);
     console.log(`  ${green}✓${reset} Wrote .clinerules`);
-    return { settingsPath: null, settings: null, statuslineCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   // Configure statusline and hooks in settings.json
@@ -8509,13 +8511,30 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
-  return { settingsPath, settings, statuslineCommand, runtime, configDir: targetDir };
+  // Compute the update-banner hook command alongside the others so
+  // installAllRuntimes can register it at finalize time when the user opts
+  // in (#2795). Computed here (not in finishInstall) so the same buildHookCommand
+  // / localCmd resolution logic is shared with the other JS hooks.
+  const updateBannerCommand = isOpencode || isKilo
+    ? null
+    : (isGlobal
+      ? buildHookCommand(targetDir, 'gsd-update-banner.js', hookOpts)
+      : localCmd('gsd-update-banner.js'));
+
+  return {
+    settingsPath,
+    settings,
+    statuslineCommand,
+    updateBannerCommand,
+    runtime,
+    configDir: targetDir,
+  };
 }
 
 /**
  * Apply statusline config, then print completion message
  */
-function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true, configDir = null) {
+function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true, configDir = null, bannerOpts = {}) {
   const isOpencode = runtime === 'opencode';
   const isKilo = runtime === 'kilo';
   const isCodex = runtime === 'codex';
@@ -8543,6 +8562,36 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
         command: statuslineCommand
       };
       console.log(`  ${green}✓${reset} Configured statusline`);
+    }
+  }
+
+  // Register the opt-in update banner (#2795) when the user accepted the
+  // banner offer at install time. Only applies to runtimes that own a
+  // settings.json hooks block — opencode/kilo/codex/cursor/windsurf/trae/
+  // cline either lack the surface or use a different config schema.
+  const { shouldInstallBanner, bannerCommand } = bannerOpts;
+  if (shouldInstallBanner && settings && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isCline) {
+    if (!bannerCommand) {
+      console.warn(`  ${yellow}⚠${reset}  Skipped update banner registration — Node executable path unavailable. See #2979 / #3002.`);
+    } else {
+      if (!settings.hooks) settings.hooks = {};
+      if (!settings.hooks.SessionStart) settings.hooks.SessionStart = [];
+      const alreadyRegistered = settings.hooks.SessionStart.some(entry =>
+        entry && entry.hooks && entry.hooks.some(h => h && h.command && h.command.includes('gsd-update-banner'))
+      );
+      const bannerHookFile = configDir ? path.join(configDir, 'hooks', 'gsd-update-banner.js') : null;
+      const bannerInstalled = bannerHookFile ? fs.existsSync(bannerHookFile) : false;
+      if (alreadyRegistered) {
+        // Idempotent re-install: don't double-register.
+      } else if (!bannerInstalled) {
+        console.warn(`  ${yellow}⚠${reset}  Skipped update banner — gsd-update-banner.js not found at target`);
+      } else {
+        const entry = buildUpdateBannerHookEntry(bannerCommand);
+        if (entry) {
+          settings.hooks.SessionStart.push(entry);
+          console.log(`  ${green}✓${reset} Configured update banner hook (opt-in)`);
+        }
+      }
     }
   }
 
@@ -8794,6 +8843,90 @@ function promptRuntime(callback) {
     answered = true;
     rl.close();
     callback(parseRuntimeInput(answer));
+  });
+}
+
+// ─── Update banner (#2795) ──────────────────────────────────────────────────
+
+/**
+ * Build the prompt text shown when offering the opt-in update banner.
+ * Pure function — no I/O. Exported for tests so they can assert against the
+ * rendered prompt structurally instead of grepping bin/install.js source.
+ */
+function buildUpdateBannerPromptText() {
+  return `
+  ${yellow}Optional: GSD update banner${reset}
+  Without GSD's statusline, update notifications won't be visible. You can
+  install a SessionStart banner that surfaces a one-line message when a new
+  GSD release is available. The banner appears only at session start and
+  only when an update exists.
+
+  ${cyan}1${reset}) ${dim}No banner (default)${reset}
+  ${cyan}2${reset}) Install update banner
+`;
+}
+
+/**
+ * Parse user input from the banner prompt. Returns true when the user opted
+ * in. Pure function — exported for direct unit testing.
+ *
+ *  - Empty input or "1" → false (default: no banner).
+ *  - "2" → true.
+ *  - "y" / "yes" (case-insensitive) → true. Affirmative shortcuts.
+ */
+function parseUpdateBannerInput(answer) {
+  const input = (answer == null ? '' : String(answer)).trim().toLowerCase();
+  if (input === '2' || input === 'y' || input === 'yes') return true;
+  return false;
+}
+
+/**
+ * Build a SessionStart hook entry (settings.json shape) that runs the
+ * update-banner script. Returns null when the input command is empty so
+ * callers can warn-and-skip rather than writing { command: null } and
+ * tripping the runtime's hook schema (#3002).
+ *
+ * @param {string|null} bannerCommand - Result of buildHookCommand() / localCmd().
+ * @returns {{hooks: Array<{type: 'command', command: string}>}|null}
+ */
+function buildUpdateBannerHookEntry(bannerCommand) {
+  if (!bannerCommand) return null;
+  return {
+    hooks: [
+      {
+        type: 'command',
+        command: bannerCommand,
+      },
+    ],
+  };
+}
+
+/**
+ * Interactive prompt that asks the user whether to install the opt-in
+ * update banner. Used by `installAllRuntimes` only when GSD's statusline
+ * was declined or skipped.
+ *
+ * @param {boolean} isInteractive
+ * @param {(shouldInstallBanner: boolean) => void} callback
+ */
+function handleUpdateBanner(isInteractive, callback) {
+  if (!isInteractive) {
+    // Never auto-install in non-interactive mode — user can re-run install
+    // interactively or hand-edit settings.json to opt in later.
+    callback(false);
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  console.log(buildUpdateBannerPromptText());
+
+  rl.question(`  Choice ${dim}[1]${reset}: `, (answer) => {
+    rl.close();
+    callback(parseUpdateBannerInput(answer));
   });
 }
 
@@ -9629,7 +9762,7 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
   const statuslineRuntimes = ['claude', 'gemini'];
   const primaryStatuslineResult = results.find(r => statuslineRuntimes.includes(r.runtime));
 
-  const finalize = (shouldInstallStatusline) => {
+  const finalize = (shouldInstallStatusline, shouldInstallBanner) => {
     // Verify sdk/dist/cli.js is present and executable. The dist is shipped
     // prebuilt in the tarball (fix/2441-sdk-decouple); gsd-sdk reaches users via
     // the parent package's bin/gsd-sdk.js shim, so no sub-install is needed.
@@ -9646,7 +9779,8 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
           useStatusline,
           result.runtime,
           isGlobal,
-          result.configDir
+          result.configDir,
+          { shouldInstallBanner: !!shouldInstallBanner, bannerCommand: result.updateBannerCommand }
         );
       }
     };
@@ -9654,10 +9788,28 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
     printSummaries();
   };
 
+  // Statusline first; if declined or unavailable, offer the opt-in update
+  // banner (#2795) as the secondary surface for update notifications. Users
+  // with GSD's statusline already get update info through that channel and
+  // are not re-prompted.
+  const continueAfterStatusline = (shouldInstallStatusline) => {
+    if (shouldInstallStatusline) {
+      finalize(true, false);
+      return;
+    }
+    handleUpdateBanner(isInteractive, (shouldInstallBanner) => {
+      finalize(false, shouldInstallBanner);
+    });
+  };
+
   if (primaryStatuslineResult) {
-    handleStatusline(primaryStatuslineResult.settings, isInteractive, finalize);
+    handleStatusline(primaryStatuslineResult.settings, isInteractive, continueAfterStatusline);
   } else {
-    finalize(false);
+    // No statusline-capable runtime in this install set — still offer the
+    // banner (e.g. Codex-only installs).
+    handleUpdateBanner(isInteractive, (shouldInstallBanner) => {
+      finalize(false, shouldInstallBanner);
+    });
   }
 }
 
@@ -9760,6 +9912,9 @@ if (process.env.GSD_TEST_MODE) {
     allRuntimes,
     parseRuntimeInput,
     buildRuntimePromptText,
+    buildUpdateBannerPromptText,
+    parseUpdateBannerInput,
+    buildUpdateBannerHookEntry,
     buildHookCommand,
     resolveNodeRunner,
     rewriteLegacyManagedNodeHookCommands,

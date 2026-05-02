@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-30",
+  "generated": "2026-05-02",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -296,6 +296,7 @@
       "gsd-read-injection-scanner.js",
       "gsd-session-state.sh",
       "gsd-statusline.js",
+      "gsd-update-banner.js",
       "gsd-validate-commit.sh",
       "gsd-workflow-guard.js"
     ]
