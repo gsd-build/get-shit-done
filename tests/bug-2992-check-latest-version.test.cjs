@@ -44,6 +44,29 @@ describe('Bug #2992: error paths', () => {
     });
     assert.equal(r.ok, false);
     assert.equal(r.reason, CHECK_REASON.FAIL_NPM_FAILED);
+    assert.equal(r.detail, 'npm ERR! 404',
+      'detail should be the trimmed stderr when npm reports a real error');
+  });
+
+  // #2993 CR: distinguish timeout from genuine npm failure in `detail`.
+  // spawnSync sets status=null and signal='SIGTERM' on timeout; stderr is
+  // typically empty. Without the signal-first branch, both shape as
+  // 'npm exited non-zero' and the operator cannot tell timeout from failure.
+  test('FAIL_NPM_FAILED detail names the signal when spawn times out', () => {
+    const r = checkLatestVersion({
+      spawn: () => ({ status: null, signal: 'SIGTERM', stdout: '', stderr: '' }),
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, CHECK_REASON.FAIL_NPM_FAILED);
+    assert.equal(r.detail, 'npm timed out (signal: SIGTERM)',
+      'detail should explicitly name the signal when status is null and signal is set');
+  });
+
+  test('FAIL_NPM_FAILED detail falls back to generic when neither stderr nor signal is present', () => {
+    const r = checkLatestVersion({
+      spawn: () => ({ status: 1, stdout: '', stderr: '' }),
+    });
+    assert.equal(r.detail, 'npm exited non-zero');
   });
 
   test('FAIL_INVALID_OUTPUT when npm prints something that is not a semver', () => {

@@ -299,9 +299,19 @@ if [ -z "$GSD_DIR" ]; then
 else
   LATEST_RESULT="$(node "$GSD_DIR/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
   LATEST_STATUS=$?
-  LATEST_OK="$(printf '%s' "$LATEST_RESULT" | jq -r '.ok // false')"
-  LATEST_VERSION="$(printf '%s' "$LATEST_RESULT" | jq -r '.version // empty')"
-  LATEST_REASON="$(printf '%s' "$LATEST_RESULT" | jq -r '.reason // empty')"
+  # #2993 CR: when node is missing or the script doesn't exist, LATEST_RESULT
+  # is empty and piping it to `jq` produces a parse error on stderr while
+  # leaving LATEST_OK / LATEST_REASON as empty strings. Fail the check with a
+  # meaningful reason instead of a blank diagnostic.
+  if [ -n "$LATEST_RESULT" ]; then
+    LATEST_OK="$(printf '%s' "$LATEST_RESULT" | jq -r '.ok // false')"
+    LATEST_VERSION="$(printf '%s' "$LATEST_RESULT" | jq -r '.version // empty')"
+    LATEST_REASON="$(printf '%s' "$LATEST_RESULT" | jq -r '.reason // empty')"
+  else
+    LATEST_OK=false
+    LATEST_VERSION=""
+    LATEST_REASON="script_not_found_or_node_unavailable"
+  fi
 fi
 ```
 

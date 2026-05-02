@@ -53,10 +53,21 @@ function checkLatestVersion(opts = {}) {
 
   const r = spawn();
   if (!r || r.status !== 0) {
+    // Distinguish timeout (status null, signal set, stderr empty) from a
+    // genuine npm failure. Without this, both surfaced as "npm exited
+    // non-zero" and the operator couldn't tell which (#2993 CR).
+    let detail;
+    if (r && r.signal) {
+      detail = `npm timed out (signal: ${r.signal})`;
+    } else if (r && r.stderr) {
+      detail = r.stderr.trim();
+    } else {
+      detail = 'npm exited non-zero';
+    }
     return {
       ok: false,
       reason: CHECK_REASON.FAIL_NPM_FAILED,
-      detail: r && r.stderr ? r.stderr.trim() : 'npm exited non-zero',
+      detail,
     };
   }
   const version = (r.stdout || '').trim();
