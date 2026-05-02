@@ -178,20 +178,24 @@ When `dynamic_routing.enabled = false` (default), behavior is identical to today
 
 ## Resolution Logic
 
-Orchestrators resolve model before spawning:
+Orchestrators resolve model before spawning. The full precedence ladder
+is (highest → lowest):
 
 ```
 1. Read .planning/config.json
-2. Check model_overrides for agent-specific override
-3. If no override, check models[phase_type] for a phase-type tier
+2. Check model_overrides[<agent>] (full IDs accepted; targeted exceptions)
+3. If dynamic_routing.enabled, return tier_models[escalated_tier]
+   (see §Dynamic Routing — escalation steps tier up per attempt counter)
+4. If no dynamic_routing match, check models[phase_type] for a phase-type tier
    (see §Per-Phase-Type Model Map for the agent → phase-type mapping)
-4. If no phase-type slot, look up agent in profile table
-5. Pass model parameter to Task call
+5. If no phase-type slot, look up agent in profile table
+6. Pass model parameter to Task call
 ```
 
 The same precedence applies to `reasoning_effort` resolution on runtimes
 that support it (Codex), so `model` and `reasoning_effort` always derive
-from the same tier source — a `models[phase_type]` override flips both.
+from the same tier source — a `models[phase_type]` or
+`dynamic_routing` override flips both.
 
 ## Per-Agent Overrides
 

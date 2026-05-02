@@ -165,14 +165,15 @@ describe('#3024 resolveModelForTier: enabled mode picks tier_models[default_tier
       },
     });
     // gsd-codebase-mapper has light default tier per AGENT_DEFAULT_TIERS.
-    // Verify the resolver returns 'haiku' (light tier model) for attempt 0.
-    if (AGENT_DEFAULT_TIERS['gsd-codebase-mapper'] === 'light') {
-      assert.equal(resolveModelForTier(projectDir, 'gsd-codebase-mapper', 0), 'haiku');
-    }
-    // gsd-planner has heavy default tier — first attempt = opus.
-    if (AGENT_DEFAULT_TIERS['gsd-planner'] === 'heavy') {
-      assert.equal(resolveModelForTier(projectDir, 'gsd-planner', 0), 'opus');
-    }
+    // CR nitpick (#3031): assert preconditions explicitly so a tier
+    // re-mapping in AGENT_DEFAULT_TIERS surfaces as a test failure
+    // instead of a silent skip.
+    assert.equal(AGENT_DEFAULT_TIERS['gsd-codebase-mapper'], 'light',
+      'gsd-codebase-mapper expected to be light tier');
+    assert.equal(resolveModelForTier(projectDir, 'gsd-codebase-mapper', 0), 'haiku');
+    assert.equal(AGENT_DEFAULT_TIERS['gsd-planner'], 'heavy',
+      'gsd-planner expected to be heavy tier');
+    assert.equal(resolveModelForTier(projectDir, 'gsd-planner', 0), 'opus');
   });
 
   test('attempt=1 escalates to next tier up (acceptance criterion 3)', () => {
@@ -187,16 +188,14 @@ describe('#3024 resolveModelForTier: enabled mode picks tier_models[default_tier
     });
     // For an agent with default tier 'light', attempt=1 should give 'standard' tier model.
     const lightAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'light')?.[0];
-    if (lightAgent) {
-      assert.equal(resolveModelForTier(projectDir, lightAgent, 0), 'haiku');
-      assert.equal(resolveModelForTier(projectDir, lightAgent, 1), 'sonnet');
-    }
+    assert.ok(lightAgent, 'AGENT_DEFAULT_TIERS must contain at least one light agent');
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 0), 'haiku');
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 1), 'sonnet');
     // For a 'standard' agent, attempt=1 should give 'heavy' model.
     const stdAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'standard')?.[0];
-    if (stdAgent) {
-      assert.equal(resolveModelForTier(projectDir, stdAgent, 0), 'sonnet');
-      assert.equal(resolveModelForTier(projectDir, stdAgent, 1), 'opus');
-    }
+    assert.ok(stdAgent, 'AGENT_DEFAULT_TIERS must contain at least one standard agent');
+    assert.equal(resolveModelForTier(projectDir, stdAgent, 0), 'sonnet');
+    assert.equal(resolveModelForTier(projectDir, stdAgent, 1), 'opus');
   });
 
   test('attempts beyond max_escalations cap at the highest reachable tier (acceptance criterion 4)', () => {
@@ -210,13 +209,12 @@ describe('#3024 resolveModelForTier: enabled mode picks tier_models[default_tier
       },
     });
     const lightAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'light')?.[0];
-    if (lightAgent) {
-      // attempts beyond max_escalations should not exceed max_escalations'
-      // tier — i.e. attempt=2 with max=1 = same as attempt=1.
-      assert.equal(resolveModelForTier(projectDir, lightAgent, 2), 'sonnet',
-        'attempt=2 with max_escalations=1 caps at attempt=1 tier');
-      assert.equal(resolveModelForTier(projectDir, lightAgent, 5), 'sonnet');
-    }
+    assert.ok(lightAgent, 'AGENT_DEFAULT_TIERS must contain at least one light agent');
+    // attempts beyond max_escalations should not exceed max_escalations'
+    // tier — i.e. attempt=2 with max=1 = same as attempt=1.
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 2), 'sonnet',
+      'attempt=2 with max_escalations=1 caps at attempt=1 tier');
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 5), 'sonnet');
   });
 
   test('"heavy" agents stay at heavy (no tier above)', () => {
@@ -230,12 +228,11 @@ describe('#3024 resolveModelForTier: enabled mode picks tier_models[default_tier
       },
     });
     const heavyAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'heavy')?.[0];
-    if (heavyAgent) {
-      assert.equal(resolveModelForTier(projectDir, heavyAgent, 0), 'opus');
-      // Already at heavy — escalation cannot go higher.
-      assert.equal(resolveModelForTier(projectDir, heavyAgent, 1), 'opus');
-      assert.equal(resolveModelForTier(projectDir, heavyAgent, 5), 'opus');
-    }
+    assert.ok(heavyAgent, 'AGENT_DEFAULT_TIERS must contain at least one heavy agent');
+    assert.equal(resolveModelForTier(projectDir, heavyAgent, 0), 'opus');
+    // Already at heavy — escalation cannot go higher.
+    assert.equal(resolveModelForTier(projectDir, heavyAgent, 1), 'opus');
+    assert.equal(resolveModelForTier(projectDir, heavyAgent, 5), 'opus');
   });
 
   test('default max_escalations is 1 when omitted', () => {
@@ -248,11 +245,52 @@ describe('#3024 resolveModelForTier: enabled mode picks tier_models[default_tier
       },
     });
     const lightAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'light')?.[0];
-    if (lightAgent) {
-      // attempt=1 escalates; attempt=2 should cap at attempt=1 (default max=1)
-      assert.equal(resolveModelForTier(projectDir, lightAgent, 1), 'sonnet');
-      assert.equal(resolveModelForTier(projectDir, lightAgent, 2), 'sonnet');
-    }
+    assert.ok(lightAgent, 'AGENT_DEFAULT_TIERS must contain at least one light agent');
+    // attempt=1 escalates; attempt=2 should cap at attempt=1 (default max=1)
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 1), 'sonnet');
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 2), 'sonnet');
+  });
+
+  // ─── CR Major (#3031): escalate_on_failure: false honored ──────────────
+
+  test('escalate_on_failure:false disables escalation even when attempt > 0 (CR Major)', () => {
+    // Pre-fix bug: an orchestrator that always passes attempt+1 on retry
+    // would silently escalate even though the user opted out via
+    // escalate_on_failure:false. The kill-switch must short-circuit
+    // every attempt back to the default tier.
+    writeConfig(projectDir, {
+      model_profile: 'balanced',
+      dynamic_routing: {
+        enabled: true,
+        tier_models: { light: 'haiku', standard: 'sonnet', heavy: 'opus' },
+        escalate_on_failure: false, // ← kill-switch
+        max_escalations: 5,
+      },
+    });
+    const lightAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'light')?.[0];
+    assert.ok(lightAgent, 'AGENT_DEFAULT_TIERS must contain at least one light agent');
+    // Every attempt must resolve to the default (light → haiku),
+    // regardless of how high the orchestrator bumped the counter.
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 0), 'haiku');
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 1), 'haiku',
+      'escalate_on_failure:false must not escalate even at attempt=1');
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 5), 'haiku');
+  });
+
+  test('escalate_on_failure:true (explicit) escalates normally', () => {
+    // Sanity: explicit true matches the default truthy behavior.
+    writeConfig(projectDir, {
+      model_profile: 'balanced',
+      dynamic_routing: {
+        enabled: true,
+        tier_models: { light: 'haiku', standard: 'sonnet', heavy: 'opus' },
+        escalate_on_failure: true,
+        max_escalations: 1,
+      },
+    });
+    const lightAgent = Object.entries(AGENT_DEFAULT_TIERS).find(([, t]) => t === 'light')?.[0];
+    assert.ok(lightAgent);
+    assert.equal(resolveModelForTier(projectDir, lightAgent, 1), 'sonnet');
   });
 });
 

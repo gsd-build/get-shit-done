@@ -1662,10 +1662,19 @@ function resolveModelForTier(cwd, agentType, attempt) {
   // the cap, the resolver returns the model for the cap level so the
   // orchestrator can log "max escalations reached" without burning
   // further budget.
+  //
+  // CR Major (#3031): `escalate_on_failure: false` is the kill-switch
+  // for escalation — when false, every attempt resolves to the default
+  // tier regardless of the attempt counter. Without this guard, an
+  // orchestrator that blindly bumps the counter on retry would silently
+  // escalate even though the user opted out.
   const maxEscalations = Number.isInteger(dr.max_escalations) && dr.max_escalations >= 0
     ? dr.max_escalations
     : 1;
-  const effectiveAttempt = Math.min(attemptN, maxEscalations);
+  const escalationEnabled = dr.escalate_on_failure !== false;
+  const effectiveAttempt = escalationEnabled
+    ? Math.min(attemptN, maxEscalations)
+    : 0;
 
   // Walk the escalation chain N times from the default tier.
   let tier = defaultTier;
