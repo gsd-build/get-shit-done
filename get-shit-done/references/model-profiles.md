@@ -140,9 +140,15 @@ Orchestrators resolve model before spawning:
 ```
 1. Read .planning/config.json
 2. Check model_overrides for agent-specific override
-3. If no override, look up agent in profile table
-4. Pass model parameter to Task call
+3. If no override, check models[phase_type] for a phase-type tier
+   (see §Per-Phase-Type Model Map for the agent → phase-type mapping)
+4. If no phase-type slot, look up agent in profile table
+5. Pass model parameter to Task call
 ```
+
+The same precedence applies to `reasoning_effort` resolution on runtimes
+that support it (Codex), so `model` and `reasoning_effort` always derive
+from the same tier source — a `models[phase_type]` override flips both.
 
 ## Per-Agent Overrides
 

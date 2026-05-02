@@ -1613,8 +1613,31 @@ function resolveReasoningEffortInternal(cwd, agentType) {
   if (profile === 'inherit') return null;
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return null;
-  const tier = agentModels[profile] || agentModels['balanced'];
-  if (!tier) return null;
+
+  // #3023 (CR Major): mirror the phase-type tier lookup from
+  // resolveModelInternal. Without this, `model` and `reasoning_effort`
+  // derive from different tier sources on Codex when models.<phase_type>
+  // overrides the profile. Example failure: model_profile=balanced,
+  // models.execution=opus, agent=gsd-executor — model resolved to
+  // gpt-5.4 (opus tier) but reasoning_effort still came from sonnet
+  // tier (medium) instead of opus tier (xhigh). Both must derive from
+  // the same tier so the runtime gets a consistent (model, effort) pair.
+  //
+  // Phase-type === 'inherit' is treated as an explicit opt-out from
+  // tier-based reasoning_effort: returning the profile tier's effort
+  // would contradict resolveModelInternal (which returns 'inherit'
+  // for model). Return null so the caller emits no effort and lets the
+  // runtime decide.
+  const phaseType = AGENT_TO_PHASE_TYPE[agentType];
+  const phaseTypeTier = (phaseType && config.models && typeof config.models === 'object')
+    ? config.models[phaseType]
+    : undefined;
+  if (phaseTypeTier === 'inherit') return null;
+  const VALID_TIERS = new Set(['opus', 'sonnet', 'haiku']);
+  const tier = (phaseTypeTier && VALID_TIERS.has(phaseTypeTier))
+    ? phaseTypeTier
+    : (agentModels[profile] || agentModels['balanced']);
+  if (!tier || tier === 'inherit') return null;
 
   const entry = _resolveRuntimeTier(config, tier);
   return entry?.reasoning_effort || null;
