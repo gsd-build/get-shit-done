@@ -226,6 +226,19 @@ describe('bug-3010: post-install message and docs recommend /gsd-update --reappl
           output.includes(expectedToken),
           `runtime ${runtime}: output must include exact token "${expectedToken}", got:\n${output}`,
         );
+        // The cursor runtime expects a BARE token without slash/dollar/colon
+        // prefix. The bare form is a substring of every prefixed variant, so
+        // the positive substring check above can't tell correct cursor output
+        // from a regression that wrongly emitted '/gsd-update --reapply'
+        // (claude form) or '$gsd-update --reapply' (codex form) for cursor.
+        // Add an explicit prefix-absence guard for cursor so that regression
+        // is caught.
+        if (runtime === 'cursor') {
+          assert.ok(
+            !/[/$:]gsd-update --reapply/.test(output),
+            `runtime cursor: output must use bare "gsd-update --reapply" without slash/dollar/colon prefix, got:\n${output}`,
+          );
+        }
         // Negative: none of the dead command forms may appear, regardless of runtime.
         for (const re of DEAD_COMMAND_PATTERNS) {
           assert.ok(
