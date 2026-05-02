@@ -252,6 +252,11 @@ describe('gsd-update-banner.js end-to-end', () => {
     try {
       writeCache(home, 'not json');
       const r1 = runHook(home);
+      assert.equal(
+        r1.status,
+        0,
+        `expected exit 0, got ${r1.status} stderr=${r1.stderr}`
+      );
       const parsed1 = JSON.parse(r1.stdout);
       assert.ok(/check failed/i.test(parsed1.systemMessage));
 

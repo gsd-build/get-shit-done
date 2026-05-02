@@ -9788,28 +9788,49 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
     printSummaries();
   };
 
-  // Statusline first; if declined or unavailable, offer the opt-in update
-  // banner (#2795) as the secondary surface for update notifications. Users
-  // with GSD's statusline already get update info through that channel and
-  // are not re-prompted.
+  // Statusline first; if it won't actually be installed (declined, or local
+  // install without --force-statusline silently skips it per #2248), offer
+  // the opt-in update banner (#2795) as the secondary surface for update
+  // notifications. Skip the banner prompt entirely when no runtime in this
+  // install set can host the banner (e.g. Codex/Copilot/Cursor/Windsurf/
+  // Trae/Cline-only installs whose updateBannerCommand is null).
+  //
+  // CR #3035: gate on actual installability — `shouldInstallStatusline`
+  // returned by handleStatusline is the raw user choice, but
+  // `finishInstall` later skips the statusline write on local installs
+  // unless --force-statusline is set. Passing the raw flag to
+  // continueAfterStatusline previously caused two bugs: (1) interactive
+  // local installs got neither a statusline nor a banner offer, and (2)
+  // banner-incapable runtimes got prompted even though every
+  // updateBannerCommand was null.
+  const canInstallBanner = results.some((r) => r && r.updateBannerCommand);
   const continueAfterStatusline = (shouldInstallStatusline) => {
-    if (shouldInstallStatusline) {
+    const willInstallStatusline =
+      shouldInstallStatusline && (isGlobal || forceStatusline);
+    if (willInstallStatusline) {
       finalize(true, false);
       return;
     }
+    if (!canInstallBanner) {
+      finalize(shouldInstallStatusline, false);
+      return;
+    }
     handleUpdateBanner(isInteractive, (shouldInstallBanner) => {
-      finalize(false, shouldInstallBanner);
+      finalize(shouldInstallStatusline, shouldInstallBanner);
     });
   };
 
   if (primaryStatuslineResult) {
     handleStatusline(primaryStatuslineResult.settings, isInteractive, continueAfterStatusline);
-  } else {
-    // No statusline-capable runtime in this install set — still offer the
-    // banner (e.g. Codex-only installs).
+  } else if (canInstallBanner) {
+    // No statusline-capable runtime, but at least one runtime can host the
+    // banner — still offer it.
     handleUpdateBanner(isInteractive, (shouldInstallBanner) => {
       finalize(false, shouldInstallBanner);
     });
+  } else {
+    // Nothing to prompt about — no statusline, no banner-capable runtime.
+    finalize(false, false);
   }
 }
 
