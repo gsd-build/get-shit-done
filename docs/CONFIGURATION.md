@@ -696,7 +696,7 @@ for the change to take effect. See issue #2256.
 5. Runtime default                       ← when nothing else applies
 ```
 
-The four layers compose: `models` defaults a phase, `model_overrides` carves an exception, `dynamic_routing` (if enabled) escalates per-attempt above all of them. In the example above, all five research agents resolve to `sonnet` *except* `gsd-codebase-mapper`, which the per-agent override pins to `haiku`. `dynamic_routing` is disabled by default — when off (`enabled: false` or block omitted), this section's behavior is unchanged from today.
+The five layers compose top-down: `model_profile` is the base tier, `models[<phase_type>]` overrides at the phase level, `dynamic_routing` (when enabled) escalates per-attempt on soft failure, `model_overrides[<agent>]` carves per-agent exceptions at the top, and the runtime default applies when nothing else does. In the example above, all five research agents resolve to `sonnet` *except* `gsd-codebase-mapper`, which the per-agent override pins to `haiku`. `dynamic_routing` is disabled by default — when off (`enabled: false` or block omitted), this section's behavior is unchanged from today.
 
 #### Accepted values
 
