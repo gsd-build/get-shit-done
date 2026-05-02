@@ -73,14 +73,28 @@ function parseCodexHookBlock(block) {
   };
 }
 
+// Strip the toml-escape (\") and JSON-quote (") layers from the parsed
+// runner token to compare against the raw absolute path the caller
+// supplied. parsed.runner round-trips through TWO escape layers:
+//   1. JSON.stringify in resolveNodeRunner adds outer "..." quotes
+//   2. toml escapes the interior " to \" inside the command field
+// After both, parsed.runner ends in `\"` and starts with `\"`.
+function unescapeRunner(token) {
+  if (!token) return token;
+  let t = token.replace(/^\\"/, '').replace(/\\"$/, '');
+  if (t.startsWith('"') && t.endsWith('"')) t = t.slice(1, -1);
+  return t;
+}
+
 describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
   test('exported as a function', () => {
     assert.equal(typeof buildCodexHookBlock, 'function');
   });
 
-  test('emits an absolute, quoted node runner (not bare "node")', () => {
+  test('emits the EXACT absolute node runner the caller supplied (#3022 CR)', () => {
     const targetDir = '/tmp/codex-test/.codex';
-    const absoluteRunner = '"/usr/local/bin/node"';
+    const expectedRunnerPath = '/usr/local/bin/node';
+    const absoluteRunner = `"${expectedRunnerPath}"`;
     const block = buildCodexHookBlock(targetDir, { absoluteRunner });
     const parsed = parseCodexHookBlock(block);
     assert.equal(parsed.ok, true, `parse failed: ${block}`);
@@ -88,12 +102,14 @@ describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
     assert.equal(parsed.hasEvent, true, '[[hooks.SessionStart]] AoT entry present');
     assert.equal(parsed.hasHandler, true, '[[hooks.SessionStart.hooks]] handler entry present');
     assert.equal(parsed.type, 'command', 'handler is type=command');
-    // Strict: runner is the absolute node path, not bare "node".
-    assert.notEqual(parsed.runner, 'node', `must not emit bare node (#3017): ${block}`);
-    assert.ok(parsed.runner && parsed.runner.includes('/node'),
-      `runner must reference an absolute node binary: ${parsed.runner}`);
-    assert.ok(parsed.hookPath && parsed.hookPath.endsWith('/hooks/gsd-check-update.js'),
-      `hook path must point at gsd-check-update.js: ${parsed.hookPath}`);
+    // Strict: parsed runner must match the supplied absolute path EXACTLY
+    // (after stripping toml/JSON escape layers). A loose substring like
+    // '/node' would let an unrelated absolute token containing '/node'
+    // pass — e.g. '/Users/x/notnode/foo'.
+    assert.equal(unescapeRunner(parsed.runner), expectedRunnerPath,
+      `parsed runner must equal supplied absolute path: got ${parsed.runner}, want ${expectedRunnerPath}`);
+    assert.equal(parsed.hookPath, '/tmp/codex-test/.codex/hooks/gsd-check-update.js',
+      `hook path equality, got: ${parsed.hookPath}`);
   });
 
   test('returns null when absoluteRunner is null (caller skips registration)', () => {
@@ -102,13 +118,18 @@ describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
       'must return null on missing runner so caller can warn-and-skip instead of writing a broken hook');
   });
 
-  test('integrates with resolveNodeRunner() in the live process', () => {
+  test('integrates with resolveNodeRunner() in the live process — runner equals process.execPath (#3022 CR)', () => {
     const runner = resolveNodeRunner();
     assert.ok(runner, 'resolveNodeRunner returns a usable value in this test env');
     const block = buildCodexHookBlock('/tmp/x/.codex', { absoluteRunner: runner });
     const parsed = parseCodexHookBlock(block);
     assert.equal(parsed.ok, true);
-    assert.notEqual(parsed.runner, 'node');
+    // Strict canonical-runner equality: the parsed runner (after
+    // stripping toml + JSON escape layers) must be exactly process.execPath
+    // (forward-slashed, since resolveNodeRunner normalizes that way).
+    const expected = process.execPath.replace(/\\/g, '/');
+    assert.equal(unescapeRunner(parsed.runner), expected,
+      `parsed runner must equal process.execPath, got: ${parsed.runner}, want: ${expected}`);
   });
 });
 
@@ -130,15 +151,17 @@ describe('Bug #3017: rewriteLegacyCodexHookBlock migrates bare-node on reinstall
       'command = "node /Users/x/.codex/hooks/gsd-check-update.js"',
       '',
     ].join('\n');
-    const runner = '"/usr/local/bin/node"';
+    const expectedRunnerPath = '/usr/local/bin/node';
+    const runner = `"${expectedRunnerPath}"`;
     const result = rewriteLegacyCodexHookBlock(before, runner);
     assert.equal(result.changed, true, 'must report change=true');
-    // The migrated command must use the absolute runner, hook path preserved & quoted.
+    // The migrated command must use the EXACT absolute runner the caller
+    // supplied (#3022 CR — was previously asserting a loose '/node'
+    // substring which let unrelated absolute paths pass).
     const parsed = parseCodexHookBlock(result.content);
     assert.equal(parsed.ok, true);
-    assert.notEqual(parsed.runner, 'node');
-    assert.ok(parsed.runner.includes('/node'),
-      `runner must be the absolute node path: ${parsed.runner}`);
+    assert.equal(unescapeRunner(parsed.runner), expectedRunnerPath,
+      `runner must equal supplied absolute path: ${parsed.runner}`);
     assert.equal(parsed.hookPath, '/Users/x/.codex/hooks/gsd-check-update.js');
     // Non-GSD content (the [model] block) must be preserved verbatim.
     assert.ok(result.content.includes('[model]'));
