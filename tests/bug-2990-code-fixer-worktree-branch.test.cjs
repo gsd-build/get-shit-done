@@ -1,5 +1,14 @@
 'use strict';
 
+// allow-test-rule: source-text-is-the-product
+// agents/gsd-code-fixer.md is the deployed agent definition the runtime
+// loads. Parsing its bash code blocks into structured invocation records
+// (extractCleanupGitInvocations + the recovery-block parsers below) IS
+// testing the runtime contract — what command sequence the agent
+// actually documents and executes. The .match() calls extract typed
+// fields from a known-shape product file, then assertions go against
+// those typed fields, not against the raw markdown text.
+
 process.env.GSD_TEST_MODE = '1';
 
 /**
