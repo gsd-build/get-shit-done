@@ -819,6 +819,30 @@ Post-mortem investigation for failed GSD workflows — diagnoses what went wrong
 
 ---
 
+### `/gsd-feedback`
+
+File a GSD issue — bug, feature request, or question — without leaving your session.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `description` | No | Brief description to pre-fill the title prompt |
+
+**Prerequisites:** None
+**Produces:** A filed GitHub issue, or a prefilled browser URL, or copy-paste markdown
+
+**Supports:**
+- Bug reports (with optional `/gsd-forensics` diagnostics attachment)
+- Feature requests
+- Questions and usage help
+- Three filing paths: `gh issue create`, prefilled browser URL, copy-paste markdown fallback
+
+```bash
+/gsd-feedback                          # Interactive — prompted for type and content
+/gsd-feedback "quick phases missing"   # Pre-fills title prompt
+```
+
+---
+
 ### `/gsd-extract-learnings`
 
 Extract reusable patterns, anti-patterns, and architectural decisions from completed phase work.

@@ -143,6 +143,7 @@ These six routers are descriptor-only entries that the model picks first; the bo
 | `/gsd-review` | Request cross-AI peer review of phase plans from external AI CLIs. | [commands/gsd/review.md](../commands/gsd/review.md) |
 | `/gsd-debug` | Systematic debugging with persistent state across context resets. | [commands/gsd/debug.md](../commands/gsd/debug.md) |
 | `/gsd-forensics` | Post-mortem investigation for failed GSD workflows — analyzes git, artifacts, state. | [commands/gsd/forensics.md](../commands/gsd/forensics.md) |
+| `/gsd-feedback` | User-driven issue intake for GSD — file bugs, feature requests, or questions. | [commands/gsd/feedback.md](../commands/gsd/feedback.md) |
 | `/gsd-health` | Diagnose planning directory health and optionally repair issues. | [commands/gsd/health.md](../commands/gsd/health.md) |
 | `/gsd-import` | Ingest external plans with conflict detection against project decisions. | [commands/gsd/import.md](../commands/gsd/import.md) |
 | `/gsd-inbox` | Triage and review all open GitHub issues and PRs against project templates. | [commands/gsd/inbox.md](../commands/gsd/inbox.md) |
@@ -162,7 +163,7 @@ These six routers are descriptor-only entries that the model picks first; the bo
 
 ---
 
-## Workflows (84 shipped)
+## Workflows (86 shipped)
 
 Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators that commands reference internally; most are not read directly by end users. Rows below map each workflow file to its role (derived from the `<purpose>` block) and, where applicable, to the command that invokes it.
 
@@ -197,6 +198,7 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 | `extract_learnings.md` | Extract decisions, lessons, patterns, and surprises from completed phase artifacts. | `/gsd-extract-learnings` |
 | `fast.md` | Execute a trivial task inline without subagent overhead. | `/gsd-fast` |
 | `forensics.md` | Forensics investigation of failed workflows — git, artifacts, and state analysis. | `/gsd-forensics` |
+| `feedback.md` | User-driven issue intake — file bugs, feature requests, or questions to GSD. | `/gsd-feedback` |
 | `graduation.md` | Cluster recurring LEARNINGS.md items across phases and surface HITL promotion candidates. | `transition.md` (graduation_scan step) |
 | `health.md` | Validate `.planning/` directory integrity and report actionable issues. | `/gsd-health` |
 | `help.md` | Display the complete GSD command reference. | `/gsd-help` |
