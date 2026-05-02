@@ -85,6 +85,27 @@ describe('bug #3020: isGsdSdkOnPath accepts an explicit PATH string', () => {
     const result = isGsdSdkOnPath('');
     assert.equal(result, false);
   });
+
+  test('null pathString is type-guarded — falls back to process.env.PATH (#3028 CR)', () => {
+    // Pre-fix: isGsdSdkOnPath(null) threw "Cannot read properties of null
+    // (reading 'split')". Post-fix: typeof check falls back to process.env.PATH.
+    let threw = null;
+    let result;
+    try {
+      result = isGsdSdkOnPath(null);
+    } catch (e) {
+      threw = e;
+    }
+    assert.equal(threw, null, `must not throw on null input, got: ${threw && threw.message}`);
+    assert.equal(typeof result, 'boolean', 'must return a boolean');
+  });
+
+  test('non-string pathString (number, object) falls back to process.env.PATH (#3028 CR)', () => {
+    // Defensive: any non-string argument should fall back, not throw.
+    assert.equal(typeof isGsdSdkOnPath(0), 'boolean');
+    assert.equal(typeof isGsdSdkOnPath({}), 'boolean');
+    assert.equal(typeof isGsdSdkOnPath([]), 'boolean');
+  });
 });
 
 describe('bug #3020: getUserShellPath probes the user login shell PATH', () => {

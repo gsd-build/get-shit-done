@@ -9173,7 +9173,10 @@ function installSdkIfNeeded(opts) {
 function isGsdSdkOnPath(pathString) {
   const path = require('path');
   const fs = require('fs');
-  const pathEnv = pathString !== undefined ? pathString : (process.env.PATH || '');
+  // Type-guard the explicit input (#3028 CR): callers may pass null
+  // (getUserShellPath() can return null), and `null.split()` throws.
+  // Only honor pathString when it's a string; fall back otherwise.
+  const pathEnv = typeof pathString === 'string' ? pathString : (process.env.PATH || '');
   const exts = process.platform === 'win32' ? ['.cmd', '.exe', '.bat', ''] : [''];
   for (const seg of pathEnv.split(path.delimiter)) {
     if (!seg) continue;
@@ -9229,8 +9232,13 @@ function getUserShellPath() {
       // is the safe fallback.
       timeout: 2000,
     });
-    const trimmed = (out || '').trim();
-    return trimmed.length > 0 ? trimmed : null;
+    // #3028 CR: login startup scripts can print banners / motd / stale
+    // log lines BEFORE the printf, polluting stdout. Take the LAST
+    // non-empty line as the PATH candidate so noise doesn't flip the
+    // cross-shell check to false. PATH itself is single-line.
+    const lines = String(out || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    const candidate = lines.length > 0 ? lines[lines.length - 1] : '';
+    return candidate.length > 0 ? candidate : null;
   } catch {
     return null;
   }
