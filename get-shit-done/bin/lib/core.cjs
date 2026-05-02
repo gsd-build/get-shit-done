@@ -1543,9 +1543,19 @@ function resolveModelInternal(cwd, agentType) {
   // Anything else falls through to profile lookup so a typo doesn't
   // silently break tier resolution.
   const VALID_TIERS = new Set(['opus', 'sonnet', 'haiku', 'inherit']);
+  // Resolve tier: phase-type wins when valid; else profile-derived; else
+  // (when profile === 'inherit') propagate inherit so the later short-
+  // circuit fires. CR Major (#3030): a config like
+  //   { model_profile: 'inherit', models: { execution: 'opus' } }
+  // must honor the phase-type opus, not return 'inherit'. Synthesizing
+  // tier='inherit' only when there's no phase-type override keeps the
+  // original inherit semantics intact while letting a valid phase-type
+  // tier win.
   const tier = (phaseTypeTier && VALID_TIERS.has(phaseTypeTier))
     ? phaseTypeTier
-    : (agentModels ? (agentModels[profile] || agentModels['balanced']) : null);
+    : (profile === 'inherit'
+      ? 'inherit'
+      : (agentModels ? (agentModels[profile] || agentModels['balanced']) : null));
 
   // 3. Runtime-aware resolution (#2517) — only when `runtime` is explicitly set
   // to a non-Claude runtime. `runtime: "claude"` is the implicit default and is
@@ -1553,8 +1563,10 @@ function resolveModelInternal(cwd, agentType) {
   // "omit"` (review finding #4). Deliberate ordering for non-Claude runtimes:
   // explicit opt-in beats `resolve_model_ids: "omit"` so users on Codex installs
   // that auto-set "omit" can still flip on tiered behavior by setting runtime
-  // alone. inherit profile is preserved verbatim.
-  if (config.runtime && config.runtime !== 'claude' && profile !== 'inherit' && tier && tier !== 'inherit') {
+  // alone. Gate on tier !== 'inherit' (not profile !== 'inherit') so a
+  // valid phase-type tier flips runtime resolution on even when the
+  // profile is inherit.
+  if (config.runtime && config.runtime !== 'claude' && tier && tier !== 'inherit') {
     const entry = _resolveRuntimeTier(config, tier);
     if (entry?.model) return entry.model;
     // Unknown runtime with no user-supplied overrides — fall through to Claude-safe
@@ -1570,7 +1582,9 @@ function resolveModelInternal(cwd, agentType) {
 
   // 5. Profile lookup (Claude-native default).
   if (!agentModels) return 'sonnet';
-  if (profile === 'inherit') return 'inherit';
+  // Gate on tier (not profile) so a valid phase-type override beats
+  // profile=inherit (#3030 CR Major).
+  if (tier === 'inherit') return 'inherit';
   // `tier` is guaranteed truthy here: agentModels exists, and MODEL_PROFILES
   // entries always define `balanced`, so `agentModels[profile] || agentModels.balanced`
   // resolves to a string. Keep the local for readability — no defensive fallback.
@@ -1610,33 +1624,37 @@ function resolveReasoningEffortInternal(cwd, agentType) {
   if (config.model_overrides?.[agentType]) return null;
 
   const profile = String(config.model_profile || 'balanced').toLowerCase();
-  if (profile === 'inherit') return null;
   const agentModels = MODEL_PROFILES[agentType];
   if (!agentModels) return null;
 
   // #3023 (CR Major): mirror the phase-type tier lookup from
   // resolveModelInternal. Without this, `model` and `reasoning_effort`
   // derive from different tier sources on Codex when models.<phase_type>
-  // overrides the profile. Example failure: model_profile=balanced,
-  // models.execution=opus, agent=gsd-executor — model resolved to
-  // gpt-5.4 (opus tier) but reasoning_effort still came from sonnet
-  // tier (medium) instead of opus tier (xhigh). Both must derive from
-  // the same tier so the runtime gets a consistent (model, effort) pair.
+  // overrides the profile.
   //
-  // Phase-type === 'inherit' is treated as an explicit opt-out from
-  // tier-based reasoning_effort: returning the profile tier's effort
-  // would contradict resolveModelInternal (which returns 'inherit'
-  // for model). Return null so the caller emits no effort and lets the
-  // runtime decide.
+  // #3030 CR follow-up: do NOT short-circuit on profile === 'inherit'
+  // before reading the phase-type tier. A config like
+  //   { model_profile: 'inherit', models: { execution: 'opus' } }
+  // must produce the opus runtime effort, not null. Compute tier from
+  // phase-type first; only fall back to profile when there's no valid
+  // phase-type override; only return null when the resolved tier is
+  // 'inherit' or unknown.
   const phaseType = AGENT_TO_PHASE_TYPE[agentType];
   const phaseTypeTier = (phaseType && config.models && typeof config.models === 'object')
     ? config.models[phaseType]
     : undefined;
+  // Explicit phase-type 'inherit' is the user opting out of tier-based
+  // effort for this phase — return null instead of falling through to
+  // profile (which would silently emit the profile's effort and
+  // contradict the user's choice).
   if (phaseTypeTier === 'inherit') return null;
   const VALID_TIERS = new Set(['opus', 'sonnet', 'haiku']);
   const tier = (phaseTypeTier && VALID_TIERS.has(phaseTypeTier))
     ? phaseTypeTier
-    : (agentModels[profile] || agentModels['balanced']);
+    : (profile === 'inherit'
+      ? 'inherit'
+      : (agentModels[profile] || agentModels['balanced']));
+  // 'inherit' (from profile fallback) yields no runtime effort.
   if (!tier || tier === 'inherit') return null;
 
   const entry = _resolveRuntimeTier(config, tier);

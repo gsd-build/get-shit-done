@@ -208,6 +208,50 @@ describe('#3023 resolver: models.<phase_type> overrides profile-based tier', () 
     });
     assert.equal(resolveModelInternal(projectDir, 'gsd-phase-researcher'), 'sonnet');
   });
+
+  // ─── CR Major: phase-type beats inherit profile ─────────────────────────
+  // Pre-fix bug: model_profile='inherit' + models.execution='opus' returned
+  // 'inherit' because the profile short-circuit fired BEFORE the phase-type
+  // override could win, violating the documented precedence where
+  // models[phase_type] beats model_profile.
+
+  test('phase-type override wins over profile=inherit (CR Major) — model resolver', () => {
+    writeConfig(projectDir, {
+      model_profile: 'inherit',
+      models: { execution: 'opus' },
+    });
+    // gsd-executor (execution) must get the phase-type opus, not inherit.
+    assert.equal(resolveModelInternal(projectDir, 'gsd-executor'), 'opus');
+  });
+
+  test('phase-type "haiku" wins over profile=inherit; agents without a slot still inherit', () => {
+    writeConfig(projectDir, {
+      model_profile: 'inherit',
+      models: { research: 'haiku' },
+    });
+    // research agents → haiku (phase-type wins)
+    assert.equal(resolveModelInternal(projectDir, 'gsd-phase-researcher'), 'haiku');
+    assert.equal(resolveModelInternal(projectDir, 'gsd-codebase-mapper'), 'haiku');
+    // planning agent has no slot set → falls through to profile=inherit.
+    assert.equal(resolveModelInternal(projectDir, 'gsd-planner'), 'inherit');
+  });
+
+  test('profile=inherit with no models block still returns inherit (no regression)', () => {
+    writeConfig(projectDir, {
+      model_profile: 'inherit',
+    });
+    assert.equal(resolveModelInternal(projectDir, 'gsd-executor'), 'inherit');
+    assert.equal(resolveModelInternal(projectDir, 'gsd-phase-researcher'), 'inherit');
+  });
+
+  test('profile=inherit with models block but agent has no slot → inherit', () => {
+    writeConfig(projectDir, {
+      model_profile: 'inherit',
+      models: { research: 'haiku' },
+    });
+    // gsd-executor (execution slot) is not set → falls through to inherit.
+    assert.equal(resolveModelInternal(projectDir, 'gsd-executor'), 'inherit');
+  });
 });
 
 // ─── #3030 CR Major outside-diff: reasoning_effort honors phase-type ───────
@@ -306,6 +350,33 @@ describe('#3023 + #3030 CR: resolveReasoningEffortInternal honors phase-type tie
       models: { execution: 'opus' },
     });
     assert.equal(resolveReasoningEffortInternal(projectDir, 'gsd-executor'), null);
+  });
+
+  test('phase-type override wins over profile=inherit for effort (CR Major #3030)', () => {
+    // Pre-fix bug: profile=inherit short-circuited to null even when
+    // models.execution=opus would have supplied a valid tier.
+    writeConfig(projectDir, {
+      runtime: 'codex',
+      model_profile: 'inherit',
+      models: { execution: 'opus' },
+    });
+    // Compute the expected effort by reading what gsd-executor would
+    // get under a profile-only opus config — the phase-type override
+    // must produce the SAME result.
+    const expected = (() => {
+      const dir = makeTmp('effort-opus2');
+      try {
+        writeConfig(dir, { runtime: 'codex', model_profile: 'quality' });
+        return resolveReasoningEffortInternal(dir, 'gsd-executor');
+      } finally {
+        rmr(dir);
+      }
+    })();
+    const actual = resolveReasoningEffortInternal(projectDir, 'gsd-executor');
+    assert.equal(actual, expected,
+      `phase-type override over profile=inherit must produce the opus-tier effort; got ${actual}, expected ${expected}`);
+    assert.notEqual(actual, null,
+      'phase-type opus must NOT return null effort just because profile=inherit');
   });
 });
 
