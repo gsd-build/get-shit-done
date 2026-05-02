@@ -113,7 +113,29 @@ describe('bug-3010: post-install message and docs recommend /gsd-update --reappl
     );
   });
 
-  test('no workflow file recommends running /gsd-reapply-patches', () => {
+  // All three legacy spellings of the removed command. The slash/dollar
+  // prefix is the slash-command marker — bare "reapply-patches" without a
+  // prefix is not a user-typable command and is allowed (file path refs,
+  // workflow filename, verify-reapply-patches.cjs script).
+  //   /gsd-reapply-patches    — claude/opencode/kilo/copilot
+  //   /gsd:reapply-patches    — gemini namespace
+  //   $gsd-reapply-patches    — codex prefix
+  const DEAD_COMMAND_PATTERNS = [
+    /\/gsd-reapply-patches\b/g,
+    /\/gsd:reapply-patches\b/g,
+    /\$gsd-reapply-patches\b/g,
+  ];
+
+  function findDeadCommands(stripped) {
+    const matches = [];
+    for (const re of DEAD_COMMAND_PATTERNS) {
+      const m = stripped.match(re);
+      if (m) matches.push(...m);
+    }
+    return matches;
+  }
+
+  test('no workflow file recommends a removed reapply-patches command', () => {
     const workflowFiles = walkMd(WORKFLOWS_DIR);
     assert.ok(workflowFiles.length > 0, `expected workflow markdown files under ${WORKFLOWS_DIR}`);
 
@@ -125,23 +147,19 @@ describe('bug-3010: post-install message and docs recommend /gsd-update --reappl
       // Strip HTML comments to avoid matching commented-out examples
       // and prose that quotes the old command for context.
       const stripped = src.replace(/<!--[\s\S]*?-->/g, '');
-      // Match "/gsd-reapply-patches" with surrounding boundaries so we
-      // don't false-positive on the workflow filename "reapply-patches.md"
-      // or the script "verify-reapply-patches.cjs". The leading slash is
-      // the slash-command marker — only command invocations carry it.
-      const matches = stripped.match(/\/gsd-reapply-patches\b/g);
-      if (matches) offenders.push(`${path.relative(ROOT, file)}: ${matches.length} mention(s)`);
+      const matches = findDeadCommands(stripped);
+      if (matches.length) offenders.push(`${path.relative(ROOT, file)}: ${matches.length} mention(s) [${[...new Set(matches)].join(', ')}]`);
     }
 
     assert.deepStrictEqual(
       offenders,
       [],
-      'workflow files must not recommend the removed /gsd-reapply-patches command:\n  ' +
+      'workflow files must not recommend any removed reapply-patches command form:\n  ' +
         offenders.join('\n  '),
     );
   });
 
-  test('no doc under docs/ recommends running /gsd-reapply-patches (excluding CHANGELOG history)', () => {
+  test('no doc under docs/ recommends a removed reapply-patches command (excluding CHANGELOG history)', () => {
     const docFiles = walkMd(DOCS_DIR);
     assert.ok(docFiles.length > 0, `expected docs under ${DOCS_DIR}`);
 
@@ -151,17 +169,14 @@ describe('bug-3010: post-install message and docs recommend /gsd-update --reappl
 
       const src = fs.readFileSync(file, 'utf-8');
       const stripped = src.replace(/<!--[\s\S]*?-->/g, '');
-      // Match the slash-command form anchored on the slash. Bare
-      // "reapply-patches" without the slash is not a user-typable
-      // command and is allowed (e.g., file path references).
-      const matches = stripped.match(/\/gsd-reapply-patches\b/g);
-      if (matches) offenders.push(`${path.relative(ROOT, file)}: ${matches.length} mention(s)`);
+      const matches = findDeadCommands(stripped);
+      if (matches.length) offenders.push(`${path.relative(ROOT, file)}: ${matches.length} mention(s) [${[...new Set(matches)].join(', ')}]`);
     }
 
     assert.deepStrictEqual(
       offenders,
       [],
-      'docs must not recommend the removed /gsd-reapply-patches command:\n  ' +
+      'docs must not recommend any removed reapply-patches command form:\n  ' +
         offenders.join('\n  '),
     );
   });
@@ -183,13 +198,21 @@ describe('bug-3010: post-install message and docs recommend /gsd-update --reappl
         JSON.stringify({ from_version: '1.0', files: ['skills/gsd-test/SKILL.md'] }),
       );
 
-      // Cover every runtime branch in the conditional. If a future refactor
-      // splits or merges runtimes, this list must be updated alongside.
-      // The runtime list intentionally enumerates each branch explicitly —
-      // a parametric loop over an inferred runtime list could mask a
-      // missing branch by silently skipping it.
-      const runtimes = ['claude', 'opencode', 'kilo', 'copilot', 'gemini', 'codex', 'cursor'];
-      for (const runtime of runtimes) {
+      // Cover every runtime branch in the conditional with the EXACT token
+      // each branch is contractually required to emit. A loose substring
+      // like 'update --reapply' would let a malformed prefix slip through
+      // (e.g. emitting '/gsd-update --reapply' for the gemini branch when
+      // it should be '/gsd:update --reapply').
+      const expectedByRuntime = {
+        claude:   '/gsd-update --reapply',
+        opencode: '/gsd-update --reapply',
+        kilo:     '/gsd-update --reapply',
+        copilot:  '/gsd-update --reapply',
+        gemini:   '/gsd:update --reapply',
+        codex:    '$gsd-update --reapply',
+        cursor:   'gsd-update --reapply',
+      };
+      for (const [runtime, expectedToken] of Object.entries(expectedByRuntime)) {
         const logs = [];
         const originalLog = console.log;
         console.log = (...args) => logs.push(args.join(' '));
@@ -200,13 +223,17 @@ describe('bug-3010: post-install message and docs recommend /gsd-update --reappl
         }
         const output = logs.join('\n');
         assert.ok(
-          output.includes('update --reapply'),
-          `runtime ${runtime}: output must include the consolidated "update --reapply" form, got:\n${output}`,
+          output.includes(expectedToken),
+          `runtime ${runtime}: output must include exact token "${expectedToken}", got:\n${output}`,
         );
-        assert.ok(
-          !output.includes('/gsd-reapply-patches'),
-          `runtime ${runtime}: output must not reference the removed /gsd-reapply-patches command, got:\n${output}`,
-        );
+        // Negative: none of the dead command forms may appear, regardless of runtime.
+        for (const re of DEAD_COMMAND_PATTERNS) {
+          assert.ok(
+            !re.test(output),
+            `runtime ${runtime}: output must not reference removed command (matched ${re.source}), got:\n${output}`,
+          );
+          re.lastIndex = 0; // reset stateful global regex
+        }
       }
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
