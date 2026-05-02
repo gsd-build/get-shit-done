@@ -9100,6 +9100,22 @@ function installSdkIfNeeded(opts) {
     }
   }
 
+  // #3020: cross-shell PATH verification. Even when the install-time
+  // process.env.PATH walk found the shim, the user's later interactive
+  // shells may have a different PATH — Windows cross-shell .cmd/no-ext
+  // mismatch, POSIX ~/.local/bin missing from login shell, or node-
+  // version-manager PATH shims. Probe the user's login shell PATH and
+  // require the shim to be reachable there too before claiming ✓.
+  // POSIX-only probe; on Windows getUserShellPath() returns null and
+  // we trust the existing check (Windows-specific fix is separate).
+  const userShellPath = getUserShellPath();
+  if (onPath && userShellPath !== null) {
+    const userSees = isGsdSdkOnPath(userShellPath);
+    if (!userSees) {
+      onPath = false;
+    }
+  }
+
   if (onPath) {
     console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
   } else {
@@ -9140,17 +9156,24 @@ function installSdkIfNeeded(opts) {
 }
 
 /**
- * #2775 helper: check whether a callable `gsd-sdk` exists on the current PATH.
+ * #2775 helper: check whether a callable `gsd-sdk` exists on a PATH.
  *
  * Pure PATH walk (no spawn) — we look for a regular file or symlink named
  * `gsd-sdk` (or `gsd-sdk.cmd`/`.exe` on Windows) in any directory on PATH and
  * verify it carries the execute bit on POSIX. Avoids paying spawn cost and
  * avoids the chicken-and-egg of needing to run the not-yet-installed binary.
+ *
+ * #3020: accepts an optional explicit PATH string. The install subprocess's
+ * process.env.PATH is not the same set the user's later interactive shells
+ * see (Windows cross-shell, POSIX ~/.local/bin, node-version-manager
+ * shims). Callers can pass the user-shell PATH from getUserShellPath() to
+ * verify the shim is reachable from the runtime shell, not just the
+ * install context. Zero-arg form preserves existing behavior.
  */
-function isGsdSdkOnPath() {
+function isGsdSdkOnPath(pathString) {
   const path = require('path');
   const fs = require('fs');
-  const pathEnv = process.env.PATH || '';
+  const pathEnv = pathString !== undefined ? pathString : (process.env.PATH || '');
   const exts = process.platform === 'win32' ? ['.cmd', '.exe', '.bat', ''] : [''];
   for (const seg of pathEnv.split(path.delimiter)) {
     if (!seg) continue;
@@ -9168,6 +9191,49 @@ function isGsdSdkOnPath() {
     }
   }
   return false;
+}
+
+/**
+ * #3020: probe the user's login shell to learn the PATH that will be
+ * visible at workflow runtime.
+ *
+ * The install subprocess inherits process.env.PATH from npm/npx, which
+ * may include directories the user's interactive shells do not (e.g.
+ * ~/.local/bin auto-injected by npm-prefix tooling, or nvm-shimmed
+ * paths). Asserting `gsd-sdk` is on the install-subprocess PATH is a
+ * weaker invariant than the runtime contract — workflows shell out via
+ * `bash -c "gsd-sdk …"`, and that bash inherits PATH from the user's
+ * login shell.
+ *
+ * Uses `$SHELL -lc 'echo $PATH'` on POSIX. Returns null on Windows
+ * (cross-shell PATH probing requires a different strategy — Git Bash
+ * vs PowerShell vs cmd.exe each read PATH from different sources, and
+ * a future revision can build a Windows-aware probe). Returns null
+ * when $SHELL is unset, when the spawn fails, or when the result is
+ * empty — callers must fall back to process.env.PATH in those cases.
+ *
+ * Synchronous so it can be called from the existing post-install check
+ * without restructuring the whole flow as async.
+ */
+function getUserShellPath() {
+  if (process.platform === 'win32') return null;
+  const shellEnv = typeof process.env.SHELL === 'string' ? process.env.SHELL : '';
+  if (!shellEnv) return null;
+  const cp = require('child_process');
+  try {
+    const out = cp.execFileSync(shellEnv, ['-lc', 'printf %s "$PATH"'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // 2-second cap so a misconfigured rc file (e.g. interactive prompt)
+      // can't hang the install. The probe is best-effort — null on timeout
+      // is the safe fallback.
+      timeout: 2000,
+    });
+    const trimmed = (out || '').trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -9564,6 +9630,7 @@ if (process.env.GSD_TEST_MODE) {
     buildWindowsShimTriple,
     formatSdkPathDiagnostic,
     isGsdSdkOnPath,
+    getUserShellPath,
     homePathCoveredByRc,
     maybeSuggestPathExport,
     runtimeMap,
