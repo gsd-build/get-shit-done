@@ -113,6 +113,12 @@ if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done
   echo "$INSTALLED_VERSION"
   echo "$INSTALL_SCOPE"
   echo "${PREFERRED_RUNTIME:-claude}"
+  # 4-line output contract (#2993 CR): early-return path must also emit
+  # GSD_DIR or downstream check_latest_version misreads the install as
+  # UNKNOWN. PREFERRED_CONFIG_DIR is the resolved config dir we just
+  # validated above (line 95-96); it is the right GSD_DIR value for
+  # this fast path.
+  echo "$PREFERRED_CONFIG_DIR"
   exit 0
 fi
 
@@ -301,7 +307,7 @@ fi
 
 **If `LATEST_OK` is not `true`** (or `LATEST_STATUS` is non-zero):
 
-```
+```text
 Couldn't check for updates (reason: {LATEST_REASON}, exit: {LATEST_STATUS}).
 
 To update manually: `npx get-shit-done-cc --global`

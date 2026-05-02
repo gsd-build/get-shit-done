@@ -43,6 +43,11 @@ function checkLatestVersion(opts = {}) {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: process.platform === 'win32', // npm is npm.cmd on Windows
+    // Bound the registry call so a hung network/registry doesn't block the
+    // entire /gsd-update workflow indefinitely (#2993 CR). 15s is generous
+    // for `npm view <pkg> version`; on timeout, spawnSync returns with
+    // signal !== null and the existing failure path emits FAIL_NPM_FAILED.
+    timeout: 15_000,
   });
   const spawn = opts.spawn || defaultSpawn;
 
