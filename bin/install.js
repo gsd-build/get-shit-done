@@ -7563,12 +7563,26 @@ function install(isGlobal, runtime = 'claude') {
     // /workspace.gsd:* and /user.gsd:*, breaking the documented namespace.
     // The user-scope install already provides the same commands, so the
     // local copy adds zero value at the cost of namespace conflicts.
+    //
+    // CR #3041 (Major): the detection must be specific to PACKAGE-MANAGED
+    // GSD content, not just "directory is non-empty". A user who hand-
+    // dropped a single override (e.g. ~/.gemini/commands/gsd/my-override
+    // .toml) would otherwise be unable to run a local install at all.
+    // Detection rule: at least 3 of the canonical GSD command files
+    // ('help.toml', 'progress.toml', 'new-project.toml') must be present.
+    // These three ship in every GSD Gemini install (minimal mode included
+    // — they're in the core skill set per #2790's consolidation), and 3-of-
+    // 3 with that specific basename set is structurally impossible to
+    // produce by accident.
     const homeGeminiGsd = path.join(os.homedir(), '.gemini', 'commands', 'gsd');
+    const GSD_MANAGED_CANARIES = ['help.toml', 'progress.toml', 'new-project.toml'];
     const userScopeHasGsd =
       !isGlobal &&
       path.resolve(targetDir) !== path.resolve(path.join(os.homedir(), '.gemini')) &&
       fs.existsSync(homeGeminiGsd) &&
-      fs.readdirSync(homeGeminiGsd).length > 0;
+      GSD_MANAGED_CANARIES.every((f) =>
+        fs.existsSync(path.join(homeGeminiGsd, f))
+      );
 
     if (userScopeHasGsd) {
       console.log(

@@ -37,12 +37,14 @@ describe('bug #3037: Gemini global+local install must not create duplicate comma
   let tmpHome;
   let tmpProject;
   let originalHome;
+  let originalUserprofile;
   let originalCwd;
 
   beforeEach(() => {
     tmpHome = createTempDir('gsd-3037-home-');
     tmpProject = createTempDir('gsd-3037-work-');
     originalHome = process.env.HOME;
+    originalUserprofile = process.env.USERPROFILE;
     originalCwd = process.cwd();
     // Point HOME at the temp dir so install(true, 'gemini') writes to
     // tmpHome/.gemini, not the developer's real home.
@@ -53,6 +55,11 @@ describe('bug #3037: Gemini global+local install must not create duplicate comma
   afterEach(() => {
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    // CR #3041: also restore USERPROFILE so the temp HOME doesn't leak
+    // into later tests and create order-dependent failures on Windows
+    // or any code path that reads USERPROFILE.
+    if (originalUserprofile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserprofile;
     process.chdir(originalCwd);
     cleanup(tmpHome);
     cleanup(tmpProject);
@@ -118,6 +125,35 @@ describe('bug #3037: Gemini global+local install must not create duplicate comma
     assert.ok(
       localFiles.length > 0,
       `local-only install must populate PROJECT/.gemini/commands/gsd; ` +
+        `found ${localFiles.length} files at ${localCmds}`
+    );
+  });
+
+  test('local install when HOME has hand-dropped overrides UNDER commands/gsd/ (but no full GSD) still populates locally', () => {
+    // CR #3041 regression: the previous detection was
+    // `fs.readdirSync(homeGeminiGsd).length > 0` which would skip the
+    // local install for a user who manually dropped a single override
+    // command at ~/.gemini/commands/gsd/<thing>.toml without ever
+    // running --gemini --global. The fix narrows detection to require
+    // at least 3 canonical GSD command files (help.toml, progress.toml,
+    // new-project.toml) — a marker that's structurally impossible to
+    // produce by accident.
+    const homeGsdDir = path.join(tmpHome, '.gemini', 'commands', 'gsd');
+    fs.mkdirSync(homeGsdDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(homeGsdDir, 'my-override.toml'),
+      'description = "user override"\nprompt = "..."\n'
+    );
+
+    process.chdir(tmpProject);
+    install(false, 'gemini');
+
+    const localCmds = path.join(tmpProject, '.gemini', 'commands', 'gsd');
+    const localFiles = listCommandFiles(localCmds);
+    assert.ok(
+      localFiles.length > 0,
+      `local install must proceed when HOME/.gemini/commands/gsd contains ` +
+        `only user overrides (not the full GSD canary set); ` +
         `found ${localFiles.length} files at ${localCmds}`
     );
   });
