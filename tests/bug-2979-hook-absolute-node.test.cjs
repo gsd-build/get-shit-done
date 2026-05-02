@@ -194,6 +194,77 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     assert.equal(changed, false);
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
   });
+
+  // #3002 CR: substring containment was a false-positive vector.
+  // User-authored hooks whose path happened to CONTAIN a managed filename
+  // as a substring would get unconditionally rewritten with the GSD runner.
+  // The fix matches by basename equality.
+  test('does NOT rewrite a user hook whose path contains a managed filename as a substring', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{
+            type: 'command',
+            // Path contains gsd-check-update.js as substring of a longer
+            // filename, but is NOT actually that file.
+            command: 'node /home/me/scripts/wraps-gsd-check-update.js-helper.js',
+          }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const before = settings.hooks.SessionStart[0].hooks[0].command;
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, false, 'must not rewrite user hooks with managed-filename-as-substring paths');
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
+  });
+
+  test('rewrites a managed entry whose path is quoted with single quotes', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: "node '/x/hooks/gsd-statusline.js'" }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.SessionStart[0].hooks[0].command,
+      `"/usr/local/bin/node" '/x/hooks/gsd-statusline.js'`,
+    );
+  });
+
+  test('rewrites a managed entry with no path quoting (bareword)', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: 'node /x/hooks/gsd-context-monitor.js' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.SessionStart[0].hooks[0].command,
+      '"/usr/local/bin/node" /x/hooks/gsd-context-monitor.js',
+    );
+  });
+
+  test('handles Windows-style backslash path separators when extracting basename', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: 'node "C:\\\\Users\\\\me\\\\.claude\\\\hooks\\\\gsd-prompt-guard.js"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
+    assert.equal(changed, true);
+  });
 });
 
 describe('Bug #2979 (#3002 CR): resolveNodeRunner returns null when execPath unavailable', () => {

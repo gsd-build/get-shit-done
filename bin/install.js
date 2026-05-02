@@ -579,14 +579,21 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
       for (const h of entry.hooks) {
         if (!h || typeof h.command !== 'string') continue;
         const trimmed = h.command.trim();
-        if (!/^node(\s|$)/.test(trimmed)) continue;
-        let isManaged = false;
-        for (const name of MANAGED_HOOK_FILES) {
-          if (trimmed.includes(name)) { isManaged = true; break; }
-        }
-        if (!isManaged) continue;
-        const script = trimmed.replace(/^node\s+/, '');
-        h.command = `${absoluteRunner} ${script}`;
+        // Match the EXACT legacy form: `node <script>` with optional quoting.
+        // The previous shape used `trimmed.includes(<filename>)` which would
+        // false-positive on user-authored hooks whose path merely contained
+        // a managed filename as a substring (e.g.
+        // /home/me/scripts/wraps-gsd-check-update.js-and-more.js). #3002 CR.
+        const m = trimmed.match(/^node\s+("([^"]+)"|'([^']+)'|(\S+))\s*$/);
+        if (!m) continue;
+        const scriptToken = m[1];
+        const scriptPath = m[2] || m[3] || m[4] || '';
+        // Take the basename — match against MANAGED_HOOK_FILES by exact
+        // equality, not substring containment. Handles both forward and
+        // backslash separators (Windows).
+        const scriptBase = scriptPath.split(/[\\/]/).pop() || '';
+        if (!MANAGED_HOOK_FILES.has(scriptBase)) continue;
+        h.command = `${absoluteRunner} ${scriptToken}`;
         changed = true;
       }
     }
