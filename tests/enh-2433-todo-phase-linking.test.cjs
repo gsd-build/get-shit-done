@@ -1,5 +1,9 @@
 'use strict';
 
+// allow-test-rule: source-text-is-the-product
+// Reads .md/.json/.yml product files whose deployed text IS what the
+// runtime loads — testing text content tests the deployed contract.
+
 /**
  * Tests for gsd-new-milestone todo-to-phase linking (#2433).
  * Verifies the workflow text contains the correct linking and auto-close steps.
