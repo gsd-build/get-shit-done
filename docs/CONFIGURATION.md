@@ -16,6 +16,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
   "granularity": "standard",
   "model_profile": "balanced",
   "model_overrides": {},
+  "models": {},
   "planning": {
     "commit_docs": true,
     "search_gitignored": false,
@@ -117,6 +118,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
 | `model_profile` | enum | `quality`, `balanced`, `budget`, `adaptive`, `inherit` | `balanced` | Model tier for each agent (see [Model Profiles](#model-profiles)). `adaptive` was added per [#1713](https://github.com/gsd-build/get-shit-done/issues/1713) / [#1806](https://github.com/gsd-build/get-shit-done/issues/1806) and resolves the same way as the other tiers under runtime-aware profiles. |
 | `runtime` | string | `claude`, `codex`, or any string | (none) | Active runtime for [runtime-aware profile resolution](#runtime-aware-profiles-2517). When set, profile tiers (opus/sonnet/haiku) resolve to runtime-native model IDs. Today only the Codex install path emits per-agent model IDs from this resolver; other runtimes (`opencode`, `gemini`, `qwen`, `copilot`, …) consume the resolver at spawn time and gain dedicated install-path support in [#2612](https://github.com/gsd-build/get-shit-done/issues/2612). When unset (default), behavior is unchanged from prior versions. Added in v1.39 |
 | `model_profile_overrides.<runtime>.<tier>` | string \| object | per-runtime tier override | (none) | Override the runtime-aware tier mapping for a specific `(runtime, tier)`. Tier is one of `opus`, `sonnet`, `haiku`. Value is either a model ID string (e.g. `"gpt-5-pro"`) or `{ model, reasoning_effort }`. See [Runtime-Aware Profiles](#runtime-aware-profiles-2517). Added in v1.39 |
+| `models.<phase_type>` | enum | `opus`, `sonnet`, `haiku`, `inherit` | (none) | Per-phase-type model tier. Six accepted slots: `planning`, `discuss`, `research`, `execution`, `verification`, `completion`. Lets you tune at the phase level ("Opus for planning, Sonnet for the rest") without learning agent names. Resolves between `model_overrides` (higher) and `model_profile` (lower); see [Per-Phase-Type Models](#per-phase-type-models-models--added-in-v140). Added in v1.40 ([#3023](https://github.com/gsd-build/get-shit-done/pull/3030)) |
 | `project_code` | string | any short string | (none) | Prefix for phase directory names (e.g., `"ABC"` produces `ABC-01-setup/`). Added in v1.31 |
 | `response_language` | string | language code | (none) | Language for agent responses (e.g., `"pt"`, `"ko"`, `"ja"`). Propagates to all spawned agents for cross-phase language consistency. Added in v1.32 |
 | `context_window` | number | any integer | `200000` | Context window size in tokens. Set `1000000` for 1M-context models (e.g., `claude-opus-4-7[1m]`). Values `>= 500000` enable adaptive context enrichment (full-body reads of prior SUMMARY.md, deeper anti-pattern reads). Configured via `/gsd-settings-advanced`. |
@@ -642,6 +644,89 @@ into each agent's static config at install time — `spawn_agent` and
 OpenCode's `task` interface do not accept an inline `model` parameter, so
 running `gsd install <runtime>` after editing `model_overrides` is required
 for the change to take effect. See issue #2256.
+
+### Per-Phase-Type Models (`models`) — added in v1.40
+
+> Express tuning at the **phase** level (planning, research, execution, verification) without learning the agent taxonomy. Added in [#3023](https://github.com/gsd-build/get-shit-done/pull/3030).
+
+`model_overrides` is per-**agent** (precise but verbose; you have to know that `gsd-codebase-mapper` is research and `gsd-doc-writer` is execution). The `models` block lets you say "Opus for planning and execution, Sonnet for the rest" in two lines:
+
+```json
+{
+  "model_profile": "balanced",
+  "models": {
+    "planning": "opus",
+    "discuss": "opus",
+    "research": "sonnet",
+    "execution": "opus",
+    "verification": "sonnet",
+    "completion": "sonnet"
+  },
+  "model_overrides": {
+    "gsd-codebase-mapper": "haiku"
+  }
+}
+```
+
+#### Phase-type → agent mapping
+
+| Phase type | Agents |
+|---|---|
+| `planning` | `gsd-planner`, `gsd-roadmapper`, `gsd-pattern-mapper` |
+| `discuss` | (reserved — no subagent today) |
+| `research` | `gsd-phase-researcher`, `gsd-project-researcher`, `gsd-research-synthesizer`, `gsd-codebase-mapper`, `gsd-ui-researcher` |
+| `execution` | `gsd-executor`, `gsd-debugger`, `gsd-doc-writer` |
+| `verification` | `gsd-verifier`, `gsd-plan-checker`, `gsd-integration-checker`, `gsd-nyquist-auditor`, `gsd-ui-checker`, `gsd-ui-auditor`, `gsd-doc-verifier` |
+| `completion` | (reserved — no subagent today) |
+
+`discuss` and `completion` are accepted by the schema for forward compatibility; setting them today is a no-op until a subagent maps to them.
+
+#### Resolution precedence (highest → lowest)
+
+```
+1. model_overrides[<agent>]      ← per-agent; full IDs accepted; targeted exception
+2. models[<phase_type>]          ← coarse phase-level tier
+3. model_profile (per-agent col) ← global tier strategy
+4. Runtime default               ← when nothing else applies
+```
+
+The three layers compose: `models` defaults a phase, and `model_overrides` carves an exception out of it. In the example above, all five research agents resolve to `sonnet` *except* `gsd-codebase-mapper`, which the per-agent override pins to `haiku`.
+
+#### Accepted values
+
+`models.<phase_type>` accepts only tier aliases:
+
+| Value | Effect |
+|---|---|
+| `"opus"` / `"sonnet"` / `"haiku"` | Standard tier — runtime resolution maps to the active runtime's model for that tier |
+| `"inherit"` | Agents in this phase follow the session model (same semantics as `model_profile: "inherit"`) |
+
+If you need a fully-qualified model ID (`"openai/gpt-5"`, `"google/gemini-2.5-pro"`), use `model_overrides` per agent instead. `models.*` is intentionally tier-only so the runtime-aware mapping stays correct on Codex / OpenCode / Gemini CLI installs.
+
+#### When to use which
+
+| You want | Use |
+|---|---|
+| One global tier strategy ("balanced everywhere") | `model_profile` |
+| Coarse phase-level tuning ("Opus for planning") | `models.<phase_type>` |
+| Per-agent precision ("force haiku on the codebase mapper") | `model_overrides[<agent>]` |
+| Full model ID for a specific agent | `model_overrides[<agent>]: "openai/gpt-5"` |
+
+Mix freely — the precedence rule above resolves any overlap deterministically.
+
+#### Validation
+
+`config-set` rejects unknown phase-types:
+
+```bash
+$ gsd config-set models.deployment opus
+Error: 'models.deployment' is not a valid config key
+
+# Valid:
+$ gsd config-set models.research sonnet
+```
+
+Direct edits to `.planning/config.json` are looser — the resolver simply ignores values it doesn't recognize and falls through to the profile tier — so a typo doesn't silently break tier resolution.
 
 ### Non-Claude Runtimes (Codex, OpenCode, Gemini CLI, Kilo)
 
