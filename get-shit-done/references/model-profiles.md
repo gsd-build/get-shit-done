@@ -181,7 +181,7 @@ When `dynamic_routing.enabled = false` (default), behavior is identical to today
 Orchestrators resolve model before spawning. The full precedence ladder
 is (highest → lowest):
 
-```
+```text
 1. Read .planning/config.json
 2. Check model_overrides[<agent>] (full IDs accepted; targeted exceptions)
 3. If dynamic_routing.enabled, return tier_models[escalated_tier]

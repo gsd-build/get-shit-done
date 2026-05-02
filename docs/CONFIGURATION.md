@@ -688,14 +688,15 @@ for the change to take effect. See issue #2256.
 
 #### Resolution precedence (highest → lowest)
 
-```
-1. model_overrides[<agent>]      ← per-agent; full IDs accepted; targeted exception
-2. models[<phase_type>]          ← coarse phase-level tier
-3. model_profile (per-agent col) ← global tier strategy
-4. Runtime default               ← when nothing else applies
+```text
+1. model_overrides[<agent>]              ← per-agent; full IDs; targeted exception
+2. dynamic_routing.tier_models[<tier>]   ← when enabled (see §Dynamic Routing)
+3. models[<phase_type>]                  ← coarse phase-level tier (this section)
+4. model_profile (per-agent col)         ← global tier strategy
+5. Runtime default                       ← when nothing else applies
 ```
 
-The three layers compose: `models` defaults a phase, and `model_overrides` carves an exception out of it. In the example above, all five research agents resolve to `sonnet` *except* `gsd-codebase-mapper`, which the per-agent override pins to `haiku`.
+The four layers compose: `models` defaults a phase, `model_overrides` carves an exception, `dynamic_routing` (if enabled) escalates per-attempt above all of them. In the example above, all five research agents resolve to `sonnet` *except* `gsd-codebase-mapper`, which the per-agent override pins to `haiku`. `dynamic_routing` is disabled by default — when off (`enabled: false` or block omitted), this section's behavior is unchanged from today.
 
 #### Accepted values
 
@@ -766,7 +767,7 @@ Each agent in `MODEL_PROFILES` declares one of three default tiers. The resolver
 
 #### Escalation flow
 
-```
+```text
 1. Orchestrator spawns agent → resolver returns tier_models[default_tier]
 2. Soft failure?
    ├─ no → ✓ done (cheap path)
