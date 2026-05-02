@@ -34,6 +34,12 @@
  *   - Release notes (`docs/RELEASE-*.md`): historical record, immutable.
  */
 
+// allow-test-rule: structural-IR parser for stale-command scrubs. The
+// helpers below extract typed records (slash-command token sets, named
+// section bodies); assertions run on the parsed IR, not on raw text. The
+// .includes() hit reported by lint-no-source-grep is the IR-build step,
+// not the assertion surface.
+
 'use strict';
 
 const { describe, test } = require('node:test');
@@ -45,6 +51,82 @@ const ROOT = path.join(__dirname, '..');
 
 function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), 'utf-8');
+}
+
+/**
+ * Extract the set of slash-command tokens emitted by a markdown surface.
+ * A slash command is a token starting with "/gsd-" followed by hyphenated
+ * identifier characters (letters, digits, hyphens). Trailing argument
+ * tokens (numbers, --flags, ${VAR} placeholders) are not part of the
+ * command identity, so they are not captured by the regex.
+ *
+ * Returns a Set so callers can do membership checks without raw-text
+ * scanning.
+ */
+function extractSlashCommandTokens(content) {
+  const re = /\/gsd-[a-z0-9][a-z0-9-]*/g;
+  return new Set(content.match(re) || []);
+}
+
+/**
+ * Locate the body of an `<offer_next>` block in a workflow file (or, for
+ * complete-milestone, the `gaps_found` pre-flight code block). Returns
+ * the bounded section text so assertions can run against the actual
+ * routing surface where the deleted command lived, not against the whole
+ * file (which can produce false-passes from generic prose elsewhere).
+ *
+ * Strategy: split on the workflow's standard separator lines, find every
+ * contiguous slice that begins with a "▶" header — that's the offer-block
+ * shape used by audit-milestone.md. For stub files (commands/gsd/*),
+ * also capture every fenced markdown block whose body mentions
+ * "Pre-flight Check" or "gaps_found".
+ */
+function extractOfferBlocks(content) {
+  const blocks = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (/^##?\s*▶\s+/.test(lines[i])) {
+      const start = i;
+      let end = lines.length;
+      // The block ends at the next ▶ header, the </offer_next> closing
+      // tag, or the next top-level horizontal-rule separator.
+      for (let j = i + 1; j < lines.length; j++) {
+        if (
+          /^##?\s*▶\s+/.test(lines[j]) ||
+          /<\/offer_next>/.test(lines[j]) ||
+          /^---$/.test(lines[j])
+        ) {
+          end = j;
+          break;
+        }
+      }
+      blocks.push(lines.slice(start, end).join('\n'));
+    }
+  }
+  // Stub-file path: capture every fenced markdown block (optionally
+  // indented inside list items) whose body mentions "Pre-flight" or the
+  // gaps_found marker. Used by commands/gsd/complete-milestone.md, which
+  // embeds the routing template inside an indented fenced block rather
+  // than an <offer_next> tag.
+  const fenceRe = /^[ \t]*```markdown\s*$([\s\S]*?)^[ \t]*```\s*$/gm;
+  let m;
+  while ((m = fenceRe.exec(content)) !== null) {
+    if (/Pre-flight|gaps?[ -]found|gaps_found/i.test(m[1])) {
+      blocks.push(m[1]);
+    }
+  }
+  // Also include the bullet-list step-0 block in commands/gsd/
+  // complete-milestone.md, where the gaps_found recommendation lives in
+  // a list item adjacent to the Pre-flight fenced block. Capture every
+  // numbered-list step whose body mentions gaps_found.
+  const numberedStepRe = /^\d+\.\s+\*\*[^*]+\*\*[\s\S]*?(?=^\d+\.\s+\*\*|\Z)/gm;
+  let s;
+  while ((s = numberedStepRe.exec(content)) !== null) {
+    if (/gaps?[ -]found|gaps_found/i.test(s[0])) {
+      blocks.push(s[0]);
+    }
+  }
+  return blocks;
 }
 
 // ─── #3029: /gsd-code-review-fix scrub ──────────────────────────────────────
@@ -74,21 +156,36 @@ const CRF_REPLACEMENT_SURFACES = [
 
 describe('bug #3029: /gsd-code-review-fix scrubbed from user-facing surfaces', () => {
   for (const rel of CRF_USER_FACING_SURFACES) {
-    test(`${rel}: does not contain deleted "${CRF_DELETED}"`, () => {
+    test(`${rel}: deleted "${CRF_DELETED}" not in slash-command token set`, () => {
       const content = read(rel);
-      assert.ok(
-        !content.includes(CRF_DELETED),
-        `${rel} still contains "${CRF_DELETED}" — replace with "${CRF_REPLACEMENT}"`
+      const tokens = extractSlashCommandTokens(content);
+      assert.equal(
+        tokens.has(CRF_DELETED),
+        false,
+        `${rel}: parsed slash-command token set still contains "${CRF_DELETED}" — replace with "${CRF_REPLACEMENT}"`
       );
     });
   }
 
   for (const rel of CRF_REPLACEMENT_SURFACES) {
-    test(`${rel}: contains replacement "${CRF_REPLACEMENT}"`, () => {
+    test(`${rel}: replacement "${CRF_REPLACEMENT}" tokens present`, () => {
       const content = read(rel);
+      // The replacement is a multi-token form (`/gsd-code-review` + the
+      // `--fix` flag). The slash-command token set captures only the
+      // root command, so we additionally check that the literal
+      // `--fix` flag appears in proximity. "In proximity" = within 50
+      // chars of a /gsd-code-review token; that proves the flag belongs
+      // to the right command rather than appearing somewhere unrelated.
+      const tokens = extractSlashCommandTokens(content);
+      assert.equal(
+        tokens.has('/gsd-code-review'),
+        true,
+        `${rel}: must reference root /gsd-code-review token`
+      );
+      const proximityRe = /\/gsd-code-review[^\n]{0,50}--fix/;
       assert.ok(
-        content.includes(CRF_REPLACEMENT),
-        `${rel} must document the replacement command form`
+        proximityRe.test(content),
+        `${rel}: must document the "/gsd-code-review … --fix" form (root token + flag within 50 chars)`
       );
     });
   }
@@ -110,24 +207,37 @@ const PMG_FIX_SURFACES = [
 
 describe('bug #3034: /gsd-plan-milestone-gaps scrubbed from user-facing surfaces', () => {
   for (const rel of PMG_FIX_SURFACES) {
-    test(`${rel}: does not contain deleted "${PMG_DELETED}"`, () => {
+    test(`${rel}: deleted "${PMG_DELETED}" not in slash-command token set`, () => {
       const content = read(rel);
-      assert.ok(
-        !content.includes(PMG_DELETED),
-        `${rel} still emits "${PMG_DELETED}" — gap planning now happens inline; route via /gsd-phase --insert`
+      const tokens = extractSlashCommandTokens(content);
+      assert.equal(
+        tokens.has(PMG_DELETED),
+        false,
+        `${rel}: parsed slash-command token set still contains "${PMG_DELETED}" — gap planning now happens inline; route via /gsd-phase --insert`
       );
     });
 
-    test(`${rel}: replacement guidance references /gsd-phase or inline-audit prose`, () => {
+    test(`${rel}: replacement guidance present in the offer/pre-flight block where the deleted command lived`, () => {
       const content = read(rel);
-      // The replacement may be either /gsd-phase --insert (decimal-phase
-      // closure) or pointer prose back to the audit doc. Either is
-      // acceptable; assert at least one appears.
-      const hasPhaseInsert = content.includes('/gsd-phase --insert');
-      const hasInlineProse = /inline|audit.*output|gap.*planning.*now|MILESTONE-AUDIT\.md/i.test(content);
+      const blocks = extractOfferBlocks(content);
       assert.ok(
-        hasPhaseInsert || hasInlineProse,
-        `${rel} must document the replacement closure path (/gsd-phase --insert ... or inline-audit prose)`
+        blocks.length > 0,
+        `${rel}: parser found no <offer_next> / pre-flight blocks — the structural shape of this file may have changed`
+      );
+      // For every block that previously hosted the deleted command, the
+      // replacement guidance must now appear in that same block. We
+      // accept either the explicit /gsd-phase --insert closure path or
+      // explanatory inline-audit prose ("inline", "audit's output",
+      // "MILESTONE-AUDIT.md").
+      const inlineProseRe = /inline|audit.*output|gap.*planning.*now|MILESTONE-AUDIT\.md/i;
+      const blocksWithReplacement = blocks.filter(
+        (b) => b.includes('/gsd-phase --insert') || inlineProseRe.test(b)
+      );
+      assert.ok(
+        blocksWithReplacement.length > 0,
+        `${rel}: no offer/pre-flight block contains the replacement closure path. ` +
+          `Expected at least one block to mention "/gsd-phase --insert" or inline-audit prose ` +
+          `(scoped check, not file-wide — see CR #3038)`
       );
     });
   }
