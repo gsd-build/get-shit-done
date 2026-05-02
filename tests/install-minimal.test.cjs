@@ -305,33 +305,51 @@ describe('install-profiles: cleanupStagedSkills', () => {
   });
 
   test('mid-copy failure removes the partial staged dir and re-throws', () => {
+    // The previous shape of this test compared listTmpStageDirs() snapshots
+    // before and after the throw. That assertion was unsound under
+    // `--test-concurrency=4` (scripts/run-tests.cjs:24): a parallel test
+    // process (notably install-minimal-all-runtimes.test.cjs, which also
+    // calls stageSkillsForMode) creates and removes `gsd-minimal-skills-*`
+    // dirs in the shared os.tmpdir() between our two snapshots, so
+    // deepStrictEqual failed deterministically when the parallel process
+    // happened to have a live stage dir during our snapshot window.
+    //
+    // Fix: observe THIS test's own stage dir directly. Stub fs.mkdtempSync
+    // to record the path stageSkillsForMode creates; on throw, assert that
+    // exact path no longer exists. No global tmpdir scan, no race with
+    // parallel processes.
     cleanupStagedSkills();
     const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-fail-'));
     fs.writeFileSync(path.join(src, 'plan-phase.md'), '# plan\n');
-    try {
-      // Force a failure mid-loop by making fs.copyFileSync throw on the
-      // second allowlisted file. Capture the staged dir from the first
-      // successful call (we can't see it directly, so we count tmp dirs).
-      const before = listTmpStageDirs();
-      const realCopy = fs.copyFileSync;
-      let copyCount = 0;
-      fs.copyFileSync = (s, d) => {
-        copyCount++;
-        if (copyCount === 2) throw new Error('synthetic disk full');
-        return realCopy(s, d);
-      };
-      // Need at least 2 allowlisted files in src for the second copy to fire.
-      fs.writeFileSync(path.join(src, 'execute-phase.md'), '# x\n');
-      try {
-        assert.throws(() => stageSkillsForMode(src, 'minimal'), /synthetic disk full/);
-      } finally {
-        fs.copyFileSync = realCopy;
+    fs.writeFileSync(path.join(src, 'execute-phase.md'), '# x\n');
+    const realCopy = fs.copyFileSync;
+    const realMkdtemp = fs.mkdtempSync;
+    let stagedDir = null;
+    fs.mkdtempSync = (prefix, ...rest) => {
+      const out = realMkdtemp(prefix, ...rest);
+      // Only track the stage dir created by stageSkillsForMode (its
+      // `gsd-minimal-skills-` prefix). Don't capture our own
+      // `gsd-stage-fail-` parent dir created above.
+      if (typeof prefix === 'string' && prefix.endsWith('gsd-minimal-skills-')) {
+        stagedDir = out;
       }
-      const after = listTmpStageDirs();
-      // Partial dir must have been cleaned up by stageSkillsForMode itself
-      // before re-throwing — so the count is unchanged.
-      assert.deepStrictEqual(after, before, 'partial staged dir should be removed on throw');
+      return out;
+    };
+    let copyCount = 0;
+    fs.copyFileSync = (s, d) => {
+      copyCount++;
+      if (copyCount === 2) throw new Error('synthetic disk full');
+      return realCopy(s, d);
+    };
+    try {
+      assert.throws(() => stageSkillsForMode(src, 'minimal'), /synthetic disk full/);
+      assert.notStrictEqual(stagedDir, null,
+        'stageSkillsForMode should have invoked mkdtempSync before the copy throw');
+      assert.equal(fs.existsSync(stagedDir), false,
+        `partial staged dir should be removed on throw, but ${stagedDir} still exists`);
     } finally {
+      fs.copyFileSync = realCopy;
+      fs.mkdtempSync = realMkdtemp;
       fs.rmSync(src, { recursive: true, force: true });
       cleanupStagedSkills();
     }
