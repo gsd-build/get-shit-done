@@ -73,6 +73,30 @@ describe('Bug #3011: formatSdkPathDiagnostic — Windows shim location and PATH 
     assert.ok(ps.includes('C:\\Users\\me\\AppData\\Roaming\\npm'),
       `PowerShell line must contain Windows-style path: ${ps}`);
   });
+
+  test("paths containing a single quote are escaped for each shell (#3014 CR)", () => {
+    // CR finding: a real Windows username like "O'Neil" would generate
+    // unparseable commands. PowerShell single-quote escape is '' (doubled);
+    // bash within outer single-quotes uses '\'' to embed a literal quote;
+    // POSIX export within double-quotes leaves single quotes alone.
+    const ir = formatSdkPathDiagnostic({
+      shimDir: "C:\\Users\\O'Neil\\AppData\\Roaming\\npm",
+      platform: 'win32',
+      runDir: 'C:\\some\\path',
+    });
+    const ps      = ir.actionLines.find(l => l.startsWith('PowerShell'));
+    const cmd     = ir.actionLines.find(l => l.startsWith('cmd.exe'));
+    const gitBash = ir.actionLines.find(l => l.startsWith('Git Bash'));
+    // PowerShell: literal quote escape is doubled
+    assert.ok(ps.includes("C:\\Users\\O''Neil\\AppData\\Roaming\\npm"),
+      `PowerShell line must double single quotes: ${ps}`);
+    // cmd.exe (which delegates to powershell) uses the same PS-escape
+    assert.ok(cmd.includes("C:\\Users\\O''Neil\\AppData\\Roaming\\npm"),
+      `cmd.exe line must double single quotes (delegates to PowerShell): ${cmd}`);
+    // Git Bash: '\'' escape inside outer single-quoted echo
+    assert.ok(gitBash.includes("C:/Users/O'\\''Neil/AppData/Roaming/npm"),
+      `Git Bash line must escape single quote with '\\\\'': ${gitBash}`);
+  });
 });
 
 describe('Bug #3011: formatSdkPathDiagnostic — POSIX action lines', () => {

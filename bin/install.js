@@ -9279,18 +9279,29 @@ function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
   const actionLines = [];
 
   if (shimDir) {
+    // Escape shimDir for each shell context. A path containing a single
+    // quote (e.g. C:\Users\O'Neil\AppData\...) would otherwise generate
+    // broken commands the user can't paste:
+    //   - PowerShell single-quoted string: '' escapes a literal single quote
+    //   - bash inside outer single quotes: '\'' (close, escaped quote, reopen)
+    //   - POSIX export inside double quotes: escape \ $ " ` so the path is
+    //     copied verbatim and $PATH (which is OUTSIDE the escaped substring)
+    //     still expands at paste time.
+    const psShimDir   = shimDir.replace(/'/g, "''");
+    const bashShimDir = shimDir.replace(/\\/g, '/').replace(/'/g, "'\\''");
+    const posixShimDir = shimDir.replace(/[\\$"`]/g, '\\$&');
     actionLines.push('Add that directory to your PATH and restart your shell.');
     if (isWin32) {
-      actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', "${shimDir};" + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
+      actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
       // setx PATH "...;%PATH%" silently truncates above 1024 chars and
       // expands %PATH% / %SystemRoot% to literals (turning REG_EXPAND_SZ
       // into REG_SZ), permanently breaking lazy variable references.
       // Invoke PowerShell from cmd.exe with the same SetEnvironmentVariable
       // call as the PowerShell line so cmd.exe users get a safe command.
-      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${shimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
-      actionLines.push(`Git Bash  : echo 'export PATH="${shimDir.replace(/\\/g, '/')}:$PATH"' >> ~/.bashrc`);
+      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
+      actionLines.push(`Git Bash  : echo 'export PATH="${bashShimDir}:$PATH"' >> ~/.bashrc`);
     } else {
-      actionLines.push(`export PATH="${shimDir}:$PATH"`);
+      actionLines.push(`export PATH="${posixShimDir}:$PATH"`);
     }
   } else {
     actionLines.push('Could not locate a writable PATH directory to install the shim.');
