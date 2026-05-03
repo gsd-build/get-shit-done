@@ -18,6 +18,7 @@
  */
 
 import { readFile, readdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { extractFrontmatter } from './frontmatter.js';
@@ -65,9 +66,39 @@ async function getPhaseFileStats(phaseDir: string): Promise<{
   hasReviews: boolean;
 }> {
   const files = await readdir(phaseDir);
+
+  // When a `plans/` subdirectory exists and contains *.md files, those are the
+  // per-plan files (manifest-style layout: PLAN.md is the manifest, plans/*.md
+  // are the individual plans). Enumerate them instead of the root PLAN.md.
+  let plans = files.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+  const plansSubdir = join(phaseDir, 'plans');
+  if (existsSync(plansSubdir)) {
+    try {
+      const subdirFiles = await readdir(plansSubdir);
+      const subdirPlans = subdirFiles.filter(f => f.endsWith('.md'));
+      if (subdirPlans.length > 0) {
+        // Use the subdir plan files; prefix with "plans/" so callers can locate them.
+        plans = subdirPlans.map(f => `plans/${f}`);
+      }
+    } catch { /* best-effort — fall back to root plans */ }
+  }
+
+  // Summaries may live in the root or inside plans/ alongside their plans.
+  const rootSummaries = files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+  let subdirSummaries: string[] = [];
+  if (existsSync(plansSubdir)) {
+    try {
+      const subdirFiles = await readdir(plansSubdir);
+      subdirSummaries = subdirFiles
+        .filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md')
+        .map(f => `plans/${f}`);
+    } catch { /* best-effort */ }
+  }
+  const summaries = [...rootSummaries, ...subdirSummaries];
+
   return {
-    plans: files.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md'),
-    summaries: files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md'),
+    plans,
+    summaries,
     hasResearch: files.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
     hasContext: files.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md'),
     hasVerification: files.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md'),
@@ -104,13 +135,22 @@ async function searchPhaseInDir(baseDir: string, relBase: string, normalized: st
     const plans = unsortedPlans.sort();
     const summaries = unsortedSummaries.sort();
 
+    // Derive a canonical plan ID from a filename (with or without "plans/" prefix).
+    // For root plans: "65-01-PLAN.md" → "65-01", "PLAN.md" → ""
+    // For subdir plans: "plans/65-01-foo.md" → "plans/65-01-foo"
+    const toPlanId = (f: string) => f
+      .replace(/^plans\//, 'plans/')
+      .replace(/-PLAN\.md$/, '')
+      .replace(/\.md$/, '')
+      .replace(/^PLAN$/, '');
+
     const completedPlanIds = new Set(
-      summaries.map(s => s.replace('-SUMMARY.md', '').replace('SUMMARY.md', ''))
+      summaries.map(s => s
+        .replace(/^plans\//, 'plans/')
+        .replace(/-SUMMARY\.md$/, '')
+        .replace(/^SUMMARY$/, '')),
     );
-    const incompletePlans = plans.filter(p => {
-      const planId = p.replace('-PLAN.md', '').replace('PLAN.md', '');
-      return !completedPlanIds.has(planId);
-    });
+    const incompletePlans = plans.filter(p => !completedPlanIds.has(toPlanId(p)));
 
     return {
       found: true,

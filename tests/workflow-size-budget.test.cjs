@@ -32,7 +32,7 @@ const path = require('path');
 
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 
-const XL_BUDGET = 1700;
+const XL_BUDGET = 1750;  // raised +50 for plan-vs-schema preflight step (issue #3 tier-2, item #7)
 const LARGE_BUDGET = 1500;
 const DEFAULT_BUDGET = 1000;
 
@@ -40,7 +40,7 @@ const DEFAULT_BUDGET = 1000;
 // Grandfathered at current sizes — see PR #2551 for #2551 progressive-disclosure
 // pattern that future shrinks should follow.
 const XL_WORKFLOWS = new Set([
-  'execute-phase',  // 1622
+  'execute-phase',  // 1742 (includes plan-vs-schema preflight step)
   'plan-phase',     // 1493
   'new-project',    // 1391
 ]);

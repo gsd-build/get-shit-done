@@ -59,6 +59,7 @@ Parse `$ARGUMENTS` before loading any context:
 - Optional `--gaps-only` keeps its current meaning
 - Optional `--cross-ai` → `CROSS_AI_FORCE=true` (force all plans through cross-AI execution)
 - Optional `--no-cross-ai` → `CROSS_AI_DISABLED=true` (disable cross-AI for this run, overrides config and frontmatter)
+- Optional `--strict-schema-check` → `STRICT_SCHEMA=true` (block on unknown table names; default is warn-only)
 
 If `--wave` is absent, preserve the current behavior of executing all incomplete waves in the phase.
 </step>
@@ -288,6 +289,47 @@ Report:
 |------|-------|----------------|
 | 1 | 01-01, 01-02 | {from plan objectives, 3-8 words} |
 | 2 | 01-03 | ... |
+```
+</step>
+
+<step name="plan_schema_preflight">
+**Pre-flight: verify plan table names against the live schema. Best-effort — never blocks by default.**
+
+For each plan file in `${phase_dir}/plans/*.md` (or `${phase_dir}/PLAN.md` if no subdir):
+
+1. **Extract SQL identifiers** from each plan:
+   ```bash
+   grep -oiE '(CREATE TABLE|ALTER TABLE|INSERT INTO|FROM|JOIN)\s+([a-z_][a-z0-9_]*)' "$PLAN_FILE" \
+     | awk '{print $NF}' | sort -u
+   ```
+
+2. **Check each identifier** against the live schema:
+   ```bash
+   for name in $TABLE_NAMES; do
+     grep -rn "CREATE TABLE\s\+${name}" src/ migrations/ schemas/ store/ 2>/dev/null | head -1 || echo "UNKNOWN: $name"
+   done
+   ```
+
+3. **Write `${phase_dir}/SCHEMA-CHECK.md`:**
+   ```markdown
+   ## Verified
+   - table_name — found in src/...
+
+   ## Unknown / Possibly stale
+   - old_table — referenced in plans/65-01-foo.md:12, not found in live schema
+   ```
+
+4. **Report inline:**
+   - If all verified: `✓ Schema check passed — {N} table names confirmed.`
+   - If unknowns found and `STRICT_SCHEMA` is **false** (default): warn and continue:
+     `⚠ Schema check: {N} unknown table name(s) — see ${phase_dir}/SCHEMA-CHECK.md. Executors should adapt mid-flight.`
+   - If unknowns found and `STRICT_SCHEMA` is **true** (`--strict-schema-check`): STOP and ask user to fix plan references before continuing.
+
+5. **If greps fail** (no `src/` dir, no plan files, unusual layout): log `[schema-preflight] skipped — no schema source found` and continue.
+
+Commit SCHEMA-CHECK.md if created and `commit_docs` is true:
+```bash
+gsd-sdk query commit "docs(${padded_phase}): schema preflight check" --files "${phase_dir}/SCHEMA-CHECK.md" 2>/dev/null || true
 ```
 </step>
 

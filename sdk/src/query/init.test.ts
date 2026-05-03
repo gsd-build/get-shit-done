@@ -330,6 +330,52 @@ describe('initExecutePhase', () => {
     const data = result.data as Record<string, unknown>;
     expect(data.error).toBeDefined();
   });
+
+  // Item #5 — manifest-style plans/ subdirectory enumeration
+  it('enumerates per-plan files from plans/ subdir when present', async () => {
+    // Create a phase with a plans/ subdirectory (manifest-style layout)
+    const phaseDir = join(tmpDir, '.planning', 'phases', '65-manifest-phase');
+    await mkdir(join(phaseDir, 'plans'), { recursive: true });
+    // Manifest file (should NOT appear in plans[] when subdir exists)
+    await writeFile(join(phaseDir, 'PLAN.md'), '# Manifest\n');
+    // Per-plan files in plans/ subdir
+    await writeFile(join(phaseDir, 'plans', '65-01-setup.md'), '# Plan 01\n');
+    await writeFile(join(phaseDir, 'plans', '65-02-implement.md'), '# Plan 02\n');
+    // Summary exists only for plan 01
+    await writeFile(join(phaseDir, 'plans', '65-01-setup-SUMMARY.md'), '# Summary 01\n');
+
+    const result = await initExecutePhase(['65'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.phase_found).toBe(true);
+    // Should enumerate per-plan files, not just PLAN.md
+    const plans = data.plans as string[];
+    expect(plans.length).toBe(2);
+    expect(plans.some(p => p.includes('65-01-setup'))).toBe(true);
+    expect(plans.some(p => p.includes('65-02-implement'))).toBe(true);
+    expect(plans).not.toContain('PLAN.md');
+    // plan_count should reflect the actual plan files
+    expect(data.plan_count).toBe(2);
+    // Only 65-02 is incomplete
+    const incomplete = data.incomplete_plans as string[];
+    expect(incomplete.length).toBe(1);
+    expect(incomplete.some(p => p.includes('65-02-implement'))).toBe(true);
+  });
+
+  // Backward compat: phases with only PLAN.md (no subdir) still report ["PLAN.md"]
+  it('falls back to root PLAN.md when no plans/ subdir exists', async () => {
+    const phaseDir = join(tmpDir, '.planning', 'phases', '11-simple');
+    await mkdir(phaseDir, { recursive: true });
+    await writeFile(join(phaseDir, 'PLAN.md'), '# Single plan\n');
+
+    const result = await initExecutePhase(['11'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.phase_found).toBe(true);
+    const plans = data.plans as string[];
+    expect(plans).toContain('PLAN.md');
+    expect(data.plan_count).toBe(1);
+  });
 });
 
 describe('initPlanPhase', () => {

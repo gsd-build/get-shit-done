@@ -393,7 +393,7 @@ The template documents variable substitutions and conditional sections. Substitu
 - Do NOT duplicate requirements text from SPEC.md into `<decisions>` — agents read SPEC.md directly.
 - The `<decisions>` section contains only implementation decisions from this discussion.
 
-Write the file.
+Write the file. Then: `Read(workflows/discuss-phase/fact-check.md)` and execute the fact-check pass.
 </step>
 
 <step name="confirm_creation">
@@ -493,5 +493,6 @@ Otherwise, route to `confirm_creation` (manual next steps).
 - Checkpoint file cleaned up after successful CONTEXT.md write
 - `--chain` triggers interactive discuss followed by auto plan+execute (no auto-answering)
 - `--chain` and `--auto` both persist chain flag and auto-advance to plan-phase
+- CONTEXT.md fact-check pass runs after write — stale schema/path/class refs corrected or flagged in `<verification_warnings>`
 - Per-mode bodies, templates, and advisor flow are lazy-loaded — parent stays under the workflow size budget enforced by `tests/workflow-size-budget.test.cjs`
 </success_criteria>
