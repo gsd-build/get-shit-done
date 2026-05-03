@@ -110,17 +110,10 @@ import { checkGates } from './check-gates.js';
 import { checkVerificationStatus } from './check-verification-status.js';
 import { checkShipReady } from './check-ship-ready.js';
 import { GSDEventStream } from '../event-stream.js';
-import {
-  GSDEventType,
-  type GSDEvent,
-  type GSDStateMutationEvent,
-  type GSDConfigMutationEvent,
-  type GSDFrontmatterMutationEvent,
-  type GSDGitCommitEvent,
-  type GSDTemplateFillEvent,
-} from '../types.js';
+import type { GSDEvent } from '../types.js';
 import type { QueryHandler, QueryResult } from './utils.js';
 import { registerAliasCatalog, registerStaticCatalog } from './command-catalog.js';
+import { buildMutationEvent } from './mutation-event-mapper.js';
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
 
@@ -160,107 +153,6 @@ export const QUERY_MUTATION_COMMANDS = new Set<string>([
   'intel.snapshot', 'intel.patch-meta', 'intel snapshot', 'intel patch-meta',
   'write-profile', 'generate-claude-profile', 'generate-dev-preferences', 'generate-claude-md',
 ]);
-
-// ─── Event builder ────────────────────────────────────────────────────────
-
-/**
- * Build a mutation event based on the command prefix and result.
- *
- * @param correlationSessionId - Optional session correlation id (from {@link createRegistry})
- */
-function buildMutationEvent(
-  correlationSessionId: string,
-  cmd: string,
-  args: string[],
-  result: QueryResult,
-): GSDEvent {
-  const base = {
-    timestamp: new Date().toISOString(),
-    sessionId: correlationSessionId,
-  };
-
-  if (cmd.startsWith('template.') || cmd.startsWith('template ')) {
-    const data = result.data as Record<string, unknown> | null;
-    return {
-      ...base,
-      type: GSDEventType.TemplateFill,
-      templateType: (data?.template as string) ?? args[0] ?? '',
-      path: (data?.path as string) ?? args[1] ?? '',
-      created: (data?.created as boolean) ?? false,
-    } as GSDTemplateFillEvent;
-  }
-
-  if (cmd === 'commit' || cmd === 'check-commit' || cmd === 'commit-to-subrepo') {
-    const data = result.data as Record<string, unknown> | null;
-    return {
-      ...base,
-      type: GSDEventType.GitCommit,
-      hash: (data?.hash as string) ?? null,
-      committed: (data?.committed as boolean) ?? false,
-      reason: (data?.reason as string) ?? '',
-    } as GSDGitCommitEvent;
-  }
-
-  if (cmd.startsWith('frontmatter.') || cmd.startsWith('frontmatter ')) {
-    return {
-      ...base,
-      type: GSDEventType.FrontmatterMutation,
-      command: cmd,
-      file: args[0] ?? '',
-      fields: args.slice(1),
-      success: true,
-    } as GSDFrontmatterMutationEvent;
-  }
-
-  if (cmd.startsWith('config-')) {
-    return {
-      ...base,
-      type: GSDEventType.ConfigMutation,
-      command: cmd,
-      key: args[0] ?? '',
-      success: true,
-    } as GSDConfigMutationEvent;
-  }
-
-  if (cmd.startsWith('validate.') || cmd.startsWith('validate ')) {
-    return {
-      ...base,
-      type: GSDEventType.ConfigMutation,
-      command: cmd,
-      key: args[0] ?? '',
-      success: true,
-    } as GSDConfigMutationEvent;
-  }
-
-  if (cmd.startsWith('phase.') || cmd.startsWith('phase ') || cmd.startsWith('phases.') || cmd.startsWith('phases ')) {
-    return {
-      ...base,
-      type: GSDEventType.StateMutation,
-      command: cmd,
-      fields: args.slice(0, 2),
-      success: true,
-    } as GSDStateMutationEvent;
-  }
-
-  if (cmd.startsWith('state.') || cmd.startsWith('state ')) {
-    return {
-      ...base,
-      type: GSDEventType.StateMutation,
-      command: cmd,
-      fields: args.slice(0, 2),
-      success: true,
-    } as GSDStateMutationEvent;
-  }
-
-  // roadmap, requirements, todo, milestone, workstream, intel, profile, learnings, docs-init
-  return {
-    ...base,
-    type: GSDEventType.StateMutation,
-    command: cmd,
-    fields: args.slice(0, 2),
-    success: true,
-  } as GSDStateMutationEvent;
-}
 
 // ─── Factory ───────────────────────────────────────────────────────────────
 
