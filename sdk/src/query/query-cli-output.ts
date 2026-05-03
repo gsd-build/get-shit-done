@@ -25,7 +25,11 @@ export function buildQueryCliOutputFromError(err: unknown): QueryCliAdapterOutpu
     return { stderrLines: [`Error: ${err.message}`], exitCode: exitCodeFor(err.classification), stdoutChunks };
   }
   if (err instanceof GSDToolsError) {
-    return { stderrLines: [`Error: ${err.message}`], exitCode: err.exitCode ?? 1, stdoutChunks };
+    // Prefer raw subprocess stderr when available so users see the original tool diagnostics.
+    const stderrLines = err.stderr && err.stderr.trim().length > 0
+      ? err.stderr.split(/\r?\n/).filter(line => line.length > 0)
+      : [`Error: ${err.message}`];
+    return { stderrLines, exitCode: err.exitCode ?? 1, stdoutChunks };
   }
   return { stderrLines: [`Error: ${err instanceof Error ? err.message : String(err)}`], exitCode: 1, stdoutChunks };
 }

@@ -6,8 +6,10 @@
 
 /**
  * Bug #2524: gsd-sdk query --ws <name> silently ignores the workstream flag.
- * Tests that --ws is forwarded through the call chain:
- *   cli.ts -> runQueryCliCommand() -> registry.dispatch() -> planningPaths()
+ *
+ * This file is structural/static coverage only (source-file assertions).
+ * Runtime forwarding coverage for the query adapter path lives in:
+ *   sdk/src/query/query-cli-adapter.test.ts
  *
  * Uses static source-file text assertions (no sdk/dist/ build required in CI).
  */
