@@ -20,8 +20,7 @@ import type { InitNewProjectInfo, PhaseOpInfo, PhasePlanIndex, RoadmapAnalysis }
 import type { GSDEventStream } from './event-stream.js';
 import { GSDError, exitCodeFor } from './errors.js';
 import { createRegistry } from './query/index.js';
-import { resolveQueryArgv } from './query/registry.js';
-import { normalizeQueryCommand } from './query/normalize-query-command.js';
+import { resolveQueryCommand, type QueryCommandResolution } from './query/command-resolution.js';
 import { formatStateLoadRawStdout } from './query/state-project-load.js';
 import type { QueryResult } from './query/utils.js';
 import { GSDTransport } from './gsd-transport.js';
@@ -152,10 +151,8 @@ export class GSDTools {
     return this.preferNativeQuery && !this.workstream;
   }
 
-  private nativeMatch(command: string, args: string[]) {
-    const [normCmd, normArgs] = normalizeQueryCommand(command, args);
-    const tokens = [normCmd, ...normArgs];
-    return resolveQueryArgv(tokens, this.registry);
+  private nativeMatch(command: string, args: string[]): QueryCommandResolution | null {
+    return resolveQueryCommand(command, args, this.registry);
   }
 
   private toToolsError(command: string, args: string[], err: unknown): GSDToolsError {
@@ -565,21 +562,18 @@ export class GSDTools {
  */
 export async function runGsdToolsQuery(projectDir: string, queryArgv: string[]): Promise<unknown> {
   const { createRegistry } = await import('./query/index.js');
-  const { resolveQueryArgv } = await import('./query/registry.js');
-  const { normalizeQueryCommand } = await import('./query/normalize-query-command.js');
+  const { resolveQueryCommand } = await import('./query/command-resolution.js');
   const { GSDError, ErrorClassification } = await import('./errors.js');
 
   if (queryArgv.length === 0 || !queryArgv[0]) {
     throw new GSDError('runGsdToolsQuery requires a command', ErrorClassification.Validation);
   }
   const queryCommand = queryArgv[0];
-  const [normCmd, normArgs] = normalizeQueryCommand(queryCommand, queryArgv.slice(1));
   const registry = createRegistry();
-  const tokens = [normCmd, ...normArgs];
-  const matched = resolveQueryArgv(tokens, registry);
+  const matched = resolveQueryCommand(queryCommand, queryArgv.slice(1), registry);
   if (!matched) {
     throw new GSDError(
-      `Unknown command: "${tokens.join(' ')}". No native handler registered.`,
+      `Unknown command: "${queryArgv.join(' ')}". No native handler registered.`,
       ErrorClassification.Validation,
     );
   }

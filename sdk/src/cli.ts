@@ -389,7 +389,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   // ─── Query command ──────────────────────────────────────────────────────
   if (args.command === 'query') {
     const { createRegistry } = await import('./query/index.js');
-    const { extractField, resolveQueryArgv } = await import('./query/registry.js');
+    const { extractField } = await import('./query/registry.js');
     const { GSDToolsError } = await import('./gsd-tools.js');
     const { GSDError, exitCodeFor, ErrorClassification } = await import('./errors.js');
 
@@ -417,6 +417,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     try {
       const queryCommand = queryArgs[0];
       const { normalizeQueryCommand } = await import('./query/normalize-query-command.js');
+      const { resolveQueryCommand } = await import('./query/command-resolution.js');
       const [normCmd, normArgs] = normalizeQueryCommand(queryCommand, queryArgs.slice(1));
       if (!normCmd || !String(normCmd).trim()) {
         console.error('Error: "gsd-sdk query" requires a command');
@@ -424,19 +425,18 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
         return;
       }
       const registry = createRegistry();
-      const tokens = [normCmd, ...normArgs];
-      const matched = resolveQueryArgv(tokens, registry);
+      const matched = resolveQueryCommand(queryCommand, queryArgs.slice(1), registry);
       if (!matched) {
         if (!queryFallbackToCjsEnabled()) {
           throw new GSDError(
-            `Unknown command: "${tokens.join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.`,
+            `Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.`,
             ErrorClassification.Validation,
           );
         }
         const { resolveGsdToolsPath } = await import('./gsd-tools.js');
         const gsdPath = resolveGsdToolsPath(args.projectDir);
         console.error(
-          `[gsd-sdk] '${tokens.join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
+          `[gsd-sdk] '${[normCmd, ...normArgs].join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
         );
         console.error('[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.');
         const { stdout, stderr } = await execGsdToolsCjsQuery(
