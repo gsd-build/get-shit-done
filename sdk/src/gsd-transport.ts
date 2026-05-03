@@ -63,6 +63,8 @@ export class GSDTransport {
 
   private toRaw(data: unknown): string {
     if (typeof data === 'string') return data.trim();
-    return JSON.stringify(data, null, 2).trim();
+    const json = JSON.stringify(data, null, 2);
+    if (json == null) return '';
+    return json.trim();
   }
 }

@@ -119,6 +119,62 @@ describe('GSDTransport', () => {
     expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
   });
 
+  it('formats native raw output via formatNativeRaw when provided', async () => {
+    const registry = new QueryRegistry();
+    registry.register('commit', async () => ({ data: { hash: 'abc123' } }));
+
+    const adapters = {
+      dispatchNative: vi.fn(async () => ({ data: { hash: 'abc123' } })),
+      execSubprocessJson: vi.fn(async () => ({ ok: false })),
+      execSubprocessRaw: vi.fn(async () => 'subprocess-raw'),
+      formatNativeRaw: vi.fn(() => 'raw-native-output'),
+    };
+
+    const transport = new GSDTransport(registry, adapters);
+    const result = await transport.run({
+      legacyCommand: 'commit',
+      legacyArgs: ['msg'],
+      registryCommand: 'commit',
+      registryArgs: ['msg'],
+      mode: 'raw',
+      projectDir: '/tmp',
+    }, {
+      preferNative: true,
+      allowFallbackToSubprocess: true,
+    });
+
+    expect(result).toBe('raw-native-output');
+    expect(adapters.formatNativeRaw).toHaveBeenCalledOnce();
+    expect(adapters.execSubprocessRaw).not.toHaveBeenCalled();
+  });
+
+  it('falls back to internal raw formatter when formatNativeRaw missing', async () => {
+    const registry = new QueryRegistry();
+    registry.register('commit', async () => ({ data: undefined }));
+
+    const adapters = {
+      dispatchNative: vi.fn(async () => ({ data: undefined })),
+      execSubprocessJson: vi.fn(async () => ({ ok: false })),
+      execSubprocessRaw: vi.fn(async () => 'subprocess-raw'),
+    };
+
+    const transport = new GSDTransport(registry, adapters);
+    const result = await transport.run({
+      legacyCommand: 'commit',
+      legacyArgs: ['msg'],
+      registryCommand: 'commit',
+      registryArgs: ['msg'],
+      mode: 'raw',
+      projectDir: '/tmp',
+    }, {
+      preferNative: true,
+      allowFallbackToSubprocess: true,
+    });
+
+    expect(result).toBe('');
+    expect(adapters.execSubprocessRaw).not.toHaveBeenCalled();
+  });
+
   it('forces subprocess when workstream present', async () => {
     const registry = new QueryRegistry();
     registry.register('state.load', async () => ({ data: { ok: true } }));
@@ -146,5 +202,35 @@ describe('GSDTransport', () => {
     expect(result).toEqual({ ok: 'ws-subprocess' });
     expect(adapters.dispatchNative).not.toHaveBeenCalled();
     expect(adapters.execSubprocessJson).toHaveBeenCalledOnce();
+  });
+
+  it('forces raw subprocess path when workstream present and mode is raw', async () => {
+    const registry = new QueryRegistry();
+    registry.register('commit', async () => ({ data: { hash: 'abc' } }));
+
+    const adapters = {
+      dispatchNative: vi.fn(async () => ({ data: { hash: 'abc' } })),
+      execSubprocessJson: vi.fn(async () => ({ ok: 'json-subprocess' })),
+      execSubprocessRaw: vi.fn(async () => 'raw-subprocess'),
+    };
+
+    const transport = new GSDTransport(registry, adapters);
+    const result = await transport.run({
+      legacyCommand: 'commit',
+      legacyArgs: ['msg'],
+      registryCommand: 'commit',
+      registryArgs: ['msg'],
+      mode: 'raw',
+      projectDir: '/tmp',
+      workstream: 'ws-1',
+    }, {
+      preferNative: true,
+      allowFallbackToSubprocess: true,
+    });
+
+    expect(result).toBe('raw-subprocess');
+    expect(adapters.dispatchNative).not.toHaveBeenCalled();
+    expect(adapters.execSubprocessRaw).toHaveBeenCalledOnce();
+    expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
   });
 });
