@@ -435,6 +435,10 @@ describe('extractCurrentMilestone', () => {
     expect(result).toContain('Add polish.');
     // Shipped milestone phases must not bleed in
     expect(result).not.toContain('Old phase');
+    // The <summary> text is normalized as a `## ` milestone heading so
+    // downstream consumers (e.g. roadmapAnalyze's data.milestones scan) see
+    // the active milestone anchor — not just the body.
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus \(active\) — Phase Details/m);
   });
 
   // ─── Bug #2641: tolerate attributes on <details> tag (e.g. <details open>) ───
@@ -461,6 +465,7 @@ describe('extractCurrentMilestone', () => {
 
     expect(result).toContain('### Phase 3: Polish');
     expect(result).toContain('Add polish.');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
   });
 
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
@@ -646,6 +651,48 @@ describe('roadmapAnalyze', () => {
     const data2 = result2.data as Record<string, unknown>;
 
     expect((data1.phases as unknown[]).length).toBe((data2.phases as unknown[]).length);
+  });
+
+  // ─── Bug #2641 (regression): roadmapAnalyze populates milestones array
+  //    for <details>-wrapped active milestones via the synthesized `## ` heading. ───
+  it('bug-2641: data.milestones contains the active milestone when wrapped in <details>', async () => {
+    // Without the synthesized heading injected by extractCurrentMilestone's
+    // <details>-aware fallback, the milestone-heading scan at the bottom of
+    // roadmapAnalyze (`/##\s*(.*v(\d+(?:\.\d+)+)[^(\n]*)/gi`) would find
+    // nothing useful inside the body of a <details>-wrapped active milestone
+    // and `data.milestones` would be empty / wrong.
+    const roadmap = `# Roadmap
+
+## Milestones
+- 📋 **v0.9 Local-First Bus** — active
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 1: Library
+**Goal:** Build the library.
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await roadmapAnalyze([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const milestones = data.milestones as Array<{ heading: string; version: string }>;
+
+    // Active milestone surfaces with correct version
+    expect(milestones.some(m => m.version === 'v0.9')).toBe(true);
+    expect(milestones.some(m => m.heading.includes('Local-First Bus'))).toBe(true);
+
+    // Phases are also surfaced (the original bug)
+    const phases = data.phases as Array<Record<string, unknown>>;
+    expect(phases.length).toBe(2);
+    expect(phases.some(p => p.number === '1')).toBe(true);
+    expect(phases.some(p => p.number === '3')).toBe(true);
   });
 });
 

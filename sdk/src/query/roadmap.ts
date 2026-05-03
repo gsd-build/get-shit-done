@@ -202,17 +202,28 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
     // route phase lookups into archived milestones.
     //
     // <details\b[^>]*> tolerates attributes like <details open> and
-    // <details class="...">. The lazy [\s\S]*? terminates on the first
-    // </details>; nested <details> inside the active milestone are not
-    // expected and would mis-anchor (acceptable; FAMP-style ROADMAPs do not
-    // nest, and any project that does will fall through to the existing
-    // stripShippedMilestones path with no regression vs. today's behavior).
+    // <details class="...">. <summary\b[^>]*> tolerates the same on the
+    // <summary> tag. The lazy [\s\S]*? terminates on the first </details>;
+    // nested <details> inside the active milestone are not expected and would
+    // mis-anchor (acceptable; FAMP-style ROADMAPs do not nest, and any project
+    // that does will fall through to the existing stripShippedMilestones path
+    // with no regression vs. today's behavior).
+    //
+    // We capture the <summary> text and prepend it as a normalized `##`
+    // milestone heading on the returned slice. This keeps downstream consumers
+    // that scan for `##` milestone headings (e.g. roadmapAnalyze's
+    // data.milestones loop later in this file) producing a meaningful entry
+    // for the active milestone instead of seeing an unanchored body.
     const detailsPattern = new RegExp(
-      `<details\\b[^>]*>\\s*<summary>[^<]*${escapedVersion}[^<]*</summary>([\\s\\S]*?)</details>`,
+      `<details\\b[^>]*>\\s*<summary\\b[^>]*>([^<]*${escapedVersion}[^<]*)</summary>([\\s\\S]*?)</details>`,
       'i'
     );
     const detailsMatch = content.match(detailsPattern);
-    if (detailsMatch) return detailsMatch[1];
+    if (detailsMatch) {
+      const summary = detailsMatch[1].trim();
+      const body = detailsMatch[2];
+      return `## ${summary}\n${body}`;
+    }
     return stripShippedMilestones(content);
   }
 
