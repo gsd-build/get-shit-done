@@ -36,9 +36,9 @@ export async function runQueryCliCommand(input: QueryCliAdapterInput): Promise<Q
   const stderrLines: string[] = [];
   const stdoutChunks: string[] = [];
   const ws = resolveQueryWorkstream(input.ws);
-  const projectDir = findProjectRoot(input.projectDir);
 
   try {
+    const projectDir = findProjectRoot(input.projectDir);
     const registry = createRegistry();
     const out = await runQueryDispatch({
       registry,
