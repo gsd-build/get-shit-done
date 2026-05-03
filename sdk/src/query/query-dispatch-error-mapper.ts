@@ -11,7 +11,7 @@ export function toDispatchFailure(
 
 export function mapNativeDispatchError(error: unknown, command: string, args: string[]): QueryDispatchError {
   const message = error instanceof Error ? error.message : String(error);
-  if (message.includes('timed out after')) {
+  if (/timed out after/i.test(message)) {
     return nativeTimeoutError({ message, command, args, timeoutMs: parseTimeoutMs(message) });
   }
   return nativeFailureError({ message, command, args });

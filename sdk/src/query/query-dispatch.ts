@@ -2,10 +2,10 @@ import type { QueryRegistry } from './registry.js';
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryDispatchResult } from './query-dispatch-contract.js';
 import type { QueryResult } from './utils.js';
-import { mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
+import { mapFallbackDispatchError, mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 import { formatSuccess } from './query-dispatch-formatting.js';
 import { diagnoseUnknownCommand } from './query-command-diagnosis.js';
-import { fallbackFailureError, unknownCommandError, validationError } from './query-error-taxonomy.js';
+import { unknownCommandError, validationError } from './query-error-taxonomy.js';
 import { planQueryDispatch } from './query-dispatch-plan.js';
 import { validateQueryDispatchInput } from './query-dispatch-input-validation.js';
 import { dispatchSuccess } from './query-dispatch-result-builder.js';
@@ -21,7 +21,7 @@ export interface QueryDispatchDeps {
 }
 
 
-function fail(error: ReturnType<typeof validationError> | ReturnType<typeof unknownCommandError> | ReturnType<typeof fallbackFailureError>, stderr: string[] = []): QueryDispatchResult {
+function fail(error: ReturnType<typeof validationError> | ReturnType<typeof unknownCommandError>, stderr: string[] = []): QueryDispatchResult {
   return toDispatchFailure(error, stderr);
 }
 
@@ -41,7 +41,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   }
 
   if (plan.mode === 'error') {
-    const diagnosis = diagnoseUnknownCommand(queryArgs[0] ?? normCmd, queryArgs.slice(1), deps.registry);
+    const diagnosis = diagnoseUnknownCommand(queryArgs[0] ?? normCmd, queryArgs.slice(1), deps.registry, !deps.cjsFallbackEnabled);
     return fail(unknownCommandError({
       message: diagnosis.message,
       normalized: diagnosis.normalized,
@@ -62,13 +62,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
         pickField,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return fail(fallbackFailureError({
-        message: msg,
-        command: normCmd,
-        args: normArgs,
-        backend: 'cjs',
-      }));
+      return toDispatchFailure(mapFallbackDispatchError(e, normCmd, normArgs));
     }
   }
 
