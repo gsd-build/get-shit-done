@@ -1,5 +1,6 @@
 import { explainQueryCommandNoMatch, type QueryCommandRegistryLike } from './query-command-semantics.js';
 import { UNKNOWN_COMMAND_HINTS } from './query-unknown-command-hints.js';
+import { describeFallbackDisabledPolicy } from './query-fallback-policy.js';
 
 export interface UnknownCommandDiagnosis {
   normalized: string;
@@ -18,7 +19,7 @@ export function diagnoseUnknownCommand(
   const attempted = noMatch.attempted.dotted.slice(0, 2);
   const hints = [...UNKNOWN_COMMAND_HINTS];
   const attemptedSuffix = attempted.length > 0 ? ` Attempted dotted: ${attempted.join(' | ')}.` : '';
-  const message = `Error: Unknown command: "${normalized}". ${hints[0]} ${hints[1]} CJS fallback is disabled (GSD_QUERY_FALLBACK=registered). ${hints[2]}${attemptedSuffix}`;
+  const message = `Error: Unknown command: "${normalized}". ${hints[0]} ${hints[1]} ${describeFallbackDisabledPolicy()} ${hints[2]}${attemptedSuffix}`;
 
   return {
     normalized,

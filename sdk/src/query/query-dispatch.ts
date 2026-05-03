@@ -7,6 +7,9 @@ import { formatSuccess } from './query-dispatch-formatting.js';
 import { diagnoseUnknownCommand } from './query-command-diagnosis.js';
 import { fallbackFailureError, unknownCommandError, validationError } from './query-error-taxonomy.js';
 import { planQueryDispatch } from './query-dispatch-plan.js';
+import { validateQueryDispatchInput } from './query-dispatch-input-validation.js';
+import { dispatchSuccess } from './query-dispatch-result-builder.js';
+import { canUseCjsFallback } from './query-fallback-policy.js';
 
 export interface QueryDispatchDeps {
   registry: QueryRegistry;
@@ -22,34 +25,12 @@ function fail(error: ReturnType<typeof validationError> | ReturnType<typeof unkn
   return toDispatchFailure(error, stderr);
 }
 
-function success(stdout: string, stderr: string[] = []): QueryDispatchResult {
-  return { ok: true, stdout, stderr, exit_code: 0 };
-}
-
-function extractPick(queryArgv: string[]): { queryArgs: string[]; pickField?: string; error?: QueryDispatchResult } {
-  const queryArgs = [...queryArgv];
-  const pickIdx = queryArgs.indexOf('--pick');
-  if (pickIdx === -1) return { queryArgs };
-  if (pickIdx + 1 >= queryArgs.length) {
-    return {
-      queryArgs,
-      error: fail(validationError({ message: 'Error: --pick requires a field name', details: { field: '--pick', reason: 'missing_value' } })),
-    };
-  }
-  const pickField = queryArgs[pickIdx + 1];
-  queryArgs.splice(pickIdx, 2);
-  return { queryArgs, pickField };
-}
-
 
 export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: string[]): Promise<QueryDispatchResult> {
-  const picked = extractPick(queryArgv);
-  if (picked.error) return picked.error;
+  const validated = validateQueryDispatchInput(queryArgv);
+  if (validated.error) return validated.error;
 
-  const { queryArgs, pickField } = picked;
-  if (queryArgs.length === 0 || !queryArgs[0]) {
-    return fail(validationError({ message: 'Error: "gsd-sdk query" requires a command', details: { reason: 'missing_command' } }));
-  }
+  const { queryArgs, pickField } = validated;
 
   const plan = planQueryDispatch(queryArgs, deps.registry, deps.cjsFallbackEnabled);
   const normCmd = plan.normalized.command;
@@ -69,7 +50,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
     }));
   }
 
-  if (plan.mode === 'cjs') {
+  if (plan.mode === 'cjs' && canUseCjsFallback({ cjsFallbackEnabled: deps.cjsFallbackEnabled })) {
     try {
       const gsdPath = deps.resolveGsdToolsPath(deps.projectDir);
       return await runCjsFallbackDispatch({
@@ -94,7 +75,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   const matched = plan.matched!;
   try {
     const result = await deps.dispatchNative(matched.cmd, matched.args);
-    return success(formatSuccess(result.data, result.format, pickField));
+    return dispatchSuccess(formatSuccess(result.data, result.format, pickField));
   } catch (e) {
     return toDispatchFailure(mapNativeDispatchError(e, matched.cmd, matched.args));
   }

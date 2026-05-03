@@ -1,16 +1,12 @@
 import type { QueryDispatchError, QueryDispatchResult } from './query-dispatch-contract.js';
 import { fallbackFailureError, nativeFailureError, nativeTimeoutError } from './query-error-taxonomy.js';
+import { dispatchFailure } from './query-dispatch-result-builder.js';
 
 export function toDispatchFailure(
   error: QueryDispatchError,
   stderr: string[] = [],
 ): QueryDispatchResult {
-  return {
-    ok: false,
-    stderr,
-    exit_code: error.code,
-    error,
-  };
+  return dispatchFailure(error, stderr);
 }
 
 export function mapNativeDispatchError(error: unknown, command: string, args: string[]): QueryDispatchError {
