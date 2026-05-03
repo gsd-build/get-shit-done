@@ -3,9 +3,9 @@ import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryDispatchResult } from './query-dispatch-contract.js';
 import type { QueryResult } from './utils.js';
 import type { QueryNativeDispatchAdapter } from './query-native-dispatch-adapter.js';
+import type { CommandTopology } from './command-topology.js';
 import { mapFallbackDispatchError, mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 import { formatSuccess } from './query-dispatch-formatting.js';
-import { diagnoseUnknownCommand } from './query-command-diagnosis.js';
 import { unknownCommandError, validationError } from './query-error-taxonomy.js';
 import { planQueryDispatch } from './query-dispatch-plan.js';
 import { validateQueryDispatchInput } from './query-dispatch-input-validation.js';
@@ -18,16 +18,16 @@ export interface QueryDispatchDeps {
   ws?: string;
   cjsFallbackEnabled: boolean;
   resolveGsdToolsPath: (projectDir: string) => string;
-  /** @deprecated use nativeAdapter */
+  /** @deprecated use topology */
   dispatchNative?: (cmd: string, args: string[]) => Promise<QueryResult>;
+  /** @deprecated use topology */
   nativeAdapter?: QueryNativeDispatchAdapter;
+  topology: CommandTopology;
 }
-
 
 function fail(error: ReturnType<typeof validationError> | ReturnType<typeof unknownCommandError>, stderr: string[] = []): QueryDispatchResult {
   return toDispatchFailure(error, stderr);
 }
-
 
 export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: string[]): Promise<QueryDispatchResult> {
   const validated = validateQueryDispatchInput(queryArgv);
@@ -35,7 +35,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
 
   const { queryArgs, pickField } = validated;
 
-  const plan = planQueryDispatch(queryArgs, deps.registry, deps.cjsFallbackEnabled);
+  const plan = planQueryDispatch(queryArgs, deps.topology, deps.cjsFallbackEnabled);
   const normCmd = plan.normalized.command;
   const normArgs = plan.normalized.args;
 
@@ -44,12 +44,11 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   }
 
   if (plan.mode === 'error') {
-    const diagnosis = diagnoseUnknownCommand(queryArgs[0] ?? normCmd, queryArgs.slice(1), deps.registry, !deps.cjsFallbackEnabled);
     return fail(unknownCommandError({
-      message: diagnosis.message,
-      normalized: diagnosis.normalized,
-      attempted: diagnosis.attempted,
-      hints: diagnosis.hints,
+      message: plan.noMatchMessage ?? `Error: Unknown command: "${queryArgs[0] ?? normCmd}"`,
+      normalized: plan.noMatchNormalized,
+      attempted: plan.noMatchAttempted,
+      hints: plan.noMatchHints,
     }));
   }
 
@@ -76,18 +75,17 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   if (!matched) {
     return toDispatchFailure(mapFallbackDispatchError(new Error('No native match in dispatch plan'), normCmd, normArgs));
   }
+
   const dispatchNative = deps.nativeAdapter
     ? (cmd: string, args: string[]) => deps.nativeAdapter!.dispatch(cmd, args)
     : deps.dispatchNative;
 
-  if (!dispatchNative) {
-    return toDispatchFailure(mapNativeDispatchError(new Error('Missing native dispatch adapter'), matched.cmd, matched.args));
-  }
-
   try {
-    const result = await dispatchNative(matched.cmd, matched.args);
+    const result = dispatchNative
+      ? await dispatchNative(matched.canonical, matched.args)
+      : await matched.adapter(matched.args, deps.projectDir, deps.ws);
     return dispatchSuccess(formatSuccess(result.data, result.format, pickField));
   } catch (e) {
-    return toDispatchFailure(mapNativeDispatchError(e, matched.cmd, matched.args));
+    return toDispatchFailure(mapNativeDispatchError(e, matched.canonical, matched.args));
   }
 }

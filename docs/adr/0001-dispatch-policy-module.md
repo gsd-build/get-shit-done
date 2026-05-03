@@ -10,6 +10,7 @@ To complete the query architecture pass, we deepened adjacent seams around the D
 - Extracted **Native Dispatch Adapter Module** so Dispatch Policy consumes a stable native dispatch Interface (not closure-wired call sites).
 - Extracted **Query CLI Output Module** to own projection from dispatch results/errors to CLI output contract.
 - Converged internal command-resolution and policy imports onto canonical modules and removed dead wrapper modules.
+- Added **Command Topology Module** as dispatch-facing seam that resolves commands, projects command policy, binds handler Adapters, and emits no-match diagnosis consumed by Dispatch Policy.
 
 ### Dead-wrapper convergence
 

@@ -3,6 +3,7 @@ import { runQueryDispatch } from './query-dispatch.js';
 import { resolveGsdToolsPath } from '../gsd-tools.js';
 import { resolveQueryRuntimeContext } from './query-runtime-context.js';
 import { createQueryNativeDispatchAdapter } from './query-native-dispatch-adapter.js';
+import { createCommandTopology } from './command-topology.js';
 import { buildQueryCliOutputFromDispatch, buildQueryCliOutputFromError, type QueryCliAdapterOutput } from './query-cli-output.js';
 
 export interface QueryCliAdapterInput {
@@ -22,6 +23,7 @@ export async function runQueryCliCommand(input: QueryCliAdapterInput): Promise<Q
   try {
     const runtime = resolveQueryRuntimeContext({ projectDir: input.projectDir, ws: input.ws });
     const registry = createRegistry();
+    const topology = createCommandTopology(registry);
     const out = await runQueryDispatch({
       registry,
       projectDir: runtime.projectDir,
@@ -29,6 +31,7 @@ export async function runQueryCliCommand(input: QueryCliAdapterInput): Promise<Q
       cjsFallbackEnabled: queryFallbackToCjsEnabled(),
       resolveGsdToolsPath,
       nativeAdapter: createQueryNativeDispatchAdapter(registry, runtime.projectDir, runtime.ws),
+      topology,
     }, input.queryArgv ?? []);
 
     return buildQueryCliOutputFromDispatch(out);

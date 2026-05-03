@@ -27,3 +27,6 @@ Module owning projection from dispatch results/errors to CLI `{ exitCode, stdout
 
 ### Query Command Resolution Module
 Canonical command normalization and resolution Interface (`query-command-resolution-strategy`) used by internal query/transport paths after dead-wrapper convergence.
+
+### Command Topology Module
+Module owning command resolution, policy projection (`mutation`, `output_mode`), unknown-command diagnosis, and handler Adapter binding at one seam for query dispatch.

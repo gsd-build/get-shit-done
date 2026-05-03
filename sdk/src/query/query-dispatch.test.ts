@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRegistry } from './index.js';
 import { runQueryDispatch } from './query-dispatch.js';
+import { createCommandTopology } from './command-topology.js';
 
 describe('runQueryDispatch', () => {
   let tmpDir: string;
@@ -33,6 +34,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => '',
       dispatchNative: async () => ({ data: { ok: true } }),
+      topology: createCommandTopology(registry),
     }, ['state', 'json']);
 
     expect(out.ok).toBe(true);
@@ -49,6 +51,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => '',
       dispatchNative: async () => ({ data: { nested: { value: 7 } } }),
+      topology: createCommandTopology(registry),
     }, ['state', 'json', '--pick', 'nested.value']);
 
     expect(out.ok).toBe(true);
@@ -65,6 +68,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: false,
       resolveGsdToolsPath: () => '',
       dispatchNative: async () => ({ data: {} }),
+      topology: createCommandTopology(registry),
     }, ['unknown-cmd']);
 
     expect(out.ok).toBe(false);
@@ -84,6 +88,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => script,
       dispatchNative: async () => ({ data: {} }),
+      topology: createCommandTopology(registry),
     }, ['unknown-cmd', '--help']);
 
     expect(out.ok).toBe(true);
@@ -100,6 +105,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => { throw new Error('path boom'); },
       dispatchNative: async () => ({ data: {} }),
+      topology: createCommandTopology(registry),
     }, ['unknown-cmd']);
 
     expect(out.ok).toBe(false);
@@ -118,6 +124,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => '',
       dispatchNative: async () => ({ data: {} }),
+      topology: createCommandTopology(registry),
     }, []);
     expect(out.ok).toBe(false);
     if (out.ok) throw new Error('expected failure');
@@ -135,6 +142,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => '',
       dispatchNative: async () => { throw new Error('gsd-tools timed out after 30000ms: state load'); },
+      topology: createCommandTopology(registry),
     }, ['state', 'load']);
 
     expect(out.ok).toBe(false);
@@ -152,6 +160,7 @@ describe('runQueryDispatch', () => {
       cjsFallbackEnabled: true,
       resolveGsdToolsPath: () => '',
       dispatchNative: async () => { throw new Error('boom'); },
+      topology: createCommandTopology(registry),
     }, ['state', 'json']);
 
     expect(out.ok).toBe(false);
