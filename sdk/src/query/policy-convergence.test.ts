@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS } from './policy-convergence.js';
+import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS, isQueryMutationCommand } from './policy-convergence.js';
 
 describe('policy convergence', () => {
   it('contains expected raw transport aliases', () => {
@@ -18,5 +18,10 @@ describe('policy convergence', () => {
     expect(QUERY_MUTATION_COMMAND_LIST).toContain('roadmap.update-plan-progress');
     expect(QUERY_MUTATION_COMMAND_LIST).toContain('workstream.progress');
     expect(QUERY_MUTATION_COMMAND_LIST).toContain('learnings prune');
+  });
+
+  it('classifies mutation commands via semantic helper', () => {
+    expect(isQueryMutationCommand('state.update')).toBe(true);
+    expect(isQueryMutationCommand('state.json')).toBe(false);
   });
 });

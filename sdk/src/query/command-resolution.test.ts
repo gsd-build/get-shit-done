@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createRegistry } from './index.js';
-import { resolveQueryCommand, resolveQueryTokens } from './command-resolution.js';
+import { explainQueryCommandNoMatch, resolveQueryCommand, resolveQueryTokens } from './command-resolution.js';
 
 describe('command resolution', () => {
   it('resolves normalized tokens with metadata', () => {
@@ -54,5 +54,17 @@ describe('command resolution', () => {
   it('returns null for unknown command', () => {
     const registry = createRegistry();
     expect(resolveQueryCommand('totally-unknown', ['x'], registry)).toBeNull();
+  });
+
+  it('returns structured no-match metadata', () => {
+    const registry = createRegistry();
+    const noMatch = explainQueryCommandNoMatch('state', ['made-up-op', 'x'], registry);
+    expect(noMatch.normalized).toEqual({
+      command: 'state',
+      args: ['made-up-op', 'x'],
+      tokens: ['state', 'made-up-op', 'x'],
+    });
+    expect(noMatch.attempted.dotted[0]).toBe('state.made-up-op.x');
+    expect(noMatch.attempted.spaced[0]).toBe('state made-up-op x');
   });
 });
