@@ -7,7 +7,7 @@ import {
   VALIDATE_SUBCOMMANDS,
   ROADMAP_SUBCOMMANDS,
 } from './command-aliases.generated.js';
-import { FAMILY_MUTATION_COMMANDS } from './command-definition.js';
+import { FAMILY_MUTATION_COMMANDS, FAMILY_RAW_OUTPUT_COMMANDS } from './command-definition.js';
 
 export interface QueryCommandRegistryLike {
   has(command: string): boolean;
@@ -67,12 +67,17 @@ export const QUERY_MUTATION_COMMAND_LIST: readonly string[] = [
   'write-profile', 'generate-claude-profile', 'generate-dev-preferences', 'generate-claude-md',
 ] as const;
 
-export const TRANSPORT_RAW_COMMANDS: readonly string[] = [
+const NON_FAMILY_RAW_OUTPUT_COMMANDS = [
   'commit',
   'config-set',
   'verify-summary',
   'verify.summary',
   'verify summary',
+] as const;
+
+export const TRANSPORT_RAW_COMMANDS: readonly string[] = [
+  ...FAMILY_RAW_OUTPUT_COMMANDS,
+  ...NON_FAMILY_RAW_OUTPUT_COMMANDS,
 ] as const;
 
 const QUERY_MUTATION_COMMAND_SET = new Set(QUERY_MUTATION_COMMAND_LIST);

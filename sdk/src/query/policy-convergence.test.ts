@@ -4,6 +4,7 @@ import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS, isQueryMutationCom
 describe('policy convergence', () => {
   it('contains expected raw transport aliases', () => {
     expect(TRANSPORT_RAW_COMMANDS).toEqual([
+      'state.load',
       'commit',
       'config-set',
       'verify-summary',
