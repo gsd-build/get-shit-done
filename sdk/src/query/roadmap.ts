@@ -181,7 +181,40 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
   );
   const sectionMatch = content.match(sectionPattern);
 
-  if (!sectionMatch || sectionMatch.index === undefined) return stripShippedMilestones(content);
+  if (!sectionMatch || sectionMatch.index === undefined) {
+    // Fallback: <details><summary> matching the active version (issue #2641).
+    //
+    // Many projects (GitHub-friendly collapse pattern) wrap the active
+    // milestone's phase details inside a collapsible block whose <summary>
+    // names the version, e.g.:
+    //
+    //   <details>
+    //   <summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+    //   ### Phase 1: ...
+    //   </details>
+    //
+    // The markdown-heading lookup above misses this because <summary> is HTML,
+    // not a heading. Without this fallback, control falls through to
+    // stripShippedMilestones() which removes ALL <details> blocks
+    // indiscriminately — including the active milestone's — causing
+    // roadmapGetPhase() to return {found:false} for phases that ARE in the
+    // active ROADMAP. The init.phase-op safety guard then misfires and can
+    // route phase lookups into archived milestones.
+    //
+    // <details\b[^>]*> tolerates attributes like <details open> and
+    // <details class="...">. The lazy [\s\S]*? terminates on the first
+    // </details>; nested <details> inside the active milestone are not
+    // expected and would mis-anchor (acceptable; FAMP-style ROADMAPs do not
+    // nest, and any project that does will fall through to the existing
+    // stripShippedMilestones path with no regression vs. today's behavior).
+    const detailsPattern = new RegExp(
+      `<details\\b[^>]*>\\s*<summary>[^<]*${escapedVersion}[^<]*</summary>([\\s\\S]*?)</details>`,
+      'i'
+    );
+    const detailsMatch = content.match(detailsPattern);
+    if (detailsMatch) return detailsMatch[1];
+    return stripShippedMilestones(content);
+  }
 
   const sectionStart = sectionMatch.index;
 

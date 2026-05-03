@@ -389,6 +389,80 @@ describe('extractCurrentMilestone', () => {
     expect(result).toContain('### Phase 19: Security Audit');
   });
 
+  // ─── Bug #2641: <details><summary>vX.Y …</summary> not recognized as anchor ───
+  it('bug-2641: finds active milestone wrapped in <details><summary>vX.Y …</summary>', async () => {
+    // Many projects (GitHub-friendly collapse) wrap the active milestone's
+    // phase details inside <details><summary>v0.9 …</summary>. Without the
+    // <details>-aware fallback, extractCurrentMilestone misses the heading
+    // anchor (because <summary> is HTML), falls through to
+    // stripShippedMilestones, and loses all <details> blocks — including
+    // the active one. Result: roadmapGetPhase returns {found:false} for
+    // phases that ARE in the active ROADMAP.
+    const roadmapWithActiveDetails = `# Roadmap
+
+## Milestones
+- ✅ **v0.8 Foundation** — shipped
+- 📋 **v0.9 Local-First Bus** — active
+
+## Phases
+
+<details>
+<summary>✅ v0.8 Foundation — SHIPPED 2026-04-15</summary>
+
+### Phase 1: Old phase
+**Goal:** Old goal.
+</details>
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 1: Library
+**Goal:** Build the library.
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithActiveDetails);
+
+    const result = await extractCurrentMilestone(roadmapWithActiveDetails, tmpDir);
+
+    // Active milestone's phases must survive
+    expect(result).toContain('### Phase 1: Library');
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toContain('Add polish.');
+    // Shipped milestone phases must not bleed in
+    expect(result).not.toContain('Old phase');
+  });
+
+  // ─── Bug #2641: tolerate attributes on <details> tag (e.g. <details open>) ───
+  it('bug-2641: finds active milestone in <details open><summary>vX.Y …</summary>', async () => {
+    // GitHub auto-renders <details open> for sections that should default to
+    // expanded. The <details>-aware fallback regex must use <details\b[^>]*>
+    // (not literal <details>) so attribute-bearing tags also anchor correctly.
+    const roadmapWithDetailsOpen = `# Roadmap
+
+## Phases
+
+<details open>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithDetailsOpen);
+
+    const result = await extractCurrentMilestone(roadmapWithDetailsOpen, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toContain('Add polish.');
+  });
+
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
   it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
     const roadmapWithDetails = `# ROADMAP
@@ -455,6 +529,41 @@ describe('roadmapGetPhase', () => {
     const data = result.data as Record<string, unknown>;
     expect(data.found).toBe(false);
     expect(data.error).toBe('ROADMAP.md not found');
+  });
+
+  // ─── Bug #2641 (regression): end-to-end via roadmapGetPhase ───
+  it('bug-2641: returns found:true for phase inside <details>-wrapped active milestone', async () => {
+    // End-to-end coverage: roadmapGetPhase calls extractCurrentMilestone
+    // internally. Without the <details>-aware fallback, the active
+    // milestone's phases were stripped before the phase-heading lookup,
+    // and roadmapGetPhase returned {found:false} for phases that exist.
+    const roadmap = `# Roadmap
+
+## Milestones
+- 📋 **v0.9 Local-First Bus** — active
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 3: Polish
+
+**Goal:** Add polish.
+
+**Success Criteria**:
+1. Polish applied
+2. Tests pass
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await roadmapGetPhase(['3'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.found).toBe(true);
+    expect(data.phase_number).toBe('3');
+    expect(data.phase_name).toBe('Polish');
+    expect(data.goal).toBe('Add polish.');
   });
 });
 
