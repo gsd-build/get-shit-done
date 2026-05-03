@@ -3,6 +3,7 @@ import { normalizeQueryCommand } from './normalize-query-command.js';
 import { explainQueryCommandNoMatch, resolveQueryCommand, type QueryCommandResolution } from './command-resolution.js';
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryDispatchResult, QueryDispatchErrorKind } from './query-dispatch-contract.js';
+import type { QueryResult } from './utils.js';
 import { mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 import { formatSuccess } from './query-dispatch-formatting.js';
 
