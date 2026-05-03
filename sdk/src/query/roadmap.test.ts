@@ -99,6 +99,20 @@ describe('stripShippedMilestones', () => {
     expect(stripShippedMilestones(content)).toBe('middleend');
   });
 
+  // Bug #2641 (symmetry): tolerate attributes on <details> tag, matching
+  // extractCurrentMilestone's attribute-tolerant fallback. Without this,
+  // shipped content wrapped in `<details open>` (a common GitHub pattern for
+  // sections that should default to expanded) would leak through the strip.
+  it('removes <details open> blocks (attribute-bearing tags)', () => {
+    const content = 'before\n<details open>\nshipped content\n</details>\nafter';
+    expect(stripShippedMilestones(content)).toBe('before\n\nafter');
+  });
+
+  it('removes <details class="..."> blocks (attribute-bearing tags)', () => {
+    const content = 'a<details class="milestone" data-version="v0.5">x</details>b';
+    expect(stripShippedMilestones(content)).toBe('ab');
+  });
+
   it('returns content unchanged when no details blocks', () => {
     expect(stripShippedMilestones('no details here')).toBe('no details here');
   });
@@ -594,6 +608,32 @@ Detail
     expect(result).not.toMatch(/^##\s+v0\.9/m);
   });
 
+  // ─── Bug #2641 (lockdown): leading `#` in <summary> stripped from synthesized heading ───
+  it('bug-2641: strips leading # from <summary> text in synthesized heading', async () => {
+    // Prevents a `<summary># v0.9 …</summary>` from producing `## # v0.9 …`,
+    // which downstream `#{2,4}` heading regexes would parse as a 4-hash
+    // header. The implementation uses `.replace(/^#+\s*/, '')` on the captured
+    // summary; this test pins that path so a future refactor doesn't drop it.
+    const roadmap = `# Roadmap
+
+<details>
+<summary># v0.9 Hash-Prefixed</summary>
+
+### Phase 1: Test
+**Goal:** Works.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // Synthesized heading must be `## v0.9 …`, not `## # v0.9 …`
+    expect(result).toMatch(/^##\s+v0\.9 Hash-Prefixed/m);
+    expect(result).not.toMatch(/^##\s+#+/m);
+  });
+
   // ─── Bug #2641 (review hardening): inline HTML in <summary> + leading # ───
   it('bug-2641: tolerates inline HTML in <summary> and strips it from synthesized heading', async () => {
     // GitHub-rendered summaries commonly contain inline tags like
@@ -937,6 +977,9 @@ describe('roadmapAnalyze', () => {
 
     const result = await roadmapAnalyze([], tmpDir);
     const data = result.data as Record<string, unknown>;
+    // Defensive guard: fail with a clear message if roadmapAnalyze didn't
+    // populate data.milestones, rather than throwing TypeError on `.some()`.
+    expect(data.milestones).toBeDefined();
     const milestones = data.milestones as Array<{ heading: string; version: string }>;
 
     // Active milestone surfaces with correct version

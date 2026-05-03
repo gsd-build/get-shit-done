@@ -50,8 +50,13 @@ interface PhaseSection {
  * Port of stripShippedMilestones from core.cjs line 1082-1084.
  */
 export function stripShippedMilestones(content: string): string {
-  // Pattern 1: <details>...</details> blocks (explicit collapse)
-  let result = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  // Pattern 1: <details>...</details> blocks (explicit collapse).
+  // <details\b[^>]*> tolerates attributes (e.g. <details open>, <details class="…">).
+  // Symmetry with extractCurrentMilestone()'s <details>-aware fallback (#2641):
+  // both functions must agree on what counts as a <details> opening tag, or
+  // shipped content wrapped in attributed tags would leak through here while
+  // the active-milestone anchor in extractCurrentMilestone() correctly fires.
+  let result = content.replace(/<details\b[^>]*>[\s\S]*?<\/details>/gi, '');
   // Pattern 2: inline milestone headings marked as shipped.
   // Keep aligned with heading levels accepted by extractCurrentMilestone() (## and ###).
   const sections = result.split(/(?=^#{2,3}\s)/m);
