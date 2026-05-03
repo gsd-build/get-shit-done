@@ -562,21 +562,23 @@ export class GSDTools {
  */
 export async function runGsdToolsQuery(projectDir: string, queryArgv: string[]): Promise<unknown> {
   const { createRegistry } = await import('./query/index.js');
-  const { planQueryDispatch } = await import('./query/query-fallback-orchestration.js');
+  const { normalizeQueryCommand } = await import('./query/normalize-query-command.js');
+  const { resolveQueryCommand } = await import('./query/command-resolution.js');
   const { GSDError, ErrorClassification } = await import('./errors.js');
 
   if (queryArgv.length === 0 || !queryArgv[0]) {
     throw new GSDError('runGsdToolsQuery requires a command', ErrorClassification.Validation);
   }
   const registry = createRegistry();
-  const plan = planQueryDispatch(queryArgv, registry, { cjsFallbackEnabled: false });
-  if (plan.mode !== 'native' || !plan.matched) {
+  const [normCmd, normArgs] = normalizeQueryCommand(queryArgv[0], queryArgv.slice(1));
+  const matched = resolveQueryCommand(queryArgv[0], queryArgv.slice(1), registry);
+  if (!matched) {
     throw new GSDError(
-      `Unknown command: "${plan.normalized.tokens.join(' ')}". No native handler registered.`,
+      `Unknown command: "${[normCmd, ...normArgs].join(' ')}". No native handler registered.`,
       ErrorClassification.Validation,
     );
   }
-  const result = await registry.dispatch(plan.matched.cmd, plan.matched.args, projectDir);
+  const result = await registry.dispatch(matched.cmd, matched.args, projectDir);
   return result.data;
 }
 

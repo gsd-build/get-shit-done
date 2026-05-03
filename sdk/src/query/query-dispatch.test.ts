@@ -65,6 +65,7 @@ describe('runQueryDispatch', () => {
 
     expect(out.error?.code).toBe(10);
     expect(out.error?.message).toContain('Unknown command: "unknown-cmd"');
+    expect(out.error?.message).toContain('Attempted dotted:');
   });
 
   it('runs cjs fallback and formats text mode', async () => {
@@ -81,5 +82,18 @@ describe('runQueryDispatch', () => {
     expect(out.error).toBeUndefined();
     expect(out.stdout).toBe('USAGE: help text\n');
     expect(out.stderr[0]).toContain('falling back to gsd-tools.cjs');
+  });
+
+  it('returns requires-command error for empty argv', async () => {
+    const registry = createRegistry();
+    const out = await runQueryDispatch({
+      registry,
+      projectDir: tmpDir,
+      cjsFallbackEnabled: true,
+      resolveGsdToolsPath: () => '',
+      dispatchNative: async () => ({ data: {} }),
+    }, []);
+    expect(out.error?.code).toBe(10);
+    expect(out.error?.message).toContain('requires a command');
   });
 });

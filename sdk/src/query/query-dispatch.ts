@@ -1,6 +1,7 @@
 import type { QueryRegistry } from './registry.js';
 import { extractField } from './registry.js';
-import { planQueryDispatch } from './query-fallback-orchestration.js';
+import { normalizeQueryCommand } from './normalize-query-command.js';
+import { explainQueryCommandNoMatch, resolveQueryCommand, type QueryCommandResolution } from './command-resolution.js';
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryResult } from './utils.js';
 import type { QueryDispatchError, QueryDispatchResult } from './query-dispatch-contract.js';
@@ -12,6 +13,32 @@ export interface QueryDispatchDeps {
   cjsFallbackEnabled: boolean;
   resolveGsdToolsPath: (projectDir: string) => string;
   dispatchNative: (cmd: string, args: string[]) => Promise<QueryResult>;
+}
+
+type DispatchMode = 'native' | 'cjs' | 'error';
+
+interface DispatchPlan {
+  mode: DispatchMode;
+  normalized: { command: string; args: string[]; tokens: string[] };
+  matched: QueryCommandResolution | null;
+}
+
+function planQueryDispatch(queryArgv: string[], registry: QueryRegistry, cjsFallbackEnabled: boolean): DispatchPlan {
+  const queryCommand = queryArgv[0];
+  if (!queryCommand) {
+    return { mode: 'error', normalized: { command: '', args: [], tokens: [] }, matched: null };
+  }
+
+  const [normCmd, normArgs] = normalizeQueryCommand(queryCommand, queryArgv.slice(1));
+  const normalizedTokens = [normCmd, ...normArgs];
+  const matched = resolveQueryCommand(queryCommand, queryArgv.slice(1), registry);
+  if (matched) {
+    return { mode: 'native', normalized: { command: normCmd, args: normArgs, tokens: normalizedTokens }, matched };
+  }
+  if (cjsFallbackEnabled) {
+    return { mode: 'cjs', normalized: { command: normCmd, args: normArgs, tokens: normalizedTokens }, matched: null };
+  }
+  return { mode: 'error', normalized: { command: normCmd, args: normArgs, tokens: normalizedTokens }, matched: null };
 }
 
 function extractPick(queryArgv: string[]): { queryArgs: string[]; pickField?: string; error?: QueryDispatchError } {
@@ -45,7 +72,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
     return { stderr: [], error: { code: 10, message: 'Error: "gsd-sdk query" requires a command' } };
   }
 
-  const plan = planQueryDispatch(queryArgs, deps.registry, { cjsFallbackEnabled: deps.cjsFallbackEnabled });
+  const plan = planQueryDispatch(queryArgs, deps.registry, deps.cjsFallbackEnabled);
   const normCmd = plan.normalized.command;
   const normArgs = plan.normalized.args;
 
@@ -54,11 +81,14 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   }
 
   if (plan.mode === 'error') {
+    const noMatch = queryArgs[0]
+      ? explainQueryCommandNoMatch(queryArgs[0], queryArgs.slice(1), deps.registry)
+      : null;
     return {
       stderr: [],
       error: {
         code: 10,
-        message: `Error: Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.`,
+        message: `Error: Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.${noMatch ? ` Attempted dotted: ${noMatch.attempted.dotted.slice(0, 2).join(' | ')}.` : ''}`,
       },
     };
   }
