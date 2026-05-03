@@ -2,6 +2,7 @@ import type { QueryRegistry } from './registry.js';
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryDispatchResult } from './query-dispatch-contract.js';
 import type { QueryResult } from './utils.js';
+import type { QueryNativeDispatchAdapter } from './query-native-dispatch-adapter.js';
 import { mapFallbackDispatchError, mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 import { formatSuccess } from './query-dispatch-formatting.js';
 import { diagnoseUnknownCommand } from './query-command-diagnosis.js';
@@ -17,7 +18,9 @@ export interface QueryDispatchDeps {
   ws?: string;
   cjsFallbackEnabled: boolean;
   resolveGsdToolsPath: (projectDir: string) => string;
-  dispatchNative: (cmd: string, args: string[]) => Promise<QueryResult>;
+  /** @deprecated use nativeAdapter */
+  dispatchNative?: (cmd: string, args: string[]) => Promise<QueryResult>;
+  nativeAdapter?: QueryNativeDispatchAdapter;
 }
 
 
@@ -73,8 +76,16 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   if (!matched) {
     return toDispatchFailure(mapFallbackDispatchError(new Error('No native match in dispatch plan'), normCmd, normArgs));
   }
+  const dispatchNative = deps.nativeAdapter
+    ? (cmd: string, args: string[]) => deps.nativeAdapter!.dispatch(cmd, args)
+    : deps.dispatchNative;
+
+  if (!dispatchNative) {
+    return toDispatchFailure(mapNativeDispatchError(new Error('Missing native dispatch adapter'), matched.cmd, matched.args));
+  }
+
   try {
-    const result = await deps.dispatchNative(matched.cmd, matched.args);
+    const result = await dispatchNative(matched.cmd, matched.args);
     return dispatchSuccess(formatSuccess(result.data, result.format, pickField));
   } catch (e) {
     return toDispatchFailure(mapNativeDispatchError(e, matched.cmd, matched.args));

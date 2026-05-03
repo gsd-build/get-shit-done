@@ -41,9 +41,9 @@ describe('query-cli-adapter', () => {
     expect(out.stderrLines.join('\n')).toContain('requires a command');
   });
 
-  it('forwards ws to registry.dispatch via dispatchNative', async () => {
+  it('forwards ws to registry.dispatch via native adapter', async () => {
     runQueryDispatchSpy.mockImplementationOnce(async (input: any) => {
-      await input.dispatchNative('state', ['show']);
+      await input.nativeAdapter.dispatch('state', ['show']);
       return { ok: true, exit_code: 0, stdout: '', stderr: [] };
     });
 
