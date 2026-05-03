@@ -37,8 +37,8 @@ Exit.
 
 <step name="parse_filter">
 Check for area filter in arguments:
-- `/gsd-check-todos` → show all
-- `/gsd-check-todos api` → filter to area:api only
+- `/gsd-capture --list` → show all
+- `/gsd-capture --list api` → filter to area:api only
 </step>
 
 <step name="list_todos">
@@ -56,7 +56,7 @@ Pending Todos:
 ---
 
 Reply with a number to view details, or:
-- `/gsd-check-todos [area]` to filter by area
+- `/gsd-capture --list [area]` to filter by area
 - `q` to exit
 ```
 

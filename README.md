@@ -651,7 +651,7 @@ You're never locked in. The system adapts.
 
 | Command | What it does |
 |---------|--------------|
-| `/gsd-new-workspace` | Create isolated workspace with repo copies (worktrees or clones) |
+| `/gsd-workspace --new` | Create isolated workspace with repo copies (worktrees or clones) |
 | `/gsd-list-workspaces` | Show all GSD workspaces and their status |
 | `/gsd-remove-workspace` | Remove workspace and clean up worktrees |
 
@@ -698,7 +698,6 @@ You're never locked in. The system adapts.
 | `/gsd-edit-phase [N] [--force]` | Modify any field of an existing phase in place — number and position unchanged |
 | `/gsd-remove-phase [N]` | Remove future phase, renumber |
 | `/gsd-list-phase-assumptions [N]` | See Claude's intended approach before planning |
-| `/gsd-plan-milestone-gaps` | Create phases to close gaps from audit |
 
 ### Session
 
@@ -740,7 +739,7 @@ You're never locked in. The system adapts.
 | `/gsd-settings` | Configure model profile and workflow agents |
 | `/gsd-set-profile <profile>` | Switch model profile (quality/balanced/budget/inherit) |
 | `/gsd-add-todo [desc]` | Capture idea for later |
-| `/gsd-check-todos` | List pending todos |
+| `/gsd-capture --list` | List pending todos |
 | `/gsd-debug [desc]` | Systematic debugging with persistent state |
 | `/gsd-do <text>` | Route freeform text to the right GSD command automatically |
 | `/gsd-note <text>` | Zero-friction idea capture — append, list, or promote notes to todos |

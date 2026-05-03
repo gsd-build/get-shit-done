@@ -80,10 +80,12 @@ Usage: `/gsd-discuss-phase 2`
 Usage: `/gsd-discuss-phase 2 --batch`
 Usage: `/gsd-discuss-phase 2 --batch=3`
 
-**`/gsd-plan-phase <number> [--skip-research] [--gaps] [--skip-verify] [--tdd] [--mvp]`**
+**`/gsd-plan-phase <number> [--skip-research] [--research-phase <N>] [--view] [--gaps] [--skip-verify] [--tdd] [--mvp]`**
 Create detailed execution plan for a specific phase.
 
 - `--skip-research` — bypass the research subagent
+- `--research-phase <N>` — research-only mode. Spawns the research agent for phase `<N>`, writes `RESEARCH.md`, then exits before the planner runs. Useful for cross-phase research, doc review before committing to a planning approach, and correction-without-replanning loops. Replaces the deleted `gsd-research-phase` standalone command (#3042).
+  - Modifiers: `--research` forces refresh (re-spawn researcher, no prompt). `--view` prints existing `RESEARCH.md` to stdout without spawning. With neither, prompts `update / view / skip` if `RESEARCH.md` already exists.
 - `--gaps` — focus only on closing gaps from a prior plan-check
 - `--skip-verify` — skip the post-plan verifier loop
 - `--tdd` — plan in test-driven order (tests before code)
@@ -95,6 +97,9 @@ Create detailed execution plan for a specific phase.
 - Multiple plans per phase supported (XX-01, XX-02, etc.)
 
 Usage: `/gsd-plan-phase 1`
+Usage: `/gsd-plan-phase --research-phase 2` — research only on phase 2 (prompts if `RESEARCH.md` exists)
+Usage: `/gsd-plan-phase --research-phase 2 --view` — print existing `RESEARCH.md`, no spawn
+Usage: `/gsd-plan-phase --research-phase 2 --research` — force-refresh, no prompt
 Result: Creates `.planning/phases/01-foundation/01-01-PLAN.md`
 
 **PRD Express Path:** Pass `--prd path/to/requirements.md` to skip discuss-phase entirely. Your PRD becomes locked decisions in CONTEXT.md. Useful when you already have clear acceptance criteria.

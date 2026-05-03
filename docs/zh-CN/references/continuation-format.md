@@ -99,7 +99,7 @@
 
 **也可选：**
 - `/gsd-discuss-phase 2` — 先收集上下文
-- `/gsd-research-phase 2` — 调查未知项
+- `/gsd-plan-phase --research-phase 2` — 调查未知项
 - 审查路线图
 
 ---
@@ -128,7 +128,7 @@
 
 **也可选：**
 - `/gsd-discuss-phase 3` — 先收集上下文
-- `/gsd-research-phase 3` — 调查未知项
+- `/gsd-plan-phase --research-phase 3` — 调查未知项
 - 回顾阶段 2 构建的内容
 
 ---
@@ -149,7 +149,7 @@
 
 **先讨论上下文：** `/gsd-discuss-phase 3`
 
-**研究未知项：** `/gsd-research-phase 3`
+**研究未知项：** `/gsd-plan-phase --research-phase 3`
 
 <sub>`/clear` 优先 → 全新上下文窗口</sub>
 

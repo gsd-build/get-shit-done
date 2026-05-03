@@ -32,7 +32,7 @@
 
 ---
 
-### `/gsd-new-workspace`
+### `/gsd-workspace --new`
 
 격리된 워크스페이스를 생성합니다. 저장소 복사본과 독립적인 `.planning/` 디렉터리가 포함됩니다.
 
@@ -52,9 +52,9 @@
 **생성 파일:** `WORKSPACE.md`, `.planning/`, 저장소 복사본 (worktree 또는 clone)
 
 ```bash
-/gsd-new-workspace --name feature-b --repos hr-ui,ZeymoAPI
-/gsd-new-workspace --name feature-b --repos . --strategy worktree  # 동일 저장소 격리
-/gsd-new-workspace --name spike --repos api,web --strategy clone   # 전체 클론
+/gsd-workspace --new --name feature-b --repos hr-ui,ZeymoAPI
+/gsd-workspace --new --name feature-b --repos . --strategy worktree  # 동일 저장소 격리
+/gsd-workspace --new --name spike --repos api,web --strategy clone   # 전체 클론
 ```
 
 ---
@@ -412,15 +412,8 @@
 /gsd-list-phase-assumptions 2       # 페이즈 2 가정 사항 확인
 ```
 
-### `/gsd-plan-milestone-gaps`
 
-마일스톤 감사에서 발견된 갭을 보완하는 페이즈를 생성합니다.
-
-```bash
-/gsd-plan-milestone-gaps             # 각 감사 갭에 대한 페이즈 생성
-```
-
-### `/gsd-research-phase`
+### `/gsd-plan-phase --research-phase`
 
 심층 에코시스템 조사만 수행합니다 (독립 실행 — 일반적으로 `/gsd-plan-phase`를 사용하세요).
 
@@ -429,7 +422,7 @@
 | `N` | 아니오 | 페이즈 번호 |
 
 ```bash
-/gsd-research-phase 4               # 페이즈 4 도메인 조사
+/gsd-plan-phase --research-phase 4               # 페이즈 4 도메인 조사
 ```
 
 ### `/gsd-validate-phase`
@@ -610,12 +603,12 @@ GSD 보증을 갖춘 임시 작업을 실행합니다.
 /gsd-add-todo "Consider adding dark mode support"
 ```
 
-### `/gsd-check-todos`
+### `/gsd-capture --list`
 
 보류 중인 할 일 목록을 표시하고 작업할 항목을 선택합니다.
 
 ```bash
-/gsd-check-todos
+/gsd-capture --list
 ```
 
 ### `/gsd-add-tests`

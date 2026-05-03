@@ -505,7 +505,7 @@ Exit skill and invoke SlashCommand("/gsd-discuss-phase [X+1] --auto ${GSD_WS}")
 
 **Also available:**
 - `/gsd-plan-phase [X+1] ${GSD_WS}` — skip discussion, plan directly
-- `/gsd-research-phase [X+1] ${GSD_WS}` — investigate unknowns
+- `/gsd-plan-phase --research-phase [X+1] ${GSD_WS}` — investigate unknowns
 
 ---
 ```
@@ -530,7 +530,7 @@ Exit skill and invoke SlashCommand("/gsd-discuss-phase [X+1] --auto ${GSD_WS}")
 
 **Also available:**
 - `/gsd-discuss-phase [X+1] ${GSD_WS}` — revisit context
-- `/gsd-research-phase [X+1] ${GSD_WS}` — investigate unknowns
+- `/gsd-plan-phase --research-phase [X+1] ${GSD_WS}` — investigate unknowns
 
 ---
 ```

@@ -39,7 +39,6 @@ Para detalhes completos de flags avançadas e mudanças recentes, consulte tamb�
 | `/gsd-insert-phase [N]` | Insere trabalho urgente entre fases |
 | `/gsd-remove-phase [N]` | Remove fase futura e reenumera |
 | `/gsd-list-phase-assumptions [N]` | Mostra abordagem assumida pelo Claude |
-| `/gsd-plan-milestone-gaps` | Cria fases para fechar lacunas de auditoria |
 
 ## Brownfield e Utilidades
 

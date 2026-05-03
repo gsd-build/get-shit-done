@@ -669,7 +669,7 @@ Workstreams let you work on multiple milestone areas concurrently without state 
 
 Each workstream maintains its own `.planning/` directory subtree. When you switch workstreams, GSD swaps the active planning context so that `/gsd-progress`, `/gsd-discuss-phase`, `/gsd-plan-phase`, and other commands operate on that workstream's state. Active context is session-scoped when the runtime exposes a stable session identifier, which prevents one terminal or AI instance from repointing another instance's `STATE.md`.
 
-This is lighter weight than `/gsd-new-workspace` (which creates separate repo worktrees). Workstreams share the same codebase and git history but isolate planning artifacts.
+This is lighter weight than `/gsd-workspace --new` (which creates separate repo worktrees). Workstreams share the same codebase and git history but isolate planning artifacts.
 
 ---
 
@@ -900,7 +900,6 @@ The gate is non-blocking: any internal failure logs and the phase continues.
 
 ```bash
 /gsd-audit-milestone        # Check requirements coverage, detect stubs
-/gsd-plan-milestone-gaps    # If audit found gaps, create phases to close them
 /gsd-complete-milestone     # Archive, tag, done
 ```
 
@@ -932,10 +931,10 @@ Work on multiple repos or features in parallel with isolated GSD state.
 
 ```bash
 # Create a workspace with repos from your monorepo
-/gsd-new-workspace --name feature-b --repos hr-ui,ZeymoAPI
+/gsd-workspace --new --name feature-b --repos hr-ui,ZeymoAPI
 
 # Feature branch isolation — worktree of current repo with its own .planning/
-/gsd-new-workspace --name feature-b --repos .
+/gsd-workspace --new --name feature-b --repos .
 
 # Then cd into the workspace and initialize GSD
 cd ~/gsd-workspaces/feature-b
@@ -1359,7 +1358,6 @@ If the installer crashes with `EPERM: operation not permitted, scandir` on Windo
 | Lost context / new session           | `/gsd-resume-work` or `/gsd-progress`                                    |
 | Phase went wrong                     | `git revert` the phase commits, then re-plan                             |
 | Need to change scope                 | `/gsd-add-phase`, `/gsd-insert-phase`, or `/gsd-remove-phase`            |
-| Milestone audit found gaps           | `/gsd-plan-milestone-gaps`                                               |
 | Something broke                      | `/gsd-debug "description"` (add `--diagnose` for analysis without fixes) |
 | STATE.md out of sync                 | `state validate` then `state sync`                                       |
 | Workflow state seems corrupted       | `/gsd-forensics`                                                         |

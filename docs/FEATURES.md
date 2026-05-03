@@ -449,7 +449,6 @@
 - REQ-MILE-08: New milestone MUST follow same flow as new-project (questions → research → requirements → roadmap)
 - REQ-MILE-09: New milestone MUST NOT reset existing workflow configuration
 
-**Gap Closure:** `/gsd-plan-milestone-gaps` creates phases to close gaps identified by audit.
 
 ---
 
@@ -865,7 +864,7 @@ continues. Drift detection cannot fail verification.
 
 ### 29. Todo Management
 
-**Commands:** `/gsd-add-todo [desc]`, `/gsd-check-todos`
+**Commands:** `/gsd-add-todo [desc]`, `/gsd-capture --list`
 
 **Purpose:** Capture ideas and tasks during sessions for later work.
 
@@ -1630,7 +1629,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 65. Claim Provenance Tagging
 
-**Part of:** `/gsd-research-phase`
+**Part of:** `/gsd-plan-phase --research-phase`
 
 **Purpose:** Ensure research claims are tagged with source evidence and assumptions are logged separately.
 

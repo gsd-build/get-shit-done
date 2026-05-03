@@ -128,7 +128,7 @@ CONTEXT: [✓ if has_context | - if not]
 - [e.g. jq -r '.blockers[].text' from state-snapshot]
 
 ## Pending Todos
-- [count] pending — /gsd-check-todos to review
+- [count] pending — /gsd-capture --list to review
 
 ## Active Debug Sessions
 - [count] active — /gsd-debug to continue

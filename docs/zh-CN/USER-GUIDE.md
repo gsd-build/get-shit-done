@@ -209,8 +209,7 @@
 | `/gsd-insert-phase [N]` | 插入紧急工作（小数编号） | 里程碑中途紧急修复 |
 | `/gsd-remove-phase [N]` | 删除未来阶段并重新编号 | 移除某个功能 |
 | `/gsd-list-phase-assumptions [N]` | 预览 Claude 的预期方法 | 规划前，验证方向 |
-| `/gsd-plan-milestone-gaps` | 为审计缺口创建阶段 | 审计发现缺失项后 |
-| `/gsd-research-phase [N]` | 仅深度生态研究 | 复杂或不熟悉的领域 |
+| `/gsd-plan-phase --research-phase [N]` | 仅深度生态研究 | 复杂或不熟悉的领域 |
 | `/gsd-autonomous [--from N] [--to N] [--only N]` | 自主执行剩余阶段（`--to N` 到阶段 N 停止） | 批量自动处理 |
 | `/gsd-analyze-dependencies` | 检测阶段间依赖关系 | `/gsd-manager` 前分析 |
 
@@ -231,7 +230,7 @@
 | `/gsd-quick` | 带 GSD 保证的临时任务 | Bug 修复、小功能、配置更改 |
 | `/gsd-debug [desc] [--diagnose]` | 带持久状态的系统化调试（`--diagnose` 仅诊断） | 出问题时 |
 | `/gsd-add-todo [desc]` | 捕获想法留待后用 | 会话期间想到什么 |
-| `/gsd-check-todos` | 列出待处理事项 | 查看捕获的想法 |
+| `/gsd-capture --list` | 列出待处理事项 | 查看捕获的想法 |
 | `/gsd-settings` | 配置工作流开关和模型配置 | 更改模型、切换代理 |
 | `/gsd-set-profile <profile>` | 快速切换配置 | 更改成本/质量权衡 |
 | `/gsd-update --reapply` | 更新后恢复本地修改 | 如果你有本地编辑，在 `/gsd-update` 后 |
@@ -390,7 +389,6 @@ claude --dangerously-skip-permissions
 
 ```bash
 /gsd-audit-milestone        # 检查需求覆盖率，检测存根
-/gsd-plan-milestone-gaps    # 如果审计发现缺口，创建阶段来填补
 /gsd-complete-milestone     # 归档，标记，完成
 ```
 
@@ -481,7 +479,6 @@ node gsd-tools.cjs state sync              # 从磁盘重建 STATE.md
 | 丢失上下文 / 新会话 | `/gsd-resume-work` 或 `/gsd-progress` |
 | 阶段出错 | `git revert` 阶段提交，然后重新规划 |
 | 需要更改范围 | `/gsd-add-phase`、`/gsd-insert-phase` 或 `/gsd-remove-phase` |
-| 里程碑审计发现缺口 | `/gsd-plan-milestone-gaps` |
 | 出问题了 | `/gsd-debug "描述"` |
 | STATE.md 不同步 | `state validate` 然后 `state sync` |
 | 快速针对性修复 | `/gsd-quick` |

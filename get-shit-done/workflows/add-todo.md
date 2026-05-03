@@ -143,7 +143,7 @@ Would you like to:
 
 1. Continue with current work
 2. Add another todo
-3. View all todos (/gsd-check-todos)
+3. View all todos (/gsd-capture --list)
 ```
 </step>
 

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-02",
+  "generated": "2026-05-03",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -163,7 +163,6 @@
       "reapply-patches.md",
       "remove-phase.md",
       "remove-workspace.md",
-      "research-phase.md",
       "resume-project.md",
       "review.md",
       "scan.md",

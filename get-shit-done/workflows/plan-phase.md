@@ -54,7 +54,26 @@ Parse JSON for: `researcher_model`, `planner_model`, `checker_model`, `research_
 
 ## 2. Parse and Normalize Arguments
 
-Extract from $ARGUMENTS: phase number (integer or decimal like `2.1`), flags (`--research`, `--skip-research`, `--gaps`, `--skip-verify`, `--skip-ui`, `--prd <filepath>`, `--reviews`, `--text`, `--bounce`, `--skip-bounce`, `--chunked`).
+Extract from $ARGUMENTS: phase number (integer or decimal like `2.1`), flags (`--research`, `--skip-research`, `--research-phase <N>`, `--gaps`, `--skip-verify`, `--skip-ui`, `--prd <filepath>`, `--reviews`, `--text`, `--bounce`, `--skip-bounce`, `--chunked`).
+
+**`--research-phase <N>` — research-only mode (#3042 + #3044).** When this flag is present, parse `<N>` as the phase number (overrides any positional phase argument), set `RESEARCH_ONLY=true`, and treat the rest of this workflow as a research-dispatch only — the planner spawn (step 8), plan-checker, verification, gaps, bounce, and post-planning-gaps blocks all skip on `RESEARCH_ONLY`. Use this for cross-phase research, doc review before committing to a planning approach, and correction-without-replanning loops. Replaces the deleted `/gsd-research-phase` command.
+
+In research-only mode, two modifiers control behavior when `RESEARCH.md` already exists:
+
+- **`--research`** — force-refresh re-research without prompting. Re-spawns the researcher unconditionally and overwrites the existing RESEARCH.md. (This is the existing `--research` flag's standard "force re-research" semantics, reused here.)
+- **`--view`** — view-only: print existing `RESEARCH.md` to stdout, do **not** spawn the researcher. Sets `VIEW_ONLY=true`. Cheapest mode for the correction-without-replanning loop. If `RESEARCH.md` does not exist, error with a hint to drop `--view`.
+
+```bash
+RESEARCH_ONLY=false
+VIEW_ONLY=false
+if [[ "$ARGUMENTS" =~ --research-phase[[:space:]]+([0-9]+(\.[0-9]+)?) ]]; then
+  RESEARCH_ONLY=true
+  PHASE="${BASH_REMATCH[1]}"
+fi
+if $RESEARCH_ONLY && [[ "$ARGUMENTS" =~ (^|[[:space:]])--view([[:space:]]|$) ]]; then
+  VIEW_ONLY=true
+fi
+```
 
 Set `TEXT_MODE=true` if `--text` is present in $ARGUMENTS OR `text_mode` from init JSON is `true`. When `TEXT_MODE` is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for Claude Code remote sessions (`/rc` mode) where TUI menus don't work through the Claude App.
 
@@ -302,6 +321,25 @@ Pass `ai_spec_path` and `framework_line` to planner in step 7 so it can referenc
 
 **Skip if:** `--gaps` flag or `--skip-research` flag or `--reviews` flag.
 
+### 5.0. Research-Only Modifiers (`--view`, `--research`, prompt)
+
+**Skip if:** `RESEARCH_ONLY` is `false`.
+
+Three branches in research-only mode (`--research-phase <N>`):
+
+1. **`--view`** (or user picks "View" in the prompt below): print `RESEARCH.md` to stdout, no spawn, exit. If `RESEARCH.md` is missing, error with: `--view requires an existing RESEARCH.md; drop --view to spawn the researcher.`
+2. **`--research`** (force-refresh): re-spawn researcher unconditionally — fall through to "Spawn gsd-phase-researcher" below.
+3. **Neither flag AND `has_research=true`:** prompt the user with three choices: `1. Update — re-spawn researcher`, `2. View — print existing RESEARCH.md`, `3. Skip — exit`. Map "Update" → fall through to spawn, "View" → set `VIEW_ONLY=true` and emit RESEARCH.md as in (1), "Skip" → exit cleanly. Mirrors the deleted `/gsd-research-phase` standalone's existing-artifact menu (#3042 parity).
+
+```bash
+if [[ "$VIEW_ONLY" == "true" ]]; then
+  [[ -f "$research_path" ]] || { echo "Error: --view requires an existing RESEARCH.md (Phase ${PHASE}). Drop --view to spawn the researcher."; exit 1; }
+  cat "$research_path"; exit 0
+fi
+```
+
+### 5.1. Standard Research Decision
+
 **If `has_research` is true (from init) AND no `--research` flag:** Use existing, skip to step 6.
 
 **If RESEARCH.md missing OR `--research` flag:**
@@ -397,6 +435,24 @@ Task(
 
 - **`## RESEARCH COMPLETE`:** Display confirmation, continue to step 6
 - **`## RESEARCH BLOCKED`:** Display blocker, offer: 1) Provide context, 2) Skip research, 3) Abort
+
+### Research-Only Early Exit (`--research-phase`)
+
+**Skip if:** `RESEARCH_ONLY` is `false` (the default).
+
+**If `RESEARCH_ONLY=true`:** the user invoked `/gsd-plan-phase --research-phase <N>` for research-only mode. Do **not** continue to Section 5.5+ (validation strategy, planner, plan-checker, verification, gaps, bounce, post-planning-gaps). Print the research-complete summary and exit cleanly:
+
+```text
+✓ Research-only mode complete (#3042)
+
+  Phase:       ${PHASE}
+  RESEARCH.md: ${research_path}
+
+Re-run /gsd-plan-phase ${PHASE} to plan the phase using this research,
+or /gsd-plan-phase ${PHASE} --research to refresh research and plan.
+```
+
+This exits the workflow. The planner / plan-checker / verifier blocks below are skipped.
 
 ## 5.5. Create Validation Strategy
 

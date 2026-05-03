@@ -23,7 +23,7 @@ gates.
 ## Why this exists
 
 GSD has the building blocks for issue-driven AI development —
-`/gsd-new-workspace`, `/gsd-manager`, `/gsd-autonomous`, `/gsd-verify-work`,
+`/gsd-workspace --new`, `/gsd-manager`, `/gsd-autonomous`, `/gsd-verify-work`,
 `/gsd-review`, `/gsd-ship`, plus `STATE.md` and the phase artifact suite
 — but no guide that walks through how to drive them from a single tracker
 issue without writing custom orchestration scripts. Without that guide
@@ -47,7 +47,7 @@ Symphony docs, blog posts, or third-party orchestration write-ups.
 | Symphony concept | GSD primitive |
 |---|---|
 | `WORKFLOW.md` (top-level intent) | `ROADMAP.md` (project intent), `STATE.md` (live status), phase `CONTEXT.md` (per-phase scope), phase `PLAN.md` (executable steps) |
-| One isolated agent workspace per task | `/gsd-new-workspace --strategy worktree` |
+| One isolated agent workspace per task | `/gsd-workspace --new --strategy worktree` |
 | Agent dispatch and concurrency | `/gsd-manager` (interactive dashboard), `/gsd-autonomous` (unattended) |
 | Per-phase plan and discuss steps | `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase` |
 | Proof-of-work / test evidence | `/gsd-verify-work` (UAT.md persisted across `/clear`) |
@@ -76,7 +76,7 @@ tracker issue end-to-end. Replace bracketed placeholders before running.
    `/gsd-insert-phase`. Capture the tracker issue URL in the phase's
    `CONTEXT.md` so traceability survives compaction.
 3. **Create an isolated workspace.** Run
-   `/gsd-new-workspace --strategy worktree <slug>` to spin up a git
+   `/gsd-workspace --new --strategy worktree <slug>` to spin up a git
    worktree with an independent `.planning/` directory. The worktree is
    the safety boundary: any exploration, partial commits, or aborted
    plans stay outside `main`.
@@ -110,7 +110,7 @@ When the PR merges, the loop closes. Auto-close keywords in the PR body
 
 The loop is safe because four invariants hold by construction:
 
-- **Isolated worktrees.** Every issue runs in a `/gsd-new-workspace`
+- **Isolated worktrees.** Every issue runs in a `/gsd-workspace --new`
   worktree, so partial work, aborted plans, and exploratory commits
   never touch `main`. `gsd-local-patches/` is the recovery surface if a
   worktree's hand-edits need to come back across an update.

@@ -25,7 +25,7 @@ Parse JSON for: `workspace_base`, `workspaces`, `workspace_count`.
 No workspaces found in ~/gsd-workspaces/
 
 Create one with:
-  /gsd-new-workspace --name my-workspace --repos repo1,repo2
+  /gsd-workspace --new --name my-workspace --repos repo1,repo2
 ```
 
 Done.

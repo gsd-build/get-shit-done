@@ -32,7 +32,7 @@
 
 ---
 
-### `/gsd-new-workspace`
+### `/gsd-workspace --new`
 
 リポジトリのコピーと独立した `.planning/` ディレクトリを持つ分離されたワークスペースを作成します。
 
@@ -52,9 +52,9 @@
 **生成物:** `WORKSPACE.md`、`.planning/`、リポジトリコピー（worktreeまたはclone）
 
 ```bash
-/gsd-new-workspace --name feature-b --repos hr-ui,ZeymoAPI
-/gsd-new-workspace --name feature-b --repos . --strategy worktree  # 同一リポジトリの分離
-/gsd-new-workspace --name spike --repos api,web --strategy clone   # フルクローン
+/gsd-workspace --new --name feature-b --repos hr-ui,ZeymoAPI
+/gsd-workspace --new --name feature-b --repos . --strategy worktree  # 同一リポジトリの分離
+/gsd-workspace --new --name spike --repos api,web --strategy clone   # フルクローン
 ```
 
 ---
@@ -412,15 +412,8 @@
 /gsd-list-phase-assumptions 2       # フェーズ2の前提を確認
 ```
 
-### `/gsd-plan-milestone-gaps`
 
-マイルストーン監査のギャップを解消するフェーズを作成します。
-
-```bash
-/gsd-plan-milestone-gaps             # 各監査ギャップに対してフェーズを作成
-```
-
-### `/gsd-research-phase`
+### `/gsd-plan-phase --research-phase`
 
 詳細なエコシステム調査のみを実行します（単体機能 — 通常は `/gsd-plan-phase` を使用してください）。
 
@@ -429,7 +422,7 @@
 | `N` | いいえ | フェーズ番号 |
 
 ```bash
-/gsd-research-phase 4               # フェーズ4のドメインを調査
+/gsd-plan-phase --research-phase 4               # フェーズ4のドメインを調査
 ```
 
 ### `/gsd-validate-phase`
@@ -610,12 +603,12 @@ GSDの保証付きでアドホックタスクを実行します。
 /gsd-add-todo "Consider adding dark mode support"
 ```
 
-### `/gsd-check-todos`
+### `/gsd-capture --list`
 
 保留中のTodoを一覧表示し、取り組むものを選択します。
 
 ```bash
-/gsd-check-todos
+/gsd-capture --list
 ```
 
 ### `/gsd-add-tests`

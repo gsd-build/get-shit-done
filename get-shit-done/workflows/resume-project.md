@@ -140,7 +140,7 @@ Present complete project status to user:
     Resume with: Task tool (resume parameter with agent ID)
 
 [If pending todos exist:]
-📋 [N] pending todos — /gsd-check-todos to review
+📋 [N] pending todos — /gsd-capture --list to review
 
 [If blockers exist:]
 ⚠️  Carried concerns:
@@ -257,7 +257,7 @@ Based on user selection, route to appropriate workflow:
 
   **Also available:**
   - `/gsd-discuss-phase [N] ${GSD_WS}` — gather context first
-  - `/gsd-research-phase [N] ${GSD_WS}` — investigate unknowns
+  - `/gsd-plan-phase --research-phase [N] ${GSD_WS}` — investigate unknowns
 
   ---
   ```

@@ -251,7 +251,6 @@ claude --dangerously-skip-permissions
 
 ```bash
 /gsd-audit-milestone
-/gsd-plan-milestone-gaps
 /gsd-complete-milestone
 ```
 
