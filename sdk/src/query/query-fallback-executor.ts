@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { extractField } from './registry.js';
+import { formatSuccess } from './query-dispatch-formatting.js';
 import type { QueryDispatchResult } from './query-dispatch-contract.js';
 import { mapFallbackDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 
@@ -82,11 +82,8 @@ function formatFallbackOutput(data: unknown, mode: 'json' | 'text', pickField?: 
   if (mode === 'text') {
     const text = String(data ?? '');
     if (!text.trim()) return undefined;
-    return text.endsWith('\n') ? text : `${text}\n`;
   }
-  let output: unknown = data;
-  if (pickField) output = extractField(output, pickField);
-  return `${JSON.stringify(output, null, 2)}\n`;
+  return formatSuccess(data, mode, pickField);
 }
 
 export async function runCjsFallbackDispatch(input: RunCjsFallbackDispatchInput): Promise<QueryDispatchResult> {

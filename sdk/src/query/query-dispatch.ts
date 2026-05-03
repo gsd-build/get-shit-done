@@ -1,11 +1,10 @@
 import type { QueryRegistry } from './registry.js';
-import { extractField } from './registry.js';
 import { normalizeQueryCommand } from './normalize-query-command.js';
 import { explainQueryCommandNoMatch, resolveQueryCommand, type QueryCommandResolution } from './command-resolution.js';
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
-import type { QueryResult } from './utils.js';
 import type { QueryDispatchResult, QueryDispatchErrorKind } from './query-dispatch-contract.js';
 import { mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
+import { formatSuccess } from './query-dispatch-formatting.js';
 
 export interface QueryDispatchDeps {
   registry: QueryRegistry;
@@ -71,15 +70,6 @@ function extractPick(queryArgv: string[]): { queryArgs: string[]; pickField?: st
   return { queryArgs, pickField };
 }
 
-function formatOutput(data: unknown, format: QueryResult['format'], pickField?: string): string {
-  // Text-format responses ignore --pick to match CJS fallback behavior.
-  if (format === 'text' && typeof data === 'string') {
-    return data.endsWith('\n') ? data : `${data}\n`;
-  }
-  let output: unknown = data;
-  if (pickField) output = extractField(output, pickField);
-  return `${JSON.stringify(output, null, 2)}\n`;
-}
 
 export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: string[]): Promise<QueryDispatchResult> {
   const picked = extractPick(queryArgv);
@@ -134,7 +124,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   const matched = plan.matched!;
   try {
     const result = await deps.dispatchNative(matched.cmd, matched.args);
-    return success(formatOutput(result.data, result.format, pickField));
+    return success(formatSuccess(result.data, result.format, pickField));
   } catch (e) {
     return toDispatchFailure(mapNativeDispatchError(e, matched.cmd, matched.args));
   }
