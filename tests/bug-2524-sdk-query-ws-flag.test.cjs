@@ -29,6 +29,10 @@ const cliTs = fs.readFileSync(
   path.join(__dirname, '../sdk/src/cli.ts'),
   'utf-8',
 );
+const queryCliAdapterTs = fs.readFileSync(
+  path.join(__dirname, '../sdk/src/query/query-cli-adapter.ts'),
+  'utf-8',
+);
 
 // ─── Layer 3: planningPaths() accepts workstream ───────────────────────────
 
@@ -88,11 +92,11 @@ describe('QueryRegistry.dispatch() workstream threading', () => {
 // ─── Layer 1: CLI forwards args.ws to registry.dispatch() ─────────────────
 
 describe('CLI forwards --ws to registry.dispatch()', () => {
-  test('cli.ts passes args.ws as the workstream argument to registry.dispatch()', () => {
-    // The CLI now uses a dispatchNative callback pattern.
+  test('query CLI adapter passes ws as the workstream argument to registry.dispatch()', () => {
     assert.ok(
-      cliTs.includes('dispatchNative') && cliTs.includes('args.ws'),
-      'cli.ts must forward args.ws to registry.dispatch() as the workstream argument',
+      queryCliAdapterTs.includes('dispatchNative') &&
+      queryCliAdapterTs.includes('registry.dispatch(cmd, argv, projectDir, ws)'),
+      'query-cli-adapter.ts must forward ws to registry.dispatch() as the workstream argument',
     );
   });
 
@@ -107,6 +111,13 @@ describe('CLI forwards --ws to registry.dispatch()', () => {
     assert.ok(
       cliTs.includes("if (a === '--ws' && argv[i + 1])"),
       'cli.ts query permissive parser must handle the --ws flag',
+    );
+  });
+
+  test('query CLI adapter resolves effective ws before dispatch', () => {
+    assert.ok(
+      queryCliAdapterTs.includes('resolveQueryWorkstream') && queryCliAdapterTs.includes('const ws = resolveQueryWorkstream(input.ws)'),
+      'query-cli-adapter.ts must resolve the effective ws before dispatching',
     );
   });
 });
