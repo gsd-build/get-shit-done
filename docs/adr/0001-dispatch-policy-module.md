@@ -11,6 +11,8 @@ To complete the query architecture pass, we deepened adjacent seams around the D
 - Extracted **Query CLI Output Module** to own projection from dispatch results/errors to CLI output contract.
 - Converged internal command-resolution and policy imports onto canonical modules and removed dead wrapper modules.
 - Added **Command Topology Module** as dispatch-facing seam that resolves commands, projects command policy, binds handler Adapters, and emits no-match diagnosis consumed by Dispatch Policy.
+- Locked **pre-project query config policy** for parity-sensitive query Interfaces: when `.planning/config.json` is absent, use built-in defaults and parity-aligned empty model ids for model-resolution surfaces.
+- Gated real-CLI SDK E2E suites behind explicit opt-in (`GSD_ENABLE_E2E=1`) to keep default CI/local verification deterministic while preserving full-path validation when requested.
 
 ### Dead-wrapper convergence
 
