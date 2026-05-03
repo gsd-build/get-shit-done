@@ -37,13 +37,34 @@ export function normalizeQueryCommand(command: string, args: string[]): [string,
   if (command === 'scaffold') return ['phase.scaffold', args];
   if (command === 'state' && args.length === 0) return ['state.load', []];
 
-  if (command === 'state' && args.length > 0 && STATE_SUBCOMMANDS.has(args[0])) return [`state.${args[0]}`, args.slice(1)];
-  if (command === 'verify' && args.length > 0 && VERIFY_SUBCOMMANDS.has(args[0])) return [`verify.${args[0]}`, args.slice(1)];
-  if (command === 'init' && args.length > 0 && INIT_SUBCOMMANDS.has(args[0])) return [`init.${args[0]}`, args.slice(1)];
-  if (command === 'phase' && args.length > 0 && PHASE_SUBCOMMANDS.has(args[0])) return [`phase.${args[0]}`, args.slice(1)];
-  if (command === 'phases' && args.length > 0 && PHASES_SUBCOMMANDS.has(args[0])) return [`phases.${args[0]}`, args.slice(1)];
-  if (command === 'validate' && args.length > 0 && VALIDATE_SUBCOMMANDS.has(args[0])) return [`validate.${args[0]}`, args.slice(1)];
-  if (command === 'roadmap' && args.length > 0 && ROADMAP_SUBCOMMANDS.has(args[0])) return [`roadmap.${args[0]}`, args.slice(1)];
+  if (command === 'state' && args.length > 0) {
+    if (STATE_SUBCOMMANDS.has(args[0])) return [`state.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
+  if (command === 'verify' && args.length > 0) {
+    if (VERIFY_SUBCOMMANDS.has(args[0])) return [`verify.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
+  if (command === 'init' && args.length > 0) {
+    if (INIT_SUBCOMMANDS.has(args[0])) return [`init.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
+  if (command === 'phase' && args.length > 0) {
+    if (PHASE_SUBCOMMANDS.has(args[0])) return [`phase.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
+  if (command === 'phases' && args.length > 0) {
+    if (PHASES_SUBCOMMANDS.has(args[0])) return [`phases.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
+  if (command === 'validate' && args.length > 0) {
+    if (VALIDATE_SUBCOMMANDS.has(args[0])) return [`validate.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
+  if (command === 'roadmap' && args.length > 0) {
+    if (ROADMAP_SUBCOMMANDS.has(args[0])) return [`roadmap.${args[0]}`, args.slice(1)];
+    return [command, args];
+  }
 
   if (MERGE_FIRST_WITH_SUBCOMMAND.has(command) && args.length > 0) return [`${command}.${args[0]}`, args.slice(1)];
   if ((command === 'progress' || command === 'stats') && args.length > 0 && !args[0].startsWith('-')) return [`${command}.${args[0]}`, args.slice(1)];

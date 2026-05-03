@@ -7,4 +7,4 @@ export {
   type QueryResolutionSource,
   explainQueryCommandNoMatch,
   type QueryCommandNoMatch,
-} from './query-command-semantics.js';
+} from './query-command-resolution-strategy.js';
