@@ -109,6 +109,14 @@ import { GSDEventStream } from '../event-stream.js';
 import type { GSDEvent } from '../types.js';
 import type { QueryHandler, QueryResult } from './utils.js';
 import { registerAliasCatalog, registerStaticCatalog } from './command-catalog.js';
+import {
+  FOUNDATION_STATIC_CATALOG,
+  STATE_SUPPORT_STATIC_CATALOG,
+  MUTATION_SURFACES_STATIC_CATALOG,
+  VERIFY_DECISION_STATIC_CATALOG,
+  DECISION_ROUTING_STATIC_CATALOG,
+} from './command-static-catalog-foundation.js';
+import { DOMAIN_STATIC_CATALOG } from './command-static-catalog-domain.js';
 import { buildMutationEvent } from './mutation-event-mapper.js';
 import { QUERY_MUTATION_COMMAND_LIST } from './policy-convergence.js';
 
@@ -147,14 +155,7 @@ export function createRegistry(
   const mutationSessionId = correlationSessionId ?? '';
   const registry = new QueryRegistry();
 
-  registerStaticCatalog(registry, [
-    ['generate-slug', generateSlug],
-    ['current-timestamp', currentTimestamp],
-    ['frontmatter.get', frontmatterGet],
-    ['config-get', configGet],
-    ['config-path', configPath],
-    ['resolve-model', resolveModel],
-  ]);
+  registerStaticCatalog(registry, FOUNDATION_STATIC_CATALOG);
   const stateHandlers: Record<string, QueryHandler> = {
     'state.load': stateProjectLoad,
     'state.json': stateJson,
@@ -181,15 +182,7 @@ export function createRegistry(
 
   registerAliasCatalog(registry, STATE_COMMAND_ALIASES, stateHandlers);
 
-  registerStaticCatalog(registry, [
-    ['state-snapshot', stateSnapshot],
-    ['find-phase', findPhase],
-    ['phase-plan-index', phasePlanIndex],
-    ['plan.task-structure', planTaskStructure],
-    ['plan task-structure', planTaskStructure],
-    ['requirements.extract-from-plans', requirementsExtractFromPlans],
-    ['requirements extract-from-plans', requirementsExtractFromPlans],
-  ]);
+  registerStaticCatalog(registry, STATE_SUPPORT_STATIC_CATALOG);
   const roadmapHandlers: Record<string, QueryHandler> = {
     'roadmap.analyze': roadmapAnalyze,
     'roadmap.get-phase': roadmapGetPhase,
@@ -199,31 +192,7 @@ export function createRegistry(
 
   registerAliasCatalog(registry, ROADMAP_COMMAND_ALIASES, roadmapHandlers);
 
-  registerStaticCatalog(registry, [
-    ['progress', progressJson],
-    ['progress.json', progressJson],
-
-    // Frontmatter mutation handlers
-    ['frontmatter.set', frontmatterSet],
-    ['frontmatter.merge', frontmatterMerge],
-    ['frontmatter.validate', frontmatterValidate],
-    ['frontmatter validate', frontmatterValidate],
-
-    // Config mutation handlers
-    ['config-set', configSet],
-    ['config-set-model-profile', configSetModelProfile],
-    ['config-new-project', configNewProject],
-    ['config-ensure-section', configEnsureSection],
-
-    // Git commit handlers
-    ['commit', commit],
-    ['check-commit', checkCommit],
-
-    // Template handlers
-    ['template.fill', templateFill],
-    ['template.select', templateSelect],
-    ['template select', templateSelect],
-  ]);
+  registerStaticCatalog(registry, MUTATION_SURFACES_STATIC_CATALOG);
 
   const verifyHandlers: Record<string, QueryHandler> = {
     'verify.plan-structure': verifyPlanStructure,
@@ -238,22 +207,7 @@ export function createRegistry(
 
   registerAliasCatalog(registry, VERIFY_COMMAND_ALIASES, verifyHandlers);
 
-  registerStaticCatalog(registry, [
-    ['verify-summary', verifySummary],
-    ['verify.summary', verifySummary],
-    ['verify summary', verifySummary],
-    ['verify-path-exists', verifyPathExists],
-    ['verify.path-exists', verifyPathExists],
-    ['verify path-exists', verifyPathExists],
-
-    // Decision coverage gates (issue #2492)
-    ['decisions.parse', decisionsParse],
-    ['decisions parse', decisionsParse],
-    ['check.decision-coverage-plan', checkDecisionCoveragePlan],
-    ['check decision-coverage-plan', checkDecisionCoveragePlan],
-    ['check.decision-coverage-verify', checkDecisionCoverageVerify],
-    ['check decision-coverage-verify', checkDecisionCoverageVerify],
-  ]);
+  registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG);
   const validateHandlers: Record<string, QueryHandler> = {
     'validate.consistency': validateConsistency,
     'validate.health': validateHealth,
@@ -264,26 +218,7 @@ export function createRegistry(
   registerAliasCatalog(registry, VALIDATE_COMMAND_ALIASES, validateHandlers);
 
   // Decision routing (SDK-only — no `gsd-tools.cjs` mirror yet; see QUERY-HANDLERS.md)
-  registerStaticCatalog(registry, [
-    ['check.config-gates', checkConfigGates],
-    ['check config-gates', checkConfigGates],
-    ['check.auto-mode', checkAutoMode],
-    ['check auto-mode', checkAutoMode],
-    ['check.phase-ready', checkPhaseReady],
-    ['check phase-ready', checkPhaseReady],
-    ['route.next-action', routeNextAction],
-    ['route next-action', routeNextAction],
-    ['detect.phase-type', detectPhaseType],
-    ['detect phase-type', detectPhaseType],
-    ['check.completion', checkCompletion],
-    ['check completion', checkCompletion],
-    ['check.gates', checkGates],
-    ['check gates', checkGates],
-    ['check.verification-status', checkVerificationStatus],
-    ['check verification-status', checkVerificationStatus],
-    ['check.ship-ready', checkShipReady],
-    ['check ship-ready', checkShipReady],
-  ]);
+  registerStaticCatalog(registry, DECISION_ROUTING_STATIC_CATALOG);
 
   const phaseHandlers: Record<string, QueryHandler> = {
     'phase.list-plans': phaseListPlans,
@@ -330,94 +265,7 @@ export function createRegistry(
   registerAliasCatalog(registry, INIT_COMMAND_ALIASES, initHandlers);
 
   // Domain-specific handlers (fully implemented)
-  registerStaticCatalog(registry, [
-    ['agent-skills', agentSkills],
-    ['requirements.mark-complete', requirementsMarkComplete],
-    ['requirements mark-complete', requirementsMarkComplete],
-    ['todo.match-phase', todoMatchPhase],
-    ['todo match-phase', todoMatchPhase],
-    ['list-todos', listTodos],
-    ['list.todos', listTodos],
-    ['todo.complete', todoComplete],
-    ['todo complete', todoComplete],
-    ['milestone.complete', milestoneComplete],
-    ['milestone complete', milestoneComplete],
-    ['summary.extract', summaryExtract],
-    ['summary extract', summaryExtract],
-    ['summary-extract', summaryExtract],
-    ['history.digest', historyDigest],
-    ['history digest', historyDigest],
-    ['history-digest', historyDigest],
-    ['stats', statsJson],
-    ['stats.json', statsJson],
-    ['stats json', statsJson],
-    ['stats.table', statsTable],
-    ['stats table', statsTable],
-    ['commit-to-subrepo', commitToSubrepo],
-    ['progress.bar', progressBar],
-    ['progress bar', progressBar],
-    ['progress.table', progressTable],
-    ['progress table', progressTable],
-    ['workstream.get', workstreamGet],
-    ['workstream get', workstreamGet],
-    ['workstream.list', workstreamList],
-    ['workstream list', workstreamList],
-    ['workstream.create', workstreamCreate],
-    ['workstream create', workstreamCreate],
-    ['workstream.set', workstreamSet],
-    ['workstream set', workstreamSet],
-    ['workstream.status', workstreamStatus],
-    ['workstream status', workstreamStatus],
-    ['workstream.complete', workstreamComplete],
-    ['workstream complete', workstreamComplete],
-    ['workstream.progress', workstreamProgress],
-    ['workstream progress', workstreamProgress],
-    ['docs-init', docsInit],
-    ['websearch', websearch],
-    ['learnings.copy', learningsCopy],
-    ['learnings copy', learningsCopy],
-    ['learnings.query', learningsQuery],
-    ['learnings query', learningsQuery],
-    ['learnings.list', learningsListHandler],
-    ['learnings list', learningsListHandler],
-    ['learnings.prune', learningsPrune],
-    ['learnings prune', learningsPrune],
-    ['learnings.delete', learningsDelete],
-    ['learnings delete', learningsDelete],
-    ['skill-manifest', skillManifest],
-    ['skill manifest', skillManifest],
-    ['audit-open', auditOpen],
-    ['audit open', auditOpen],
-    ['detect-custom-files', detectCustomFiles],
-    ['extract-messages', extractMessages],
-    ['extract.messages', extractMessages],
-    ['audit-uat', auditUat],
-    ['uat.render-checkpoint', uatRenderCheckpoint],
-    ['uat render-checkpoint', uatRenderCheckpoint],
-    ['intel.diff', intelDiff],
-    ['intel diff', intelDiff],
-    ['intel.snapshot', intelSnapshot],
-    ['intel snapshot', intelSnapshot],
-    ['intel.validate', intelValidate],
-    ['intel validate', intelValidate],
-    ['intel.status', intelStatus],
-    ['intel status', intelStatus],
-    ['intel.query', intelQuery],
-    ['intel query', intelQuery],
-    ['intel.extract-exports', intelExtractExports],
-    ['intel extract-exports', intelExtractExports],
-    ['intel.patch-meta', intelPatchMeta],
-    ['intel patch-meta', intelPatchMeta],
-    ['intel.update', intelUpdate],
-    ['intel update', intelUpdate],
-    ['generate-claude-profile', generateClaudeProfile],
-    ['generate-dev-preferences', generateDevPreferences],
-    ['write-profile', writeProfile],
-    ['profile-questionnaire', profileQuestionnaire],
-    ['profile-sample', profileSample],
-    ['scan-sessions', scanSessions],
-    ['generate-claude-md', generateClaudeMd],
-  ]);
+  registerStaticCatalog(registry, DOMAIN_STATIC_CATALOG);
 
   // Wire event emission for mutation commands
   if (eventStream) {
