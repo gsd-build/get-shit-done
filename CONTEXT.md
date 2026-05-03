@@ -25,6 +25,12 @@ Adapter Module that satisfies native query dispatch at the Dispatch Policy seam,
 ### Query CLI Output Module
 Module owning projection from dispatch results/errors to CLI `{ exitCode, stdoutChunks, stderrLines }` output contract.
 
+### Query Execution Policy Module
+Module owning query transport routing policy projection (`preferNative`, fallback policy, workstream subprocess forcing) at execution seam.
+
+### Query Subprocess Adapter Module
+Adapter Module owning subprocess execution contract for query commands (JSON/raw invocation, `@file:` indirection parsing, timeout/exit error projection).
+
 ### Query Command Resolution Module
 Canonical command normalization and resolution Interface (`query-command-resolution-strategy`) used by internal query/transport paths after dead-wrapper convergence.
 
