@@ -8,6 +8,21 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <process>
 
+<step name="parse_flags">
+Parse $ARGUMENTS for the polling override flag:
+
+```bash
+IGNORE_PIPELINE=false
+for arg in $ARGUMENTS; do
+  if [ "$arg" = "--ignore-pipeline" ]; then
+    IGNORE_PIPELINE=true
+  fi
+done
+```
+
+When `IGNORE_PIPELINE` is true, the `poll_post_push_pipeline` step records a `pipeline_override` block in the SUMMARY.md instead of refusing on a failed pipeline. Override is auditable.
+</step>
+
 <step name="initialize">
 Parse arguments and load project state:
 
@@ -247,6 +262,114 @@ gh pr edit ${PR_NUMBER} --add-reviewer "${REVIEWER}"
 Report the PR URL and suggest: "Review the diff at {url}/files"
 </step>
 
+<step name="poll_post_push_pipeline">
+**Purpose (HK-04):** After `git push`, capture the new pipeline ID, poll until terminal, and refuse to mark the phase shipped if the pipeline ends in `failed` or `canceled`. Override available via `--ignore-pipeline` (parsed in `parse_flags`).
+
+**Skip if:** the platform isn't GitLab, `glab` isn't authenticated, or no pipeline triggered (e.g., docs-only commit with `[ci skip]`).
+
+```bash
+# Pre-flight
+if ! command -v glab >/dev/null 2>&1; then
+  echo "glab not installed — skipping pipeline polling"
+elif ! glab auth status >/dev/null 2>&1; then
+  echo "glab not authenticated — skipping pipeline polling. Run \`glab auth login\` to enable."
+else
+  # Resolve URL-encoded project path from `git remote get-url origin`
+  REMOTE_URL=$(git remote get-url origin)
+  # Strip protocol + .git; URL-encode slashes
+  PROJECT_PATH=$(echo "$REMOTE_URL" | sed -E 's|^https?://[^/]+/||; s|^git@[^:]+:||; s|\.git$||')
+  ENCODED_PROJECT=$(echo "$PROJECT_PATH" | sed 's|/|%2F|g')
+
+  # Capture the pipeline ID. Retry up to 3× because GitLab may not have created
+  # the pipeline yet immediately after push.
+  PIPELINE_ID=""
+  for attempt in 1 2 3; do
+    PIPELINE_ID=$(glab api "projects/${ENCODED_PROJECT}/pipelines?ref=${CURRENT_BRANCH}&order_by=id&sort=desc&per_page=1" \
+      | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const r=JSON.parse(d);if(r[0])console.log(r[0].id)}catch(e){}})")
+    if [ -n "$PIPELINE_ID" ]; then break; fi
+    sleep 5
+  done
+
+  if [ -z "$PIPELINE_ID" ]; then
+    echo "No pipeline triggered for ${CURRENT_BRANCH} — proceeding without polling."
+  fi
+fi
+```
+
+**Polling loop (only if PIPELINE_ID was captured):**
+
+The polling uses `ScheduleWakeup` — never an in-context `sleep` loop. Each tick:
+
+1. Query: `glab api "projects/${ENCODED_PROJECT}/pipelines/${PIPELINE_ID}"`.
+2. Parse `status`. Branches:
+   - `success` → exit polling, proceed to `track_shipping`.
+   - `failed` or `canceled` → enter `surface_failed_traces` substep.
+   - `pending`, `running`, `waiting_for_resource`, `preparing` → schedule next wakeup at 30s, increment tick counter.
+3. Cap at 30 ticks (15-minute total). On cap reached:
+   ```
+   AskUserQuestion:
+     question: "Pipeline ${PIPELINE_ID} still running after 15 minutes. Continue waiting, skip polling, or fail?"
+     options: ["Continue another 15 min", "Skip — assume green", "Fail — refuse to ship"]
+   ```
+
+**ScheduleWakeup pattern:**
+
+```
+ScheduleWakeup({
+  delaySeconds: 30,
+  reason: "polling pipeline #${PIPELINE_ID} (tick ${tickN}/30) — current status: ${prevStatus}",
+  prompt: "/gsd-ship --resume-poll-tick=${nextTick} --pipeline-id=${PIPELINE_ID} <original args>"
+})
+```
+
+**`surface_failed_traces` substep (only on failed/canceled):**
+
+```bash
+JOBS=$(glab api "projects/${ENCODED_PROJECT}/pipelines/${PIPELINE_ID}/jobs")
+# Filter status==failed and ALSO status==canceled (different from pipeline-cancelled)
+FAILED_JOB_IDS=$(echo "$JOBS" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);console.log(r.filter(j=>j.status==='failed').map(j=>j.id+':'+j.name).join('\\n'))}")
+```
+
+For each failed job ID:
+```bash
+echo "## Job: ${JOB_NAME} (failed)"
+glab ci trace "${JOB_ID}" -p "${PIPELINE_ID}" 2>&1 | tail -50
+```
+
+Surface in user prompt:
+
+```
+## Pipeline #${PIPELINE_ID} failed
+
+Branch: ${CURRENT_BRANCH}
+Status: failed
+Failed jobs (${count}):
+
+[per-job ## blocks with last 50 lines of trace]
+
+──────────────────────────────────────────────────────────────────
+```
+
+If `IGNORE_PIPELINE=true`:
+- Skip the refusal; record an override block in the next `track_shipping` step's SUMMARY:
+  ```yaml
+  pipeline_override:
+    pipeline_id: ${PIPELINE_ID}
+    status: failed
+    failed_jobs: [list]
+    overridden_by: $(git config user.email)
+    overridden_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+    reason: "user-supplied or 'unspecified'"
+  ```
+
+If `IGNORE_PIPELINE=false` (default):
+- REFUSE: print "Phase NOT marked shipped. Pipeline #${PIPELINE_ID} ended in failed."
+- Suggest options: "Fix the failure and re-push (recommended); rerun the failed jobs via GitLab UI; OR re-run /gsd-ship --ignore-pipeline (records audit trail)."
+- Exit workflow.
+
+**Backwards compatibility (D-10):** if no pipeline was triggered (e.g., `[ci skip]` commit, or platform isn't GitLab), the entire polling block becomes a no-op and the workflow proceeds to `track_shipping` as before.
+</step>
+
 <step name="track_shipping">
 Update STATE.md to reflect the shipping action:
 
@@ -259,6 +382,8 @@ If `commit_docs` is true:
 ```bash
 gsd-sdk query commit "docs(${padded_phase}): ship phase ${PHASE_NUMBER} — PR #${PR_NUMBER}" --files .planning/STATE.md
 ```
+
+**If `IGNORE_PIPELINE=true`** (an override happened in `poll_post_push_pipeline`), append the `pipeline_override` block to the phase's SUMMARY.md as documented in that step. This block becomes a permanent audit record.
 </step>
 
 <step name="report">

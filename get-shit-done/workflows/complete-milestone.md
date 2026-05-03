@@ -722,6 +722,54 @@ fi
 
 </step>
 
+<step name="check_main_pipeline_green">
+**Purpose (HK-04):** Refuse to push a `vX.Y.0` tag while the most recent `main` pipeline is in a non-success state. This prevents the v1.3 close anti-pattern (pipeline #236 went red post-merge, but the close was already in flight, so `v1.3.0` shipped over a red main).
+
+**No `--ignore-pipeline` override at the milestone level (D-07): pushing tags deploys to prod in many setups; this guard is strict.**
+
+```bash
+# Skip if glab unavailable / not authenticated
+if ! command -v glab >/dev/null 2>&1 || ! glab auth status >/dev/null 2>&1; then
+  echo "glab not configured — skipping main-pipeline gate. Confirm CI is green manually before tagging."
+else
+  REMOTE_URL=$(git remote get-url origin)
+  PROJECT_PATH=$(echo "$REMOTE_URL" | sed -E 's|^https?://[^/]+/||; s|^git@[^:]+:||; s|\.git$||')
+  ENCODED_PROJECT=$(echo "$PROJECT_PATH" | sed 's|/|%2F|g')
+
+  PIPELINE_STATUS=$(glab api "projects/${ENCODED_PROJECT}/pipelines?ref=main&order_by=id&sort=desc&per_page=1" \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const r=JSON.parse(d);if(r[0])console.log(r[0].status)}catch(e){}})")
+
+  PIPELINE_ID=$(glab api "projects/${ENCODED_PROJECT}/pipelines?ref=main&order_by=id&sort=desc&per_page=1" \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const r=JSON.parse(d);if(r[0])console.log(r[0].id)}catch(e){}})")
+
+  if [ -z "$PIPELINE_STATUS" ]; then
+    echo "No pipeline found on main — confirm manually before tagging."
+  elif [ "$PIPELINE_STATUS" != "success" ]; then
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════"
+    echo "  REFUSING to tag — main pipeline #${PIPELINE_ID} is ${PIPELINE_STATUS}"
+    echo "═══════════════════════════════════════════════════════════════"
+    echo ""
+    echo "Tags trigger production deploys in many setups. Pushing v[X.Y] over a"
+    echo "${PIPELINE_STATUS} pipeline could deploy broken code to prod."
+    echo ""
+    echo "Required actions:"
+    echo "  1. Investigate https://<gitlab>/${PROJECT_PATH}/-/pipelines/${PIPELINE_ID}"
+    echo "  2. Fix the underlying issue + push to main"
+    echo "  3. Wait for the next main pipeline to succeed"
+    echo "  4. Re-run /gsd-complete-milestone"
+    echo ""
+    echo "There is no --ignore-pipeline override for milestone tagging (HK-04 D-07)."
+    echo ""
+    exit 1
+  else
+    echo "✓ main pipeline #${PIPELINE_ID} is success — proceeding to tag"
+  fi
+fi
+```
+
+</step>
+
 <step name="git_tag">
 
 Create git tag:
