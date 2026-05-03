@@ -117,8 +117,8 @@ import {
   DECISION_ROUTING_STATIC_CATALOG,
 } from './command-static-catalog-foundation.js';
 import { DOMAIN_STATIC_CATALOG } from './command-static-catalog-domain.js';
-import { buildMutationEvent } from './mutation-event-mapper.js';
 import { QUERY_MUTATION_COMMAND_LIST } from './policy-convergence.js';
+import { decorateMutationsWithEvents } from './mutation-event-decorator.js';
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
 
@@ -269,21 +269,7 @@ export function createRegistry(
 
   // Wire event emission for mutation commands
   if (eventStream) {
-    for (const cmd of QUERY_MUTATION_COMMANDS) {
-      const original = registry.getHandler(cmd);
-      if (original) {
-        registry.register(cmd, async (args: string[], projectDir: string) => {
-          const result = await original(args, projectDir);
-          try {
-            const event = buildMutationEvent(mutationSessionId, cmd, args, result);
-            eventStream.emitEvent(event);
-          } catch {
-            // T-11-12: Event emission is fire-and-forget; never block mutation success
-          }
-          return result;
-        });
-      }
-    }
+    decorateMutationsWithEvents(registry, QUERY_MUTATION_COMMANDS, eventStream, mutationSessionId);
   }
 
   return registry;
