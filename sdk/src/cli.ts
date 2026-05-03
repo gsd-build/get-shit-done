@@ -361,9 +361,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       }, args.queryArgv ?? []);
 
       for (const line of out.stderr) console.error(line);
-      if (out.error) {
+      if (!out.ok) {
         console.error(out.error.message);
-        process.exitCode = out.error.code;
+        process.exitCode = out.exit_code;
         return;
       }
       if (out.stdout) process.stdout.write(out.stdout);

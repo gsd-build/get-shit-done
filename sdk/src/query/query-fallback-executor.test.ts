@@ -32,6 +32,8 @@ describe('runCjsFallbackDispatch', () => {
       normCmd: 'state',
       normArgs: ['load'],
     });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected success');
     expect(result.stdout).toBe('{\n  "ok": true\n}\n');
   });
 
@@ -43,6 +45,8 @@ describe('runCjsFallbackDispatch', () => {
       normCmd: 'phase',
       normArgs: ['add', '--help'],
     });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected success');
     expect(result.stdout).toBe('USAGE: help text\n');
   });
 
@@ -56,6 +60,8 @@ describe('runCjsFallbackDispatch', () => {
       ws: 'ws-1',
       pickField: 'args',
     });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected success');
     expect(result.stdout).toBe('[\n  "state",\n  "load",\n  "--ws",\n  "ws-1"\n]\n');
   });
 
@@ -66,7 +72,10 @@ describe('runCjsFallbackDispatch', () => {
       normCmd: 'state',
       normArgs: ['load'],
     });
-    expect(result.error?.code).toBe(1);
-    expect(result.error?.message).toContain('fallback failed');
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.error.code).toBe(1);
+    expect(result.error.kind).toBe('fallback_failure');
+    expect(result.error.message).toContain('fallback failed');
   });
 });

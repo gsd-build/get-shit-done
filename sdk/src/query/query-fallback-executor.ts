@@ -99,14 +99,23 @@ export async function runCjsFallbackDispatch(input: RunCjsFallbackDispatchInput)
     const fallback = await runCjsFallbackQuery(projectDir, gsdToolsPath, normCmd, normArgs, ws);
     if (fallback.stderr.trim()) stderr.push(fallback.stderr.trimEnd());
     return {
+      ok: true,
       stderr,
-      stdout: formatFallbackOutput(fallback.output, fallback.mode, pickField),
+      stdout: formatFallbackOutput(fallback.output, fallback.mode, pickField) ?? '',
+      exit_code: 0,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
+      ok: false,
       stderr,
-      error: { code: 1, message: `Error: gsd-tools.cjs fallback failed: ${msg}` },
+      exit_code: 1,
+      error: {
+        kind: 'fallback_failure',
+        code: 1,
+        message: `Error: gsd-tools.cjs fallback failed: ${msg}`,
+        details: { command: normCmd, args: normArgs, backend: 'cjs' },
+      },
     };
   }
 }
