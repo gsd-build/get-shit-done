@@ -181,11 +181,12 @@ describe('loadConfig', () => {
   // model aliases from MODEL_PROFILES via resolveModel even when the user
   // had `resolve_model_ids: "omit"` in ~/.gsd/defaults.json.
   //
-  // Mirrors CJS behavior in get-shit-done/bin/lib/core.cjs:421 (#1683):
-  // user-level defaults only apply when no project .planning/config.json
-  // exists (pre-project context). Once a project is initialized, its
-  // config.json is authoritative — buildNewProjectConfig baked the user
-  // defaults in at /gsd:new-project time.
+  // Mirrors current CJS parity expectations for SDK loadConfig + resolveModel:
+  // in pre-project context, loadConfig ignores ~/.gsd/defaults.json so
+  // resolveModel/MODEL_PROFILES do not emit aliases when resolve_model_ids
+  // is "omit". Once a project is initialized, config.json is authoritative,
+  // because buildNewProjectConfig bakes user defaults into project config
+  // at /gsd:new-project time.
 
   it('pre-project: ignores user defaults and uses built-in defaults', async () => {
     await writeUserDefaults({ resolve_model_ids: 'omit' });

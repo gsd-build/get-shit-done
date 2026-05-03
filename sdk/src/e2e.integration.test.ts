@@ -2,8 +2,8 @@
  * E2E integration test — proves full SDK pipeline:
  * parse → prompt → query() → SUMMARY.md
  *
- * Requires Claude Code CLI (`claude`) installed and authenticated.
- * Skips gracefully if CLI is unavailable.
+ * Requires Claude Code CLI (`claude`) installed and authenticated, plus
+ * opt-in env `GSD_ENABLE_E2E=1`. Skips if env unset or CLI unavailable.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';

@@ -17,8 +17,8 @@ describe('QueryNativeHotpathAdapter', () => {
 
     await expect(adapter.dispatch('state', ['load'], 'state.load', [], 'json')).resolves.toEqual({ ok: true });
     await expect(adapter.dispatch('commit', ['m'], 'commit', ['m'], 'raw')).resolves.toEqual('ok');
-    expect((native as { dispatchJson: ReturnType<typeof vi.fn> }).dispatchJson).toHaveBeenCalledTimes(1);
-    expect((native as { dispatchRaw: ReturnType<typeof vi.fn> }).dispatchRaw).toHaveBeenCalledTimes(1);
+    expect((native as { dispatchJson: ReturnType<typeof vi.fn> }).dispatchJson).toHaveBeenCalledWith('state', ['load'], 'state.load', []);
+    expect((native as { dispatchRaw: ReturnType<typeof vi.fn> }).dispatchRaw).toHaveBeenCalledWith('commit', ['m'], 'commit', ['m']);
   });
 
   it('uses fallback when native query disabled', async () => {
@@ -37,7 +37,7 @@ describe('QueryNativeHotpathAdapter', () => {
 
     await expect(adapter.dispatch('state', ['load'], 'state.load', [], 'json')).resolves.toEqual({ from: 'fallback-json' });
     await expect(adapter.dispatch('commit', ['m'], 'commit', ['m'], 'raw')).resolves.toEqual('fallback-raw');
-    expect(execJsonFallback).toHaveBeenCalledTimes(1);
-    expect(execRawFallback).toHaveBeenCalledTimes(1);
+    expect(execJsonFallback).toHaveBeenCalledWith('state', ['load']);
+    expect(execRawFallback).toHaveBeenCalledWith('commit', ['m']);
   });
 });

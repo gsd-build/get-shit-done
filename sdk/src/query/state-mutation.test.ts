@@ -349,6 +349,14 @@ describe('stateBeginPhase', () => {
     ).rejects.toThrow('missing value for --phase');
   });
 
+  it('bug-2420: flag parser throws when a flag is last token with no value', async () => {
+    const { stateBeginPhase } = await import('./state-mutation.js');
+
+    await expect(
+      stateBeginPhase(['--name', 'Title', '--plans', '1', '--phase'], tmpDir)
+    ).rejects.toThrow('missing value for --phase');
+  });
+
   it('does not treat argv after named flags as positional name/plans', async () => {
     const { stateBeginPhase } = await import('./state-mutation.js');
 

@@ -321,7 +321,7 @@ export async function readModifyWriteStateMdFull(
  *
  * @param args - args[0]: field name, args[1]: new value
  * @param projectDir - Project root directory
- * @returns QueryResult with { updated: true/false, field, value }
+ * @returns QueryResult with { updated: true/false }
  */
 export const stateUpdate: QueryHandler = async (args, projectDir, workstream) => {
   const field = args[0];
