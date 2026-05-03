@@ -25,6 +25,32 @@ execute → verify → review → ship loop using existing GSD primitives.
 
 ---
 
+## Slash-command forms (hyphen vs colon)
+
+GSD ships **the same set of skills** to every supported runtime, but two slash-form spellings are in play:
+
+- **Hyphen form** — `/gsd-command-name` — used by Claude Code, Copilot, OpenCode, Kilo, Cursor, Windsurf, Augment, Antigravity, and Trae.
+- **Colon form** — `/gsd:command-name` — used by **Gemini CLI only**. Gemini namespaces every plugin's commands under the plugin id, so the install path rewrites every body-text reference and command file to the colon form during `--gemini` install.
+
+You don't need to choose — the installer writes the correct form into the command directory of each runtime you target. When following a walkthrough on a Gemini terminal, replace the hyphen after `gsd` with a colon as you read each slash command.
+
+## Namespace routing primer (`gsd:<namespace>`, v1.40)
+
+v1.40 ships six **namespace meta-skills** as the first-stage entry points for hierarchical routing — they keep the eager skill-listing token cost low (~120 tokens for 6 routers vs ~2,150 for a flat 86-skill listing) while every concrete sub-skill remains directly invocable. Each namespace router's body contains a routing table that maps your intent to the correct concrete sub-skill.
+
+| Namespace | Router | Routes to |
+|-----------|--------|-----------|
+| Phase pipeline | `/gsd-ns-workflow` | discuss / plan / execute / verify / phase / progress |
+| Project lifecycle | `/gsd-ns-project` | milestones, audits, summary |
+| Quality gates | `/gsd-ns-review` | code review, debug, audit, security, eval, ui |
+| Codebase intelligence | `/gsd-ns-context` | map, graphify, docs, learnings |
+| Management | `/gsd-ns-manage` | config, workspace, workstreams, thread, update, ship, inbox |
+| Exploration & capture | `/gsd-ns-ideate` | explore, sketch, spike, spec, capture |
+
+You almost never need to type a namespace router yourself. Their value is in the routing layer the model uses to discover the right sub-skill — they exist so the system prompt can list 6 entries instead of 86. If you already know the concrete command (e.g. `/gsd-plan-phase`), call it directly.
+
+---
+
 ## End-to-End Walkthrough
 
 This walkthrough shows how GSD phases connect for a typical single-phase project — a small Node.js REST API that validates webhook signatures. Follow it to understand what each command does, what it creates, and how the next command consumes it.
@@ -571,7 +597,7 @@ Each spike runs 2–5 experiments. Every experiment has:
 
 Results land in `.planning/spikes/NNN-name/README.md` and are indexed in `.planning/spikes/MANIFEST.md`.
 
-Once you have signal, run `/gsd-spike-wrap-up` to package the findings into `.claude/skills/spike-findings-[project]/` — future sessions will load them automatically via project-skills discovery.
+Once you have signal, run `/gsd-spike --wrap-up` to package the findings into `.claude/skills/spike-findings-[project]/` — future sessions will load them automatically via project-skills discovery.
 
 ### When to Sketch
 
@@ -586,16 +612,16 @@ Sketch when you need to compare layout structures, interaction models, or visual
 
 Each sketch answers **one design question** with 2–3 variants in a single `index.html` you open directly in a browser — no build step. Variants use tab navigation and shared CSS variables from `themes/default.css`. All interactive elements (hover, click, transitions) are functional.
 
-After picking a winner, run `/gsd-sketch-wrap-up` to capture the visual decisions into `.claude/skills/sketch-findings-[project]/`.
+After picking a winner, run `/gsd-sketch --wrap-up` to capture the visual decisions into `.claude/skills/sketch-findings-[project]/`.
 
 ### Spike → Sketch → Phase Flow
 
 ```
 /gsd-spike "SSE vs WebSocket"     # Validate the approach
-/gsd-spike-wrap-up                # Package learnings
+/gsd-spike --wrap-up              # Package learnings
 
 /gsd-sketch "real-time feed UI"   # Explore the design
-/gsd-sketch-wrap-up               # Package decisions
+/gsd-sketch --wrap-up             # Package decisions
 
 /gsd-discuss-phase N              # Lock in preferences (now informed by spike + sketch)
 /gsd-plan-phase N                 # Plan with confidence
@@ -610,8 +636,8 @@ After picking a winner, run `/gsd-sketch-wrap-up` to capture the visual decision
 Ideas that aren't ready for active planning go into the backlog using 999.x numbering, keeping them outside the active phase sequence.
 
 ```
-/gsd-add-backlog "GraphQL API layer"     # Creates 999.1-graphql-api-layer/
-/gsd-add-backlog "Mobile responsive"     # Creates 999.2-mobile-responsive/
+/gsd-capture --backlog "GraphQL API layer"     # Creates 999.1-graphql-api-layer/
+/gsd-capture --backlog "Mobile responsive"     # Creates 999.2-mobile-responsive/
 ```
 
 Backlog items get full phase directories, so you can use `/gsd-discuss-phase 999.1` to explore an idea further or `/gsd-plan-phase 999.1` when it's ready.
@@ -623,7 +649,7 @@ Backlog items get full phase directories, so you can use `/gsd-discuss-phase 999
 Seeds are forward-looking ideas with trigger conditions. Unlike backlog items, seeds surface automatically when the right milestone arrives.
 
 ```
-/gsd-plant-seed "Add real-time collab when WebSocket infra is in place"
+/gsd-capture --seed "Add real-time collab when WebSocket infra is in place"
 ```
 
 Seeds preserve the full WHY and WHEN to surface. `/gsd-new-milestone` scans all seeds and presents matches.
@@ -642,7 +668,7 @@ Threads are lightweight cross-session knowledge stores for work that spans multi
 
 Threads are lighter weight than `/gsd-pause-work` — no phase state, no plan context. Each thread file includes Goal, Context, References, and Next Steps sections.
 
-Threads can be promoted to phases (`/gsd-add-phase`) or backlog items (`/gsd-add-backlog`) when they mature.
+Threads can be promoted to phases (`/gsd-phase`) or backlog items (`/gsd-capture --backlog`) when they mature.
 
 **Storage:** `.planning/threads/{slug}.md`
 
@@ -918,11 +944,13 @@ The gate is non-blocking: any internal failure logs and the phase continues.
 ### Mid-Milestone Scope Changes
 
 ```bash
-/gsd-add-phase              # Append a new phase to the roadmap
+/gsd-phase                  # Append a new phase to the roadmap (default mode)
 # or
-/gsd-insert-phase 3         # Insert urgent work between phases 3 and 4
+/gsd-phase --insert 3       # Insert urgent work between phases 3 and 4
 # or
-/gsd-remove-phase 7         # Descope phase 7 and renumber
+/gsd-phase --remove 7       # Descope phase 7 and renumber
+# or
+/gsd-phase --edit 4         # Edit any field of phase 4 in place
 ```
 
 ### Multi-Project Workspaces
@@ -941,8 +969,8 @@ cd ~/gsd-workspaces/feature-b
 /gsd-new-project
 
 # List and manage workspaces
-/gsd-list-workspaces
-/gsd-remove-workspace feature-b
+/gsd-workspace --list
+/gsd-workspace --remove feature-b
 ```
 
 Each workspace gets:
@@ -1014,7 +1042,7 @@ Do not re-run `/gsd-execute-phase`. Use `/gsd-quick` for targeted fixes, or `/gs
 
 ### Model Costs Too High
 
-Switch to budget profile: `/gsd-set-profile budget`. Disable research and plan-check agents via `/gsd-settings` if the domain is familiar to you (or to Claude).
+Switch to budget profile: `/gsd-config --profile budget`. Disable research and plan-check agents via `/gsd-settings` if the domain is familiar to you (or to Claude).
 
 ### Tuning model cost by phase (`models`) — added in v1.40
 
@@ -1174,7 +1202,7 @@ Skills are installed to `~/.qwen/skills/gsd-*/SKILL.md`. Use the `QWEN_CONFIG_DI
 
 ### Using Claude Code with Non-Anthropic Providers (OpenRouter, Local)
 
-If GSD subagents call Anthropic models and you're paying through OpenRouter or a local provider, switch to the `inherit` profile: `/gsd-set-profile inherit`. This makes all agents use your current session model instead of specific Anthropic models. See also `/gsd-settings` → Model Profile → Inherit.
+If GSD subagents call Anthropic models and you're paying through OpenRouter or a local provider, switch to the `inherit` profile: `/gsd-config --profile inherit`. This makes all agents use your current session model instead of specific Anthropic models. See also `/gsd-settings` → Model Profile → Inherit.
 
 ### Working on a Sensitive/Private Project
 
@@ -1357,13 +1385,13 @@ If the installer crashes with `EPERM: operation not permitted, scandir` on Windo
 | ------------------------------------ | ------------------------------------------------------------------------ |
 | Lost context / new session           | `/gsd-resume-work` or `/gsd-progress`                                    |
 | Phase went wrong                     | `git revert` the phase commits, then re-plan                             |
-| Need to change scope                 | `/gsd-add-phase`, `/gsd-insert-phase`, or `/gsd-remove-phase`            |
+| Need to change scope                 | `/gsd-phase` (default), `/gsd-phase --insert`, or `/gsd-phase --remove`  |
 | Something broke                      | `/gsd-debug "description"` (add `--diagnose` for analysis without fixes) |
 | STATE.md out of sync                 | `state validate` then `state sync`                                       |
 | Workflow state seems corrupted       | `/gsd-forensics`                                                         |
 | Quick targeted fix                   | `/gsd-quick`                                                             |
 | Plan doesn't match your vision       | `/gsd-discuss-phase [N]` then re-plan                                    |
-| Costs running high                   | `/gsd-set-profile budget` and `/gsd-settings` to toggle agents off       |
+| Costs running high                   | `/gsd-config --profile budget` and `/gsd-settings` to toggle agents off  |
 | Update broke local changes           | `/gsd-update --reapply`                                                  |
 | Want session summary for stakeholder | `/gsd-session-report`                                                    |
 | Don't know what step is next         | `/gsd-next`                                                              |

@@ -126,7 +126,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
 | `dynamic_routing.max_escalations` | integer | `0`, `1`, `2`, … | `1` | Hard cap on retries per agent invocation. Beyond the cap the resolver returns the cap-tier model. Added in v1.40 |
 | `project_code` | string | any short string | (none) | Prefix for phase directory names (e.g., `"ABC"` produces `ABC-01-setup/`). Added in v1.31 |
 | `response_language` | string | language code | (none) | Language for agent responses (e.g., `"pt"`, `"ko"`, `"ja"`). Propagates to all spawned agents for cross-phase language consistency. Added in v1.32 |
-| `context_window` | number | any integer | `200000` | Context window size in tokens. Set `1000000` for 1M-context models (e.g., `claude-opus-4-7[1m]`). Values `>= 500000` enable adaptive context enrichment (full-body reads of prior SUMMARY.md, deeper anti-pattern reads). Configured via `/gsd-settings-advanced`. |
+| `context_window` | number | any integer | `200000` | Context window size in tokens. Set `1000000` for 1M-context models (e.g., `claude-opus-4-7[1m]`). Values `>= 500000` enable adaptive context enrichment (full-body reads of prior SUMMARY.md, deeper anti-pattern reads). Configured via `/gsd-config --advanced`. |
 | `context_profile` | string | `dev`, `research`, `review` | (none) | Execution context preset that applies a pre-configured bundle of mode, model, and workflow settings for the current type of work. Added in v1.34 |
 | `claude_md_path` | string | any file path | `./CLAUDE.md` | Custom output path for the generated CLAUDE.md file. Useful for monorepos or projects that need CLAUDE.md in a non-root location. Defaults to `./CLAUDE.md` at the project root. Added in v1.36 |
 | `claude_md_assembly.mode` | enum | `embed`, `link` | `embed` | Controls how managed sections are written into CLAUDE.md. `embed` (default) inlines content between GSD markers. `link` writes `@.planning/<source-path>` instead — Claude Code expands the reference at runtime, reducing CLAUDE.md size by ~65% on typical projects. `link` only applies to sections that have a real source file; `workflow` and fallback sections always embed. Per-block overrides: `claude_md_assembly.blocks.<section>` (e.g. `claude_md_assembly.blocks.architecture: link`). Added in v1.38 |
@@ -143,7 +143,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
 
 ## Integration Settings
 
-Configured interactively via [`/gsd-settings-integrations`](COMMANDS.md#gsd-settings-integrations). These are *connectivity* settings — API keys and cross-tool routing — and are intentionally kept separate from `/gsd-settings` (workflow toggles).
+Configured interactively via [`/gsd-config --integrations`](COMMANDS.md#gsd-config). These are *connectivity* settings — API keys and cross-tool routing — and are intentionally kept separate from `/gsd-settings` (workflow toggles).
 
 ### Search API keys
 
@@ -172,7 +172,7 @@ The `<cli>` slug is validated against `[a-zA-Z0-9_-]+`. Empty or path-containing
 
 ### Agent-skill injection (dynamic)
 
-`agent_skills.<agent-type>` extends the `agent_skills` map documented below. Slug is validated against `[a-zA-Z0-9_-]+` — no path separators, no whitespace, no shell metacharacters. Configured interactively via `/gsd-settings-integrations`.
+`agent_skills.<agent-type>` extends the `agent_skills` map documented below. Slug is validated against `[a-zA-Z0-9_-]+` — no path separators, no whitespace, no shell metacharacters. Configured interactively via `/gsd-config --integrations`.
 
 ---
 
@@ -389,6 +389,21 @@ The `features.*` namespace is a dynamic key pattern — new feature flags can be
 | `parallelization.min_plans_for_parallel` | number | `2` | Minimum plans to trigger parallel execution |
 
 > **Pre-commit hooks and parallel execution**: When parallelization is enabled, executor agents commit with `--no-verify` to avoid build lock contention (e.g., cargo lock fights in Rust projects). The orchestrator validates hooks once after each wave completes. STATE.md writes are protected by file-level locking to prevent concurrent write corruption. If you need hooks to run per-commit, set `parallelization.enabled: false`.
+
+---
+
+## STATE.md Frontmatter (Phase Lifecycle)
+
+`STATE.md` carries YAML frontmatter that the status-line hook reads on every render. v1.40 adds four optional phase-lifecycle fields read by `parseStateMd()` and rendered by `formatGsdState()`:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `active_phase` | string (e.g. `"4.5"`) | Phase number when an orchestrator command is in flight |
+| `next_action` | string | Recommended next command when idle (`discuss-phase` / `plan-phase` / `execute-phase` / `verify-phase`) |
+| `next_phases` | YAML flow array | Phases the `next_action` applies to (e.g. `["4.5"]`) |
+| `progress` | block | Nested `total_phases` / `completed_phases` / `percent` for the milestone progress bar |
+
+All four fields are **optional and additive** — STATE.md files without them keep rendering exactly as in v1.38.x. See [`STATE-MD-LIFECYCLE.md`](STATE-MD-LIFECYCLE.md) for the full field reference, parser constraints, and rendering scenes.
 
 ---
 

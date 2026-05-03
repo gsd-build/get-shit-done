@@ -393,7 +393,7 @@
 
 ### 9. フェーズ管理
 
-**コマンド:** `/gsd-add-phase`、`/gsd-insert-phase [N]`、`/gsd-remove-phase [N]`
+**コマンド:** `/gsd-phase`、`/gsd-phase --insert [N]`、`/gsd-phase --remove [N]`
 
 **目的:** 開発中のロードマップの動的な変更。
 
@@ -680,7 +680,7 @@
 
 ### 26. モデルプロファイル
 
-**コマンド:** `/gsd-set-profile <quality|balanced|budget|inherit>`
+**コマンド:** `/gsd-config --profile <quality|balanced|budget|inherit>`
 
 **目的:** 各エージェントが使用する AI モデルを制御し、品質とコストのバランスを取ります。
 
@@ -762,7 +762,7 @@
 
 ### 29. Todo 管理
 
-**コマンド:** `/gsd-add-todo [desc]`、`/gsd-capture --list`
+**コマンド:** `/gsd-capture [desc]`、`/gsd-capture --list`
 
 **目的:** セッション中にアイデアやタスクをキャプチャし、後で作業できるようにします。
 
@@ -1065,7 +1065,7 @@ fix(03-01): correct auth token expiry
 
 ### 43. バックログパーキングロット
 
-**コマンド:** `/gsd-add-backlog <description>`、`/gsd-review-backlog`、`/gsd-plant-seed <idea>`
+**コマンド:** `/gsd-capture --backlog <description>`、`/gsd-review-backlog`、`/gsd-capture --seed <idea>`
 
 **目的:** アクティブなプランニングの準備ができていないアイデアをキャプチャします。バックログ項目は 999.x の番号付けを使用して、アクティブなフェーズシーケンスの外に留まります。シードは、適切なマイルストーンで自動的に表面化するトリガー条件を持つ、将来を見据えたアイデアです。
 

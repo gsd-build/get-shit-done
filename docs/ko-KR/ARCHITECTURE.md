@@ -411,7 +411,7 @@ UI-SPEC.md (per phase) ───────────────────
 │   ├── pending/            # 캡처된 아이디어
 │   └── done/               # 완료된 할 일
 ├── threads/               # 영구 컨텍스트 스레드 (/gsd-thread에서)
-├── seeds/                 # 미래 지향적 아이디어 (/gsd-plant-seed에서)
+├── seeds/                 # 미래 지향적 아이디어 (/gsd-capture --seed에서)
 ├── debug/                  # 활성 디버그 세션
 │   ├── *.md                # 활성 세션
 │   ├── resolved/           # 보관된 세션

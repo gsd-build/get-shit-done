@@ -6,9 +6,28 @@
 
 ## Command Syntax
 
-- **Claude Code / Gemini / Copilot:** `/gsd-command-name [args]`
-- **OpenCode / Kilo:** `/gsd-command-name [args]`
+- **Claude Code / Copilot / OpenCode / Kilo:** `/gsd-command-name [args]` (hyphen form)
+- **Gemini CLI:** `/gsd:command-name [args]` (colon form — Gemini namespaces commands under `gsd:`)
 - **Codex:** `$gsd-command-name [args]`
+
+The hyphen and colon forms are *runtime-specific spellings of the same command*. Whichever runtime you're on, the installer writes the correct form into your runtime's command directory.
+
+---
+
+## Namespace Meta-Skills
+
+Six namespace routers ship as the first-stage entry points in v1.40. They keep the eager skill-listing token cost low (~120 tokens for 6 routers vs ~2,150 for a flat 86-skill listing) while the full surface remains directly invocable. The model selects a namespace, then routes to the concrete sub-skill. See [#2792](https://github.com/gsd-build/get-shit-done/issues/2792).
+
+| Command | Routes to |
+|---------|-----------|
+| `/gsd-ns-workflow` | Phase pipeline — discuss / plan / execute / verify / phase / progress |
+| `/gsd-ns-project` | Project lifecycle — milestones, audits, summary |
+| `/gsd-ns-review` | Quality gates — code review, debug, audit, security, eval, ui |
+| `/gsd-ns-context` | Codebase intelligence — map, graphify, docs, learnings |
+| `/gsd-ns-manage` | Management — config, workspace, workstreams, thread, update, ship, inbox |
+| `/gsd-ns-ideate` | Exploration & capture — explore, sketch, spike, spec, capture |
+
+The namespace skills are **additive** — every existing concrete command (e.g. `/gsd-plan-phase`, `/gsd-code-review --fix`) is still invocable directly.
 
 ---
 
@@ -699,15 +718,19 @@ Generate a developer behavioral profile from Claude Code session analysis across
 
 ### `/gsd-health`
 
-Validate `.planning/` directory integrity.
+Validate `.planning/` directory integrity. With `--context`, probes the
+context-window utilization guard against the 60 % / 70 % thresholds (added
+v1.40.0, [#2792](https://github.com/gsd-build/get-shit-done/issues/2792)).
 
 | Flag | Description |
 |------|-------------|
 | `--repair` | Auto-fix recoverable issues |
+| `--context` | Probe context-window utilization; warns at 60 %, critical at 70 % |
 
 ```bash
 /gsd-health                         # Check integrity
 /gsd-health --repair                # Check and fix
+/gsd-health --context               # Context-utilization triage
 ```
 
 ### `/gsd-cleanup`
