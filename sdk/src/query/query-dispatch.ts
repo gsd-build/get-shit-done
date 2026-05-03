@@ -5,6 +5,7 @@ import { explainQueryCommandNoMatch, resolveQueryCommand, type QueryCommandResol
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryResult } from './utils.js';
 import type { QueryDispatchResult, QueryDispatchErrorKind } from './query-dispatch-contract.js';
+import { mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 
 export interface QueryDispatchDeps {
   registry: QueryRegistry;
@@ -30,7 +31,7 @@ function fail(
   details?: Record<string, unknown>,
   stderr: string[] = [],
 ): QueryDispatchResult {
-  return { ok: false, stderr, exit_code: code, error: { kind, code, message, details } };
+  return toDispatchFailure({ kind, code, message, details }, stderr);
 }
 
 function success(stdout: string, stderr: string[] = []): QueryDispatchResult {
@@ -126,8 +127,6 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
     const result = await deps.dispatchNative(matched.cmd, matched.args);
     return success(formatOutput(result.data, result.format, pickField));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const kind: QueryDispatchErrorKind = msg.includes('timed out after') ? 'native_timeout' : 'native_failure';
-    return fail(kind, 1, `Error: ${msg}`, { command: matched.cmd, args: matched.args });
+    return toDispatchFailure(mapNativeDispatchError(e, matched.cmd, matched.args));
   }
 }

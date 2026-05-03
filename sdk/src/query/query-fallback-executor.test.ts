@@ -77,5 +77,6 @@ describe('runCjsFallbackDispatch', () => {
     expect(result.error.code).toBe(1);
     expect(result.error.kind).toBe('fallback_failure');
     expect(result.error.message).toContain('fallback failed');
+    expect(result.error.details).toMatchObject({ command: 'state', args: ['load'], backend: 'cjs' });
   });
 });

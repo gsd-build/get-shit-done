@@ -36,9 +36,26 @@ CJS routing seams mirror these families with thin adapters (`state/verify/init/p
 
 ## Error handling
 
-- **Validation and programmer errors**: Handlers throw `GSDError` with an `ErrorClassification` (e.g. missing required args, invalid phase). The CLI maps these to exit codes via `exitCodeFor()`.
+- **Validation and programmer errors**: Handlers throw `GSDError` with an `ErrorClassification` (e.g. missing required args, invalid phase). The Dispatch Policy Module maps native failures into structured dispatch errors.
 - **Expected domain failures**: Handlers return `{ data: { error: string, ... } }` for cases that are not exceptional in normal use (file not found, intel disabled, todo missing, etc.). Callers must check `data.error` when present.
 - Do not mix both styles for the same failure mode in new code: prefer **throw** for "caller must fix input"; prefer `**data.error`** for "operation could not complete in this project state."
+
+### Dispatch Policy Module contract
+
+`runQueryDispatch()` returns a structured union contract:
+
+- success: `{ ok: true, stdout, stderr, exit_code: 0 }`
+- failure: `{ ok: false, error: { kind, code, message, details }, stderr, exit_code }`
+
+Current error `kind` values:
+- `unknown_command`
+- `native_failure`
+- `native_timeout`
+- `fallback_failure`
+- `validation_error`
+- `internal_error`
+
+CLI is a thin adapter over this seam and uses `exit_code` directly.
 
 ## Mutation commands and events
 

@@ -106,5 +106,40 @@ describe('runQueryDispatch', () => {
     expect(out.error.code).toBe(10);
     expect(out.error.kind).toBe('validation_error');
     expect(out.error.message).toContain('requires a command');
+    expect(out.error.details).toEqual({ reason: 'missing_command' });
+  });
+
+  it('maps native timeout to native_timeout kind with details', async () => {
+    const registry = createRegistry();
+    const out = await runQueryDispatch({
+      registry,
+      projectDir: tmpDir,
+      cjsFallbackEnabled: true,
+      resolveGsdToolsPath: () => '',
+      dispatchNative: async () => { throw new Error('gsd-tools timed out after 30000ms: state load'); },
+    }, ['state', 'load']);
+
+    expect(out.ok).toBe(false);
+    if (out.ok) throw new Error('expected failure');
+    expect(out.error.kind).toBe('native_timeout');
+    expect(out.error.code).toBe(1);
+    expect(out.error.details).toMatchObject({ command: 'state.load', args: [], timeout_ms: 30000 });
+  });
+
+  it('maps native error to native_failure kind with details', async () => {
+    const registry = createRegistry();
+    const out = await runQueryDispatch({
+      registry,
+      projectDir: tmpDir,
+      cjsFallbackEnabled: true,
+      resolveGsdToolsPath: () => '',
+      dispatchNative: async () => { throw new Error('boom'); },
+    }, ['state', 'json']);
+
+    expect(out.ok).toBe(false);
+    if (out.ok) throw new Error('expected failure');
+    expect(out.error.kind).toBe('native_failure');
+    expect(out.error.code).toBe(1);
+    expect(out.error.details).toMatchObject({ command: 'state.json', args: [] });
   });
 });
