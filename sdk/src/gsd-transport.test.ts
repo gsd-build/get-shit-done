@@ -90,6 +90,35 @@ describe('GSDTransport', () => {
     expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
   });
 
+  it('does not fallback after timeout-like native error', async () => {
+    const registry = new QueryRegistry();
+    registry.register('state.load', async () => ({ data: { ok: true } }));
+
+    const adapters = {
+      dispatchNative: vi.fn(async () => {
+        throw new Error('gsd-tools timed out after 500ms: state load');
+      }),
+      execSubprocessJson: vi.fn(async () => ({ ok: 'fallback' })),
+      execSubprocessRaw: vi.fn(async () => 'fallback-raw'),
+    };
+
+    const transport = new GSDTransport(registry, adapters);
+
+    await expect(transport.run({
+      legacyCommand: 'state',
+      legacyArgs: ['load'],
+      registryCommand: 'state.load',
+      registryArgs: [],
+      mode: 'json',
+      projectDir: '/tmp',
+    }, {
+      preferNative: true,
+      allowFallbackToSubprocess: true,
+    })).rejects.toThrow('timed out after');
+
+    expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
+  });
+
   it('forces subprocess when workstream present', async () => {
     const registry = new QueryRegistry();
     registry.register('state.load', async () => ({ data: { ok: true } }));
