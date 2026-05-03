@@ -26,6 +26,8 @@ export interface WorkflowConfig {
   /** Mirrors gsd-tools flat `config.tdd_mode` (from `workflow.tdd_mode`). */
   tdd_mode: boolean;
   auto_advance: boolean;
+  /** Internal auto-chain flag used by workflow routing. */
+  _auto_chain_active?: boolean;
   node_repair: boolean;
   node_repair_budget: number;
   ui_phase: boolean;
@@ -67,8 +69,6 @@ export interface GSDConfig {
   project_code?: string | null;
   /** Interactive vs headless; mirrors gsd-tools flat `config.mode`. */
   mode?: string;
-  /** Internal auto-chain flag; mirrors gsd-tools `config._auto_chain_active`. */
-  _auto_chain_active?: boolean;
   [key: string]: unknown;
 }
 
@@ -106,6 +106,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     max_discuss_passes: 3,
     subagent_timeout: 300000,
     context_coverage_gate: true,
+    _auto_chain_active: false,
   },
   hooks: {
     context_warnings: true,
@@ -113,15 +114,14 @@ export const CONFIG_DEFAULTS: GSDConfig = {
   agent_skills: {},
   project_code: null,
   mode: 'interactive',
-  _auto_chain_active: false,
 };
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 /**
  * Load project config from `.planning/config.json`, merging with defaults.
- * When project config is missing or empty, layers user defaults
- * (`~/.gsd/defaults.json`) over built-in defaults.
+ * When project config is missing or empty, this returns `mergeDefaults({})`
+ * (built-in defaults only; no `~/.gsd/defaults.json` layering).
  * Throws on malformed JSON with a helpful error message.
  */
 export async function loadConfig(projectDir: string, workstream?: string): Promise<GSDConfig> {

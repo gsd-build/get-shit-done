@@ -391,7 +391,7 @@ export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) 
     commit_docs: config.commit_docs,
     text_mode: config.workflow.text_mode,
     auto_advance: !!config.workflow.auto_advance,
-    auto_chain_active: !!cfg._auto_chain_active,
+    auto_chain_active: !!config.workflow._auto_chain_active,
     mode: cfg.mode ?? 'interactive',
     phase_found: !!phaseInfo,
     phase_dir: (phaseInfo?.directory as string) ?? null,
