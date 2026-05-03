@@ -10,13 +10,7 @@
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { STATE_COMMAND_MANIFEST } from '../src/query/command-manifest.state.js';
-import { VERIFY_COMMAND_MANIFEST } from '../src/query/command-manifest.verify.js';
-import { INIT_COMMAND_MANIFEST } from '../src/query/command-manifest.init.js';
-import { PHASE_COMMAND_MANIFEST } from '../src/query/command-manifest.phase.js';
-import { PHASES_COMMAND_MANIFEST } from '../src/query/command-manifest.phases.js';
-import { VALIDATE_COMMAND_MANIFEST } from '../src/query/command-manifest.validate.js';
-import { ROADMAP_COMMAND_MANIFEST } from '../src/query/command-manifest.roadmap.js';
+import { COMMAND_DEFINITIONS_BY_FAMILY } from '../src/query/command-definition.js';
 
 function toSubcommand(canonical: string, family: 'state' | 'verify' | 'init' | 'phase' | 'phases' | 'validate' | 'roadmap'): string {
   const prefix = `${family}.`;
@@ -24,49 +18,49 @@ function toSubcommand(canonical: string, family: 'state' | 'verify' | 'init' | '
 }
 
 async function main(): Promise<void> {
-  const stateEntries = STATE_COMMAND_MANIFEST.map((entry) => ({
+  const stateEntries = COMMAND_DEFINITIONS_BY_FAMILY.state.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'state'),
     mutation: entry.mutation,
   }));
 
-  const verifyEntries = VERIFY_COMMAND_MANIFEST.map((entry) => ({
+  const verifyEntries = COMMAND_DEFINITIONS_BY_FAMILY.verify.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'verify'),
     mutation: entry.mutation,
   }));
 
-  const initEntries = INIT_COMMAND_MANIFEST.map((entry) => ({
+  const initEntries = COMMAND_DEFINITIONS_BY_FAMILY.init.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'init'),
     mutation: entry.mutation,
   }));
 
-  const phaseEntries = PHASE_COMMAND_MANIFEST.map((entry) => ({
+  const phaseEntries = COMMAND_DEFINITIONS_BY_FAMILY.phase.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'phase'),
     mutation: entry.mutation,
   }));
 
-  const phasesEntries = PHASES_COMMAND_MANIFEST.map((entry) => ({
+  const phasesEntries = COMMAND_DEFINITIONS_BY_FAMILY.phases.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'phases'),
     mutation: entry.mutation,
   }));
 
-  const validateEntries = VALIDATE_COMMAND_MANIFEST.map((entry) => ({
+  const validateEntries = COMMAND_DEFINITIONS_BY_FAMILY.validate.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'validate'),
     mutation: entry.mutation,
   }));
 
-  const roadmapEntries = ROADMAP_COMMAND_MANIFEST.map((entry) => ({
+  const roadmapEntries = COMMAND_DEFINITIONS_BY_FAMILY.roadmap.map((entry) => ({
     canonical: entry.canonical,
     aliases: entry.aliases,
     subcommand: toSubcommand(entry.canonical, 'roadmap'),
@@ -98,22 +92,7 @@ async function main(): Promise<void> {
     'export const VALIDATE_SUBCOMMANDS = new Set<string>(VALIDATE_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     'export const ROADMAP_SUBCOMMANDS = new Set<string>(ROADMAP_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     '',
-    'export const STATE_MUTATION_COMMANDS: readonly string[] = STATE_COMMAND_ALIASES',
-    '  .filter((entry) => entry.mutation)',
-    '  .flatMap((entry) => [entry.canonical, ...entry.aliases]);',
-    '',
-    'export const PHASE_MUTATION_COMMANDS: readonly string[] = PHASE_COMMAND_ALIASES',
-    '  .filter((entry) => entry.mutation)',
-    '  .flatMap((entry) => [entry.canonical, ...entry.aliases]);',
-    '',
-    'export const PHASES_MUTATION_COMMANDS: readonly string[] = PHASES_COMMAND_ALIASES',
-    '  .filter((entry) => entry.mutation)',
-    '  .flatMap((entry) => [entry.canonical, ...entry.aliases]);',
-    '',
-    'export const ROADMAP_MUTATION_COMMANDS: readonly string[] = ROADMAP_COMMAND_ALIASES',
-    '  .filter((entry) => entry.mutation)',
-    '  .flatMap((entry) => [entry.canonical, ...entry.aliases]);',
-    '',
+
   ].join('\n');
   await writeFile(outPath, header + body, 'utf-8');
 }

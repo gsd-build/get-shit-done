@@ -12,3 +12,6 @@ Canonical error kind set:
 - `fallback_failure`
 - `validation_error`
 - `internal_error`
+
+### Command Definition Module
+Canonical command metadata Interface powering alias, catalog, and semantics generation.

@@ -1,13 +1,6 @@
 import { QueryRegistry } from './registry.js';
-import {
-  STATE_COMMAND_ALIASES,
-  VERIFY_COMMAND_ALIASES,
-  INIT_COMMAND_ALIASES,
-  PHASE_COMMAND_ALIASES,
-  PHASES_COMMAND_ALIASES,
-  VALIDATE_COMMAND_ALIASES,
-  ROADMAP_COMMAND_ALIASES,
-} from './command-aliases.generated.js';
+import type { AliasCatalogEntry } from './command-catalog.js';
+import type { CommandFamily } from './command-manifest.types.js';
 import { GSDEventStream } from '../event-stream.js';
 import type { QueryHandler } from './utils.js';
 import { registerAliasCatalog, registerStaticCatalog } from './command-catalog.js';
@@ -20,6 +13,7 @@ import {
 } from './command-static-catalog-foundation.js';
 import { DOMAIN_STATIC_CATALOG } from './command-static-catalog-domain.js';
 import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS } from './policy-convergence.js';
+import { COMMAND_DEFINITIONS_BY_FAMILY, type CommandDefinition } from './command-definition.js';
 import { decorateMutationsWithEvents } from './mutation-event-decorator.js';
 import { FAMILY_HANDLERS } from './command-family-handlers.js';
 import {
@@ -45,15 +39,44 @@ const STATIC_CATALOG_GROUPS: readonly RegistryAssemblyStaticGroup[] = [
   { name: 'DOMAIN_STATIC_CATALOG', entries: DOMAIN_STATIC_CATALOG },
 ] as const;
 
+function toAliasCatalogEntry(entry: CommandDefinition): AliasCatalogEntry {
+  return {
+    canonical: entry.canonical,
+    aliases: entry.aliases,
+  };
+}
+
+function buildAliasGroup(family: CommandFamily): RegistryAssemblyAliasGroup {
+  const definitions = COMMAND_DEFINITIONS_BY_FAMILY[family];
+  const familyHandlers = FAMILY_HANDLERS[family] as Readonly<Record<string, QueryHandler>>;
+  const handlers: Record<string, QueryHandler> = {};
+
+  for (const entry of definitions) {
+    const handler = familyHandlers[entry.handler_key];
+    if (!handler) continue;
+    handlers[entry.canonical] = handler;
+  }
+
+  return {
+    family,
+    aliases: definitions.map(toAliasCatalogEntry),
+    handlers,
+  };
+}
+
 const ALIAS_GROUPS: readonly RegistryAssemblyAliasGroup[] = [
-  { family: 'state', aliases: STATE_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.state as Record<string, QueryHandler> },
-  { family: 'roadmap', aliases: ROADMAP_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.roadmap as Record<string, QueryHandler> },
-  { family: 'verify', aliases: VERIFY_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.verify as Record<string, QueryHandler> },
-  { family: 'validate', aliases: VALIDATE_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.validate as Record<string, QueryHandler> },
-  { family: 'phase', aliases: PHASE_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.phase as Record<string, QueryHandler> },
-  { family: 'phases', aliases: PHASES_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.phases as Record<string, QueryHandler> },
-  { family: 'init', aliases: INIT_COMMAND_ALIASES, handlers: FAMILY_HANDLERS.init as Record<string, QueryHandler> },
+  buildAliasGroup('state'),
+  buildAliasGroup('roadmap'),
+  buildAliasGroup('verify'),
+  buildAliasGroup('validate'),
+  buildAliasGroup('phase'),
+  buildAliasGroup('phases'),
+  buildAliasGroup('init'),
 ] as const;
+
+const ALIAS_GROUP_BY_FAMILY = Object.fromEntries(
+  ALIAS_GROUPS.map((group) => [group.family, group]),
+) as Readonly<Record<CommandFamily, RegistryAssemblyAliasGroup>>;
 
 export function buildRegistry(): QueryRegistry {
   assertAliasCanonicalsHaveHandlers({
@@ -72,25 +95,25 @@ export function buildRegistry(): QueryRegistry {
   const registry = new QueryRegistry();
 
   registerStaticCatalog(registry, FOUNDATION_STATIC_CATALOG);
-  registerAliasCatalog(registry, STATE_COMMAND_ALIASES, FAMILY_HANDLERS.state as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.state.aliases, ALIAS_GROUP_BY_FAMILY.state.handlers);
 
   registerStaticCatalog(registry, STATE_SUPPORT_STATIC_CATALOG);
-  registerAliasCatalog(registry, ROADMAP_COMMAND_ALIASES, FAMILY_HANDLERS.roadmap as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.roadmap.aliases, ALIAS_GROUP_BY_FAMILY.roadmap.handlers);
 
   registerStaticCatalog(registry, MUTATION_SURFACES_STATIC_CATALOG);
 
-  registerAliasCatalog(registry, VERIFY_COMMAND_ALIASES, FAMILY_HANDLERS.verify as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.verify.aliases, ALIAS_GROUP_BY_FAMILY.verify.handlers);
 
   registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG);
-  registerAliasCatalog(registry, VALIDATE_COMMAND_ALIASES, FAMILY_HANDLERS.validate as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.validate.aliases, ALIAS_GROUP_BY_FAMILY.validate.handlers);
 
   registerStaticCatalog(registry, DECISION_ROUTING_STATIC_CATALOG);
 
-  registerAliasCatalog(registry, PHASE_COMMAND_ALIASES, FAMILY_HANDLERS.phase as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.phase.aliases, ALIAS_GROUP_BY_FAMILY.phase.handlers);
 
-  registerAliasCatalog(registry, PHASES_COMMAND_ALIASES, FAMILY_HANDLERS.phases as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.phases.aliases, ALIAS_GROUP_BY_FAMILY.phases.handlers);
 
-  registerAliasCatalog(registry, INIT_COMMAND_ALIASES, FAMILY_HANDLERS.init as Record<string, QueryHandler>);
+  registerAliasCatalog(registry, ALIAS_GROUP_BY_FAMILY.init.aliases, ALIAS_GROUP_BY_FAMILY.init.handlers);
 
   registerStaticCatalog(registry, DOMAIN_STATIC_CATALOG);
 

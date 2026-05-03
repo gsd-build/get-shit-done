@@ -106,9 +106,8 @@ export async function runCjsFallbackDispatch(input: RunCjsFallbackDispatchInput)
       exit_code: 0,
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     return toDispatchFailure(
-      mapFallbackDispatchError(msg, normCmd, normArgs),
+      mapFallbackDispatchError(err, normCmd, normArgs),
       stderr,
     );
   }

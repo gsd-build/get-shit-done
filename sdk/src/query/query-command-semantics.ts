@@ -6,11 +6,8 @@ import {
   PHASES_SUBCOMMANDS,
   VALIDATE_SUBCOMMANDS,
   ROADMAP_SUBCOMMANDS,
-  STATE_MUTATION_COMMANDS,
-  PHASE_MUTATION_COMMANDS,
-  PHASES_MUTATION_COMMANDS,
-  ROADMAP_MUTATION_COMMANDS,
 } from './command-aliases.generated.js';
+import { FAMILY_MUTATION_COMMANDS } from './command-definition.js';
 
 export interface QueryCommandRegistryLike {
   has(command: string): boolean;
@@ -52,14 +49,11 @@ const MERGE_FIRST_WITH_SUBCOMMAND = new Set<string>([
 ]);
 
 export const QUERY_MUTATION_COMMAND_LIST: readonly string[] = [
-  ...STATE_MUTATION_COMMANDS,
+  ...FAMILY_MUTATION_COMMANDS,
   'frontmatter.set', 'frontmatter.merge', 'frontmatter.validate', 'frontmatter validate',
   'config-set', 'config-set-model-profile', 'config-new-project', 'config-ensure-section',
   'commit', 'check-commit', 'commit-to-subrepo',
   'template.fill', 'template.select', 'template select',
-  ...PHASE_MUTATION_COMMANDS,
-  ...PHASES_MUTATION_COMMANDS,
-  ...ROADMAP_MUTATION_COMMANDS,
   'requirements.mark-complete', 'requirements mark-complete',
   'todo.complete', 'todo complete',
   'milestone.complete', 'milestone complete',

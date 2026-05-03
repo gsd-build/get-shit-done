@@ -105,18 +105,3 @@ export const PHASES_SUBCOMMANDS = new Set<string>(PHASES_COMMAND_ALIASES.map((en
 export const VALIDATE_SUBCOMMANDS = new Set<string>(VALIDATE_COMMAND_ALIASES.map((entry) => entry.subcommand));
 export const ROADMAP_SUBCOMMANDS = new Set<string>(ROADMAP_COMMAND_ALIASES.map((entry) => entry.subcommand));
 
-export const STATE_MUTATION_COMMANDS: readonly string[] = STATE_COMMAND_ALIASES
-  .filter((entry) => entry.mutation)
-  .flatMap((entry) => [entry.canonical, ...entry.aliases]);
-
-export const PHASE_MUTATION_COMMANDS: readonly string[] = PHASE_COMMAND_ALIASES
-  .filter((entry) => entry.mutation)
-  .flatMap((entry) => [entry.canonical, ...entry.aliases]);
-
-export const PHASES_MUTATION_COMMANDS: readonly string[] = PHASES_COMMAND_ALIASES
-  .filter((entry) => entry.mutation)
-  .flatMap((entry) => [entry.canonical, ...entry.aliases]);
-
-export const ROADMAP_MUTATION_COMMANDS: readonly string[] = ROADMAP_COMMAND_ALIASES
-  .filter((entry) => entry.mutation)
-  .flatMap((entry) => [entry.canonical, ...entry.aliases]);
