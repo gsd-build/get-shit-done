@@ -390,6 +390,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   if (args.command === 'query') {
     const { createRegistry } = await import('./query/index.js');
     const { extractField } = await import('./query/registry.js');
+    const { planQueryDispatch } = await import('./query/query-fallback-orchestration.js');
     const { GSDToolsError } = await import('./gsd-tools.js');
     const { GSDError, exitCodeFor, ErrorClassification } = await import('./errors.js');
 
@@ -415,19 +416,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     }
 
     try {
-      const queryCommand = queryArgs[0];
-      const { normalizeQueryCommand } = await import('./query/normalize-query-command.js');
-      const { resolveQueryCommand } = await import('./query/command-resolution.js');
-      const [normCmd, normArgs] = normalizeQueryCommand(queryCommand, queryArgs.slice(1));
+      const registry = createRegistry();
+      const plan = planQueryDispatch(queryArgs, registry, { cjsFallbackEnabled: queryFallbackToCjsEnabled() });
+      const normCmd = plan.normalized.command;
+      const normArgs = plan.normalized.args;
       if (!normCmd || !String(normCmd).trim()) {
         console.error('Error: "gsd-sdk query" requires a command');
         process.exitCode = 10;
         return;
       }
-      const registry = createRegistry();
-      const matched = resolveQueryCommand(queryCommand, queryArgs.slice(1), registry);
-      if (!matched) {
-        if (!queryFallbackToCjsEnabled()) {
+      if (plan.mode !== 'native') {
+        if (plan.mode === 'error') {
           throw new GSDError(
             `Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.`,
             ErrorClassification.Validation,
@@ -468,6 +467,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
         }
         console.log(JSON.stringify(output, null, 2));
       } else {
+        const matched = plan.matched!;
         const result = await registry.dispatch(matched.cmd, matched.args, args.projectDir, args.ws);
         let output: unknown = result.data;
 

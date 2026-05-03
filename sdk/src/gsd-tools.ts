@@ -562,22 +562,21 @@ export class GSDTools {
  */
 export async function runGsdToolsQuery(projectDir: string, queryArgv: string[]): Promise<unknown> {
   const { createRegistry } = await import('./query/index.js');
-  const { resolveQueryCommand } = await import('./query/command-resolution.js');
+  const { planQueryDispatch } = await import('./query/query-fallback-orchestration.js');
   const { GSDError, ErrorClassification } = await import('./errors.js');
 
   if (queryArgv.length === 0 || !queryArgv[0]) {
     throw new GSDError('runGsdToolsQuery requires a command', ErrorClassification.Validation);
   }
-  const queryCommand = queryArgv[0];
   const registry = createRegistry();
-  const matched = resolveQueryCommand(queryCommand, queryArgv.slice(1), registry);
-  if (!matched) {
+  const plan = planQueryDispatch(queryArgv, registry, { cjsFallbackEnabled: false });
+  if (plan.mode !== 'native' || !plan.matched) {
     throw new GSDError(
-      `Unknown command: "${queryArgv.join(' ')}". No native handler registered.`,
+      `Unknown command: "${plan.normalized.tokens.join(' ')}". No native handler registered.`,
       ErrorClassification.Validation,
     );
   }
-  const result = await registry.dispatch(matched.cmd, matched.args, projectDir);
+  const result = await registry.dispatch(plan.matched.cmd, plan.matched.args, projectDir);
   return result.data;
 }
 
