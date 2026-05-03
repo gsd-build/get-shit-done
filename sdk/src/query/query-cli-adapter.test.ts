@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const dispatchSpy = vi.fn();
-const runQueryDispatchSpy = vi.fn();
+const dispatchSpy = vi.hoisted(() => vi.fn());
+const runQueryDispatchSpy = vi.hoisted(() => vi.fn());
 
 vi.mock('./helpers.js', () => ({
   findProjectRoot: (projectDir: string) => projectDir,
