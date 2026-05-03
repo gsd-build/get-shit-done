@@ -92,6 +92,24 @@ describe('runQueryDispatch', () => {
     expect(out.stderr[0]).toContain('falling back to gsd-tools.cjs');
   });
 
+  it('returns structured fallback failure when resolveGsdToolsPath throws', async () => {
+    const registry = createRegistry();
+    const out = await runQueryDispatch({
+      registry,
+      projectDir: tmpDir,
+      cjsFallbackEnabled: true,
+      resolveGsdToolsPath: () => { throw new Error('path boom'); },
+      dispatchNative: async () => ({ data: {} }),
+    }, ['unknown-cmd']);
+
+    expect(out.ok).toBe(false);
+    if (out.ok) throw new Error('expected failure');
+    expect(out.error.kind).toBe('fallback_failure');
+    expect(out.error.code).toBe(1);
+    expect(out.error.message).toContain('path boom');
+    expect(out.error.details).toMatchObject({ command: 'unknown-cmd', backend: 'cjs' });
+  });
+
   it('returns requires-command error for empty argv', async () => {
     const registry = createRegistry();
     const out = await runQueryDispatch({

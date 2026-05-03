@@ -111,15 +111,24 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   }
 
   if (plan.mode === 'cjs') {
-    const gsdPath = deps.resolveGsdToolsPath(deps.projectDir);
-    return runCjsFallbackDispatch({
-      projectDir: deps.projectDir,
-      gsdToolsPath: gsdPath,
-      normCmd,
-      normArgs,
-      ws: deps.ws,
-      pickField,
-    });
+    try {
+      const gsdPath = deps.resolveGsdToolsPath(deps.projectDir);
+      return await runCjsFallbackDispatch({
+        projectDir: deps.projectDir,
+        gsdToolsPath: gsdPath,
+        normCmd,
+        normArgs,
+        ws: deps.ws,
+        pickField,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return fail('fallback_failure', 1, `Error: gsd-tools.cjs fallback failed: ${msg}`, {
+        command: normCmd,
+        args: normArgs,
+        backend: 'cjs',
+      });
+    }
   }
 
   const matched = plan.matched!;
