@@ -341,7 +341,7 @@ export class GSDTools {
         legacyArgs: args,
         registryCommand,
         registryArgs,
-        mode: 'raw',
+        mode: policy.outputMode,
         projectDir: this.projectDir,
         workstream: this.workstream,
       }, {

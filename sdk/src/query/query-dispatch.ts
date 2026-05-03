@@ -59,7 +59,9 @@ function extractPick(queryArgv: string[]): { queryArgs: string[]; pickField?: st
 function formatOutput(data: unknown, format: QueryResult['format'], pickField?: string): string {
   let output: unknown = data;
   if (pickField) output = extractField(output, pickField);
-  if (!pickField && format === 'text' && typeof output === 'string') return output;
+  if (!pickField && format === 'text' && typeof output === 'string') {
+    return output.endsWith('\n') ? output : `${output}\n`;
+  }
   return `${JSON.stringify(output, null, 2)}\n`;
 }
 

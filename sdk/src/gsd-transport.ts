@@ -50,8 +50,11 @@ export class GSDTransport {
         }
         return native.data;
       } catch (error) {
-        if (isTimeoutLikeError(error)) throw error;
         if (!policy.allowFallbackToSubprocess) throw error;
+        // Do not subprocess-fallback after a timed-out native dispatch:
+        // the timeout does not cancel the native handler, so falling through
+        // would run the same command twice (double-execution race).
+        if (isTimeoutLikeError(error)) throw error;
       }
     }
 

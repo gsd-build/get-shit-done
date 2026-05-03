@@ -38,7 +38,7 @@ function execGsdToolsCjsQuery(
     execFile(
       process.execPath,
       fullArgv,
-      { cwd: projectDir, maxBuffer: 10 * 1024 * 1024, env: { ...process.env } },
+      { cwd: projectDir, maxBuffer: 10 * 1024 * 1024, timeout: 30_000, killSignal: 'SIGKILL', env: { ...process.env } },
       (err, stdout, stderr) => {
         if (err) reject(err);
         else resolve({ stdout: stdout?.toString() ?? '', stderr: stderr?.toString() ?? '' });
@@ -91,7 +91,7 @@ function formatFallbackOutput(data: unknown, mode: 'json' | 'text', pickField?: 
 export async function runCjsFallbackDispatch(input: RunCjsFallbackDispatchInput): Promise<QueryDispatchResult> {
   const { projectDir, gsdToolsPath, normCmd, normArgs, ws, pickField } = input;
   const stderr = [
-    `[gsd-sdk] '${[normCmd, ...normArgs].join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
+    `[gsd-sdk] '${normCmd}' not in native registry; falling back to gsd-tools.cjs.`,
     '[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.',
   ];
 

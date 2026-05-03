@@ -209,9 +209,9 @@ describe('GSDTools', () => {
         'state-load.cjs',
         `
         const args = process.argv.slice(2);
-        // Script receives: state load --raw
-        if (args[0] === 'state' && args[1] === 'load' && args.includes('--raw')) {
-          process.stdout.write('phase=3\\nstatus=executing');
+        // Script receives: state load (no --raw when policy is json)
+        if (args[0] === 'state' && args[1] === 'load') {
+          process.stdout.write(JSON.stringify({ phase: '3', status: 'executing' }));
         } else {
           process.stderr.write('unexpected args: ' + args.join(' '));
           process.exit(1);
@@ -222,7 +222,7 @@ describe('GSDTools', () => {
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
       const result = await tools.stateLoad();
 
-      expect(result).toBe('phase=3\nstatus=executing');
+      expect(result).toEqual({ phase: '3', status: 'executing' });
     });
 
     it('commit() passes message and optional files', async () => {
