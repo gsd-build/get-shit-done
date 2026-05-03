@@ -77,7 +77,7 @@ describe('QueryRegistry', () => {
 
     const result = await registry.dispatch('test-cmd', ['arg1'], '/tmp');
 
-    expect(handler).toHaveBeenCalledWith(['arg1'], '/tmp');
+    expect(handler).toHaveBeenCalledWith(['arg1'], '/tmp', undefined);
     expect(result).toEqual({ data: { value: 'arg1' } });
   });
 

@@ -120,6 +120,7 @@ import {
   type GSDTemplateFillEvent,
 } from '../types.js';
 import type { QueryHandler, QueryResult } from './utils.js';
+import { registerAliasCatalog, registerStaticCatalog } from './command-catalog.js';
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
 
@@ -277,12 +278,14 @@ export function createRegistry(
   const mutationSessionId = correlationSessionId ?? '';
   const registry = new QueryRegistry();
 
-  registry.register('generate-slug', generateSlug);
-  registry.register('current-timestamp', currentTimestamp);
-  registry.register('frontmatter.get', frontmatterGet);
-  registry.register('config-get', configGet);
-  registry.register('config-path', configPath);
-  registry.register('resolve-model', resolveModel);
+  registerStaticCatalog(registry, [
+    ['generate-slug', generateSlug],
+    ['current-timestamp', currentTimestamp],
+    ['frontmatter.get', frontmatterGet],
+    ['config-get', configGet],
+    ['config-path', configPath],
+    ['resolve-model', resolveModel],
+  ]);
   const stateHandlers: Record<string, QueryHandler> = {
     'state.load': stateProjectLoad,
     'state.json': stateJson,
@@ -307,22 +310,17 @@ export function createRegistry(
     'state.add-roadmap-evolution': stateAddRoadmapEvolution,
   };
 
-  for (const entry of STATE_COMMAND_ALIASES) {
-    const handler = stateHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, STATE_COMMAND_ALIASES, stateHandlers);
 
-  registry.register('state-snapshot', stateSnapshot);
-  registry.register('find-phase', findPhase);
-  registry.register('phase-plan-index', phasePlanIndex);
-  registry.register('plan.task-structure', planTaskStructure);
-  registry.register('plan task-structure', planTaskStructure);
-  registry.register('requirements.extract-from-plans', requirementsExtractFromPlans);
-  registry.register('requirements extract-from-plans', requirementsExtractFromPlans);
+  registerStaticCatalog(registry, [
+    ['state-snapshot', stateSnapshot],
+    ['find-phase', findPhase],
+    ['phase-plan-index', phasePlanIndex],
+    ['plan.task-structure', planTaskStructure],
+    ['plan task-structure', planTaskStructure],
+    ['requirements.extract-from-plans', requirementsExtractFromPlans],
+    ['requirements extract-from-plans', requirementsExtractFromPlans],
+  ]);
   const roadmapHandlers: Record<string, QueryHandler> = {
     'roadmap.analyze': roadmapAnalyze,
     'roadmap.get-phase': roadmapGetPhase,
@@ -330,38 +328,33 @@ export function createRegistry(
     'roadmap.annotate-dependencies': roadmapAnnotateDependencies,
   };
 
-  for (const entry of ROADMAP_COMMAND_ALIASES) {
-    const handler = roadmapHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, ROADMAP_COMMAND_ALIASES, roadmapHandlers);
 
-  registry.register('progress', progressJson);
-  registry.register('progress.json', progressJson);
+  registerStaticCatalog(registry, [
+    ['progress', progressJson],
+    ['progress.json', progressJson],
 
-  // Frontmatter mutation handlers
-  registry.register('frontmatter.set', frontmatterSet);
-  registry.register('frontmatter.merge', frontmatterMerge);
-  registry.register('frontmatter.validate', frontmatterValidate);
-  registry.register('frontmatter validate', frontmatterValidate);
+    // Frontmatter mutation handlers
+    ['frontmatter.set', frontmatterSet],
+    ['frontmatter.merge', frontmatterMerge],
+    ['frontmatter.validate', frontmatterValidate],
+    ['frontmatter validate', frontmatterValidate],
 
-  // Config mutation handlers
-  registry.register('config-set', configSet);
-  registry.register('config-set-model-profile', configSetModelProfile);
-  registry.register('config-new-project', configNewProject);
-  registry.register('config-ensure-section', configEnsureSection);
+    // Config mutation handlers
+    ['config-set', configSet],
+    ['config-set-model-profile', configSetModelProfile],
+    ['config-new-project', configNewProject],
+    ['config-ensure-section', configEnsureSection],
 
-  // Git commit handlers
-  registry.register('commit', commit);
-  registry.register('check-commit', checkCommit);
+    // Git commit handlers
+    ['commit', commit],
+    ['check-commit', checkCommit],
 
-  // Template handlers
-  registry.register('template.fill', templateFill);
-  registry.register('template.select', templateSelect);
-  registry.register('template select', templateSelect);
+    // Template handlers
+    ['template.fill', templateFill],
+    ['template.select', templateSelect],
+    ['template select', templateSelect],
+  ]);
 
   const verifyHandlers: Record<string, QueryHandler> = {
     'verify.plan-structure': verifyPlanStructure,
@@ -374,29 +367,24 @@ export function createRegistry(
     'verify.codebase-drift': verifyCodebaseDrift,
   };
 
-  for (const entry of VERIFY_COMMAND_ALIASES) {
-    const handler = verifyHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, VERIFY_COMMAND_ALIASES, verifyHandlers);
 
-  registry.register('verify-summary', verifySummary);
-  registry.register('verify.summary', verifySummary);
-  registry.register('verify summary', verifySummary);
-  registry.register('verify-path-exists', verifyPathExists);
-  registry.register('verify.path-exists', verifyPathExists);
-  registry.register('verify path-exists', verifyPathExists);
+  registerStaticCatalog(registry, [
+    ['verify-summary', verifySummary],
+    ['verify.summary', verifySummary],
+    ['verify summary', verifySummary],
+    ['verify-path-exists', verifyPathExists],
+    ['verify.path-exists', verifyPathExists],
+    ['verify path-exists', verifyPathExists],
 
-  // Decision coverage gates (issue #2492)
-  registry.register('decisions.parse', decisionsParse);
-  registry.register('decisions parse', decisionsParse);
-  registry.register('check.decision-coverage-plan', checkDecisionCoveragePlan);
-  registry.register('check decision-coverage-plan', checkDecisionCoveragePlan);
-  registry.register('check.decision-coverage-verify', checkDecisionCoverageVerify);
-  registry.register('check decision-coverage-verify', checkDecisionCoverageVerify);
+    // Decision coverage gates (issue #2492)
+    ['decisions.parse', decisionsParse],
+    ['decisions parse', decisionsParse],
+    ['check.decision-coverage-plan', checkDecisionCoveragePlan],
+    ['check decision-coverage-plan', checkDecisionCoveragePlan],
+    ['check.decision-coverage-verify', checkDecisionCoverageVerify],
+    ['check decision-coverage-verify', checkDecisionCoverageVerify],
+  ]);
   const validateHandlers: Record<string, QueryHandler> = {
     'validate.consistency': validateConsistency,
     'validate.health': validateHealth,
@@ -404,34 +392,29 @@ export function createRegistry(
     'validate.context': validateContext,
   };
 
-  for (const entry of VALIDATE_COMMAND_ALIASES) {
-    const handler = validateHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, VALIDATE_COMMAND_ALIASES, validateHandlers);
 
   // Decision routing (SDK-only — no `gsd-tools.cjs` mirror yet; see QUERY-HANDLERS.md)
-  registry.register('check.config-gates', checkConfigGates);
-  registry.register('check config-gates', checkConfigGates);
-  registry.register('check.auto-mode', checkAutoMode);
-  registry.register('check auto-mode', checkAutoMode);
-  registry.register('check.phase-ready', checkPhaseReady);
-  registry.register('check phase-ready', checkPhaseReady);
-  registry.register('route.next-action', routeNextAction);
-  registry.register('route next-action', routeNextAction);
-  registry.register('detect.phase-type', detectPhaseType);
-  registry.register('detect phase-type', detectPhaseType);
-  registry.register('check.completion', checkCompletion);
-  registry.register('check completion', checkCompletion);
-  registry.register('check.gates', checkGates);
-  registry.register('check gates', checkGates);
-  registry.register('check.verification-status', checkVerificationStatus);
-  registry.register('check verification-status', checkVerificationStatus);
-  registry.register('check.ship-ready', checkShipReady);
-  registry.register('check ship-ready', checkShipReady);
+  registerStaticCatalog(registry, [
+    ['check.config-gates', checkConfigGates],
+    ['check config-gates', checkConfigGates],
+    ['check.auto-mode', checkAutoMode],
+    ['check auto-mode', checkAutoMode],
+    ['check.phase-ready', checkPhaseReady],
+    ['check phase-ready', checkPhaseReady],
+    ['route.next-action', routeNextAction],
+    ['route next-action', routeNextAction],
+    ['detect.phase-type', detectPhaseType],
+    ['detect phase-type', detectPhaseType],
+    ['check.completion', checkCompletion],
+    ['check completion', checkCompletion],
+    ['check.gates', checkGates],
+    ['check gates', checkGates],
+    ['check.verification-status', checkVerificationStatus],
+    ['check verification-status', checkVerificationStatus],
+    ['check.ship-ready', checkShipReady],
+    ['check ship-ready', checkShipReady],
+  ]);
 
   const phaseHandlers: Record<string, QueryHandler> = {
     'phase.list-plans': phaseListPlans,
@@ -445,14 +428,7 @@ export function createRegistry(
     'phase.next-decimal': phaseNextDecimal,
   };
 
-  for (const entry of PHASE_COMMAND_ALIASES) {
-    const handler = phaseHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, PHASE_COMMAND_ALIASES, phaseHandlers);
 
   const phasesHandlers: Record<string, QueryHandler> = {
     'phases.list': phasesList,
@@ -460,14 +436,7 @@ export function createRegistry(
     'phases.archive': phasesArchive,
   };
 
-  for (const entry of PHASES_COMMAND_ALIASES) {
-    const handler = phasesHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, PHASES_COMMAND_ALIASES, phasesHandlers);
 
   const initHandlers: Record<string, QueryHandler> = {
     'init.execute-phase': initExecutePhase,
@@ -489,102 +458,97 @@ export function createRegistry(
     'init.remove-workspace': initRemoveWorkspace,
   };
 
-  for (const entry of INIT_COMMAND_ALIASES) {
-    const handler = initHandlers[entry.canonical];
-    if (!handler) continue;
-    registry.register(entry.canonical, handler);
-    for (const alias of entry.aliases) {
-      registry.register(alias, handler);
-    }
-  }
+  registerAliasCatalog(registry, INIT_COMMAND_ALIASES, initHandlers);
 
   // Domain-specific handlers (fully implemented)
-  registry.register('agent-skills', agentSkills);
-  registry.register('requirements.mark-complete', requirementsMarkComplete);
-  registry.register('requirements mark-complete', requirementsMarkComplete);
-  registry.register('todo.match-phase', todoMatchPhase);
-  registry.register('todo match-phase', todoMatchPhase);
-  registry.register('list-todos', listTodos);
-  registry.register('list.todos', listTodos);
-  registry.register('todo.complete', todoComplete);
-  registry.register('todo complete', todoComplete);
-  registry.register('milestone.complete', milestoneComplete);
-  registry.register('milestone complete', milestoneComplete);
-  registry.register('summary.extract', summaryExtract);
-  registry.register('summary extract', summaryExtract);
-  registry.register('summary-extract', summaryExtract);
-  registry.register('history.digest', historyDigest);
-  registry.register('history digest', historyDigest);
-  registry.register('history-digest', historyDigest);
-  registry.register('stats', statsJson);
-  registry.register('stats.json', statsJson);
-  registry.register('stats json', statsJson);
-  registry.register('stats.table', statsTable);
-  registry.register('stats table', statsTable);
-  registry.register('commit-to-subrepo', commitToSubrepo);
-  registry.register('progress.bar', progressBar);
-  registry.register('progress bar', progressBar);
-  registry.register('progress.table', progressTable);
-  registry.register('progress table', progressTable);
-  registry.register('workstream.get', workstreamGet);
-  registry.register('workstream get', workstreamGet);
-  registry.register('workstream.list', workstreamList);
-  registry.register('workstream list', workstreamList);
-  registry.register('workstream.create', workstreamCreate);
-  registry.register('workstream create', workstreamCreate);
-  registry.register('workstream.set', workstreamSet);
-  registry.register('workstream set', workstreamSet);
-  registry.register('workstream.status', workstreamStatus);
-  registry.register('workstream status', workstreamStatus);
-  registry.register('workstream.complete', workstreamComplete);
-  registry.register('workstream complete', workstreamComplete);
-  registry.register('workstream.progress', workstreamProgress);
-  registry.register('workstream progress', workstreamProgress);
-  registry.register('docs-init', docsInit);
-  registry.register('websearch', websearch);
-  registry.register('learnings.copy', learningsCopy);
-  registry.register('learnings copy', learningsCopy);
-  registry.register('learnings.query', learningsQuery);
-  registry.register('learnings query', learningsQuery);
-  registry.register('learnings.list', learningsListHandler);
-  registry.register('learnings list', learningsListHandler);
-  registry.register('learnings.prune', learningsPrune);
-  registry.register('learnings prune', learningsPrune);
-  registry.register('learnings.delete', learningsDelete);
-  registry.register('learnings delete', learningsDelete);
-  registry.register('skill-manifest', skillManifest);
-  registry.register('skill manifest', skillManifest);
-  registry.register('audit-open', auditOpen);
-  registry.register('audit open', auditOpen);
-  registry.register('detect-custom-files', detectCustomFiles);
-  registry.register('extract-messages', extractMessages);
-  registry.register('extract.messages', extractMessages);
-  registry.register('audit-uat', auditUat);
-  registry.register('uat.render-checkpoint', uatRenderCheckpoint);
-  registry.register('uat render-checkpoint', uatRenderCheckpoint);
-  registry.register('intel.diff', intelDiff);
-  registry.register('intel diff', intelDiff);
-  registry.register('intel.snapshot', intelSnapshot);
-  registry.register('intel snapshot', intelSnapshot);
-  registry.register('intel.validate', intelValidate);
-  registry.register('intel validate', intelValidate);
-  registry.register('intel.status', intelStatus);
-  registry.register('intel status', intelStatus);
-  registry.register('intel.query', intelQuery);
-  registry.register('intel query', intelQuery);
-  registry.register('intel.extract-exports', intelExtractExports);
-  registry.register('intel extract-exports', intelExtractExports);
-  registry.register('intel.patch-meta', intelPatchMeta);
-  registry.register('intel patch-meta', intelPatchMeta);
-  registry.register('intel.update', intelUpdate);
-  registry.register('intel update', intelUpdate);
-  registry.register('generate-claude-profile', generateClaudeProfile);
-  registry.register('generate-dev-preferences', generateDevPreferences);
-  registry.register('write-profile', writeProfile);
-  registry.register('profile-questionnaire', profileQuestionnaire);
-  registry.register('profile-sample', profileSample);
-  registry.register('scan-sessions', scanSessions);
-  registry.register('generate-claude-md', generateClaudeMd);
+  registerStaticCatalog(registry, [
+    ['agent-skills', agentSkills],
+    ['requirements.mark-complete', requirementsMarkComplete],
+    ['requirements mark-complete', requirementsMarkComplete],
+    ['todo.match-phase', todoMatchPhase],
+    ['todo match-phase', todoMatchPhase],
+    ['list-todos', listTodos],
+    ['list.todos', listTodos],
+    ['todo.complete', todoComplete],
+    ['todo complete', todoComplete],
+    ['milestone.complete', milestoneComplete],
+    ['milestone complete', milestoneComplete],
+    ['summary.extract', summaryExtract],
+    ['summary extract', summaryExtract],
+    ['summary-extract', summaryExtract],
+    ['history.digest', historyDigest],
+    ['history digest', historyDigest],
+    ['history-digest', historyDigest],
+    ['stats', statsJson],
+    ['stats.json', statsJson],
+    ['stats json', statsJson],
+    ['stats.table', statsTable],
+    ['stats table', statsTable],
+    ['commit-to-subrepo', commitToSubrepo],
+    ['progress.bar', progressBar],
+    ['progress bar', progressBar],
+    ['progress.table', progressTable],
+    ['progress table', progressTable],
+    ['workstream.get', workstreamGet],
+    ['workstream get', workstreamGet],
+    ['workstream.list', workstreamList],
+    ['workstream list', workstreamList],
+    ['workstream.create', workstreamCreate],
+    ['workstream create', workstreamCreate],
+    ['workstream.set', workstreamSet],
+    ['workstream set', workstreamSet],
+    ['workstream.status', workstreamStatus],
+    ['workstream status', workstreamStatus],
+    ['workstream.complete', workstreamComplete],
+    ['workstream complete', workstreamComplete],
+    ['workstream.progress', workstreamProgress],
+    ['workstream progress', workstreamProgress],
+    ['docs-init', docsInit],
+    ['websearch', websearch],
+    ['learnings.copy', learningsCopy],
+    ['learnings copy', learningsCopy],
+    ['learnings.query', learningsQuery],
+    ['learnings query', learningsQuery],
+    ['learnings.list', learningsListHandler],
+    ['learnings list', learningsListHandler],
+    ['learnings.prune', learningsPrune],
+    ['learnings prune', learningsPrune],
+    ['learnings.delete', learningsDelete],
+    ['learnings delete', learningsDelete],
+    ['skill-manifest', skillManifest],
+    ['skill manifest', skillManifest],
+    ['audit-open', auditOpen],
+    ['audit open', auditOpen],
+    ['detect-custom-files', detectCustomFiles],
+    ['extract-messages', extractMessages],
+    ['extract.messages', extractMessages],
+    ['audit-uat', auditUat],
+    ['uat.render-checkpoint', uatRenderCheckpoint],
+    ['uat render-checkpoint', uatRenderCheckpoint],
+    ['intel.diff', intelDiff],
+    ['intel diff', intelDiff],
+    ['intel.snapshot', intelSnapshot],
+    ['intel snapshot', intelSnapshot],
+    ['intel.validate', intelValidate],
+    ['intel validate', intelValidate],
+    ['intel.status', intelStatus],
+    ['intel status', intelStatus],
+    ['intel.query', intelQuery],
+    ['intel query', intelQuery],
+    ['intel.extract-exports', intelExtractExports],
+    ['intel extract-exports', intelExtractExports],
+    ['intel.patch-meta', intelPatchMeta],
+    ['intel patch-meta', intelPatchMeta],
+    ['intel.update', intelUpdate],
+    ['intel update', intelUpdate],
+    ['generate-claude-profile', generateClaudeProfile],
+    ['generate-dev-preferences', generateDevPreferences],
+    ['write-profile', writeProfile],
+    ['profile-questionnaire', profileQuestionnaire],
+    ['profile-sample', profileSample],
+    ['scan-sessions', scanSessions],
+    ['generate-claude-md', generateClaudeMd],
+  ]);
 
   // Wire event emission for mutation commands
   if (eventStream) {
