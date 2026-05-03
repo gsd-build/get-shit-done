@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { GSDTools, GSDToolsError, resolveGsdToolsPath } from './gsd-tools.js';
+import { setTransportPolicy, clearTransportPolicy } from './gsd-transport-policy.js';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,6 +23,7 @@ describe('GSDTools', () => {
   });
 
   afterEach(async () => {
+    clearTransportPolicy();
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -162,6 +164,41 @@ describe('GSDTools', () => {
         expect(gsdErr.message).toContain('timed out');
       }
     }, 10_000);
+
+    it('uses subprocess fallback when native handler throws and policy allows fallback', async () => {
+      const scriptPath = await createScript(
+        'fallback-ok.cjs',
+        `process.stdout.write(JSON.stringify({ from: 'subprocess-fallback' }));`,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      setTransportPolicy('verify.path-exists', { allowFallbackToSubprocess: true });
+
+      const result = await tools.exec('verify.path-exists', []);
+      expect(result).toEqual({ from: 'subprocess-fallback' });
+    });
+
+    it('preserves GSDToolsError contract when native handler throws and fallback disabled', async () => {
+      const scriptPath = await createScript(
+        'should-not-run.cjs',
+        `process.stdout.write(JSON.stringify({ should: 'not-run' }));`,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
+      setTransportPolicy('verify.path-exists', { allowFallbackToSubprocess: false });
+
+      try {
+        await tools.exec('verify.path-exists', []);
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(GSDToolsError);
+        const gsdErr = err as GSDToolsError;
+        expect(gsdErr.command).toBe('verify.path-exists');
+        expect(gsdErr.args).toEqual([]);
+        expect(gsdErr.stderr).toBe('');
+        expect(typeof gsdErr.exitCode === 'number').toBe(true);
+      }
+    });
   });
 
   // ─── Typed method tests ────────────────────────────────────────────────

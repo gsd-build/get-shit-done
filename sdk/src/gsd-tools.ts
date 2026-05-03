@@ -23,6 +23,9 @@ import { createRegistry } from './query/index.js';
 import { resolveQueryArgv } from './query/registry.js';
 import { normalizeQueryCommand } from './query/normalize-query-command.js';
 import { formatStateLoadRawStdout } from './query/state-project-load.js';
+import type { QueryResult } from './query/utils.js';
+import { GSDTransport } from './gsd-transport.js';
+import { resolveTransportPolicy } from './gsd-transport-policy.js';
 
 // ─── Error type ──────────────────────────────────────────────────────────────
 
@@ -109,6 +112,7 @@ export class GSDTools {
   private readonly workstream?: string;
   private readonly registry: ReturnType<typeof createRegistry>;
   private readonly preferNativeQuery: boolean;
+  private readonly transport: GSDTransport;
 
   constructor(opts: {
     projectDir: string;
@@ -132,6 +136,16 @@ export class GSDTools {
     this.workstream = opts.workstream;
     this.preferNativeQuery = opts.preferNativeQuery ?? true;
     this.registry = createRegistry(opts.eventStream, opts.sessionId);
+    this.transport = new GSDTransport(this.registry, {
+      dispatchNative: async (registryCommand, registryArgs) => this.withRegistryDispatchTimeout(
+        registryCommand,
+        registryArgs,
+        this.registry.dispatch(registryCommand, registryArgs, this.projectDir),
+      ) as Promise<QueryResult>,
+      execSubprocessJson: async (legacyCommand, legacyArgs) => this.execSubprocessJson(legacyCommand, legacyArgs),
+      execSubprocessRaw: async (legacyCommand, legacyArgs) => this.execSubprocessRaw(legacyCommand, legacyArgs),
+      formatNativeRaw: (registryCommand, data) => formatRegistryRawStdout(registryCommand, data),
+    });
   }
 
   private shouldUseNativeQuery(): boolean {
@@ -262,101 +276,30 @@ export class GSDTools {
   /**
    * Execute a gsd-tools command and return parsed JSON output.
    * Handles the `@file:` prefix pattern for large results.
-   *
-   * With native query enabled, a matching registry handler runs in-process;
-   * if that handler throws, the error is surfaced (no automatic fallback to `gsd-tools.cjs`).
    */
   async exec(command: string, args: string[] = []): Promise<unknown> {
-    if (this.shouldUseNativeQuery()) {
-      const matched = this.nativeMatch(command, args);
-      if (matched) {
-        try {
-          const result = await this.withRegistryDispatchTimeout(
-            command,
-            args,
-            this.registry.dispatch(matched.cmd, matched.args, this.projectDir),
-          );
-          return result.data;
-        } catch (err) {
-          if (err instanceof GSDToolsError) throw err;
-          throw this.toToolsError(command, args, err);
-        }
-      }
-    }
+    const matched = this.nativeMatch(command, args);
+    const policy = resolveTransportPolicy(command);
+    const registryCommand = matched?.cmd ?? command;
+    const registryArgs = matched?.args ?? args;
 
-    const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
-    const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs];
-
-    return new Promise<unknown>((resolve, reject) => {
-      const child = execFile(
-        process.execPath,
-        fullArgs,
-        {
-          cwd: this.projectDir,
-          maxBuffer: 10 * 1024 * 1024, // 10MB
-          timeout: this.timeoutMs,
-          env: { ...process.env },
-        },
-        async (error, stdout, stderr) => {
-          const stderrStr = stderr?.toString() ?? '';
-
-          if (error) {
-            if (error.killed || (error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
-              reject(
-                new GSDToolsError(
-                  `gsd-tools timed out after ${this.timeoutMs}ms: ${command} ${args.join(' ')}`,
-                  command,
-                  args,
-                  null,
-                  stderrStr,
-                ),
-              );
-              return;
-            }
-
-            reject(
-              new GSDToolsError(
-                `gsd-tools exited with code ${error.code ?? 'unknown'}: ${command} ${args.join(' ')}${stderrStr ? `\n${stderrStr}` : ''}`,
-                command,
-                args,
-                typeof error.code === 'number' ? error.code : (error as { status?: number }).status ?? 1,
-                stderrStr,
-              ),
-            );
-            return;
-          }
-
-          const raw = stdout?.toString() ?? '';
-
-          try {
-            const parsed = await this.parseOutput(raw);
-            resolve(parsed);
-          } catch (parseErr) {
-            reject(
-              new GSDToolsError(
-                `Failed to parse gsd-tools output for "${command}": ${parseErr instanceof Error ? parseErr.message : String(parseErr)}\nRaw output: ${raw.slice(0, 500)}`,
-                command,
-                args,
-                0,
-                stderrStr,
-              ),
-            );
-          }
-        },
-      );
-
-      child.on('error', (err) => {
-        reject(
-          new GSDToolsError(
-            `Failed to execute gsd-tools: ${err.message}`,
-            command,
-            args,
-            null,
-            '',
-          ),
-        );
+    try {
+      return await this.transport.run({
+        legacyCommand: command,
+        legacyArgs: args,
+        registryCommand,
+        registryArgs,
+        mode: 'json',
+        projectDir: this.projectDir,
+        workstream: this.workstream,
+      }, {
+        preferNative: this.shouldUseNativeQuery() && policy.preferNative,
+        allowFallbackToSubprocess: policy.allowFallbackToSubprocess,
       });
-    });
+    } catch (err) {
+      if (err instanceof GSDToolsError) throw err;
+      throw this.toToolsError(command, args, err);
+    }
   }
 
   /**
@@ -390,23 +333,98 @@ export class GSDTools {
    * Use for commands like `config-set` that return plain text, not JSON.
    */
   async execRaw(command: string, args: string[] = []): Promise<string> {
-    if (this.shouldUseNativeQuery()) {
-      const matched = this.nativeMatch(command, args);
-      if (matched) {
-        try {
-          const result = await this.withRegistryDispatchTimeout(
-            command,
-            args,
-            this.registry.dispatch(matched.cmd, matched.args, this.projectDir),
-          );
-          return formatRegistryRawStdout(matched.cmd, result.data).trim();
-        } catch (err) {
-          if (err instanceof GSDToolsError) throw err;
-          throw this.toToolsError(command, args, err);
-        }
-      }
-    }
+    const matched = this.nativeMatch(command, args);
+    const policy = resolveTransportPolicy(command);
+    const registryCommand = matched?.cmd ?? command;
+    const registryArgs = matched?.args ?? args;
 
+    try {
+      return await this.transport.run({
+        legacyCommand: command,
+        legacyArgs: args,
+        registryCommand,
+        registryArgs,
+        mode: 'raw',
+        projectDir: this.projectDir,
+        workstream: this.workstream,
+      }, {
+        preferNative: this.shouldUseNativeQuery() && policy.preferNative,
+        allowFallbackToSubprocess: policy.allowFallbackToSubprocess,
+      }) as string;
+    } catch (err) {
+      if (err instanceof GSDToolsError) throw err;
+      throw this.toToolsError(command, args, err);
+    }
+  }
+
+  private async execSubprocessJson(command: string, args: string[]): Promise<unknown> {
+    const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
+    const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs];
+
+    return new Promise<unknown>((resolve, reject) => {
+      const child = execFile(
+        process.execPath,
+        fullArgs,
+        {
+          cwd: this.projectDir,
+          maxBuffer: 10 * 1024 * 1024,
+          timeout: this.timeoutMs,
+          env: { ...process.env },
+        },
+        async (error, stdout, stderr) => {
+          const stderrStr = stderr?.toString() ?? '';
+
+          if (error) {
+            if (error.killed || (error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+              reject(
+                new GSDToolsError(
+                  `gsd-tools timed out after ${this.timeoutMs}ms: ${command} ${args.join(' ')}`,
+                  command,
+                  args,
+                  null,
+                  stderrStr,
+                ),
+              );
+              return;
+            }
+
+            reject(
+              new GSDToolsError(
+                `gsd-tools exited with code ${error.code ?? 'unknown'}: ${command} ${args.join(' ')}${stderrStr ? `\n${stderrStr}` : ''}`,
+                command,
+                args,
+                typeof error.code === 'number' ? error.code : (error as { status?: number }).status ?? 1,
+                stderrStr,
+              ),
+            );
+            return;
+          }
+
+          const raw = stdout?.toString() ?? '';
+          try {
+            const parsed = await this.parseOutput(raw);
+            resolve(parsed);
+          } catch (parseErr) {
+            reject(
+              new GSDToolsError(
+                `Failed to parse gsd-tools output for "${command}": ${parseErr instanceof Error ? parseErr.message : String(parseErr)}\nRaw output: ${raw.slice(0, 500)}`,
+                command,
+                args,
+                0,
+                stderrStr,
+              ),
+            );
+          }
+        },
+      );
+
+      child.on('error', (err) => {
+        reject(new GSDToolsError(`Failed to execute gsd-tools: ${err.message}`, command, args, null, ''));
+      });
+    });
+  }
+
+  private async execSubprocessRaw(command: string, args: string[]): Promise<string> {
     const wsArgs = this.workstream ? ['--ws', this.workstream] : [];
     const fullArgs = [this.gsdToolsPath, command, ...args, ...wsArgs, '--raw'];
 
@@ -439,15 +457,7 @@ export class GSDTools {
       );
 
       child.on('error', (err) => {
-        reject(
-          new GSDToolsError(
-            `Failed to execute gsd-tools: ${err.message}`,
-            command,
-            args,
-            null,
-            '',
-          ),
-        );
+        reject(new GSDToolsError(`Failed to execute gsd-tools: ${err.message}`, command, args, null, ''));
       });
     });
   }
