@@ -10,6 +10,9 @@ export function formatQueryRawOutput(registryCommand: string, data: unknown): st
   }
 
   if (registryCommand === 'commit') {
+    if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+      return JSON.stringify(data, null, 2);
+    }
     const d = data as Record<string, unknown>;
     if (d.committed === true) {
       return d.hash != null ? String(d.hash) : 'committed';
@@ -33,6 +36,9 @@ export function formatQueryRawOutput(registryCommand: string, data: unknown): st
   }
 
   if (registryCommand === 'config-set') {
+    if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+      return JSON.stringify(data, null, 2);
+    }
     const d = data as Record<string, unknown>;
     if ((d.updated === true || d.set === true) && d.key !== undefined) {
       const v = d.value;
@@ -48,6 +54,9 @@ export function formatQueryRawOutput(registryCommand: string, data: unknown): st
   }
 
   if (registryCommand === 'state.begin-phase' || registryCommand === 'state begin-phase') {
+    if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+      return JSON.stringify(data, null, 2);
+    }
     const d = data as Record<string, unknown>;
     const u = d.updated as string[] | undefined;
     return Array.isArray(u) && u.length > 0 ? 'true' : 'false';
