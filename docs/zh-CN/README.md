@@ -530,7 +530,7 @@ lmn012o feat(08-02): 创建注册端点
 | 命令 | 作用 |
 |---------|--------------|
 | `/gsd-settings` | 配置模型配置文件和工作流代理 |
-| `/gsd-config --profile <profile>` | 切换模型配置文件（quality/balanced/budget） |
+| `/gsd-config --profile <profile>` | 切换模型配置文件（quality/balanced/budget/inherit） |
 | `/gsd-capture [desc]` | 捕获想法留待后用 |
 | `/gsd-capture --list` | 列出待处理事项 |
 | `/gsd-debug [desc] [--diagnose]` | 带持久状态的系统化调试（`--diagnose` 仅诊断不修复） |

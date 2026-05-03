@@ -32,7 +32,7 @@ GSD ships **the same set of skills** to every supported runtime, but two slash-f
 - **Hyphen form** — `/gsd-command-name` — used by Claude Code, Copilot, OpenCode, Kilo, Cursor, Windsurf, Augment, Antigravity, and Trae.
 - **Colon form** — `/gsd:command-name` — used by **Gemini CLI only**. Gemini namespaces every plugin's commands under the plugin id, so the install path rewrites every body-text reference and command file to the colon form during `--gemini` install.
 
-You don't need to choose — the installer writes the correct form into the command directory of each runtime you target. When following a walkthrough on a Gemini terminal, mentally substitute the hyphen with a colon (e.g. read `/gsd-plan-phase` as `/gsd:plan-phase`).
+You don't need to choose — the installer writes the correct form into the command directory of each runtime you target. When following a walkthrough on a Gemini terminal, replace the hyphen after `gsd` with a colon as you read each slash command.
 
 ## Namespace routing primer (`gsd:<namespace>`, v1.40)
 

@@ -720,7 +720,7 @@ Generate a developer behavioral profile from Claude Code session analysis across
 
 Validate `.planning/` directory integrity. With `--context`, probes the
 context-window utilization guard against the 60 % / 70 % thresholds (added
-v1.40, [#2792](https://github.com/gsd-build/get-shit-done/issues/2792)).
+v1.40.0, [#2792](https://github.com/gsd-build/get-shit-done/issues/2792)).
 
 | Flag | Description |
 |------|-------------|
