@@ -50,23 +50,29 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
     }));
   }
 
-  if (plan.mode === 'cjs' && canUseCjsFallback({ cjsFallbackEnabled: deps.cjsFallbackEnabled })) {
-    try {
-      const gsdPath = deps.resolveGsdToolsPath(deps.projectDir);
-      return await runCjsFallbackDispatch({
-        projectDir: deps.projectDir,
-        gsdToolsPath: gsdPath,
-        normCmd,
-        normArgs,
-        ws: deps.ws,
-        pickField,
-      });
-    } catch (e) {
-      return toDispatchFailure(mapFallbackDispatchError(e, normCmd, normArgs));
+  if (plan.mode === 'cjs') {
+    if (canUseCjsFallback({ cjsFallbackEnabled: deps.cjsFallbackEnabled })) {
+      try {
+        const gsdPath = deps.resolveGsdToolsPath(deps.projectDir);
+        return await runCjsFallbackDispatch({
+          projectDir: deps.projectDir,
+          gsdToolsPath: gsdPath,
+          normCmd,
+          normArgs,
+          ws: deps.ws,
+          pickField,
+        });
+      } catch (e) {
+        return toDispatchFailure(mapFallbackDispatchError(e, normCmd, normArgs));
+      }
     }
+    return toDispatchFailure(mapFallbackDispatchError(new Error('CJS fallback denied by policy'), normCmd, normArgs));
   }
 
-  const matched = plan.matched!;
+  const matched = plan.matched;
+  if (!matched) {
+    return toDispatchFailure(mapFallbackDispatchError(new Error('No native match in dispatch plan'), normCmd, normArgs));
+  }
   try {
     const result = await deps.dispatchNative(matched.cmd, matched.args);
     return dispatchSuccess(formatSuccess(result.data, result.format, pickField));

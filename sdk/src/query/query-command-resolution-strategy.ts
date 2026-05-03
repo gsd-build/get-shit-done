@@ -66,7 +66,7 @@ export function normalizeQueryCommand(command: string, args: string[]): [string,
     return [command, args];
   }
 
-  if (MERGE_FIRST_WITH_SUBCOMMAND.has(command) && args.length > 0) return [`${command}.${args[0]}`, args.slice(1)];
+  if (MERGE_FIRST_WITH_SUBCOMMAND.has(command) && args.length > 0 && !args[0].startsWith('-')) return [`${command}.${args[0]}`, args.slice(1)];
   if ((command === 'progress' || command === 'stats') && args.length > 0 && !args[0].startsWith('-')) return [`${command}.${args[0]}`, args.slice(1)];
   return [command, args];
 }

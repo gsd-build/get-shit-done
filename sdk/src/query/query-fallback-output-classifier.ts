@@ -19,6 +19,9 @@ async function parseCliQueryJsonOutput(raw: string, projectDir: string): Promise
 }
 
 export async function classifyFallbackOutput(raw: string, projectDir: string): Promise<FallbackOutputClassification> {
+  if (raw.trim() === '') {
+    return { mode: 'text', output: raw };
+  }
   try {
     const output = await parseCliQueryJsonOutput(raw, projectDir);
     return { mode: 'json', output };
