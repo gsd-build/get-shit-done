@@ -345,93 +345,28 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   // ─── Query command ──────────────────────────────────────────────────────
   if (args.command === 'query') {
     const { createRegistry } = await import('./query/index.js');
-    const { extractField } = await import('./query/registry.js');
-    const { planQueryDispatch } = await import('./query/query-fallback-orchestration.js');
-    const { runCjsFallbackQuery } = await import('./query/query-fallback-executor.js');
-    const { GSDToolsError } = await import('./gsd-tools.js');
-    const { GSDError, exitCodeFor, ErrorClassification } = await import('./errors.js');
-
-    const queryArgs = args.queryArgv ?? [];
-
-    // Extract --pick before dispatch
-    const pickIdx = queryArgs.indexOf('--pick');
-    let pickField: string | undefined;
-    if (pickIdx !== -1) {
-      if (pickIdx + 1 >= queryArgs.length) {
-        console.error('Error: --pick requires a field name');
-        process.exitCode = 10;
-        return;
-      }
-      pickField = queryArgs[pickIdx + 1];
-      queryArgs.splice(pickIdx, 2);
-    }
-
-    if (queryArgs.length === 0 || !queryArgs[0]) {
-      console.error('Error: "gsd-sdk query" requires a command');
-      process.exitCode = 10;
-      return;
-    }
+    const { runQueryDispatch } = await import('./query/query-dispatch.js');
+    const { resolveGsdToolsPath, GSDToolsError } = await import('./gsd-tools.js');
+    const { GSDError, exitCodeFor } = await import('./errors.js');
 
     try {
       const registry = createRegistry();
-      const plan = planQueryDispatch(queryArgs, registry, { cjsFallbackEnabled: queryFallbackToCjsEnabled() });
-      const normCmd = plan.normalized.command;
-      const normArgs = plan.normalized.args;
-      if (!normCmd || !String(normCmd).trim()) {
-        console.error('Error: "gsd-sdk query" requires a command');
-        process.exitCode = 10;
+      const out = await runQueryDispatch({
+        registry,
+        projectDir: args.projectDir,
+        ws: args.ws,
+        cjsFallbackEnabled: queryFallbackToCjsEnabled(),
+        resolveGsdToolsPath,
+        dispatchNative: (cmd, argv) => registry.dispatch(cmd, argv, args.projectDir, args.ws),
+      }, args.queryArgv ?? []);
+
+      for (const line of out.stderr) console.error(line);
+      if (out.error) {
+        console.error(out.error.message);
+        process.exitCode = out.error.code;
         return;
       }
-      if (plan.mode !== 'native') {
-        if (plan.mode === 'error') {
-          throw new GSDError(
-            `Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.`,
-            ErrorClassification.Validation,
-          );
-        }
-        const { resolveGsdToolsPath } = await import('./gsd-tools.js');
-        const gsdPath = resolveGsdToolsPath(args.projectDir);
-        console.error(
-          `[gsd-sdk] '${[normCmd, ...normArgs].join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
-        );
-        console.error('[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.');
-        const fallback = await runCjsFallbackQuery(
-          args.projectDir,
-          gsdPath,
-          normCmd,
-          normArgs,
-          args.ws,
-        );
-        if (fallback.stderr.trim()) console.error(fallback.stderr.trimEnd());
-        if (fallback.mode === 'text') {
-          const stdout = String(fallback.output ?? '');
-          if (stdout.trim()) {
-            process.stdout.write(stdout.endsWith('\n') ? stdout : stdout + '\n');
-          }
-          return;
-        }
-        let output: unknown = fallback.output;
-        if (pickField) {
-          output = extractField(output, pickField);
-        }
-        console.log(JSON.stringify(output, null, 2));
-      } else {
-        const matched = plan.matched!;
-        const result = await registry.dispatch(matched.cmd, matched.args, args.projectDir, args.ws);
-        let output: unknown = result.data;
-
-        if (pickField) {
-          output = extractField(output, pickField);
-        }
-
-        // Handlers can signal format:'text' to emit a raw string (e.g. agent-skills
-        // emits an <agent_skills> XML block workflows embed via $(...) substitution).
-        if (!pickField && result.format === 'text' && typeof output === 'string') {
-          process.stdout.write(output);
-        } else {
-          console.log(JSON.stringify(output, null, 2));
-        }
-      }
+      if (out.stdout) process.stdout.write(out.stdout);
     } catch (err) {
       if (err instanceof GSDError) {
         console.error(`Error: ${err.message}`);
