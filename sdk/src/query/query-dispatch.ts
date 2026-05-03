@@ -1,11 +1,13 @@
 import type { QueryRegistry } from './registry.js';
 import { normalizeQueryCommand } from './normalize-query-command.js';
-import { explainQueryCommandNoMatch, resolveQueryCommand, type QueryCommandResolution } from './command-resolution.js';
+import { resolveQueryCommand, type QueryCommandResolution } from './command-resolution.js';
 import { runCjsFallbackDispatch } from './query-fallback-executor.js';
-import type { QueryDispatchResult, QueryDispatchErrorKind } from './query-dispatch-contract.js';
+import type { QueryDispatchResult } from './query-dispatch-contract.js';
 import type { QueryResult } from './utils.js';
 import { mapNativeDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 import { formatSuccess } from './query-dispatch-formatting.js';
+import { diagnoseUnknownCommand } from './query-command-diagnosis.js';
+import { fallbackFailureError, unknownCommandError, validationError } from './query-error-taxonomy.js';
 
 export interface QueryDispatchDeps {
   registry: QueryRegistry;
@@ -24,14 +26,8 @@ interface DispatchPlan {
   matched: QueryCommandResolution | null;
 }
 
-function fail(
-  kind: QueryDispatchErrorKind,
-  code: number,
-  message: string,
-  details?: Record<string, unknown>,
-  stderr: string[] = [],
-): QueryDispatchResult {
-  return toDispatchFailure({ kind, code, message, details }, stderr);
+function fail(error: ReturnType<typeof validationError> | ReturnType<typeof unknownCommandError> | ReturnType<typeof fallbackFailureError>, stderr: string[] = []): QueryDispatchResult {
+  return toDispatchFailure(error, stderr);
 }
 
 function success(stdout: string, stderr: string[] = []): QueryDispatchResult {
@@ -63,7 +59,7 @@ function extractPick(queryArgv: string[]): { queryArgs: string[]; pickField?: st
   if (pickIdx + 1 >= queryArgs.length) {
     return {
       queryArgs,
-      error: fail('validation_error', 10, 'Error: --pick requires a field name', { field: '--pick', reason: 'missing_value' }),
+      error: fail(validationError({ message: 'Error: --pick requires a field name', details: { field: '--pick', reason: 'missing_value' } })),
     };
   }
   const pickField = queryArgs[pickIdx + 1];
@@ -78,7 +74,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
 
   const { queryArgs, pickField } = picked;
   if (queryArgs.length === 0 || !queryArgs[0]) {
-    return fail('validation_error', 10, 'Error: "gsd-sdk query" requires a command', { reason: 'missing_command' });
+    return fail(validationError({ message: 'Error: "gsd-sdk query" requires a command', details: { reason: 'missing_command' } }));
   }
 
   const plan = planQueryDispatch(queryArgs, deps.registry, deps.cjsFallbackEnabled);
@@ -86,19 +82,17 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   const normArgs = plan.normalized.args;
 
   if (!normCmd || !String(normCmd).trim()) {
-    return fail('validation_error', 10, 'Error: "gsd-sdk query" requires a command', { reason: 'empty_normalized_command' });
+    return fail(validationError({ message: 'Error: "gsd-sdk query" requires a command', details: { reason: 'empty_normalized_command' } }));
   }
 
   if (plan.mode === 'error') {
-    const noMatch = queryArgs[0]
-      ? explainQueryCommandNoMatch(queryArgs[0], queryArgs.slice(1), deps.registry)
-      : null;
-    return fail(
-      'unknown_command',
-      10,
-      `Error: Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. CJS fallback is disabled (GSD_QUERY_FALLBACK=registered). To enable fallback, unset GSD_QUERY_FALLBACK or set it to a non-restricted value.${noMatch ? ` Attempted dotted: ${noMatch.attempted.dotted.slice(0, 2).join(' | ')}.` : ''}`,
-      { normalized: [normCmd, ...normArgs].join(' '), attempted: noMatch?.attempted.dotted.slice(0, 2) ?? [] },
-    );
+    const diagnosis = diagnoseUnknownCommand(queryArgs[0] ?? normCmd, queryArgs.slice(1), deps.registry);
+    return fail(unknownCommandError({
+      message: diagnosis.message,
+      normalized: diagnosis.normalized,
+      attempted: diagnosis.attempted,
+      hints: diagnosis.hints,
+    }));
   }
 
   if (plan.mode === 'cjs') {
@@ -114,11 +108,12 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return fail('fallback_failure', 1, `Error: gsd-tools.cjs fallback failed: ${msg}`, {
+      return fail(fallbackFailureError({
+        message: msg,
         command: normCmd,
         args: normArgs,
         backend: 'cjs',
-      });
+      }));
     }
   }
 

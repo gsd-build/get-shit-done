@@ -20,11 +20,17 @@ export interface RegistryAssemblyInputs {
   rawOutputPolicyCommands: readonly string[];
 }
 
-function toSortedList(values: Iterable<string>): string[] {
-  return Array.from(values).sort((a, b) => a.localeCompare(b));
+export interface RegistryAssemblyInvariantReport {
+  duplicateCommandKeys: string[];
+  aliasCanonicalsMissingHandlers: string[];
+  missingMutationCommands: string[];
+  missingRawOutputPolicyCommands: string[];
 }
 
-export function assertNoDuplicateRegisteredCommands(inputs: RegistryAssemblyInputs): void {
+export function collectRegistryAssemblyInvariantReport(
+  inputs: RegistryAssemblyInputs,
+  registry?: QueryRegistry,
+): RegistryAssemblyInvariantReport {
   const counts = new Map<string, number>();
 
   for (const group of inputs.staticGroups) {
@@ -42,28 +48,51 @@ export function assertNoDuplicateRegisteredCommands(inputs: RegistryAssemblyInpu
     }
   }
 
-  const duplicates = toSortedList(
+  const duplicateCommandKeys = toSortedList(
     Array.from(counts.entries())
       .filter(([, count]) => count > 1)
       .map(([command]) => command),
   );
 
-  if (duplicates.length > 0) {
-    throw new Error(`registry assembly invariant failed: duplicate command keys: ${duplicates.join(', ')}`);
+  const aliasCanonicalsMissingHandlers: string[] = [];
+  for (const group of inputs.aliasGroups) {
+    for (const entry of group.aliases) {
+      if (!group.handlers[entry.canonical]) {
+        aliasCanonicalsMissingHandlers.push(`${group.family}:${entry.canonical}`);
+      }
+    }
+  }
+
+  const missingMutationCommands = registry
+    ? toSortedList(Array.from(inputs.mutationCommands).filter((command) => !registry.has(command)))
+    : [];
+  const missingRawOutputPolicyCommands = registry
+    ? toSortedList(inputs.rawOutputPolicyCommands.filter((command) => !registry.has(command)))
+    : [];
+
+  return {
+    duplicateCommandKeys,
+    aliasCanonicalsMissingHandlers: toSortedList(aliasCanonicalsMissingHandlers),
+    missingMutationCommands,
+    missingRawOutputPolicyCommands,
+  };
+}
+
+function toSortedList(values: Iterable<string>): string[] {
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
+export function assertNoDuplicateRegisteredCommands(inputs: RegistryAssemblyInputs): void {
+  const report = collectRegistryAssemblyInvariantReport(inputs);
+  if (report.duplicateCommandKeys.length > 0) {
+    throw new Error(`registry assembly invariant failed: duplicate command keys: ${report.duplicateCommandKeys.join(', ')}`);
   }
 }
 
 export function assertAliasCanonicalsHaveHandlers(inputs: RegistryAssemblyInputs): void {
-  const missing: string[] = [];
-  for (const group of inputs.aliasGroups) {
-    for (const entry of group.aliases) {
-      if (!group.handlers[entry.canonical]) {
-        missing.push(`${group.family}:${entry.canonical}`);
-      }
-    }
-  }
-  if (missing.length > 0) {
-    throw new Error(`registry assembly invariant failed: alias canonical missing handler: ${toSortedList(missing).join(', ')}`);
+  const report = collectRegistryAssemblyInvariantReport(inputs);
+  if (report.aliasCanonicalsMissingHandlers.length > 0) {
+    throw new Error(`registry assembly invariant failed: alias canonical missing handler: ${report.aliasCanonicalsMissingHandlers.join(', ')}`);
   }
 }
 
@@ -71,9 +100,14 @@ export function assertMutationCommandsRegistered(
   registry: QueryRegistry,
   mutationCommands: ReadonlySet<string>,
 ): void {
-  const missing = toSortedList(Array.from(mutationCommands).filter((command) => !registry.has(command)));
-  if (missing.length > 0) {
-    throw new Error(`registry assembly invariant failed: mutation command missing from registry: ${missing.join(', ')}`);
+  const report = collectRegistryAssemblyInvariantReport({
+    staticGroups: [],
+    aliasGroups: [],
+    mutationCommands,
+    rawOutputPolicyCommands: [],
+  }, registry);
+  if (report.missingMutationCommands.length > 0) {
+    throw new Error(`registry assembly invariant failed: mutation command missing from registry: ${report.missingMutationCommands.join(', ')}`);
   }
 }
 
@@ -81,8 +115,13 @@ export function assertRawOutputPolicyCommandsRegistered(
   registry: QueryRegistry,
   rawOutputPolicyCommands: readonly string[],
 ): void {
-  const missing = toSortedList(rawOutputPolicyCommands.filter((command) => !registry.has(command)));
-  if (missing.length > 0) {
-    throw new Error(`registry assembly invariant failed: raw-output policy command missing from registry: ${missing.join(', ')}`);
+  const report = collectRegistryAssemblyInvariantReport({
+    staticGroups: [],
+    aliasGroups: [],
+    mutationCommands: new Set<string>(),
+    rawOutputPolicyCommands,
+  }, registry);
+  if (report.missingRawOutputPolicyCommands.length > 0) {
+    throw new Error(`registry assembly invariant failed: raw-output policy command missing from registry: ${report.missingRawOutputPolicyCommands.join(', ')}`);
   }
 }

@@ -1,4 +1,5 @@
-import type { QueryDispatchError, QueryDispatchErrorKind, QueryDispatchResult } from './query-dispatch-contract.js';
+import type { QueryDispatchError, QueryDispatchResult } from './query-dispatch-contract.js';
+import { fallbackFailureError, nativeFailureError, nativeTimeoutError } from './query-error-taxonomy.js';
 
 export function toDispatchFailure(
   error: QueryDispatchError,
@@ -14,33 +15,15 @@ export function toDispatchFailure(
 
 export function mapNativeDispatchError(error: unknown, command: string, args: string[]): QueryDispatchError {
   const message = error instanceof Error ? error.message : String(error);
-  const kind: QueryDispatchErrorKind = message.includes('timed out after')
-    ? 'native_timeout'
-    : 'native_failure';
-  return {
-    kind,
-    code: 1,
-    message: `Error: ${message}`,
-    details: {
-      command,
-      args,
-      ...(kind === 'native_timeout' ? { timeout_ms: parseTimeoutMs(message) } : {}),
-    },
-  };
+  if (message.includes('timed out after')) {
+    return nativeTimeoutError({ message, command, args, timeoutMs: parseTimeoutMs(message) });
+  }
+  return nativeFailureError({ message, command, args });
 }
 
 export function mapFallbackDispatchError(error: unknown, command: string, args: string[]): QueryDispatchError {
   const message = error instanceof Error ? error.message : String(error);
-  return {
-    kind: 'fallback_failure',
-    code: 1,
-    message: `Error: gsd-tools.cjs fallback failed: ${message}`,
-    details: {
-      command,
-      args,
-      backend: 'cjs',
-    },
-  };
+  return fallbackFailureError({ message, command, args, backend: 'cjs' });
 }
 
 function parseTimeoutMs(message: string): number | undefined {

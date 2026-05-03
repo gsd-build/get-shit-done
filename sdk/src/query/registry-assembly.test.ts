@@ -11,6 +11,7 @@ import {
   assertMutationCommandsRegistered,
   assertNoDuplicateRegisteredCommands,
   assertRawOutputPolicyCommandsRegistered,
+  collectRegistryAssemblyInvariantReport,
   type RegistryAssemblyAliasGroup,
   type RegistryAssemblyStaticGroup,
 } from './registry-assembly-invariants.js';
@@ -105,5 +106,27 @@ describe('registry assembly invariants', () => {
     })).not.toThrow();
     expect(() => assertMutationCommandsRegistered(registry, new Set(['one']))).not.toThrow();
     expect(() => assertRawOutputPolicyCommandsRegistered(registry, ['canon'])).not.toThrow();
+  });
+
+  it('collects invariant report for all failure classes', () => {
+    const registry = new QueryRegistry();
+    const report = collectRegistryAssemblyInvariantReport({
+      staticGroups: [
+        { name: 'S1', entries: [['dup', noop]] },
+        { name: 'S2', entries: [['dup', noop]] },
+      ],
+      aliasGroups: [
+        { family: 'f', aliases: [{ canonical: 'missing', aliases: ['dup'] }], handlers: {} },
+      ],
+      mutationCommands: new Set(['missing.mutation']),
+      rawOutputPolicyCommands: ['missing.raw'],
+    }, registry);
+
+    expect(report).toEqual({
+      duplicateCommandKeys: ['dup'],
+      aliasCanonicalsMissingHandlers: ['f:missing'],
+      missingMutationCommands: ['missing.mutation'],
+      missingRawOutputPolicyCommands: ['missing.raw'],
+    });
   });
 });
