@@ -26,7 +26,6 @@ function workflowBool(v: unknown, defaultVal: boolean): boolean {
 export const checkConfigGates: QueryHandler = async (args, projectDir) => {
   const config = await loadConfig(projectDir);
   const wf: Record<string, unknown> = {
-    ...CONFIG_DEFAULTS.workflow,
     ...(config.workflow as unknown as Record<string, unknown>),
   };
   const root = config as Record<string, unknown>;

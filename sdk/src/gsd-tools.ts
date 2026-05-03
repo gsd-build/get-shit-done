@@ -286,7 +286,7 @@ export class GSDTools {
         legacyArgs: args,
         registryCommand,
         registryArgs,
-        mode: policy.outputMode,
+        mode: 'json',
         projectDir: this.projectDir,
         workstream: this.workstream,
       }, {
@@ -341,7 +341,7 @@ export class GSDTools {
         legacyArgs: args,
         registryCommand,
         registryArgs,
-        mode: policy.outputMode,
+        mode: 'raw',
         projectDir: this.projectDir,
         workstream: this.workstream,
       }, {
@@ -461,8 +461,8 @@ export class GSDTools {
 
   // ─── Typed convenience methods ─────────────────────────────────────────
 
-  async stateLoad(): Promise<string> {
-    return this.dispatchNativeRaw('state', ['load'], 'state.load', []);
+  async stateLoad(): Promise<unknown> {
+    return this.exec('state', ['load']);
   }
 
   async roadmapAnalyze(): Promise<RoadmapAnalysis> {

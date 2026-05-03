@@ -341,7 +341,7 @@ export const stateUpdate: QueryHandler = async (args, projectDir, workstream) =>
     return content;
   }, workstream);
 
-  return { data: { updated, field, value: updated ? value : undefined } };
+  return { data: { updated } };
 };
 
 /**
@@ -1250,9 +1250,15 @@ function parseNamedArgs(
   const result: Record<string, string | boolean | null> = {};
   for (const flag of valueFlags) {
     const idx = args.indexOf(`--${flag}`);
-    result[flag] = idx !== -1 && args[idx + 1] !== undefined && !args[idx + 1].startsWith('--')
-      ? args[idx + 1]
-      : null;
+    if (idx === -1) {
+      result[flag] = null;
+      continue;
+    }
+    const value = args[idx + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new GSDError(`missing value for --${flag}`, ErrorClassification.Validation);
+    }
+    result[flag] = value;
   }
   for (const flag of booleanFlags) {
     result[flag] = args.includes(`--${flag}`);

@@ -174,7 +174,7 @@ describe('agentSkills CLI stdout', () => {
     );
 
     expect(stdout).toBe(
-      '<agent_skills>\nRead these user-configured skills:\n- @.claude/skills/cli-skill/SKILL.md\n</agent_skills>',
+      '<agent_skills>\nRead these user-configured skills:\n- @.claude/skills/cli-skill/SKILL.md\n</agent_skills>\n',
     );
   });
 

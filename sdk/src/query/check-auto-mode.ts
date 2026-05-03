@@ -8,7 +8,7 @@
  * or the persistent user preference is true (`active === true`).
  */
 
-import { CONFIG_DEFAULTS, loadConfig } from '../config.js';
+import { loadConfig } from '../config.js';
 import type { QueryHandler } from './utils.js';
 
 export type AutoModeSource = 'auto_chain' | 'auto_advance' | 'both' | 'none';
@@ -32,7 +32,6 @@ function resolveSource(
 export const checkAutoMode: QueryHandler = async (_args, projectDir) => {
   const config = await loadConfig(projectDir);
   const wf: Record<string, unknown> = {
-    ...CONFIG_DEFAULTS.workflow,
     ...(config.workflow as unknown as Record<string, unknown>),
   };
   const autoAdvance = Boolean(wf.auto_advance ?? false);

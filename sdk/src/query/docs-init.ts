@@ -234,9 +234,10 @@ function checkAgentsInstalled(config?: { runtime?: unknown }): { agents_installe
  */
 export const docsInit: QueryHandler = async (_args, projectDir) => {
   const config = await loadConfig(projectDir);
+  const configExists = existsSync(join(projectDir, '.planning', 'config.json'));
   const docModelResult = await resolveModel(['gsd-doc-writer'], projectDir);
   const docWriterData = docModelResult.data as Record<string, unknown>;
-  const doc_writer_model = (docWriterData?.model as string) || 'sonnet';
+  const doc_writer_model = configExists ? ((docWriterData?.model as string) || '') : '';
 
   const agentStatus = checkAgentsInstalled(config as { runtime?: unknown });
 

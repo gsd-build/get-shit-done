@@ -46,9 +46,9 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   if (plan.mode === 'error') {
     return fail(unknownCommandError({
       message: plan.noMatchMessage ?? `Error: Unknown command: "${queryArgs[0] ?? normCmd}"`,
-      normalized: plan.noMatchNormalized,
-      attempted: plan.noMatchAttempted,
-      hints: plan.noMatchHints,
+      normalized: plan.noMatchNormalized ?? [normCmd, ...normArgs].join(' ').trim(),
+      attempted: plan.noMatchAttempted ?? [],
+      hints: plan.noMatchHints ?? [],
     }));
   }
 

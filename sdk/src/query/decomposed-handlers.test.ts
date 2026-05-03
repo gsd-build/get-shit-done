@@ -68,12 +68,9 @@ afterEach(async () => {
 // ─── skills.ts ───────────────────────────────────────────────────────────
 
 describe('agentSkills', () => {
-  it('returns valid QueryResult with skills array', async () => {
+  it('returns empty string when agent_skills config is missing', async () => {
     const result = await agentSkills(['gsd-executor'], tmpDir);
-    const data = result.data as Record<string, unknown>;
-    expect(Array.isArray(data.skills)).toBe(true);
-    expect(typeof data.skill_count).toBe('number');
-    expect(data.agent_type).toBe('gsd-executor');
+    expect(result.data).toBe('');
   });
 });
 

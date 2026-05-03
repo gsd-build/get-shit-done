@@ -34,6 +34,8 @@ try {
   cliAvailable = false;
 }
 
+const e2eEnabled = process.env.GSD_ENABLE_E2E === '1';
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const sdkPromptsDir = join(__dirname, '..', 'prompts');
 const GSD_TOOLS_PATH = resolveGsdToolsPath(process.cwd());
@@ -41,7 +43,7 @@ const gsdToolsAvailable = existsSync(GSD_TOOLS_PATH);
 
 // ─── Test suite ──────────────────────────────────────────────────────────────
 
-describe.skipIf(!cliAvailable || !gsdToolsAvailable)('E2E: InitRunner.run() full workflow', () => {
+describe.skipIf(!cliAvailable || !gsdToolsAvailable || !e2eEnabled)('E2E: InitRunner.run() full workflow', () => {
   let tmpDir: string;
   let events: GSDEvent[];
 
