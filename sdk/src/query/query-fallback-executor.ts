@@ -2,6 +2,7 @@ import { formatSuccess } from './query-dispatch-formatting.js';
 import type { QueryDispatchResult } from './query-dispatch-contract.js';
 import { mapFallbackDispatchError, toDispatchFailure } from './query-dispatch-error-mapper.js';
 import { runFallbackBridge } from './query-fallback-bridge-adapter.js';
+import { fallbackBridgeNotices } from './query-dispatch-observability.js';
 
 export interface RunCjsFallbackDispatchInput {
   projectDir: string;
@@ -23,10 +24,7 @@ function formatFallbackOutput(data: unknown, mode: 'json' | 'text', pickField?: 
 
 export async function runCjsFallbackDispatch(input: RunCjsFallbackDispatchInput): Promise<QueryDispatchResult> {
   const { projectDir, gsdToolsPath, normCmd, normArgs, ws, pickField } = input;
-  const stderr = [
-    `[gsd-sdk] '${normCmd}' not in native registry; falling back to gsd-tools.cjs.`,
-    '[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.',
-  ];
+  const stderr = fallbackBridgeNotices(normCmd);
 
   try {
     const fallback = await runFallbackBridge({ projectDir, gsdToolsPath, normCmd, normArgs, ws });

@@ -1,4 +1,5 @@
 import type { QueryDispatchError } from './query-dispatch-contract.js';
+import { fallbackErrorDetails, nativeErrorDetails, unknownCommandDetails } from './query-error-details-schema.js';
 
 export function unknownCommandError(input: {
   message: string;
@@ -10,11 +11,11 @@ export function unknownCommandError(input: {
     kind: 'unknown_command',
     code: 10,
     message: input.message,
-    details: {
+    details: unknownCommandDetails({
       normalized: input.normalized,
       attempted: input.attempted,
       hints: input.hints,
-    },
+    }) as unknown as Record<string, unknown>,
   };
 }
 
@@ -27,10 +28,10 @@ export function nativeFailureError(input: {
     kind: 'native_failure',
     code: 1,
     message: `Error: ${input.message}`,
-    details: {
+    details: nativeErrorDetails({
       command: input.command,
       args: input.args,
-    },
+    }) as unknown as Record<string, unknown>,
   };
 }
 
@@ -44,11 +45,11 @@ export function nativeTimeoutError(input: {
     kind: 'native_timeout',
     code: 1,
     message: `Error: ${input.message}`,
-    details: {
+    details: nativeErrorDetails({
       command: input.command,
       args: input.args,
       ...(input.timeoutMs !== undefined ? { timeout_ms: input.timeoutMs } : {}),
-    },
+    }) as unknown as Record<string, unknown>,
   };
 }
 
@@ -62,11 +63,11 @@ export function fallbackFailureError(input: {
     kind: 'fallback_failure',
     code: 1,
     message: `Error: gsd-tools.cjs fallback failed: ${input.message}`,
-    details: {
+    details: fallbackErrorDetails({
       command: input.command,
       args: input.args,
       backend: input.backend ?? 'cjs',
-    },
+    }) as unknown as Record<string, unknown>,
   };
 }
 

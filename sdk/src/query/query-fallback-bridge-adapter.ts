@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { classifyFallbackOutput } from './query-fallback-output-classifier.js';
 
 export interface FallbackBridgeRunInput {
   projectDir: string;
@@ -18,19 +18,6 @@ export interface FallbackBridgeOutput {
 function dottedCommandToCjsArgv(normCmd: string, normArgs: string[]): string[] {
   if (normCmd.includes('.')) return [...normCmd.split('.'), ...normArgs];
   return [normCmd, ...normArgs];
-}
-
-async function parseCliQueryJsonOutput(raw: string, projectDir: string): Promise<unknown> {
-  const trimmed = raw.trim();
-  if (trimmed === '') return null;
-  let jsonStr = trimmed;
-  if (jsonStr.startsWith('@file:')) {
-    const rel = jsonStr.slice(6).trim();
-    const { resolvePathUnderProject } = await import('./helpers.js');
-    const filePath = await resolvePathUnderProject(projectDir, rel);
-    jsonStr = await readFile(filePath, 'utf-8');
-  }
-  return JSON.parse(jsonStr);
 }
 
 function execBridge(input: FallbackBridgeRunInput): Promise<{ stdout: string; stderr: string }> {
@@ -53,10 +40,6 @@ function execBridge(input: FallbackBridgeRunInput): Promise<{ stdout: string; st
 
 export async function runFallbackBridge(input: FallbackBridgeRunInput): Promise<FallbackBridgeOutput> {
   const { stdout, stderr } = await execBridge(input);
-  try {
-    const output = await parseCliQueryJsonOutput(stdout, input.projectDir);
-    return { mode: 'json', output, stderr };
-  } catch {
-    return { mode: 'text', output: stdout, stderr };
-  }
+  const classified = await classifyFallbackOutput(stdout, input.projectDir);
+  return { ...classified, stderr };
 }
