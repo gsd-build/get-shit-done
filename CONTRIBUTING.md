@@ -81,6 +81,20 @@ PRs that arrive without a properly-labeled linked issue are closed automatically
 
 ## Pull Request Guidelines
 
+### Architecture & Domain Standards (Maintainer-Defined)
+
+The following files are maintainer-owned coding standards and must be treated as canonical when contributing:
+
+- `CONTEXT.md` — domain language and module naming standards
+- `docs/adr/` — Architecture Decision Records (ADRs) for accepted architectural decisions
+
+Contributor requirements:
+- Read `CONTEXT.md` before naming or refactoring modules/interfaces/seams.
+- Use `CONTEXT.md` vocabulary consistently in code comments, tests, issue/PR text, and docs for the touched area.
+- Check relevant ADRs in `docs/adr/` before proposing or implementing architectural changes.
+- If a change intentionally revisits an ADR decision, call it out explicitly in the linked issue and PR rationale.
+- Do not rewrite maintainer intent in `CONTEXT.md`/ADRs as part of drive-by cleanup; propose focused updates tied to approved scope.
+
 **Every PR must link to an approved issue.** PRs without a linked issue are closed without review, no exceptions.
 
 - **No draft PRs** — draft PRs are automatically closed. Only open a PR when it is complete, tested, and ready for review. If your work is not finished, keep it on your local branch until it is.
@@ -503,6 +517,14 @@ The following checks run on every PR in addition to the test suite:
 Run locally before pushing: `npm run lint:tests`
 
 ### Test Requirements by Contribution Type
+
+### Architecture-Aware Testing Requirements
+
+When work touches architecture, routing, policy, registry assembly, or command semantics:
+- Write tests against module **interfaces** and seam behavior, not implementation trivia.
+- Prefer invariant/contract tests that protect ADR-backed behavior and `CONTEXT.md` terminology.
+- Ensure tests validate canonical behavior through the defined seam (for example: structured result contracts, canonical command metadata, and adapter parity), not source-text coupling.
+- If ADRs define expected behavior, tests should assert those expectations directly.
 
 The required tests differ depending on what you are contributing:
 
