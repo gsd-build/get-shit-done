@@ -13,7 +13,7 @@ export interface TransportRequest {
 }
 
 export interface TransportAdapters {
-  dispatchNative: (registryCommand: string, registryArgs: string[]) => Promise<QueryResult>;
+  dispatchNative: (request: TransportRequest) => Promise<QueryResult>;
   execSubprocessJson: (legacyCommand: string, legacyArgs: string[]) => Promise<unknown>;
   execSubprocessRaw: (legacyCommand: string, legacyArgs: string[]) => Promise<string>;
   formatNativeRaw?: (registryCommand: string, data: unknown) => string;
@@ -22,6 +22,12 @@ export interface TransportAdapters {
 export interface TransportPolicyLike {
   preferNative: boolean;
   allowFallbackToSubprocess: boolean;
+}
+
+function isTimeoutLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'TimeoutError' || error.name === 'AbortError') return true;
+  return error.message.includes('timed out after');
 }
 
 export class GSDTransport {
@@ -35,7 +41,7 @@ export class GSDTransport {
 
     if (!forceSubprocess && policy.preferNative && this.registry.has(request.registryCommand)) {
       try {
-        const native = await this.adapters.dispatchNative(request.registryCommand, request.registryArgs);
+        const native = await this.adapters.dispatchNative(request);
         if (request.mode === 'raw') {
           if (this.adapters.formatNativeRaw) {
             return this.adapters.formatNativeRaw(request.registryCommand, native.data).trim();
@@ -44,6 +50,7 @@ export class GSDTransport {
         }
         return native.data;
       } catch (error) {
+        if (isTimeoutLikeError(error)) throw error;
         if (!policy.allowFallbackToSubprocess) throw error;
       }
     }

@@ -17,6 +17,8 @@ const BUILTIN_COMMAND_POLICY: Record<string, Partial<TransportPolicy>> = {
   commit: { outputMode: 'raw' },
   'config-set': { outputMode: 'raw' },
   'verify-summary': { outputMode: 'raw' },
+  'verify.summary': { outputMode: 'raw' },
+  'verify summary': { outputMode: 'raw' },
 
   // native-first/hard-fail examples (can expand later)
   // 'state.load': { allowFallbackToSubprocess: false, outputMode: 'raw' },

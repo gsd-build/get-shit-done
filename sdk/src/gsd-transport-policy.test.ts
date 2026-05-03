@@ -19,6 +19,12 @@ describe('gsd-transport-policy', () => {
     expect(policy.allowFallbackToSubprocess).toBe(true);
   });
 
+  it('applies verify-summary alias raw overrides', () => {
+    expect(resolveTransportPolicy('verify-summary').outputMode).toBe('raw');
+    expect(resolveTransportPolicy('verify.summary').outputMode).toBe('raw');
+    expect(resolveTransportPolicy('verify summary').outputMode).toBe('raw');
+  });
+
   it('supports per-command override updates', () => {
     setTransportPolicy('state', { allowFallbackToSubprocess: false, outputMode: 'raw' });
     const policy = resolveTransportPolicy('state');

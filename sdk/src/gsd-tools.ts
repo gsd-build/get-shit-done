@@ -136,10 +136,10 @@ export class GSDTools {
     this.preferNativeQuery = opts.preferNativeQuery ?? true;
     this.registry = createRegistry(opts.eventStream, opts.sessionId);
     this.transport = new GSDTransport(this.registry, {
-      dispatchNative: async (registryCommand, registryArgs) => this.withRegistryDispatchTimeout(
-        registryCommand,
-        registryArgs,
-        this.registry.dispatch(registryCommand, registryArgs, this.projectDir),
+      dispatchNative: async (request) => this.withRegistryDispatchTimeout(
+        request.legacyCommand,
+        request.legacyArgs,
+        this.registry.dispatch(request.registryCommand, request.registryArgs, this.projectDir),
       ) as Promise<QueryResult>,
       execSubprocessJson: async (legacyCommand, legacyArgs) => this.execSubprocessJson(legacyCommand, legacyArgs),
       execSubprocessRaw: async (legacyCommand, legacyArgs) => this.execSubprocessRaw(legacyCommand, legacyArgs),
@@ -276,9 +276,9 @@ export class GSDTools {
    */
   async exec(command: string, args: string[] = []): Promise<unknown> {
     const matched = this.nativeMatch(command, args);
-    const policy = resolveTransportPolicy(command);
     const registryCommand = matched?.cmd ?? command;
     const registryArgs = matched?.args ?? args;
+    const policy = resolveTransportPolicy(registryCommand);
 
     try {
       return await this.transport.run({
@@ -286,7 +286,7 @@ export class GSDTools {
         legacyArgs: args,
         registryCommand,
         registryArgs,
-        mode: 'json',
+        mode: policy.outputMode,
         projectDir: this.projectDir,
         workstream: this.workstream,
       }, {
@@ -331,9 +331,9 @@ export class GSDTools {
    */
   async execRaw(command: string, args: string[] = []): Promise<string> {
     const matched = this.nativeMatch(command, args);
-    const policy = resolveTransportPolicy(command);
     const registryCommand = matched?.cmd ?? command;
     const registryArgs = matched?.args ?? args;
+    const policy = resolveTransportPolicy(registryCommand);
 
     try {
       return await this.transport.run({
