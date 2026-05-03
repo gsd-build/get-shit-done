@@ -622,6 +622,107 @@ Detail
     expect(result).not.toMatch(/^##.*<em>/m);
   });
 
+  // ─── Bug #2641 (lockdown): single-quote YAML version ───
+  it('bug-2641: handles single-quote YAML version (milestone: \'v0.9\') in STATE.md', async () => {
+    // Parity coverage with the double-quote test. The strip pattern
+    // `/^["']|["']$/g` handles both — locked here so a future change to
+    // either character class doesn't silently regress one form.
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details</summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const stateSingle = `---\nmilestone: 'v0.9'\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), stateSingle);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
+  });
+
+  // ─── Bug #2641 (lockdown): heading wins when BOTH heading and <details> match ───
+  it('bug-2641: markdown heading anchor wins over <details><summary> fallback', async () => {
+    // The <details> fallback only fires when the heading-level lookup MISSES.
+    // If a ROADMAP has both `### v0.9 …` heading AND `<details><summary>v0.9 …</summary>`
+    // for the same version, the heading anchor must win. Locks precedence so a
+    // future refactor doesn't accidentally flip the order and silently change
+    // which slice gets returned.
+    const roadmap = `# Roadmap
+
+### v0.9 Local-First Bus (heading-anchored)
+
+### Phase 1: Heading-anchored Phase
+**Goal:** From the heading slice.
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details (details-anchored)</summary>
+
+### Phase 99: Details-anchored Phase
+**Goal:** From the details slice.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // Heading slice is what got returned — original `### v0.9` heading
+    // present, Phase 1 from the heading slice present.
+    expect(result).toContain('### v0.9 Local-First Bus (heading-anchored)');
+    expect(result).toContain('### Phase 1: Heading-anchored Phase');
+    // Critical: the <details> fallback did NOT fire, so no synthesized
+    // `## ` heading is prepended. (The heading-anchor slice extends to the
+    // next milestone boundary and includes the downstream <details> block
+    // verbatim — that's a property of the heading-anchor path, not the
+    // fallback. We're locking which CODE PATH ran, not how its output looks.)
+    expect(result).not.toMatch(/^##\s+v0\.9 Local-First Bus.*details-anchored/im);
+    // The original heading must appear at the START of the slice (the
+    // heading-anchor path returns content starting at the matched heading).
+    expect(result.indexOf('### v0.9 Local-First Bus (heading-anchored)')).toBe(0);
+  });
+
+  // ─── Bug #2641 (lockdown): multiple <details> blocks for same version ───
+  it('bug-2641: when multiple <details> match the version, the FIRST is returned', async () => {
+    // `content.match(detailsPattern)` (non-`g`) returns the first match in
+    // document order. Lock this so a future change to the matcher (e.g.
+    // switching to `matchAll` and picking the last) doesn't silently change
+    // which block is treated as the active milestone. Document-order-first is
+    // intentional: in real ROADMAPs, the active milestone is conventionally
+    // listed before any duplicates (e.g. retro-active or branch-merge artefacts).
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details (FIRST)</summary>
+
+### Phase 1: First-block Phase
+**Goal:** Should be returned.
+</details>
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details (SECOND)</summary>
+
+### Phase 99: Second-block Phase
+**Goal:** Should NOT be returned.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 1: First-block Phase');
+    expect(result).not.toContain('### Phase 99: Second-block Phase');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus.*FIRST/m);
+  });
+
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
   it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
     const roadmapWithDetails = `# ROADMAP
