@@ -1,19 +1,9 @@
 import type { QueryRegistry } from './registry.js';
 import { extractField } from './registry.js';
 import { planQueryDispatch } from './query-fallback-orchestration.js';
-import { runCjsFallbackQuery } from './query-fallback-executor.js';
+import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 import type { QueryResult } from './utils.js';
-
-export interface QueryDispatchError {
-  code: number;
-  message: string;
-}
-
-export interface QueryDispatchResult {
-  stdout?: string;
-  stderr: string[];
-  error?: QueryDispatchError;
-}
+import type { QueryDispatchError, QueryDispatchResult } from './query-dispatch-contract.js';
 
 export interface QueryDispatchDeps {
   registry: QueryRegistry;
@@ -75,29 +65,14 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
 
   if (plan.mode === 'cjs') {
     const gsdPath = deps.resolveGsdToolsPath(deps.projectDir);
-    const fallback = await runCjsFallbackQuery(
-      deps.projectDir,
-      gsdPath,
+    return runCjsFallbackDispatch({
+      projectDir: deps.projectDir,
+      gsdToolsPath: gsdPath,
       normCmd,
       normArgs,
-      deps.ws,
-    );
-    const stderr = [
-      `[gsd-sdk] '${[normCmd, ...normArgs].join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
-      '[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.',
-    ];
-    if (fallback.stderr.trim()) stderr.push(fallback.stderr.trimEnd());
-
-    if (fallback.mode === 'text') {
-      const text = String(fallback.output ?? '');
-      if (!text.trim()) return { stderr };
-      return { stderr, stdout: text.endsWith('\n') ? text : `${text}\n` };
-    }
-
-    return {
-      stderr,
-      stdout: formatOutput(fallback.output, 'json', pickField),
-    };
+      ws: deps.ws,
+      pickField,
+    });
   }
 
   const matched = plan.matched!;

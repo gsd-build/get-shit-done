@@ -1,10 +1,21 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { extractField } from './registry.js';
+import type { QueryDispatchResult } from './query-dispatch-contract.js';
 
-export interface CjsFallbackQueryResult {
+interface CjsFallbackQueryResult {
   mode: 'json' | 'text';
   output: unknown;
   stderr: string;
+}
+
+export interface RunCjsFallbackDispatchInput {
+  projectDir: string;
+  gsdToolsPath: string;
+  normCmd: string;
+  normArgs: string[];
+  ws?: string;
+  pickField?: string;
 }
 
 function dottedCommandToCjsArgv(normCmd: string, normArgs: string[]): string[] {
@@ -49,7 +60,7 @@ async function parseCliQueryJsonOutput(raw: string, projectDir: string): Promise
   return JSON.parse(jsonStr);
 }
 
-export async function runCjsFallbackQuery(
+async function runCjsFallbackQuery(
   projectDir: string,
   gsdToolsPath: string,
   normCmd: string,
@@ -63,5 +74,39 @@ export async function runCjsFallbackQuery(
     return { mode: 'json', output, stderr };
   } catch {
     return { mode: 'text', output: stdout, stderr };
+  }
+}
+
+function formatFallbackOutput(data: unknown, mode: 'json' | 'text', pickField?: string): string | undefined {
+  if (mode === 'text') {
+    const text = String(data ?? '');
+    if (!text.trim()) return undefined;
+    return text.endsWith('\n') ? text : `${text}\n`;
+  }
+  let output: unknown = data;
+  if (pickField) output = extractField(output, pickField);
+  return `${JSON.stringify(output, null, 2)}\n`;
+}
+
+export async function runCjsFallbackDispatch(input: RunCjsFallbackDispatchInput): Promise<QueryDispatchResult> {
+  const { projectDir, gsdToolsPath, normCmd, normArgs, ws, pickField } = input;
+  const stderr = [
+    `[gsd-sdk] '${[normCmd, ...normArgs].join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
+    '[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.',
+  ];
+
+  try {
+    const fallback = await runCjsFallbackQuery(projectDir, gsdToolsPath, normCmd, normArgs, ws);
+    if (fallback.stderr.trim()) stderr.push(fallback.stderr.trimEnd());
+    return {
+      stderr,
+      stdout: formatFallbackOutput(fallback.output, fallback.mode, pickField),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      stderr,
+      error: { code: 1, message: `Error: gsd-tools.cjs fallback failed: ${msg}` },
+    };
   }
 }

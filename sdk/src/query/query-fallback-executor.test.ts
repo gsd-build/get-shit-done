@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runCjsFallbackQuery } from './query-fallback-executor.js';
+import { runCjsFallbackDispatch } from './query-fallback-executor.js';
 
-describe('runCjsFallbackQuery', () => {
+describe('runCjsFallbackDispatch', () => {
   let tmpDir: string;
   let fixtureDir: string;
 
@@ -24,24 +24,49 @@ describe('runCjsFallbackQuery', () => {
     return scriptPath;
   }
 
-  it('returns json mode when stdout is json', async () => {
+  it('returns json output', async () => {
     const script = await createScript('json.cjs', "process.stdout.write(JSON.stringify({ok:true}));");
-    const result = await runCjsFallbackQuery(tmpDir, script, 'state', ['load'], undefined);
-    expect(result.mode).toBe('json');
-    expect(result.output).toEqual({ ok: true });
+    const result = await runCjsFallbackDispatch({
+      projectDir: tmpDir,
+      gsdToolsPath: script,
+      normCmd: 'state',
+      normArgs: ['load'],
+    });
+    expect(result.stdout).toBe('{\n  "ok": true\n}\n');
   });
 
-  it('returns text mode when stdout is non-json', async () => {
+  it('returns text output with trailing newline', async () => {
     const script = await createScript('text.cjs', "process.stdout.write('USAGE: help text');");
-    const result = await runCjsFallbackQuery(tmpDir, script, 'phase', ['add', '--help'], undefined);
-    expect(result.mode).toBe('text');
-    expect(result.output).toBe('USAGE: help text');
+    const result = await runCjsFallbackDispatch({
+      projectDir: tmpDir,
+      gsdToolsPath: script,
+      normCmd: 'phase',
+      normArgs: ['add', '--help'],
+    });
+    expect(result.stdout).toBe('USAGE: help text\n');
   });
 
   it('passes ws flag to cjs command', async () => {
     const script = await createScript('ws.cjs', "const args=process.argv.slice(2); process.stdout.write(JSON.stringify({args}));");
-    const result = await runCjsFallbackQuery(tmpDir, script, 'state', ['load'], 'ws-1');
-    expect(result.mode).toBe('json');
-    expect((result.output as { args: string[] }).args).toEqual(['state', 'load', '--ws', 'ws-1']);
+    const result = await runCjsFallbackDispatch({
+      projectDir: tmpDir,
+      gsdToolsPath: script,
+      normCmd: 'state',
+      normArgs: ['load'],
+      ws: 'ws-1',
+      pickField: 'args',
+    });
+    expect(result.stdout).toBe('[\n  "state",\n  "load",\n  "--ws",\n  "ws-1"\n]\n');
+  });
+
+  it('returns structured error when subprocess fails', async () => {
+    const result = await runCjsFallbackDispatch({
+      projectDir: tmpDir,
+      gsdToolsPath: join(fixtureDir, 'missing.cjs'),
+      normCmd: 'state',
+      normArgs: ['load'],
+    });
+    expect(result.error?.code).toBe(1);
+    expect(result.error?.message).toContain('fallback failed');
   });
 });
