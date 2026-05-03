@@ -588,6 +588,7 @@ The commands above cover the most common day-to-day flows. Every command listed 
 ### Repository Integration
 
 - **`/gsd-inbox [--issues] [--prs] [--label] [--close-incomplete] [--repo owner/repo]`** — Triage and review open GitHub issues and PRs against project templates and contribution guidelines.
+- **`/gsd-feedback [brief description]`** — File a GSD issue — bug, feature request, or question — without leaving your session.
 
 ### Namespace Routers (model-facing meta-skills)
 
