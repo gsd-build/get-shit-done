@@ -146,7 +146,21 @@ export async function getMilestoneInfo(projectDir: string, workstream?: string):
 /**
  * Extract the current milestone section from ROADMAP.md.
  *
- * Port of extractCurrentMilestone from core.cjs lines 1102-1170.
+ * Two anchoring strategies, tried in order:
+ *   1. Markdown heading containing the active version (`^#{1,3}\s+.*vX.Y…`).
+ *   2. `<details><summary>vX.Y…</summary>…</details>` block (the GitHub-friendly
+ *      collapse pattern; see #2641). When this fallback fires, the captured
+ *      `<summary>` text is synthesized as a `##` heading prepended to the
+ *      returned slice so downstream consumers that scan for milestone headings
+ *      (e.g. the `data.milestones` loop in `roadmapAnalyze`) still see an
+ *      active-milestone anchor.
+ *
+ * If neither strategy matches the active version, falls through to
+ * `stripShippedMilestones(content)`.
+ *
+ * Originally ported from core.cjs lines 1102-1170; the TS implementation has
+ * since diverged (Backlog-leak fix #2422, phase-vX.Y truncation fix #2619,
+ * fenced-code-block tracking #2787, `<details><summary>` fallback #2641).
  *
  * @param content - Full ROADMAP.md content
  * @param projectDir - Working directory for reading STATE.md
@@ -207,26 +221,47 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
     // active ROADMAP. The init.phase-op safety guard then misfires and can
     // route phase lookups into archived milestones.
     //
-    // <details\b[^>]*> tolerates attributes like <details open> and
-    // <details class="...">. <summary\b[^>]*> tolerates the same on the
-    // <summary> tag. The lazy [\s\S]*? terminates on the first </details>;
-    // nested <details> inside the active milestone are not expected and would
-    // mis-anchor (acceptable; FAMP-style ROADMAPs do not nest, and any project
-    // that does will fall through to the existing stripShippedMilestones path
-    // with no regression vs. today's behavior).
+    // Regex anatomy:
+    //   <details\b[^>]*>          tolerate attributes (e.g. <details open>)
+    //   \s*<summary\b[^>]*>       tolerate attributes on <summary>
+    //   ((?:(?!</summary>).)*?    non-greedy summary capture; tolerates
+    //     ${escapedVersion}        inline HTML in the summary text
+    //     (?![\d.])                non-version-character lookahead — prevents
+    //                                 `v0.1` from substring-matching `v0.10`
+    //     (?:(?!</summary>).)*)
+    //   </summary>                 end of summary
+    //   ([\s\S]*?)</details>       lazy body capture to the FIRST </details>
     //
-    // We capture the <summary> text and prepend it as a normalized `##`
-    // milestone heading on the returned slice. This keeps downstream consumers
-    // that scan for `##` milestone headings (e.g. roadmapAnalyze's
-    // data.milestones loop later in this file) producing a meaningful entry
-    // for the active milestone instead of seeing an unanchored body.
+    // Contract: any consumer that scans the returned slice for milestone
+    // headings (e.g. /##\s*.*vX.Y/) sees the active milestone's anchor. We
+    // synthesize that heading from the captured <summary> text rather than
+    // returning the body alone.
+    //
+    // Hardening guards:
+    //   - Nested <details>: the lazy quantifier truncates at the inner
+    //     </details>, silently losing trailing phases. Detect and fall through
+    //     to stripShippedMilestones() instead of returning truncated content.
+    //   - Empty body: a <details> block with no body would synthesize a heading
+    //     with nothing under it. Treat as no-match.
+    //   - Summary sanitization: strip inline HTML (e.g. <em>active</em>) and
+    //     leading `#` tokens before promoting to a `##` heading, so the result
+    //     is a single well-formed markdown heading.
     const detailsPattern = new RegExp(
-      `<details\\b[^>]*>\\s*<summary\\b[^>]*>([^<]*${escapedVersion}[^<]*)</summary>([\\s\\S]*?)</details>`,
+      `<details\\b[^>]*>\\s*<summary\\b[^>]*>` +
+      `((?:(?!</summary>).)*?${escapedVersion}(?![\\d.])(?:(?!</summary>).)*)` +
+      `</summary>([\\s\\S]*?)</details>`,
       'i'
     );
     const detailsMatch = content.match(detailsPattern);
-    if (detailsMatch) {
-      const summary = detailsMatch[1].trim();
+    if (
+      detailsMatch &&
+      detailsMatch[2].trim() &&                    // empty-body guard
+      !detailsMatch[2].includes('<details')        // nested-<details> guard
+    ) {
+      const summary = detailsMatch[1]
+        .replace(/<[^>]+>/g, '')                   // strip inline HTML
+        .replace(/^#+\s*/, '')                     // strip leading `#`
+        .trim();
       const body = detailsMatch[2];
       return `## ${summary}\n${body}`;
     }

@@ -495,6 +495,133 @@ describe('extractCurrentMilestone', () => {
     expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
   });
 
+  // ─── Bug #2641 (review hardening): substring-version trap ───
+  it('bug-2641: v0.1 must not substring-match <summary>v0.10 …</summary>', async () => {
+    // The fallback regex anchors on `escapedVersion` inside `<summary>` text.
+    // Without a non-version-character lookahead, `v0.1` matches inside `v0.10`,
+    // and the function returns the v0.10 block's body as the active milestone
+    // — confidently-wrong content (worse than the pre-fix fall-through, which
+    // returned known-incomplete content). The synthesized `## v0.10 …` heading
+    // would then mask the bug from downstream debugging. Lock the boundary.
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.10 Future Milestone — Phase Details</summary>
+
+### Phase 7: Wrong Phase
+**Goal:** This is from v0.10, not v0.1.
+</details>
+
+<details>
+<summary>v0.1 Active — Phase Details</summary>
+
+### Phase 1: Right Phase
+**Goal:** This is the active milestone.
+</details>
+`;
+    const state = `---\nmilestone: v0.1\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 1: Right Phase');
+    expect(result).toContain('This is the active milestone');
+    expect(result).not.toContain('Phase 7: Wrong Phase');
+    expect(result).not.toContain('This is from v0.10');
+  });
+
+  // ─── Bug #2641 (review hardening): nested <details> guard ───
+  it('bug-2641: nested <details> falls through (does not silently truncate)', async () => {
+    // The lazy [\s\S]*?</details> terminates on the FIRST </details>, which
+    // is the inner closer when nesting is present. Without a guard, the
+    // function returns truncated body and silently loses everything after the
+    // inner </details>. Detect nesting and fall through to the existing
+    // stripShippedMilestones path so the failure mode is loud (no match) not
+    // silent (truncated content).
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details</summary>
+
+### Phase 1: Library
+<details>
+<summary>Implementation notes</summary>
+Detail
+</details>
+
+### Phase 2: Polish — would be silently lost without the guard
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // The critical contract: must NOT return a synthesized `## v0.9` heading
+    // anchored to truncated body. The truncation case (without the nested-
+    // guard) would emit `## v0.9 Local-First Bus\n\n### Phase 1: Library\n
+    // <details><summary>Implementation notes</summary>\nDetail` and silently
+    // lose Phase 2 — confidently-wrong content. Falling through to
+    // stripShippedMilestones() may leak unrelated content but doesn't claim
+    // to be the active milestone. Loud failure > silent truncation.
+    expect(result).not.toMatch(/^##\s+v0\.9 Local-First Bus/m);
+    // The Phase 1 detail block (which sits between the outer <details> open
+    // and the inner </details>) must not appear under a v0.9 heading.
+    expect(result).not.toMatch(/##\s+v0\.9[\s\S]*Phase 1: Library/);
+  });
+
+  // ─── Bug #2641 (review hardening): empty <details> body guard ───
+  it('bug-2641: empty <details> body falls through (no phantom milestone)', async () => {
+    // <details><summary>v0.9</summary></details> with no body would synthesize
+    // `## v0.9\n` — a phantom milestone with zero phases. roadmapAnalyze would
+    // then return {phases: []} with no error signal. Treat as no-match.
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Empty</summary>
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // Must not synthesize a phantom heading
+    expect(result).not.toMatch(/^##\s+v0\.9/m);
+  });
+
+  // ─── Bug #2641 (review hardening): inline HTML in <summary> + leading # ───
+  it('bug-2641: tolerates inline HTML in <summary> and strips it from synthesized heading', async () => {
+    // GitHub-rendered summaries commonly contain inline tags like
+    // <em>(active)</em> or <code>v0.9</code>. The summary capture must allow
+    // them through and the synthesized `## ` heading must strip the tags so
+    // the result is clean markdown (no `## <em>...</em>`).
+    const roadmap = `# Roadmap
+
+<details open>
+<summary><strong>v0.9 Local-First Bus</strong> <em>(active)</em></summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus\s+\(active\)/m);
+    // Tags must be stripped from the synthesized heading
+    expect(result).not.toMatch(/^##.*<strong>/m);
+    expect(result).not.toMatch(/^##.*<em>/m);
+  });
+
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
   it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
     const roadmapWithDetails = `# ROADMAP
