@@ -1,3 +1,5 @@
+import { TRANSPORT_RAW_COMMANDS } from './query/policy-convergence.js';
+
 export type TransportMode = 'json' | 'raw';
 
 export interface TransportPolicy {
@@ -12,17 +14,9 @@ const DEFAULT_POLICY: TransportPolicy = {
   outputMode: 'json',
 };
 
-const BUILTIN_COMMAND_POLICY: Record<string, Partial<TransportPolicy>> = {
-  // raw stdout contracts
-  commit: { outputMode: 'raw' },
-  'config-set': { outputMode: 'raw' },
-  'verify-summary': { outputMode: 'raw' },
-  'verify.summary': { outputMode: 'raw' },
-  'verify summary': { outputMode: 'raw' },
-
-  // native-first/hard-fail examples (can expand later)
-  // 'state.load': { allowFallbackToSubprocess: false, outputMode: 'raw' },
-};
+const BUILTIN_COMMAND_POLICY: Record<string, Partial<TransportPolicy>> = Object.fromEntries(
+  TRANSPORT_RAW_COMMANDS.map((command) => [command, { outputMode: 'raw' as const }]),
+);
 
 const COMMAND_POLICY_OVERRIDES: Record<string, Partial<TransportPolicy>> = {};
 

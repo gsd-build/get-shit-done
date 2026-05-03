@@ -22,16 +22,12 @@ import { stateJson, stateGet, stateSnapshot } from './state.js';
 import { stateProjectLoad } from './state-project-load.js';
 import {
   STATE_COMMAND_ALIASES,
-  STATE_MUTATION_COMMANDS,
   VERIFY_COMMAND_ALIASES,
   INIT_COMMAND_ALIASES,
   PHASE_COMMAND_ALIASES,
-  PHASE_MUTATION_COMMANDS,
   PHASES_COMMAND_ALIASES,
-  PHASES_MUTATION_COMMANDS,
   VALIDATE_COMMAND_ALIASES,
   ROADMAP_COMMAND_ALIASES,
-  ROADMAP_MUTATION_COMMANDS,
 } from './command-aliases.generated.js';
 import { findPhase, phasePlanIndex } from './phase.js';
 import { phaseListPlans, phaseListArtifacts } from './phase-list-queries.js';
@@ -114,6 +110,7 @@ import type { GSDEvent } from '../types.js';
 import type { QueryHandler, QueryResult } from './utils.js';
 import { registerAliasCatalog, registerStaticCatalog } from './command-catalog.js';
 import { buildMutationEvent } from './mutation-event-mapper.js';
+import { QUERY_MUTATION_COMMAND_LIST } from './policy-convergence.js';
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
 
@@ -132,27 +129,7 @@ export { normalizeQueryCommand } from './normalize-query-command.js';
  * See QUERY-HANDLERS.md for semantics. Init composition handlers are omitted
  * (they emit JSON for workflows; agents perform writes).
  */
-export const QUERY_MUTATION_COMMANDS = new Set<string>([
-  ...STATE_MUTATION_COMMANDS,
-  'frontmatter.set', 'frontmatter.merge', 'frontmatter.validate', 'frontmatter validate',
-  'config-set', 'config-set-model-profile', 'config-new-project', 'config-ensure-section',
-  'commit', 'check-commit', 'commit-to-subrepo',
-  'template.fill', 'template.select', 'template select',
-  ...PHASE_MUTATION_COMMANDS,
-  ...PHASES_MUTATION_COMMANDS,
-  ...ROADMAP_MUTATION_COMMANDS,
-  'requirements.mark-complete', 'requirements mark-complete',
-  'todo.complete', 'todo complete',
-  'milestone.complete', 'milestone complete',
-  'workstream.create', 'workstream.set', 'workstream.complete', 'workstream.progress',
-  'workstream create', 'workstream set', 'workstream complete', 'workstream progress',
-  'docs-init',
-  'learnings.copy', 'learnings copy',
-  'learnings.prune', 'learnings prune',
-  'learnings.delete', 'learnings delete',
-  'intel.snapshot', 'intel.patch-meta', 'intel snapshot', 'intel patch-meta',
-  'write-profile', 'generate-claude-profile', 'generate-dev-preferences', 'generate-claude-md',
-]);
+export const QUERY_MUTATION_COMMANDS = new Set<string>(QUERY_MUTATION_COMMAND_LIST);
 
 // ─── Factory ───────────────────────────────────────────────────────────────
 
