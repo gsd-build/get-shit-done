@@ -1,6 +1,9 @@
 import type { QueryRegistry } from './registry.js';
-import { normalizeQueryCommand } from './normalize-query-command.js';
-import { resolveQueryCommand, type QueryCommandResolution } from './command-resolution.js';
+import {
+  normalizeQueryCommand,
+  resolveQueryCommand,
+  type QueryCommandResolution,
+} from './query-command-resolution-strategy.js';
 
 export type DispatchMode = 'native' | 'cjs' | 'error';
 

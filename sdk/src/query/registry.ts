@@ -22,7 +22,7 @@
 
 import type { QueryResult, QueryHandler } from './utils.js';
 import { GSDError, ErrorClassification } from '../errors.js';
-import { resolveQueryTokens } from './command-resolution.js';
+import { resolveQueryTokens } from './query-command-resolution-strategy.js';
 
 // ─── extractField ──────────────────────────────────────────────────────────
 

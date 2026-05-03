@@ -20,7 +20,7 @@ import type { InitNewProjectInfo, PhaseOpInfo, PhasePlanIndex, RoadmapAnalysis }
 import type { GSDEventStream } from './event-stream.js';
 import { GSDError, exitCodeFor } from './errors.js';
 import { createRegistry } from './query/index.js';
-import { resolveQueryCommand, type QueryCommandResolution } from './query/command-resolution.js';
+import { resolveQueryCommand, normalizeQueryCommand, type QueryCommandResolution } from './query/query-command-resolution-strategy.js';
 import { formatStateLoadRawStdout } from './query/state-project-load.js';
 import type { QueryResult } from './query/utils.js';
 import { GSDTransport } from './gsd-transport.js';
@@ -562,8 +562,6 @@ export class GSDTools {
  */
 export async function runGsdToolsQuery(projectDir: string, queryArgv: string[]): Promise<unknown> {
   const { createRegistry } = await import('./query/index.js');
-  const { normalizeQueryCommand } = await import('./query/normalize-query-command.js');
-  const { resolveQueryCommand } = await import('./query/command-resolution.js');
   const { GSDError, ErrorClassification } = await import('./errors.js');
 
   if (queryArgv.length === 0 || !queryArgv[0]) {
