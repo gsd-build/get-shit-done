@@ -7,7 +7,6 @@
  */
 
 import { parseArgs } from 'node:util';
-import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve, join, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -284,49 +283,6 @@ function queryFallbackToCjsEnabled(): boolean {
   return true;
 }
 
-async function parseCliQueryJsonOutput(raw: string, projectDir: string): Promise<unknown> {
-  const trimmed = raw.trim();
-  if (trimmed === '') return null;
-  let jsonStr = trimmed;
-  if (jsonStr.startsWith('@file:')) {
-    const rel = jsonStr.slice(6).trim();
-    const { resolvePathUnderProject } = await import('./query/helpers.js');
-    const filePath = await resolvePathUnderProject(projectDir, rel);
-    jsonStr = await readFile(filePath, 'utf-8');
-  }
-  return JSON.parse(jsonStr);
-}
-
-/** Map registry-style dotted command tokens to gsd-tools.cjs argv (space-separated subcommands). */
-function dottedCommandToCjsArgv(normCmd: string, normArgs: string[]): string[] {
-  if (normCmd.includes('.')) {
-    return [...normCmd.split('.'), ...normArgs];
-  }
-  return [normCmd, ...normArgs];
-}
-
-function execGsdToolsCjsQuery(
-  projectDir: string,
-  gsdToolsPath: string,
-  normCmd: string,
-  normArgs: string[],
-  ws: string | undefined,
-): Promise<{ stdout: string; stderr: string }> {
-  const cjsArgv = dottedCommandToCjsArgv(normCmd, normArgs);
-  const wsSuffix = ws ? ['--ws', ws] : [];
-  const fullArgv = [gsdToolsPath, ...cjsArgv, ...wsSuffix];
-  return new Promise((resolve, reject) => {
-    execFile(
-      process.execPath,
-      fullArgv,
-      { cwd: projectDir, maxBuffer: 10 * 1024 * 1024, env: { ...process.env } },
-      (err, stdout, stderr) => {
-        if (err) reject(err);
-        else resolve({ stdout: stdout?.toString() ?? '', stderr: stderr?.toString() ?? '' });
-      },
-    );
-  });
-}
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
@@ -391,6 +347,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     const { createRegistry } = await import('./query/index.js');
     const { extractField } = await import('./query/registry.js');
     const { planQueryDispatch } = await import('./query/query-fallback-orchestration.js');
+    const { runCjsFallbackQuery } = await import('./query/query-fallback-executor.js');
     const { GSDToolsError } = await import('./gsd-tools.js');
     const { GSDError, exitCodeFor, ErrorClassification } = await import('./errors.js');
 
@@ -438,30 +395,22 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
           `[gsd-sdk] '${[normCmd, ...normArgs].join(' ')}' not in native registry; falling back to gsd-tools.cjs.`,
         );
         console.error('[gsd-sdk] Transparent bridge — prefer adding a native handler when parity matters.');
-        const { stdout, stderr } = await execGsdToolsCjsQuery(
+        const fallback = await runCjsFallbackQuery(
           args.projectDir,
           gsdPath,
           normCmd,
           normArgs,
           args.ws,
         );
-        if (stderr.trim()) console.error(stderr.trimEnd());
-        // #3026 CR (Major outside-diff): the gsd-tools.cjs fallback now
-        // emits plain-text usage on --help / -h with exit 0, instead of
-        // a JSON object. Wrap the JSON parse in a try/catch and forward
-        // non-JSON stdout verbatim so subcommand help reaches the user.
-        // (Previously this path JSON.parsed the help text and threw
-        // "Unexpected token 'U'" — exitCode=1 — a regression introduced
-        // alongside the --help passthrough fix.)
-        let output: unknown;
-        try {
-          output = await parseCliQueryJsonOutput(stdout, args.projectDir);
-        } catch {
+        if (fallback.stderr.trim()) console.error(fallback.stderr.trimEnd());
+        if (fallback.mode === 'text') {
+          const stdout = String(fallback.output ?? '');
           if (stdout.trim()) {
             process.stdout.write(stdout.endsWith('\n') ? stdout : stdout + '\n');
           }
           return;
         }
+        let output: unknown = fallback.output;
         if (pickField) {
           output = extractField(output, pickField);
         }
