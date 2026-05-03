@@ -393,7 +393,7 @@
 
 ### 9. Phase Management
 
-**명령어:** `/gsd-add-phase`, `/gsd-insert-phase [N]`, `/gsd-remove-phase [N]`
+**명령어:** `/gsd-phase`, `/gsd-phase --insert [N]`, `/gsd-phase --remove [N]`
 
 **목적:** 개발 중 동적 로드맵 수정.
 
@@ -680,7 +680,7 @@
 
 ### 26. Model Profiles
 
-**명령어:** `/gsd-set-profile <quality|balanced|budget|inherit>`
+**명령어:** `/gsd-config --profile <quality|balanced|budget|inherit>`
 
 **목적:** 각 에이전트가 사용하는 AI 모델을 제어하여 품질과 비용의 균형을 맞춥니다.
 
@@ -762,7 +762,7 @@
 
 ### 29. Todo Management
 
-**명령어:** `/gsd-add-todo [desc]`, `/gsd-capture --list`
+**명령어:** `/gsd-capture [desc]`, `/gsd-capture --list`
 
 **목적:** 세션 중 나중에 처리할 아이디어와 작업을 캡처합니다.
 
@@ -1065,7 +1065,7 @@ fix(03-01): correct auth token expiry
 
 ### 43. Backlog Parking Lot
 
-**명령어:** `/gsd-add-backlog <description>`, `/gsd-review-backlog`, `/gsd-plant-seed <idea>`
+**명령어:** `/gsd-capture --backlog <description>`, `/gsd-review-backlog`, `/gsd-capture --seed <idea>`
 
 **목적:** 아직 적극적인 계획에 준비되지 않은 아이디어를 캡처합니다. 백로그 항목은 활성 페이즈 순서 밖에 있기 위해 999.x 번호를 사용합니다. 시드는 올바른 마일스톤에서 자동으로 표시되는 트리거 조건이 있는 미래 지향적 아이디어입니다.
 

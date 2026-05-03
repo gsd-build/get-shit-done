@@ -411,7 +411,7 @@ UI-SPEC.md (per phase) ───────────────────
 │   ├── pending/            # キャプチャされたアイデア
 │   └── done/               # 完了済みtodo
 ├── threads/               # 永続コンテキストスレッド（/gsd-thread から）
-├── seeds/                 # 将来に向けたアイデア（/gsd-plant-seed から）
+├── seeds/                 # 将来に向けたアイデア（/gsd-capture --seed から）
 ├── debug/                  # アクティブなデバッグセッション
 │   ├── *.md                # アクティブセッション
 │   ├── resolved/           # アーカイブ済みセッション

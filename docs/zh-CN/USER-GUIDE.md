@@ -205,9 +205,9 @@
 
 | 命令 | 用途 | 何时使用 |
 |---------|---------|-------------|
-| `/gsd-add-phase` | 向路线图追加新阶段 | 初始规划后范围增长 |
-| `/gsd-insert-phase [N]` | 插入紧急工作（小数编号） | 里程碑中途紧急修复 |
-| `/gsd-remove-phase [N]` | 删除未来阶段并重新编号 | 移除某个功能 |
+| `/gsd-phase` | 向路线图追加新阶段 | 初始规划后范围增长 |
+| `/gsd-phase --insert [N]` | 插入紧急工作（小数编号） | 里程碑中途紧急修复 |
+| `/gsd-phase --remove [N]` | 删除未来阶段并重新编号 | 移除某个功能 |
 | `/gsd-list-phase-assumptions [N]` | 预览 Claude 的预期方法 | 规划前，验证方向 |
 | `/gsd-plan-phase --research-phase [N]` | 仅深度生态研究 | 复杂或不熟悉的领域 |
 | `/gsd-autonomous [--from N] [--to N] [--only N]` | 自主执行剩余阶段（`--to N` 到阶段 N 停止） | 批量自动处理 |
@@ -229,10 +229,10 @@
 | `/gsd-map-codebase` | 分析现有代码库 | 在现有代码上运行 `/gsd-new-project` 之前 |
 | `/gsd-quick` | 带 GSD 保证的临时任务 | Bug 修复、小功能、配置更改 |
 | `/gsd-debug [desc] [--diagnose]` | 带持久状态的系统化调试（`--diagnose` 仅诊断） | 出问题时 |
-| `/gsd-add-todo [desc]` | 捕获想法留待后用 | 会话期间想到什么 |
+| `/gsd-capture [desc]` | 捕获想法留待后用 | 会话期间想到什么 |
 | `/gsd-capture --list` | 列出待处理事项 | 查看捕获的想法 |
 | `/gsd-settings` | 配置工作流开关和模型配置 | 更改模型、切换代理 |
-| `/gsd-set-profile <profile>` | 快速切换配置 | 更改成本/质量权衡 |
+| `/gsd-config --profile <profile>` | 快速切换配置 | 更改成本/质量权衡 |
 | `/gsd-update --reapply` | 更新后恢复本地修改 | 如果你有本地编辑，在 `/gsd-update` 后 |
 
 ---
@@ -403,11 +403,11 @@ claude --dangerously-skip-permissions
 ### 里程碑中途范围变更
 
 ```bash
-/gsd-add-phase              # 向路线图追加新阶段
+/gsd-phase              # 向路线图追加新阶段
 # 或
-/gsd-insert-phase 3         # 在阶段 3 和 4 之间插入紧急工作
+/gsd-phase --insert 3         # 在阶段 3 和 4 之间插入紧急工作
 # 或
-/gsd-remove-phase 7         # 移除阶段 7 并重新编号
+/gsd-phase --remove 7         # 移除阶段 7 并重新编号
 ```
 
 ---
@@ -456,7 +456,7 @@ node gsd-tools.cjs state sync              # 从磁盘重建 STATE.md
 
 ### 模型成本太高
 
-切换到 budget 配置：`/gsd-set-profile budget`。如果领域对你（或 Claude）熟悉，通过 `/gsd-settings` 禁用研究和计划检查代理。
+切换到 budget 配置：`/gsd-config --profile budget`。如果领域对你（或 Claude）熟悉，通过 `/gsd-settings` 禁用研究和计划检查代理。
 
 ### 处理敏感/私有项目
 
@@ -478,12 +478,12 @@ node gsd-tools.cjs state sync              # 从磁盘重建 STATE.md
 |---------|----------|
 | 丢失上下文 / 新会话 | `/gsd-resume-work` 或 `/gsd-progress` |
 | 阶段出错 | `git revert` 阶段提交，然后重新规划 |
-| 需要更改范围 | `/gsd-add-phase`、`/gsd-insert-phase` 或 `/gsd-remove-phase` |
+| 需要更改范围 | `/gsd-phase`、`/gsd-phase --insert` 或 `/gsd-phase --remove` |
 | 出问题了 | `/gsd-debug "描述"` |
 | STATE.md 不同步 | `state validate` 然后 `state sync` |
 | 快速针对性修复 | `/gsd-quick` |
 | 计划与你的愿景不符 | `/gsd-discuss-phase [N]` 然后重新规划 |
-| 成本过高 | `/gsd-set-profile budget` 和 `/gsd-settings` 关闭代理 |
+| 成本过高 | `/gsd-config --profile budget` 和 `/gsd-settings` 关闭代理 |
 | 更新破坏了本地更改 | `/gsd-update --reapply` |
 
 ---
