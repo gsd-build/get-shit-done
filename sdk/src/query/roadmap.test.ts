@@ -441,6 +441,33 @@ describe('extractCurrentMilestone', () => {
     expect(result).toMatch(/^##\s+v0\.9 Local-First Bus \(active\) — Phase Details/m);
   });
 
+  // ─── Bug #2641 (CodeRabbit follow-up): quoted YAML version normalization ───
+  it('bug-2641: handles quoted YAML version (milestone: "v0.9") in STATE.md', async () => {
+    // STATE.md may use quoted YAML (`milestone: "v0.9"`). Without quote-stripping,
+    // version would carry literal quotes, escapedVersion would be `\"v0\.9\"`,
+    // and neither the markdown-heading regex nor the <details><summary> fallback
+    // would match — falling through to stripShippedMilestones and reintroducing
+    // the archived-milestone misrouting this PR addresses. Parity with
+    // parseMilestoneFromState() and getMilestoneInfo() (which both strip quotes).
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const stateQuoted = `---\nmilestone: "v0.9"\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), stateQuoted);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
+  });
+
   // ─── Bug #2641: tolerate attributes on <details> tag (e.g. <details open>) ───
   it('bug-2641: finds active milestone in <details open><summary>vX.Y …</summary>', async () => {
     // GitHub auto-renders <details open> for sections that should default to

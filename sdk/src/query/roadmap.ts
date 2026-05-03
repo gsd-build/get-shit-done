@@ -153,13 +153,19 @@ export async function getMilestoneInfo(projectDir: string, workstream?: string):
  * @returns Content scoped to current milestone
  */
 export async function extractCurrentMilestone(content: string, projectDir: string, workstream?: string): Promise<string> {
-  // Get version from STATE.md frontmatter
+  // Get version from STATE.md frontmatter.
+  // Strip optional surrounding YAML quotes (e.g. `milestone: "v0.9"`) for parity
+  // with parseMilestoneFromState() above and getMilestoneInfo()'s STATE.md path.
+  // Without this, a quoted version yields `escapedVersion = '\\"v0\\.9\\"'`
+  // which matches neither markdown headings nor <summary> text, falling
+  // through to stripShippedMilestones() — and reintroducing the same archived-
+  // milestone misrouting this fallback addresses.
   let version: string | null = null;
   try {
     const stateRaw = await readFile(planningPaths(projectDir, workstream).state, 'utf-8');
     const milestoneMatch = stateRaw.match(/^milestone:\s*(.+)/m);
     if (milestoneMatch) {
-      version = milestoneMatch[1].trim();
+      version = milestoneMatch[1].trim().replace(/^["']|["']$/g, '');
     }
   } catch { /* intentionally empty */ }
 
