@@ -20,7 +20,7 @@ import type { InitNewProjectInfo, PhaseOpInfo, PhasePlanIndex, RoadmapAnalysis }
 import type { GSDEventStream } from './event-stream.js';
 import { GSDError, exitCodeFor } from './errors.js';
 import { createRegistry } from './query/index.js';
-import { resolveQueryCommand, normalizeQueryCommand, type QueryCommandResolution } from './query/query-command-resolution-strategy.js';
+import { resolveQueryCommand, type QueryCommandResolution } from './query/query-command-resolution-strategy.js';
 import { formatStateLoadRawStdout } from './query/state-project-load.js';
 import type { QueryResult } from './query/utils.js';
 import { GSDTransport } from './gsd-transport.js';
@@ -554,30 +554,6 @@ export class GSDTools {
   async configSet(key: string, value: string): Promise<string> {
     return this.dispatchNativeRaw('config-set', [key, value], 'config-set', [key, value]);
   }
-}
-
-/**
- * Run `gsd-sdk query` semantics in-process: normalize argv, resolve registry, dispatch.
- * Returns handler JSON payload (same as stdout from the `gsd-sdk query` CLI without `--pick`).
- */
-export async function runGsdToolsQuery(projectDir: string, queryArgv: string[]): Promise<unknown> {
-  const { createRegistry } = await import('./query/index.js');
-  const { GSDError, ErrorClassification } = await import('./errors.js');
-
-  if (queryArgv.length === 0 || !queryArgv[0]) {
-    throw new GSDError('runGsdToolsQuery requires a command', ErrorClassification.Validation);
-  }
-  const registry = createRegistry();
-  const [normCmd, normArgs] = normalizeQueryCommand(queryArgv[0], queryArgv.slice(1));
-  const matched = resolveQueryCommand(queryArgv[0], queryArgv.slice(1), registry);
-  if (!matched) {
-    throw new GSDError(
-      `Unknown command: "${[normCmd, ...normArgs].join(' ')}". No native handler registered.`,
-      ErrorClassification.Validation,
-    );
-  }
-  const result = await registry.dispatch(matched.cmd, matched.args, projectDir);
-  return result.data;
 }
 
 // ─── Path resolution ────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { QUERY_POLICY_SNAPSHOT, QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS } from './query-policy-snapshot.js';
+import { QUERY_POLICY_SNAPSHOT, QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS } from './query-policy-capability.js';
 
 describe('query-policy-snapshot', () => {
   it('exposes policy constants through one snapshot interface', () => {

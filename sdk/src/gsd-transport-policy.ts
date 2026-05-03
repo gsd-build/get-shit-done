@@ -1,4 +1,4 @@
-import { TRANSPORT_RAW_COMMANDS } from './query/policy-convergence.js';
+import { TRANSPORT_RAW_COMMANDS } from './query/query-policy-capability.js';
 
 export type TransportMode = 'json' | 'raw';
 

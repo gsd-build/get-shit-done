@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { supportsMutationCommand, supportsRawOutputCommand } from './query-registry-capability.js';
+import { supportsMutationCommand, supportsRawOutputCommand } from './query-policy-capability.js';
 
 describe('query-registry-capability', () => {
   it('reports mutation command capability', () => {

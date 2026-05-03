@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createRegistry } from './index.js';
-import { explainQueryCommandNoMatch, resolveQueryCommand, resolveQueryTokens } from './command-resolution.js';
+import { explainQueryCommandNoMatch, resolveQueryCommand, resolveQueryTokens } from './query-command-resolution-strategy.js';
 
 describe('command resolution', () => {
   it('resolves normalized tokens with metadata', () => {

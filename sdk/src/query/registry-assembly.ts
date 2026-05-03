@@ -12,7 +12,7 @@ import {
   DECISION_ROUTING_STATIC_CATALOG,
 } from './command-static-catalog-foundation.js';
 import { DOMAIN_STATIC_CATALOG } from './command-static-catalog-domain.js';
-import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS } from './policy-convergence.js';
+import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS } from './query-policy-capability.js';
 import { COMMAND_DEFINITIONS_BY_FAMILY, type CommandDefinition } from './command-definition.js';
 import { decorateMutationsWithEvents } from './mutation-event-decorator.js';
 import { FAMILY_HANDLERS } from './command-family-handlers.js';

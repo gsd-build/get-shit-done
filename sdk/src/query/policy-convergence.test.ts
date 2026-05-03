@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS, isQueryMutationCommand } from './policy-convergence.js';
+import { QUERY_MUTATION_COMMAND_LIST, TRANSPORT_RAW_COMMANDS, isQueryMutationCommand } from './query-policy-capability.js';
 
 describe('policy convergence', () => {
   it('contains expected raw transport aliases', () => {

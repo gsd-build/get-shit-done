@@ -4,4 +4,4 @@ export { createRegistry, buildRegistry, decorateRegistryMutations, QUERY_MUTATIO
 
 export type { QueryResult, QueryHandler } from './utils.js';
 export { extractField } from './registry.js';
-export { normalizeQueryCommand } from './normalize-query-command.js';
+export { normalizeQueryCommand } from './query-command-resolution-strategy.js';
