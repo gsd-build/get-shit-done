@@ -109,9 +109,17 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
   }
 
   const matched = plan.matched!;
-  const result = await deps.dispatchNative(matched.cmd, matched.args);
-  return {
-    stderr: [],
-    stdout: formatOutput(result.data, result.format, pickField),
-  };
+  try {
+    const result = await deps.dispatchNative(matched.cmd, matched.args);
+    return {
+      stderr: [],
+      stdout: formatOutput(result.data, result.format, pickField),
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      stderr: [],
+      error: { code: 1, message: `Error: ${msg}` },
+    };
+  }
 }

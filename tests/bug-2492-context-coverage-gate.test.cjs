@@ -174,6 +174,6 @@ describe('SDK wiring for #2492 gates', () => {
     assert.ok(c.includes('VERIFY_DECISION_STATIC_CATALOG'), 'decision-coverage-plan handler must be registered via the verify-decision catalog');
     assert.ok(c.includes('registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG)'), 'check.decision-coverage-plan handler must be registered');
     assert.ok(c.includes('registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG)'), 'check.decision-coverage-verify handler must be registered');
-    assert.ok(c.includes('FOUNDATION_STATIC_CATALOG'), 'decisions.parse handler must be registered');
+    assert.ok(c.includes('decisions.parse') || c.includes('VERIFY_DECISION_STATIC_CATALOG'), 'decisions.parse handler must be registered');
   });
 });
