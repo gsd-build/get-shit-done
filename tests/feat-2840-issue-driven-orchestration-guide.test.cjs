@@ -91,7 +91,7 @@ function parseGuide() {
   // Track which referenced commands appear at least once anywhere in the
   // guide. This prevents drift if /gsd-* command names are renamed.
   const requiredCommands = [
-    '/gsd-workspace',
+    '/gsd-workspace --new',
     '/gsd-manager',
     '/gsd-autonomous',
     '/gsd-discuss-phase',
@@ -114,7 +114,7 @@ function parseGuide() {
         statemd: /STATE\.md/.test(conceptMappingSection),
         contextmd: /CONTEXT\.md/.test(conceptMappingSection),
         planmd: /PLAN\.md/.test(conceptMappingSection),
-        workspaceCommand: /\/gsd-workspace/.test(conceptMappingSection),
+        workspaceCommand: /\/gsd-workspace\s+--new/.test(conceptMappingSection),
         executionCommand:
           /\/gsd-manager/.test(conceptMappingSection) ||
           /\/gsd-autonomous/.test(conceptMappingSection),
@@ -202,7 +202,7 @@ describe('issue-driven-orchestration guide (#2840)', () => {
       statemd: 'STATE.md must appear in the concept mapping',
       contextmd: 'CONTEXT.md must appear in the concept mapping',
       planmd: 'PLAN.md must appear in the concept mapping',
-      workspaceCommand: '/gsd-workspace must appear in the concept mapping',
+      workspaceCommand: '/gsd-workspace --new must appear in the concept mapping',
       executionCommand:
         '/gsd-manager or /gsd-autonomous must appear in the concept mapping',
       verifyCommand: '/gsd-verify-work must appear in the concept mapping',

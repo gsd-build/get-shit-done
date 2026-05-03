@@ -1629,7 +1629,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 65. Claim Provenance Tagging
 
-**Part of:** `/gsd-plan-phase --research-phase`
+**Part of:** `/gsd-plan-phase --research-phase <N>`
 
 **Purpose:** Ensure research claims are tagged with source evidence and assumptions are logged separately.
 

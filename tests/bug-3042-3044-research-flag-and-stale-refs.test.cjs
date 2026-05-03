@@ -182,17 +182,29 @@ describe('bug #3042: /gsd-plan-phase --research-phase flag absorbs the standalon
     );
   });
 
-  test('workflow has an existing-RESEARCH.md prompt path (update/view/skip)', () => {
+  test('workflow has an existing-RESEARCH.md prompt path (update/view/skip) within proximity', () => {
     const content = read('get-shit-done/workflows/plan-phase.md');
-    // When RESEARCH.md exists in research-only mode and no --view or
-    // --research flag, the workflow must prompt the user. Assert the
-    // three choice keywords appear together in the prose.
-    const promptHasUpdate = /\bupdate\b/i.test(content) && /\bRESEARCH\.md\b/.test(content);
-    const promptHasView = /\bview\b/i.test(content);
-    const promptHasSkip = /\bskip\b/i.test(content);
+    // CR #3045 finding: the previous version of this test asserted
+    // `update`, `view`, `skip` appeared anywhere in the file, which was
+    // tautological — those words occur all over the workflow for
+    // unrelated reasons (--skip-research, --view flag declarations,
+    // etc.). Tighten to a proximity check: all three choice tokens
+    // must occur in a window of ~400 chars surrounding "RESEARCH.md
+    // already exists" / "Update — re-spawn" / equivalent prompt prose,
+    // proving the prompt section is genuinely present.
+    const idx = content.indexOf('RESEARCH.md already exists');
     assert.ok(
-      promptHasUpdate && promptHasView && promptHasSkip,
-      'plan-phase workflow must include a prompt path with update/view/skip choices when RESEARCH.md exists in research-only mode'
+      idx >= 0,
+      'plan-phase workflow must contain the literal "RESEARCH.md already exists" prompt header in the research-only existing-artifact section'
+    );
+    const window = content.slice(idx, idx + 600);
+    const hasUpdate = /\b(?:update|refresh|re-spawn)\b/i.test(window);
+    const hasView = /\bview\b/i.test(window);
+    const hasSkip = /\bskip\b/i.test(window);
+    assert.ok(
+      hasUpdate && hasView && hasSkip,
+      `prompt section near "RESEARCH.md already exists" must mention all three choices (update/refresh/re-spawn, view, skip); ` +
+        `got update=${hasUpdate} view=${hasView} skip=${hasSkip}`
     );
   });
 });

@@ -123,6 +123,8 @@ Research, plan, and verify a phase.
 | `--auto` | Skip interactive confirmations |
 | `--research` | Force re-research even if RESEARCH.md exists |
 | `--skip-research` | Skip domain research step |
+| `--research-phase <N>` | Research-only mode: spawn researcher for phase `<N>`, write RESEARCH.md, exit before planner. Replaces the deleted `gsd-research-phase` standalone command (#3042). |
+| `--view` | Research-only modifier: when used with `--research-phase`, print existing RESEARCH.md to stdout and exit (no spawn). |
 | `--gaps` | Gap closure mode (reads VERIFICATION.md, skips research) |
 | `--skip-verify` | Skip plan checker verification loop |
 | `--prd <file>` | Use a PRD file instead of discuss-phase for context |
@@ -134,12 +136,20 @@ Research, plan, and verify a phase.
 **Prerequisites:** `.planning/ROADMAP.md` exists
 **Produces:** `{phase}-RESEARCH.md`, `{phase}-{N}-PLAN.md`, `{phase}-VALIDATION.md`
 
+**Research-only mode (`--research-phase <N>`):**
+- No modifier: prompts `update / view / skip` if RESEARCH.md already exists.
+- With `--research`: force-refresh — re-spawn researcher unconditionally, no prompt.
+- With `--view`: print existing RESEARCH.md to stdout, no spawn. Errors if RESEARCH.md missing.
+
 ```bash
-/gsd-plan-phase 1                   # Research + plan + verify phase 1
-/gsd-plan-phase 3 --skip-research   # Plan without research (familiar domain)
-/gsd-plan-phase --auto              # Non-interactive planning
-/gsd-plan-phase 2 --validate        # Validate state before planning
-/gsd-plan-phase 1 --bounce          # Plan + external bounce validation
+/gsd-plan-phase 1                              # Research + plan + verify phase 1
+/gsd-plan-phase 3 --skip-research              # Plan without research (familiar domain)
+/gsd-plan-phase --auto                         # Non-interactive planning
+/gsd-plan-phase 2 --validate                   # Validate state before planning
+/gsd-plan-phase 1 --bounce                     # Plan + external bounce validation
+/gsd-plan-phase --research-phase 4             # Research only on phase 4 (prompts if RESEARCH.md exists)
+/gsd-plan-phase --research-phase 4 --view      # Print existing RESEARCH.md, no spawn
+/gsd-plan-phase --research-phase 4 --research  # Force-refresh research, no prompt
 ```
 
 ---
