@@ -41,9 +41,11 @@ describe('query-cli-adapter', () => {
     expect(out.stderrLines.join('\n')).toContain('requires a command');
   });
 
-  it('forwards ws to registry.dispatch via native adapter', async () => {
+  it('passes ws and topology to dispatch without native adapter', async () => {
     runQueryDispatchSpy.mockImplementationOnce(async (input: any) => {
-      await input.nativeAdapter.dispatch('state', ['show']);
+      expect(input.ws).toBe('alpha');
+      expect(input.topology).toBeDefined();
+      expect(input.nativeAdapter).toBeUndefined();
       return { ok: true, exit_code: 0, stdout: '', stderr: [] };
     });
 
@@ -52,7 +54,5 @@ describe('query-cli-adapter', () => {
       ws: 'alpha',
       queryArgv: ['state', 'show'],
     });
-
-    expect(dispatchSpy).toHaveBeenCalledWith('state', ['show'], process.cwd(), 'alpha');
   });
 });
