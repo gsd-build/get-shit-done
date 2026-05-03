@@ -119,6 +119,7 @@ import {
 import { DOMAIN_STATIC_CATALOG } from './command-static-catalog-domain.js';
 import { QUERY_MUTATION_COMMAND_LIST } from './policy-convergence.js';
 import { decorateMutationsWithEvents } from './mutation-event-decorator.js';
+import { FAMILY_HANDLERS } from './command-family-handlers.js';
 
 // ─── Re-exports ────────────────────────────────────────────────────────────
 
@@ -156,113 +157,26 @@ export function createRegistry(
   const registry = new QueryRegistry();
 
   registerStaticCatalog(registry, FOUNDATION_STATIC_CATALOG);
-  const stateHandlers: Record<string, QueryHandler> = {
-    'state.load': stateProjectLoad,
-    'state.json': stateJson,
-    'state.get': stateGet,
-    'state.update': stateUpdate,
-    'state.patch': statePatch,
-    'state.begin-phase': stateBeginPhase,
-    'state.advance-plan': stateAdvancePlan,
-    'state.record-metric': stateRecordMetric,
-    'state.update-progress': stateUpdateProgress,
-    'state.add-decision': stateAddDecision,
-    'state.add-blocker': stateAddBlocker,
-    'state.resolve-blocker': stateResolveBlocker,
-    'state.record-session': stateRecordSession,
-    'state.signal-waiting': stateSignalWaiting,
-    'state.signal-resume': stateSignalResume,
-    'state.planned-phase': statePlannedPhase,
-    'state.validate': stateValidate,
-    'state.sync': stateSync,
-    'state.prune': statePrune,
-    'state.milestone-switch': stateMilestoneSwitch,
-    'state.add-roadmap-evolution': stateAddRoadmapEvolution,
-  };
-
-  registerAliasCatalog(registry, STATE_COMMAND_ALIASES, stateHandlers);
+  registerAliasCatalog(registry, STATE_COMMAND_ALIASES, FAMILY_HANDLERS.state as Record<string, QueryHandler>);
 
   registerStaticCatalog(registry, STATE_SUPPORT_STATIC_CATALOG);
-  const roadmapHandlers: Record<string, QueryHandler> = {
-    'roadmap.analyze': roadmapAnalyze,
-    'roadmap.get-phase': roadmapGetPhase,
-    'roadmap.update-plan-progress': roadmapUpdatePlanProgress,
-    'roadmap.annotate-dependencies': roadmapAnnotateDependencies,
-  };
-
-  registerAliasCatalog(registry, ROADMAP_COMMAND_ALIASES, roadmapHandlers);
+  registerAliasCatalog(registry, ROADMAP_COMMAND_ALIASES, FAMILY_HANDLERS.roadmap as Record<string, QueryHandler>);
 
   registerStaticCatalog(registry, MUTATION_SURFACES_STATIC_CATALOG);
 
-  const verifyHandlers: Record<string, QueryHandler> = {
-    'verify.plan-structure': verifyPlanStructure,
-    'verify.phase-completeness': verifyPhaseCompleteness,
-    'verify.references': verifyReferences,
-    'verify.commits': verifyCommits,
-    'verify.artifacts': verifyArtifacts,
-    'verify.key-links': verifyKeyLinks,
-    'verify.schema-drift': verifySchemaDrift,
-    'verify.codebase-drift': verifyCodebaseDrift,
-  };
-
-  registerAliasCatalog(registry, VERIFY_COMMAND_ALIASES, verifyHandlers);
+  registerAliasCatalog(registry, VERIFY_COMMAND_ALIASES, FAMILY_HANDLERS.verify as Record<string, QueryHandler>);
 
   registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG);
-  const validateHandlers: Record<string, QueryHandler> = {
-    'validate.consistency': validateConsistency,
-    'validate.health': validateHealth,
-    'validate.agents': validateAgents,
-    'validate.context': validateContext,
-  };
-
-  registerAliasCatalog(registry, VALIDATE_COMMAND_ALIASES, validateHandlers);
+  registerAliasCatalog(registry, VALIDATE_COMMAND_ALIASES, FAMILY_HANDLERS.validate as Record<string, QueryHandler>);
 
   // Decision routing (SDK-only — no `gsd-tools.cjs` mirror yet; see QUERY-HANDLERS.md)
   registerStaticCatalog(registry, DECISION_ROUTING_STATIC_CATALOG);
 
-  const phaseHandlers: Record<string, QueryHandler> = {
-    'phase.list-plans': phaseListPlans,
-    'phase.list-artifacts': phaseListArtifacts,
-    'phase.add': phaseAdd,
-    'phase.add-batch': phaseAddBatch,
-    'phase.insert': phaseInsert,
-    'phase.remove': phaseRemove,
-    'phase.complete': phaseComplete,
-    'phase.scaffold': phaseScaffold,
-    'phase.next-decimal': phaseNextDecimal,
-  };
+  registerAliasCatalog(registry, PHASE_COMMAND_ALIASES, FAMILY_HANDLERS.phase as Record<string, QueryHandler>);
 
-  registerAliasCatalog(registry, PHASE_COMMAND_ALIASES, phaseHandlers);
+  registerAliasCatalog(registry, PHASES_COMMAND_ALIASES, FAMILY_HANDLERS.phases as Record<string, QueryHandler>);
 
-  const phasesHandlers: Record<string, QueryHandler> = {
-    'phases.list': phasesList,
-    'phases.clear': phasesClear,
-    'phases.archive': phasesArchive,
-  };
-
-  registerAliasCatalog(registry, PHASES_COMMAND_ALIASES, phasesHandlers);
-
-  const initHandlers: Record<string, QueryHandler> = {
-    'init.execute-phase': initExecutePhase,
-    'init.plan-phase': initPlanPhase,
-    'init.new-project': initNewProject,
-    'init.new-milestone': initNewMilestone,
-    'init.quick': initQuick,
-    'init.ingest-docs': initIngestDocs,
-    'init.resume': initResume,
-    'init.verify-work': initVerifyWork,
-    'init.phase-op': initPhaseOp,
-    'init.todos': initTodos,
-    'init.milestone-op': initMilestoneOp,
-    'init.map-codebase': initMapCodebase,
-    'init.progress': initProgress,
-    'init.manager': initManager,
-    'init.new-workspace': initNewWorkspace,
-    'init.list-workspaces': initListWorkspaces,
-    'init.remove-workspace': initRemoveWorkspace,
-  };
-
-  registerAliasCatalog(registry, INIT_COMMAND_ALIASES, initHandlers);
+  registerAliasCatalog(registry, INIT_COMMAND_ALIASES, FAMILY_HANDLERS.init as Record<string, QueryHandler>);
 
   // Domain-specific handlers (fully implemented)
   registerStaticCatalog(registry, DOMAIN_STATIC_CATALOG);
