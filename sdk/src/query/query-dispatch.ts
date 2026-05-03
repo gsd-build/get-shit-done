@@ -57,11 +57,12 @@ function extractPick(queryArgv: string[]): { queryArgs: string[]; pickField?: st
 }
 
 function formatOutput(data: unknown, format: QueryResult['format'], pickField?: string): string {
+  // Text-format responses ignore --pick to match CJS fallback behavior.
+  if (format === 'text' && typeof data === 'string') {
+    return data.endsWith('\n') ? data : `${data}\n`;
+  }
   let output: unknown = data;
   if (pickField) output = extractField(output, pickField);
-  if (!pickField && format === 'text' && typeof output === 'string') {
-    return output.endsWith('\n') ? output : `${output}\n`;
-  }
   return `${JSON.stringify(output, null, 2)}\n`;
 }
 
@@ -90,7 +91,7 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
       stderr: [],
       error: {
         code: 10,
-        message: `Error: Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. Set GSD_QUERY_FALLBACK=registered (default) to allow automatic fallback.${noMatch ? ` Attempted dotted: ${noMatch.attempted.dotted.slice(0, 2).join(' | ')}.` : ''}`,
+        message: `Error: Unknown command: "${[normCmd, ...normArgs].join(' ')}". Use a registered \`gsd-sdk query\` subcommand (see sdk/src/query/QUERY-HANDLERS.md) or invoke \`node …/gsd-tools.cjs\` for CJS-only operations. CJS fallback is disabled (GSD_QUERY_FALLBACK=registered). To enable fallback, unset GSD_QUERY_FALLBACK or set it to a non-restricted value.${noMatch ? ` Attempted dotted: ${noMatch.attempted.dotted.slice(0, 2).join(' | ')}.` : ''}`,
       },
     };
   }
