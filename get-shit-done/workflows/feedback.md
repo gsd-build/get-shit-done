@@ -49,7 +49,7 @@ cat ~/.claude/get-shit-done/VERSION 2>/dev/null
 ```
 
 If version is found, append to the body:
-```
+```text
 ---
 GSD version: {version}
 ```
@@ -76,7 +76,7 @@ If **yes** and `.planning/` exists in the current directory:
 4. Redact paths: replace all occurrences of `$HOME` and the literal home directory
    path with `~`.
 5. Append to `ISSUE_BODY`:
-   ```
+   ```text
    ---
    ## Attached Diagnostics
 
@@ -95,17 +95,18 @@ affirmatively: skip silently and proceed to Step 4.
 **Determine label:**
 ```bash
 case "$ISSUE_TYPE" in
-  bug)     CANDIDATE_LABEL="bug" ;;
-  feature) CANDIDATE_LABEL="enhancement" ;;
-  *)       CANDIDATE_LABEL="" ;;
+  bug)      CANDIDATE_LABEL="bug" ;;
+  feature)  CANDIDATE_LABEL="enhancement" ;;
+  question) CANDIDATE_LABEL="question" ;;
+  *)        CANDIDATE_LABEL="" ;;
 esac
 
-# Verify the label exists before using it
+# Verify the label exists (exact match) before using it
 LABEL=""
 if [ -n "$CANDIDATE_LABEL" ]; then
   EXISTS=$(gh label list --repo gsd-build/get-shit-done \
     --search "$CANDIDATE_LABEL" --json name -q '.[0].name' 2>/dev/null)
-  [ -n "$EXISTS" ] && LABEL="$CANDIDATE_LABEL"
+  [ "$EXISTS" = "$CANDIDATE_LABEL" ] && LABEL="$CANDIDATE_LABEL"
 fi
 ```
 
@@ -123,7 +124,7 @@ gh issue create \
 
 If this succeeds, go to Step 5.
 
-**Fallback — prefilled browser URL** (if gh is unavailable or unauthenticated):
+**Fallback — pre-filled browser URL** (if gh is unavailable or unauthenticated):
 
 Construct a URL-encoded link and display it:
 ```bash
@@ -131,10 +132,14 @@ python3 -c "
 import urllib.parse, sys
 title = sys.argv[1]
 body  = sys.argv[2]
-print('https://github.com/gsd-build/get-shit-done/issues/new?title='
-      + urllib.parse.quote(title)
-      + '&body=' + urllib.parse.quote(body))
-" "$ISSUE_TITLE" "$ISSUE_BODY"
+label = sys.argv[3]
+url = ('https://github.com/gsd-build/get-shit-done/issues/new?title='
+       + urllib.parse.quote(title)
+       + '&body=' + urllib.parse.quote(body))
+if label:
+    url += '&labels=' + urllib.parse.quote(label)
+print(url)
+" "$ISSUE_TITLE" "$ISSUE_BODY" "$LABEL"
 ```
 
 Display: `Open this URL to file the issue (fields are pre-filled): {url}`
@@ -143,7 +148,7 @@ Display: `Open this URL to file the issue (fields are pre-filled): {url}`
 
 If neither of the above is possible, display:
 
-```
+```text
 ─────────────────────────────────────────
 File this issue at:
 https://github.com/gsd-build/get-shit-done/issues/new
