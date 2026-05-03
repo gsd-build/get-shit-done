@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import type { GSDToolsError } from './gsd-tools.js';
+import type { GSDToolsError } from './gsd-tools-error.js';
 
 export interface QuerySubprocessAdapterDeps {
   projectDir: string;
