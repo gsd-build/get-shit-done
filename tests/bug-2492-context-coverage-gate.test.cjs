@@ -26,7 +26,7 @@ const CONFIG_MUTATION_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'co
 // #2653 — allowlist moved to shared schema module.
 const CONFIG_SCHEMA_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'config-schema.ts');
 const CONFIG_GATES_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'config-gates.ts');
-const QUERY_INDEX_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'index.ts');
+const QUERY_INDEX_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'registry-assembly.ts');
 
 describe('plan-phase decision-coverage gate (#2492)', () => {
   const md = fs.readFileSync(PLAN_PHASE, 'utf-8');
@@ -168,12 +168,12 @@ describe('SDK wiring for #2492 gates', () => {
     );
   });
 
-  test('query index.ts registers the new handlers', () => {
+  test('query registry assembly registers the new handlers', () => {
     const c = fs.readFileSync(QUERY_INDEX_TS, 'utf-8');
     // Handlers are now registered through catalog-based registration.
     assert.ok(c.includes('VERIFY_DECISION_STATIC_CATALOG'), 'decision-coverage-plan handler must be registered via the verify-decision catalog');
-    assert.ok(c.includes('check.decision-coverage-plan') || c.includes('VERIFY_DECISION_STATIC_CATALOG'), 'check.decision-coverage-plan handler must be registered');
-    assert.ok(c.includes('check.decision-coverage-verify') || c.includes('VERIFY_DECISION_STATIC_CATALOG'), 'check.decision-coverage-verify handler must be registered');
-    assert.ok(c.includes('decisions.parse') || c.includes('FOUNDATION_STATIC_CATALOG'), 'decisions.parse handler must be registered');
+    assert.ok(c.includes('registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG)'), 'check.decision-coverage-plan handler must be registered');
+    assert.ok(c.includes('registerStaticCatalog(registry, VERIFY_DECISION_STATIC_CATALOG)'), 'check.decision-coverage-verify handler must be registered');
+    assert.ok(c.includes('FOUNDATION_STATIC_CATALOG'), 'decisions.parse handler must be registered');
   });
 });

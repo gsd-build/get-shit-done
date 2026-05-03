@@ -1,6 +1,6 @@
 /**
  * Drift guard: every `gsd-sdk query <cmd>` reference in the repo must
- * resolve to a handler registered in sdk/src/query/index.ts.
+ * resolve to a handler registered in sdk/src/query/registry-assembly.ts.
  *
  * The set of commands workflows/agents/commands call must equal the set
  * the SDK registry exposes. New references with no handler — or handlers
@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.join(__dirname, '..');
-const REGISTRY_FILE = path.join(REPO_ROOT, 'sdk', 'src', 'query', 'index.ts');
+const REGISTRY_FILE = path.join(REPO_ROOT, 'sdk', 'src', 'query', 'registry-assembly.ts');
 const COMMAND_ALIASES_FILE = path.join(REPO_ROOT, 'get-shit-done', 'bin', 'lib', 'command-aliases.generated.cjs');
 
 // Prose tokens that repeatedly appear after `gsd-sdk query` in English
@@ -191,7 +191,7 @@ describe('gsd-sdk query registry integration', () => {
     assert.strictEqual(
       offenders.length, 0,
       'Referenced `gsd-sdk query <cmd>` tokens with no handler in ' +
-      'sdk/src/query/index.ts. Either register the handler or remove ' +
+      'sdk/src/query/registry-assembly.ts. Either register the handler or remove ' +
       'the reference.\n\n' + offenders.join('\n')
     );
   });
