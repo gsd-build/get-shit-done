@@ -23,6 +23,15 @@ export function validateQueryDispatchInput(queryArgv: string[]): DispatchInputVa
     }
     const pickField = queryArgs[pickIdx + 1];
     queryArgs.splice(pickIdx, 2);
+    if (queryArgs.length === 0 || !queryArgs[0]) {
+      return {
+        queryArgs,
+        error: dispatchFailure(validationError({
+          message: 'Error: "gsd-sdk query" requires a command',
+          details: { reason: 'missing_command' },
+        })),
+      };
+    }
     return { queryArgs, pickField };
   }
 

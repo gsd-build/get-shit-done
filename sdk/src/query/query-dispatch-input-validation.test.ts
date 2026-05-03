@@ -13,4 +13,11 @@ describe('query-dispatch-input-validation', () => {
     expect(out.queryArgs).toEqual(['state', 'json']);
     expect(out.pickField).toBe('x.y');
   });
+
+  it('fails when --pick is the only command token', () => {
+    const out = validateQueryDispatchInput(['--pick', 'x.y']);
+    expect(out.error?.ok).toBe(false);
+    if (out.error?.ok) throw new Error('expected failure');
+    expect(out.error?.error.kind).toBe('validation_error');
+  });
 });

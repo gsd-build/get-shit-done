@@ -31,8 +31,17 @@ function execBridge(input: FallbackBridgeRunInput): Promise<{ stdout: string; st
       fullArgv,
       { cwd: input.projectDir, maxBuffer: 10 * 1024 * 1024, timeout: 30_000, killSignal: 'SIGKILL', env: { ...process.env } },
       (err, stdout, stderr) => {
-        if (err) reject(err);
-        else resolve({ stdout: stdout?.toString() ?? '', stderr: stderr?.toString() ?? '' });
+        const stdoutText = stdout?.toString() ?? '';
+        const stderrText = stderr?.toString() ?? '';
+        if (err) {
+          if (stderrText.trim()) {
+            reject(new Error(`${err.message}\n${stderrText.trimEnd()}`));
+            return;
+          }
+          reject(err);
+          return;
+        }
+        resolve({ stdout: stdoutText, stderr: stderrText });
       },
     );
   });
