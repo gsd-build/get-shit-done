@@ -43,10 +43,35 @@ function collectRegisteredNames() {
   const src = fs.readFileSync(REGISTRY_FILE, 'utf8');
   const names = new Set();
 
-  // Static registrations in index.ts
+  // Static registrations in index.ts (legacy style, may still exist)
   const re = /registry\.register\(\s*['"]([^'"]+)['"]/g;
   let m;
   while ((m = re.exec(src)) !== null) names.add(m[1]);
+
+  // Catalog-based registrations: extract handler names from registerStaticCatalog calls.
+  const catalogRe = /registerStaticCatalog\(registry, (\w+)\)/g;
+  let cm;
+  while ((cm = catalogRe.exec(src)) !== null) {
+    const catalogVarName = cm[1];
+    // Try to resolve the catalog constant from known files.
+    const catalogFiles = [
+      path.join(REPO_ROOT, 'sdk', 'src', 'query', 'command-static-catalog-foundation.ts'),
+      path.join(REPO_ROOT, 'sdk', 'src', 'query', 'command-static-catalog-domain.ts'),
+    ];
+    for (const cf of catalogFiles) {
+      try {
+        const catSrc = fs.readFileSync(cf, 'utf8');
+        // Match: export const CATALOG_NAME: ... = [[name, handler], ...]
+        const entryRe = /\[\s*['"]([^'"]+)['"]/g;
+        let em;
+        while ((em = entryRe.exec(catSrc)) !== null) {
+          names.add(em[1]);
+        }
+      } catch {
+        // File not found, skip.
+      }
+    }
+  }
 
   // Manifest-generated family aliases registered via loop in index.ts.
   // Keep this in sync with command-manifest-driven routing seams.

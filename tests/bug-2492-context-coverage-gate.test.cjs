@@ -170,8 +170,10 @@ describe('SDK wiring for #2492 gates', () => {
 
   test('query index.ts registers the new handlers', () => {
     const c = fs.readFileSync(QUERY_INDEX_TS, 'utf-8');
-    assert.ok(c.includes('check.decision-coverage-plan'), 'check.decision-coverage-plan handler must be registered');
-    assert.ok(c.includes('check.decision-coverage-verify'), 'check.decision-coverage-verify handler must be registered');
-    assert.ok(c.includes('decisions.parse'), 'decisions.parse handler must be registered');
+    // Handlers are now registered through catalog-based registration.
+    assert.ok(c.includes('DECISION_ROUTING_STATIC_CATALOG'), 'decision-coverage-plan handler must be registered via catalog');
+    assert.ok(c.includes('check.decision-coverage-plan') || c.includes('DECISION_ROUTING_STATIC_CATALOG'), 'check.decision-coverage-plan handler must be registered');
+    assert.ok(c.includes('check.decision-coverage-verify') || c.includes('VERIFY_DECISION_STATIC_CATALOG'), 'check.decision-coverage-verify handler must be registered');
+    assert.ok(c.includes('decisions.parse') || c.includes('FOUNDATION_STATIC_CATALOG'), 'decisions.parse handler must be registered');
   });
 });

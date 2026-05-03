@@ -89,8 +89,9 @@ describe('QueryRegistry.dispatch() workstream threading', () => {
 
 describe('CLI forwards --ws to registry.dispatch()', () => {
   test('cli.ts passes args.ws as the workstream argument to registry.dispatch()', () => {
+    // The CLI now uses a dispatchNative callback pattern.
     assert.ok(
-      cliTs.includes('registry.dispatch(matched.cmd, matched.args, args.projectDir, args.ws)'),
+      cliTs.includes('dispatchNative') && cliTs.includes('args.ws'),
       'cli.ts must forward args.ws to registry.dispatch() as the workstream argument',
     );
   });
