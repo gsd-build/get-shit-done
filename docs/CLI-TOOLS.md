@@ -250,7 +250,14 @@ node gsd-tools.cjs validate consistency
 
 # Check .planning/ integrity, optionally repair
 node gsd-tools.cjs validate health [--repair]
+
+# Probe context-window utilization for status-line / hook callers (v1.40.0)
+node gsd-tools.cjs validate context
 ```
+
+`validate context` emits a structured envelope with `utilization`, `status`
+(`ok` / `warn` / `critical` at the 60 % / 70 % thresholds), and a
+`suggestion` string. The same data backs `/gsd-health --context`.
 
 ---
 
