@@ -20,7 +20,8 @@ process.env.GSD_TEST_MODE = '1';
  * resolveNodeRunner helper, asserting on structured records:
  *  - the runner field is an absolute path (not bare 'node')
  *  - it ends with /node or \\node (or .exe on Windows simulation)
- *  - .sh hooks still use bare 'bash' (POSIX std PATH always has /bin)
+ *  - .sh hooks still use bare 'bash' (PATH-resolved; portable across
+ *    distros that don't ship /bin/bash, like NixOS)
  *
  * No source-grep on install.js content — assertions go against the
  * value returned by the exported function and the parsed structure of

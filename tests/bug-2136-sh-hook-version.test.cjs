@@ -100,11 +100,18 @@ describe('bug #2136 part 1: bash hook sources carry gsd-hook-version placeholder
   }
 
   test('version header is on line 2 (immediately after shebang)', () => {
-    // Placing the header immediately after #!/bin/bash ensures it is always
-    // found regardless of how much of the file is read.
+    // Placing the header immediately after the shebang ensures it is always
+    // found regardless of how much of the file is read. The shebang itself
+    // must use `#!/usr/bin/env bash` (PATH-resolved) rather than `#!/bin/bash`
+    // — POSIX guarantees /bin/sh but not /bin/bash, and distros like NixOS
+    // do not ship /bin/bash by default.
     for (const sh of SH_HOOKS) {
       const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').split('\n');
-      assert.strictEqual(lines[0], '#!/bin/bash', `${sh} line 1 must be #!/bin/bash`);
+      assert.strictEqual(
+        lines[0],
+        '#!/usr/bin/env bash',
+        `${sh} line 1 must be "#!/usr/bin/env bash" for cross-distro portability`
+      );
       assert.ok(
         lines[1].startsWith('# gsd-hook-version:'),
         `${sh} line 2 must be the gsd-hook-version header (got: "${lines[1]}")`

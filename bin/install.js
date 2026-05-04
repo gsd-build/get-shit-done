@@ -709,10 +709,16 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
-  // .sh hooks run under /bin/bash (POSIX std PATH always includes /bin),
-  // so bare `bash` is fine. .js hooks need the absolute node path because
-  // GUI-launched runtimes start with a minimal PATH that does not include
-  // nvm/Homebrew/Volta-installed node binaries (#2979).
+  // .sh hooks run under bare `bash` (PATH-resolved). POSIX guarantees
+  // /bin/sh but not /bin/bash, and distros like NixOS do not ship
+  // /bin/bash by default — so PATH-resolved `bash` is more portable than
+  // an absolute /bin/bash. The wrapping `bash <path>` invocation also
+  // means the script's own shebang (#!/usr/bin/env bash) is read as a
+  // comment in this code path; it only matters when the script is run
+  // directly (e.g. tests or future installer changes). .js hooks still
+  // need the absolute node path because GUI-launched runtimes start with
+  // a minimal PATH that does not include nvm/Homebrew/Volta-installed
+  // node binaries (#2979).
   const nodeRunner = resolveNodeRunner();
   const runner = hookName.endsWith('.sh') ? 'bash' : nodeRunner;
   // resolveNodeRunner returns null when process.execPath is unavailable.

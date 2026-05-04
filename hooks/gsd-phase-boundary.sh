@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # gsd-hook-version: {{GSD_VERSION}}
 # gsd-phase-boundary.sh — PostToolUse hook: detect .planning/ file writes
 # Outputs a reminder when planning files are modified outside normal workflow.
