@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads roadmap.cjs source to verify isPlanFile pattern was adopted — structural contract prevents silent regression to old filter
 
 // Regression guard for bug #3128.
 //
