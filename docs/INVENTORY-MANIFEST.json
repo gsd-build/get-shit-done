@@ -104,6 +104,7 @@
       "/gsd-workstreams"
     ],
     "workflows": [
+      "add-backlog.md",
       "add-phase.md",
       "add-tests.md",
       "add-todo.md",
