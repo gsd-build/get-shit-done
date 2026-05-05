@@ -106,7 +106,7 @@ Resolve creator model and skills before spawning (per CONFIG-03, DETECT-04):
 
 ```bash
 CREATOR_MODEL=$(gsd-sdk query resolve-model gsd-sme-creator --raw 2>/dev/null || echo "inherit")
-AGENT_SKILLS_CREATOR=$(gsd-sdk query agent-skills gsd-sme-creator 2>/dev/null || echo "")
+AGENT_SKILLS_CREATOR=$(gsd-sdk query agent-skills gsd-sme-creator || echo "")
 ```
 
 For each accepted process name:
