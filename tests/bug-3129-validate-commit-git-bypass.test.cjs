@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads hook shell script to verify delegation pattern — structural contract test, not source-grep
 
 // Regression tests for bug #3129.
 //

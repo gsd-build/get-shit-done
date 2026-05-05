@@ -26,8 +26,8 @@ CMD=$(echo "$INPUT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process
 # classifier that handles env-prefix, -C path, and full-path git invocations.
 # A naive `^git\s+commit` regex misses all three; this guard fixes that (#3129).
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
-if node -e "
-  const {isGitSubcommand}=require('$HOOK_DIR/lib/git-cmd.js');
+if GIT_CMD_LIB="$HOOK_DIR/lib/git-cmd.js" node -e "
+  const {isGitSubcommand}=require(process.env.GIT_CMD_LIB);
   process.exit(isGitSubcommand(process.argv[1],'commit')?0:1);
 " "$CMD" 2>/dev/null; then
   # Extract message from -m flag
