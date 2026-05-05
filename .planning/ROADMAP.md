@@ -81,7 +81,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 04-01-PLAN.md — Create /gsd-create-sme command, create-sme workflow, and structural validation tests
-- [ ] 04-02-PLAN.md — Gap closure: fuzzy overlap detection and related_smes cross-referencing
+- [x] 04-02-PLAN.md — Gap closure: fuzzy overlap detection and related_smes cross-referencing
 
 ### Phase 5: SME Auditor Agent
 **Goal**: The adversarial SME auditor agent can review a PLAN.md against domain knowledge and return structured findings with the correct return markers
@@ -151,19 +151,48 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md — TDD: Structural tests (RED) then sme_refresh step + staleness pre-flight check (GREEN)
 
+### Phase 10: Fix New-Milestone SME Creator Integration
+**Goal**: Fix integration bugs in new-milestone SME creation flow: resolve template placeholders, add completion marker checks, and wire sme.blocking config consumption
+**Depends on**: Phase 8, Phase 3, Phase 1
+**Requirements**: CONFIG-03, DETECT-04, DETECT-05
+**Gap Closure:** Closes gaps from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `new-milestone/sme-step.md` resolves `CREATOR_MODEL` and `AGENT_SKILLS_CREATOR` via `gsd-sdk query resolve-model` and `gsd-sdk query agent-skills` before spawning the creator
+  2. After `gsd-sme-creator` Task() returns in `new-milestone/sme-step.md`, the `## SME Creation Complete` marker is checked — failed creations are not added to `SELECTED_SMES`
+  3. `gsd-sme-creator` reads `sme.blocking` config to set `block_mode` in generated SME documents instead of hardcoding `soft`
+  4. Structural tests cover all three fixes
+**Plans:** 0 plans
+
+### Phase 11: Documentation & Tracking Sync
+**Goal**: Sync all tracking metadata with verified phase state: update REQUIREMENTS.md checkboxes and traceability, ROADMAP.md phase completion, INVENTORY.md/COMMANDS.md for new artifacts, and SUMMARY.md requirements_completed frontmatter
+**Depends on**: Phase 10
+**Requirements**: (tracking metadata — no new functional requirements)
+**Gap Closure:** Closes metadata gaps from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. All 43 requirements in REQUIREMENTS.md have correct checkbox state matching their VERIFICATION.md status
+  2. REQUIREMENTS.md traceability table shows "Complete" (not "Pending") for all verified requirements
+  3. ROADMAP.md phases 2-9 have `[x]` checkboxes
+  4. INVENTORY.md lists `gsd-sme-creator`, `gsd-sme-creator-analyzer`, `gsd-sme-auditor` agents
+  5. COMMANDS.md lists `/gsd-create-sme` command
+  6. All CJS documentation parity tests pass (0 failures related to missing inventory/command entries)
+  7. SUMMARY.md `requirements_completed` frontmatter is populated for all plans that satisfy requirements
+**Plans:** 0 plans
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Schema & Config | 3/3 | Complete   | 2026-04-28 |
-| 2. SDK Query Handlers | 0/2 | Not started | - |
-| 3. SME Creator Agent | 0/2 | Not started | - |
-| 4. Creation Command & Workflow | 1/2 | In progress | - |
-| 5. SME Auditor Agent | 0/1 | Not started | - |
-| 6. Plan-Phase Gate | 0/1 | Not started | - |
-| 7. Discuss-Phase Integration | 0/1 | Not started | - |
-| 8. New-Milestone Process Detection | 0/1 | Not started | - |
-| 9. Post-Execution Refresh | 0/1 | Not started | - |
+| 2. SDK Query Handlers | 2/2 | Complete | 2026-04-29 |
+| 3. SME Creator Agent | 2/2 | Complete | 2026-04-30 |
+| 4. Creation Command & Workflow | 2/2 | Complete | 2026-05-02 |
+| 5. SME Auditor Agent | 1/1 | Complete | 2026-04-30 |
+| 6. Plan-Phase Gate | 1/1 | Complete | 2026-04-30 |
+| 7. Discuss-Phase Integration | 1/1 | Complete | 2026-04-30 |
+| 8. New-Milestone Process Detection | 1/1 | Complete | 2026-04-30 |
+| 9. Post-Execution Refresh | 1/1 | Complete | 2026-05-01 |
+| 10. Fix New-Milestone SME Creator Integration | 0/0 | Not started | - |
+| 11. Documentation & Tracking Sync | 0/0 | Not started | - |
