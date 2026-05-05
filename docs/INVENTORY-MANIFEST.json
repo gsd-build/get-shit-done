@@ -1,5 +1,5 @@
 {
-  "generated": "2026-04-27",
+  "generated": "2026-05-05",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -30,6 +30,7 @@
       "gsd-research-synthesizer",
       "gsd-roadmapper",
       "gsd-security-auditor",
+      "gsd-sme-auditor",
       "gsd-sme-creator",
       "gsd-sme-creator-analyzer",
       "gsd-ui-auditor",
@@ -54,6 +55,7 @@
       "/gsd-code-review",
       "/gsd-code-review-fix",
       "/gsd-complete-milestone",
+      "/gsd-create-sme",
       "/gsd-debug",
       "/gsd-discuss-phase",
       "/gsd-do",
@@ -141,6 +143,7 @@
       "code-review-fix.md",
       "code-review.md",
       "complete-milestone.md",
+      "create-sme.md",
       "diagnose-issues.md",
       "discovery-phase.md",
       "discuss-phase-assumptions.md",

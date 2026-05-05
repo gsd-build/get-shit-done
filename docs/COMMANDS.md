@@ -1194,6 +1194,24 @@ Rapid single-focus codebase assessment — lightweight alternative to `/gsd-map-
 
 ---
 
+### `/gsd-create-sme`
+
+Create or refresh an SME (Subject Matter Expert) document for a specified process by running the `gsd-sme-creator` agent.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `process-name` | No | Process to create an SME for (e.g., `contribution`) |
+
+**Prerequisites:** `workflow.use_sme_agents: true` in `config.json`
+**Produces:** `.planning/smes/{process-name}-SME.md`
+
+```bash
+/gsd-create-sme contribution        # Create SME for contribution process
+/gsd-create-sme                     # Interactive menu of detected processes
+```
+
+---
+
 ### `/gsd-intel`
 
 Query, inspect, or refresh queryable codebase intelligence files stored in `.planning/intel/`. Requires `intel.enabled: true` in `config.json`.
