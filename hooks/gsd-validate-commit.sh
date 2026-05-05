@@ -21,8 +21,15 @@ INPUT=$(cat)
 # Extract command from JSON using Node (handles escaping correctly, no jq needed)
 CMD=$(echo "$INPUT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(d).tool_input?.command||'')}catch{}})" 2>/dev/null)
 
-# Only check git commit commands
-if [[ "$CMD" =~ ^git[[:space:]]+commit ]]; then
+# Only check git commit commands.
+# Delegates to hooks/lib/git-cmd.js isGitSubcommand() — the canonical token-walk
+# classifier that handles env-prefix, -C path, and full-path git invocations.
+# A naive `^git\s+commit` regex misses all three; this guard fixes that (#3129).
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+if node -e "
+  const {isGitSubcommand}=require('$HOOK_DIR/lib/git-cmd.js');
+  process.exit(isGitSubcommand(process.argv[1],'commit')?0:1);
+" "$CMD" 2>/dev/null; then
   # Extract message from -m flag
   MSG=""
   if [[ "$CMD" =~ -m[[:space:]]+\"([^\"]+)\" ]]; then
