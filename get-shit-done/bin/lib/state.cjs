@@ -1039,7 +1039,7 @@ function cmdStateBeginPhase(cwd, phaseNumber, phaseName, planCount, raw) {
     // A phase is considered mid-flight when Status contains 'Executing Phase N'
     // for the current phase number.
     const currentStatus = stateExtractField(content, 'Status') || '';
-    const isAlreadyExecuting = new RegExp(`Executing Phase\\s+${String(phaseNumber)}\\b`, 'i').test(currentStatus);
+    const isAlreadyExecuting = new RegExp(`Executing Phase\\s+${escapeRegex(String(phaseNumber))}\\b`, 'i').test(currentStatus);
 
     // Update Status field
     const statusValue = `Executing Phase ${phaseNumber}`;

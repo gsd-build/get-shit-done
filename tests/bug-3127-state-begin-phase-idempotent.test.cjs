@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads runtime STATE.md written to temp dir — behavioral output test, not source-grep
 
 // Regression tests for bug #3127.
 //
