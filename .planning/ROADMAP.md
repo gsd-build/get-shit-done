@@ -13,14 +13,14 @@ The SME Agent Framework adds domain-expert AI agents to GSD that capture process
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Schema & Config** - Define the SME document format and opt-in config keys that all other components depend on (completed 2026-04-28)
-- [ ] **Phase 2: SDK Query Handlers** - Implement the three query handlers that gate, detect, and discuss integrations all call
-- [ ] **Phase 3: SME Creator Agent** - Build the agent that analyzes codepaths, git history, and docs to produce SME documents
-- [ ] **Phase 4: Creation Command & Workflow** - Wire the creator into a user-facing `/gsd-create-sme` command with interactive flow
-- [ ] **Phase 5: SME Auditor Agent** - Build the adversarial read-only agent that reviews PLAN.md against SME domain knowledge
-- [ ] **Phase 6: Plan-Phase Gate** - Integrate the auditor as step 12.5 in plan-phase — the core product value
-- [ ] **Phase 7: Discuss-Phase Integration** - Inject SME domain probing questions into discuss-phase before planning begins
-- [ ] **Phase 8: New-Milestone Process Detection** - Auto-detect processes at milestone start and surface or queue relevant SMEs
-- [ ] **Phase 9: Post-Execution Refresh** - Refresh stale SME documents after phase execution and warn on staleness at gate
+- [x] **Phase 2: SDK Query Handlers** - Implement the three query handlers that gate, detect, and discuss integrations all call
+- [x] **Phase 3: SME Creator Agent** - Build the agent that analyzes codepaths, git history, and docs to produce SME documents
+- [x] **Phase 4: Creation Command & Workflow** - Wire the creator into a user-facing `/gsd-create-sme` command with interactive flow
+- [x] **Phase 5: SME Auditor Agent** - Build the adversarial read-only agent that reviews PLAN.md against SME domain knowledge
+- [x] **Phase 6: Plan-Phase Gate** - Integrate the auditor as step 12.5 in plan-phase — the core product value
+- [x] **Phase 7: Discuss-Phase Integration** - Inject SME domain probing questions into discuss-phase before planning begins
+- [x] **Phase 8: New-Milestone Process Detection** - Auto-detect processes at milestone start and surface or queue relevant SMEs
+- [x] **Phase 9: Post-Execution Refresh** - Refresh stale SME documents after phase execution and warn on staleness at gate
 
 ## Phase Details
 
