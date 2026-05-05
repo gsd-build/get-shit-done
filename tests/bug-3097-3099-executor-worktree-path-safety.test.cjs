@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads markdown product files (gsd-executor.md, worktree-path-safety.md) to verify structural protocol — not source-grep
 
 // Regression guards for bug #3097 and #3099.
 //

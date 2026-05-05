@@ -363,10 +363,9 @@ A prior Bash call may have `cd`'d out of the worktree into the main repo. When t
 `[ -f .git ]` is false (main repo's `.git` is a directory), silently skipping all worktree guards.
 Capture the spawn-time toplevel via a sentinel on first commit, then verify on every subsequent commit:
 ```bash
-if [ -f .git ]; then  # we are in a worktree
-  WT_GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
-  case "$WT_GIT_DIR" in
-    *.git/worktrees/*)
+WT_GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+case "$WT_GIT_DIR" in
+  *.git/worktrees/*)
       SENTINEL="$WT_GIT_DIR/gsd-spawn-toplevel"
       [ ! -f "$SENTINEL" ] && git rev-parse --show-toplevel > "$SENTINEL" 2>/dev/null
       EXPECTED_TL=$(cat "$SENTINEL" 2>/dev/null)
@@ -378,9 +377,8 @@ if [ -f .git ]; then  # we are in a worktree
         echo "RECOVERY: cd \"$EXPECTED_TL\" before staging, then re-run this commit." >&2
         exit 1
       fi
-      ;;
-  esac
-fi
+    ;;
+esac
 ```
 
 **0b. absolute-path safety (worktree mode only, MANDATORY before Edit/Write — #3099):**
@@ -390,9 +388,11 @@ resolve to the **main repo**, not the worktree — silently writing files to the
 ```bash
 # Obtain the canonical worktree root
 WT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-# Verify an absolute path is within the worktree before using it
-if [[ "$ABS_PATH" != "$WT_ROOT"* ]]; then
-  echo "WARNING: $ABS_PATH is outside the worktree ($WT_ROOT) — use a relative path or recompute from WT_ROOT" >&2
+[ -z "$WT_ROOT" ] && { echo "FATAL: could not determine worktree root" >&2; exit 1; }
+# Verify absolute path containment with boundary safety (not glob prefix which allows siblings)
+if [[ "$ABS_PATH" != "$WT_ROOT" && "$ABS_PATH" != "$WT_ROOT/"* ]]; then
+  echo "FATAL: $ABS_PATH is outside the worktree ($WT_ROOT) — use a relative path or recompute from WT_ROOT" >&2
+  exit 1
 fi
 ```
 Prefer **relative paths** for all Edit/Write operations inside a worktree. When an absolute path

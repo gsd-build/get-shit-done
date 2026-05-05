@@ -343,7 +343,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 | `planner-revision.md` | Plan revision patterns for iterative refinement. |
 | `planner-source-audit.md` | Planner source-audit and authority-limit rules. |
 
-> **Subdirectory:** `get-shit-done/references/few-shot-examples/` contains additional few-shot examples (`plan-checker.md`, `verifier.md`) that are referenced from specific agents. These are not counted in the 51 top-level references.
+> **Subdirectory:** `get-shit-done/references/few-shot-examples/` contains additional few-shot examples (`plan-checker.md`, `verifier.md`) that are referenced from specific agents. These are not counted in the 52 top-level references.
 
 ---
 
