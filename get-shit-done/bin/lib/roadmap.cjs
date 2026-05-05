@@ -38,7 +38,16 @@ function coerceTruthToString(t) {
 
 function countPhasePlansAndSummaries(phaseDir) {
   const phaseFiles = fs.readdirSync(phaseDir);
-  const rootPlans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+  // Canonical form: *-PLAN.md or PLAN.md.
+  // Extended form: {N}-PLAN-{NN}-{slug}.md — the layout gsd-plan-phase
+  // actually writes (e.g. 5-PLAN-01-setup.md). Mirrors the looksLikePlanFile
+  // logic in phase.cjs (#2893 / #3128).
+  const PLAN_OUTLINE_RE = /-PLAN-OUTLINE\.md$/i;
+  const PLAN_PRE_BOUNCE_RE = /-PLAN.*\.pre-bounce\.md$/i;
+  const isPlanFile = (f) =>
+    (f.endsWith('-PLAN.md') || f === 'PLAN.md') ||
+    (/\.md$/i.test(f) && /PLAN/i.test(f) && !PLAN_OUTLINE_RE.test(f) && !PLAN_PRE_BOUNCE_RE.test(f));
+  const rootPlans = phaseFiles.filter(isPlanFile);
   const rootSummaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
 
   let nestedPlans = [];
