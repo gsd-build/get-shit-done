@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads product workflow markdown (ai-integration-phase.md) to verify structural ordering contract — not a source-grep test
 
 // Regression guard for bug #3096.
 //
