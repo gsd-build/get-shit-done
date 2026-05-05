@@ -161,9 +161,9 @@ Plans:
   2. After `gsd-sme-creator` Task() returns in `new-milestone/sme-step.md`, the `## SME Creation Complete` marker is checked — failed creations are not added to `SELECTED_SMES`
   3. `gsd-sme-creator` reads `sme.blocking` config to set `block_mode` in generated SME documents instead of hardcoding `soft`
   4. Structural tests cover all three fixes
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 10-01-PLAN.md — TDD: structural tests (RED) then sme-step.md + gsd-sme-creator.md fixes (GREEN)
+- [x] 10-01-PLAN.md — TDD: structural tests (RED) then sme-step.md + gsd-sme-creator.md fixes (GREEN)
 
 ### Phase 11: Documentation & Tracking Sync
 **Goal**: Sync all tracking metadata with verified phase state: update REQUIREMENTS.md checkboxes and traceability, ROADMAP.md phase completion, INVENTORY.md/COMMANDS.md for new artifacts, and SUMMARY.md requirements_completed frontmatter
@@ -178,9 +178,10 @@ Plans:
   5. COMMANDS.md lists `/gsd-create-sme` command
   6. All CJS documentation parity tests pass (0 failures related to missing inventory/command entries)
   7. SUMMARY.md `requirements_completed` frontmatter is populated for all plans that satisfy requirements
-**Plans:** 1 plan
+**Plans:** 2 plans
 Plans:
-- [ ] 10-01-PLAN.md — TDD: structural tests (RED) then sme-step.md + gsd-sme-creator.md fixes (GREEN)
+- [ ] 11-01-PLAN.md — Sync REQUIREMENTS.md, ROADMAP.md, and SUMMARY.md frontmatter metadata
+- [ ] 11-02-PLAN.md — Fix CJS doc parity tests: INVENTORY.md, COMMANDS.md, INVENTORY-MANIFEST.json
 
 ## Progress
 
@@ -198,5 +199,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 7. Discuss-Phase Integration | 1/1 | Complete | 2026-04-30 |
 | 8. New-Milestone Process Detection | 1/1 | Complete | 2026-04-30 |
 | 9. Post-Execution Refresh | 1/1 | Complete | 2026-05-01 |
-| 10. Fix New-Milestone SME Creator Integration | 0/1 | Planned | - |
-| 11. Documentation & Tracking Sync | 0/0 | Not started | - |
+| 10. Fix New-Milestone SME Creator Integration | 1/1 | Complete    | 2026-05-05 |
+| 11. Documentation & Tracking Sync | 0/2 | Not started | - |
