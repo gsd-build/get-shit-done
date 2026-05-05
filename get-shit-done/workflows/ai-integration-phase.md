@@ -139,6 +139,8 @@ Fill in header fields:
 
 ## 7. Spawn gsd-ai-researcher
 
+> **Ordering note (prevents tool-level last-writer-wins race):** Steps 7 and 8 write disjoint sections of AI-SPEC.md but MUST run sequentially — wait for Step 7 to complete before spawning Step 8. Both agents use the `Edit` tool exclusively (never `Write`) when modifying AI-SPEC.md. A `Write` on a shared file replaces the entire file, silently overwriting the other agent's work; `Edit` targets only the relevant lines. See #3096 for a confirmed 40%-incidence race on parallel dispatch.
+
 Display:
 ```
 ◆ Step 2/4 — Researching {primary_framework} docs + AI systems best practices...
@@ -148,9 +150,12 @@ Spawn `gsd-ai-researcher` with:
 ```markdown
 Read ~/.claude/agents/gsd-ai-researcher.md for instructions.
 
+**Tool discipline (mandatory):**
+Use the Edit tool exclusively when modifying AI-SPEC.md — NEVER use Write on this file.
+Write replaces the entire file and will overwrite work from parallel or sequential sibling agents.
+Before editing, verify the section you are about to write is still a template placeholder.
+
 <objective>
-Research {primary_framework} for Phase {phase_number}: {phase_name}
-Write Sections 3 and 4 of AI-SPEC.md
 </objective>
 
 <files_to_read>
@@ -169,6 +174,8 @@ phase_context: Phase {phase_number}: {phase_name} — {phase_goal}
 
 ## 8. Spawn gsd-domain-researcher
 
+> **Wait for Step 7 to complete before spawning this step** (see ordering note in Step 7).
+
 Display:
 ```
 ◆ Step 3/4 — Researching domain context and expert evaluation criteria...
@@ -178,9 +185,12 @@ Spawn `gsd-domain-researcher` with:
 ```markdown
 Read ~/.claude/agents/gsd-domain-researcher.md for instructions.
 
+**Tool discipline (mandatory):**
+Use the Edit tool exclusively when modifying AI-SPEC.md — NEVER use Write on this file.
+Write replaces the entire file and will overwrite work from parallel or sequential sibling agents.
+Before editing, verify the section you are about to write is still a template placeholder.
+
 <objective>
-Research the business domain and expert evaluation criteria for Phase {phase_number}: {phase_name}
-Write Section 1b (Domain Context) of AI-SPEC.md
 </objective>
 
 <files_to_read>
