@@ -25,7 +25,6 @@ via filesystem and git state.
 
 <required_reading>
 Read STATE.md before any operation to load project context.
-
 @~/.claude/get-shit-done/references/agent-contracts.md
 @~/.claude/get-shit-done/references/context-budget.md
 @~/.claude/get-shit-done/references/gates.md
@@ -529,11 +528,11 @@ increases monotonically across waves. `{status}` is `complete` (success),
          [ "$(git rev-parse HEAD)" != "{EXPECTED_BASE}" ] && { echo "ERROR: could not correct worktree base"; exit 1; }
        fi
        ```
-       Per-commit HEAD assertion lives in `agents/gsd-executor.md` `<task_commit_protocol>` step 0.
+       Per-commit HEAD/cwd-drift/path-guard: `agents/gsd-executor.md` steps 0/0a/0b + `references/worktree-path-safety.md` (in <execution_context>).
        </worktree_branch_check>
 
        <parallel_execution>
-       You are running as a PARALLEL executor agent in a git worktree.
+       You are running as a PARALLEL executor agent in a git worktree. Worktree path safety (cwd-drift, absolute-path guards) is in `worktree-path-safety.md` (loaded below).
        Run `git commit` normally — hooks run by default. Do NOT pass `--no-verify`
        unless the orchestrator surfaces `workflow.worktree_skip_hooks=true` in this
        prompt; silent bypass violates project CLAUDE.md guidance (#2924).
@@ -556,6 +555,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        @~/.claude/get-shit-done/templates/summary.md
        @~/.claude/get-shit-done/references/checkpoints.md
        @~/.claude/get-shit-done/references/tdd.md
+       @~/.claude/get-shit-done/references/worktree-path-safety.md
        ${CONTEXT_WINDOW < 200000 ? '' : '@~/.claude/get-shit-done/references/executor-examples.md'}
        </execution_context>
 

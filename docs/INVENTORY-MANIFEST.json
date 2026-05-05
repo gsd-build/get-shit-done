@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-03",
+  "generated": "2026-05-05",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -240,7 +240,8 @@
       "user-profiling.md",
       "verification-overrides.md",
       "verification-patterns.md",
-      "workstream-flag.md"
+      "workstream-flag.md",
+      "worktree-path-safety.md"
     ],
     "cli_modules": [
       "artifacts.cjs",

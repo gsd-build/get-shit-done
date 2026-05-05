@@ -358,6 +358,47 @@ If RED or GREEN gate commits are missing, add a warning to SUMMARY.md under a `#
 <task_commit_protocol>
 After each task completes (verification passed, done criteria met), commit immediately.
 
+**0a. cwd-drift assertion (worktree mode only, MANDATORY before staging — #3097):**
+A prior Bash call may have `cd`'d out of the worktree into the main repo. When that happens
+`[ -f .git ]` is false (main repo's `.git` is a directory), silently skipping all worktree guards.
+Capture the spawn-time toplevel via a sentinel on first commit, then verify on every subsequent commit:
+```bash
+if [ -f .git ]; then  # we are in a worktree
+  WT_GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+  case "$WT_GIT_DIR" in
+    *.git/worktrees/*)
+      SENTINEL="$WT_GIT_DIR/gsd-spawn-toplevel"
+      [ ! -f "$SENTINEL" ] && git rev-parse --show-toplevel > "$SENTINEL" 2>/dev/null
+      EXPECTED_TL=$(cat "$SENTINEL" 2>/dev/null)
+      ACTUAL_TL=$(git rev-parse --show-toplevel 2>/dev/null)
+      if [ -n "$EXPECTED_TL" ] && [ "$ACTUAL_TL" != "$EXPECTED_TL" ]; then
+        echo "FATAL: cwd drifted from spawn-time worktree root (#3097)" >&2
+        echo "  Spawn-time: $EXPECTED_TL" >&2
+        echo "  Current:    $ACTUAL_TL" >&2
+        echo "RECOVERY: cd \"$EXPECTED_TL\" before staging, then re-run this commit." >&2
+        exit 1
+      fi
+      ;;
+  esac
+fi
+```
+
+**0b. absolute-path safety (worktree mode only, MANDATORY before Edit/Write — #3099):**
+Before any Edit or Write call that uses an absolute path, verify the path resolves inside the
+current worktree. Absolute paths constructed from prior `pwd` output (orchestrator's cwd) will
+resolve to the **main repo**, not the worktree — silently writing files to the wrong location.
+```bash
+# Obtain the canonical worktree root
+WT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+# Verify an absolute path is within the worktree before using it
+if [[ "$ABS_PATH" != "$WT_ROOT"* ]]; then
+  echo "WARNING: $ABS_PATH is outside the worktree ($WT_ROOT) — use a relative path or recompute from WT_ROOT" >&2
+fi
+```
+Prefer **relative paths** for all Edit/Write operations inside a worktree. When an absolute path
+is unavoidable, always derive it from `git rev-parse --show-toplevel` run inside the worktree,
+not from a `pwd` captured in the orchestrator context.
+
 **0. Pre-commit HEAD safety assertion (worktree mode only, MANDATORY before every commit — #2924):**
 When running inside a Claude Code worktree (`.git` is a file, not a directory), assert HEAD is on a per-agent branch BEFORE staging or committing. If HEAD has drifted onto a protected ref, HALT — never self-recover via `git update-ref refs/heads/<protected>`:
 ```bash
