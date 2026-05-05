@@ -14,7 +14,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const src = fs.readFileSync(path.join(ROOT, 'agents', 'gsd-planner.md'), 'utf8');
+let src;
+try {
+  src = fs.readFileSync(path.join(ROOT, 'agents', 'gsd-planner.md'), 'utf8');
+} catch (err) {
+  throw new Error(`agents/gsd-planner.md not found — was the file renamed? (${err.message})`);
+}
 
 const directives = [
   { desc: 'User Decision Fidelity heading is CRITICAL',         pattern: /## CRITICAL: User Decision Fidelity/ },
