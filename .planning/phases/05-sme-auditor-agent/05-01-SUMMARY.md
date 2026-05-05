@@ -28,6 +28,7 @@ metrics:
   tasks-completed: 2
   files-created: 2
   files-modified: 1
+requirements-completed: [AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05]
 ---
 
 # Phase 05 Plan 01: SME Auditor Agent Definition Summary

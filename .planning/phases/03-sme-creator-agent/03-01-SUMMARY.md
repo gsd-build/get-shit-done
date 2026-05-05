@@ -37,6 +37,7 @@ metrics:
   tasks_completed: 2
   files_created: 2
   files_modified: 0
+requirements-completed: [CREATE-01, CREATE-02, CREATE-03, CREATE-04]
 ---
 
 # Phase 03 Plan 01: SME Creator Agent Definitions Summary

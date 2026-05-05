@@ -38,6 +38,7 @@ metrics:
   completed_date: "2026-04-30"
   tasks_completed: 3
   files_created: 3
+requirements-completed: [CMD-01, CMD-02, CMD-04]
 ---
 
 # Phase 04 Plan 01: Create SME Command and Workflow Summary
