@@ -52,7 +52,7 @@ Read all files referenced by the invoking prompt's execution_context before star
    ```
 
 6. **Report:**
-   ```
+   ```text
    ## Backlog Item Added
 
    Phase {NEXT}: {description}
