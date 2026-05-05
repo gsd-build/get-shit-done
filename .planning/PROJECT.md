@@ -40,11 +40,13 @@ The plan-phase gate: SMEs must catch domain-specific risks and pattern mismatche
 
 ## Context
 
-GSD currently writes code that works but doesn't match existing process-specific conventions. In applications with multiple process types (e.g., contributions vs claims vs enrollment in an HSA engine), each process may have different validation patterns, edge case handling, and domain rules. GSD's planner and executor lack this process-level awareness, leading to wrong patterns applied and domain edge cases missed.
+**Shipped v1.0** on 2026-05-05 with 11 phases, 17 plans, 82 commits, ~12K lines across 79 files.
 
-The SME framework addresses this by capturing process knowledge in structured documents that get injected into planning and execution agents — similar to how security auditing works but focused on domain/process correctness.
+The SME framework captures process knowledge in structured documents (`.planning/smes/{PROCESS}-SME.md`) that get injected into planning and execution agents. The core loop: discuss-phase probing questions surface domain risks → plan-phase gate (step 12.6) audits plans against SME findings → post-execution refresh keeps SMEs current → new-milestone detection queues relevant SMEs.
 
-SMEs follow the existing skill injection pattern (.claude/skills/ SKILL.md mechanism via agent-skills query), keeping integration consistent with GSD's current architecture.
+**Tech stack:** TypeScript SDK query handlers + markdown agent definitions + CJS CLI tooling. Three SDK handlers (`sme.list`, `sme.detect-processes`, `sme.context-block`), three agents (`gsd-sme-creator`, `gsd-sme-creator-analyzer`, `gsd-sme-auditor`), one command (`/gsd-create-sme`), and integration points in plan-phase, discuss-phase, execute-phase, and new-milestone workflows.
+
+**Known tech debt:** SME agents not in MODEL_PROFILES (silent sonnet fallback), SDK/CJS config default asymmetry for `sme.blocking`, discuss-phase gating contract mismatch.
 
 ## Constraints
 
@@ -57,11 +59,14 @@ SMEs follow the existing skill injection pattern (.claude/skills/ SKILL.md mecha
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Opt-in by default (workflow.use_sme_agents: false) | Backward compatibility, token cost awareness | — Pending |
-| Configurable blocking (soft default, strict per-process) | Different processes have different risk tolerance | — Pending |
-| Follow existing skill injection pattern | Consistency with GSD architecture, no new injection mechanism | — Pending |
-| SMEs use all available context (code + git + docs + PRs) | Maximize domain understanding, especially the "why" behind patterns | — Pending |
-| Plan-phase gate is the core value | Highest leverage — catch issues before code is written | — Pending |
+| Opt-in by default (workflow.use_sme_agents: false) | Backward compatibility, token cost awareness | ✓ Good — zero impact on existing projects |
+| Configurable blocking (soft default, strict per-process) | Different processes have different risk tolerance | ✓ Good — sme.blocking config + per-process block_mode frontmatter |
+| Follow existing skill injection pattern | Consistency with GSD architecture, no new injection mechanism | ✓ Good — agent-skills, subagent_type spawning, lazy-loaded sme-step.md |
+| SMEs use all available context (code + git + docs + PRs) | Maximize domain understanding, especially the "why" behind patterns | ✓ Good — git log --follow, PR grep, parallel sub-agent analysis |
+| Plan-phase gate is the core value | Highest leverage — catch issues before code is written | ✓ Good — step 12.6 with soft/strict routing, staleness warnings |
+| SME document schema: 6 flat H2 sections, severity-labeled findings | Consistent structure for machine parsing and auditor consumption | ✓ Good — round-trips through frontmatter.cjs, all sections validated |
+| Step 12.6 (not 12.5) for gate position | Existing step 12.5 Plan Bounce conflict | ✓ Good — positional requirement satisfied without disrupting existing flow |
+| frontmatter.merge for STATE.md writes | Avoids state.update/state.patch which lose custom fields | ✓ Good — active_smes preserved across state operations |
 
 ## Evolution
 
@@ -81,4 +86,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 after Phase 11 completion (all v1 milestone phases complete)*
+*Last updated: 2026-05-05 after v1.0 milestone completion*

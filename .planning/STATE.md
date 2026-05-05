@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: milestone_complete
+status: completed
 stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-05-05T02:14:16.400Z"
-last_activity: 2026-05-05 -- Phase 11 execution started
+last_updated: "2026-05-05T03:05:46.389Z"
+last_activity: 2026-05-05
 progress:
   total_phases: 11
   completed_phases: 11
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 17
   percent: 100
 ---
 
@@ -96,9 +96,12 @@ None yet.
 
 ## Deferred Items
 
+Items acknowledged and deferred at milestone close on 2026-05-05:
+
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| verification | Phase 03 (03-VERIFICATION.md) — HSA engine target quality test | human_needed | 2026-05-05 |
+| verification | Phase 04 (04-VERIFICATION.md) — interactive runtime behaviors | human_needed | 2026-05-05 |
 
 ## Session Continuity
 
