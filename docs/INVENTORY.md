@@ -10,7 +10,7 @@
 
 ---
 
-## Agents (35 shipped)
+## Agents (36 shipped)
 
 Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/AGENTS.md`](AGENTS.md) carries a full role card (*primary*), a short stub in the "Advanced and Specialized Agents" section (*advanced stub*), or no coverage (*inventory only*).
 
@@ -49,14 +49,15 @@ Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/
 | gsd-intel-updater | Writes structured intel files (`.planning/intel/*.json`) used as a queryable codebase knowledge base. | `/gsd-intel` | advanced stub |
 | gsd-sme-creator | Analyzes a codebase process and produces a structured SME document by spawning parallel analyzer sub-agents and synthesizing their findings. | `/gsd-create-sme` (Phase 4) | inventory only |
 | gsd-sme-creator-analyzer | Analyzes a file partition for SME risks, test gaps, outdated logic, and edge cases. Writes findings to .tmp file. | `gsd-sme-creator` (sub-agent) | inventory only |
+| gsd-sme-auditor | Reviews PLAN.md against SME domain knowledge with adversarial stance; returns SME_APPROVED or SME_CONCERNS with severity-classified findings. | `/gsd-plan-phase` (step 12.6 SME gate) | inventory only |
 | gsd-doc-classifier | Classifies a single planning document as ADR, PRD, SPEC, DOC, or UNKNOWN; spawned in parallel to process the doc corpus. | `/gsd-ingest-docs` | advanced stub |
 | gsd-doc-synthesizer | Synthesizes classified planning docs into a single consolidated context with precedence rules, cycle detection, and three-bucket conflicts report. | `/gsd-ingest-docs` | advanced stub |
 
-**Coverage note.** `docs/AGENTS.md` gives full role cards for 21 primary agents plus concise stubs for the 12 advanced agents. The Agent Tool Permissions Summary in that file covers only the primary 21 agents; the advanced agents' tool lists are captured in their per-agent frontmatter in `agents/gsd-*.md`. The 2 SME creator agents (`gsd-sme-creator`, `gsd-sme-creator-analyzer`) are inventory-only until Phase 4 integrates them into the create-sme workflow.
+**Coverage note.** `docs/AGENTS.md` gives full role cards for 21 primary agents plus concise stubs for the 12 advanced agents. The Agent Tool Permissions Summary in that file covers only the primary 21 agents; the advanced agents' tool lists are captured in their per-agent frontmatter in `agents/gsd-*.md`. The 3 SME agents (`gsd-sme-creator`, `gsd-sme-creator-analyzer`, `gsd-sme-auditor`) are inventory-only.
 
 ---
 
-## Commands (86 shipped)
+## Commands (87 shipped)
 
 Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md` section order; each row carries the command name, a one-line role derived from the command's frontmatter `description:`, and a link to the source file. `tests/command-count-sync.test.cjs` locks the count against the filesystem.
 
@@ -140,6 +141,7 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 |---------|------|--------|
 | `/gsd-map-codebase` | Analyze codebase with parallel mapper agents; produces `.planning/codebase/` documents. | [commands/gsd/map-codebase.md](../commands/gsd/map-codebase.md) |
 | `/gsd-scan` | Rapid codebase assessment — lightweight alternative to `/gsd-map-codebase`. | [commands/gsd/scan.md](../commands/gsd/scan.md) |
+| `/gsd-create-sme` | Create or refresh an SME document for a specified process by running the gsd-sme-creator agent. | [commands/gsd/create-sme.md](../commands/gsd/create-sme.md) |
 | `/gsd-intel` | Query, inspect, or refresh codebase intelligence files in `.planning/intel/`. | [commands/gsd/intel.md](../commands/gsd/intel.md) |
 | `/gsd-graphify` | Build, query, and inspect the project knowledge graph in `.planning/graphs/`. | [commands/gsd/graphify.md](../commands/gsd/graphify.md) |
 | `/gsd-extract-learnings` | Extract decisions, lessons, patterns, and surprises from completed phase artifacts. | [commands/gsd/extract_learnings.md](../commands/gsd/extract_learnings.md) |
@@ -178,7 +180,7 @@ Full roster at `commands/gsd/*.md`. The groupings below mirror `docs/COMMANDS.md
 
 ---
 
-## Workflows (84 shipped)
+## Workflows (85 shipped)
 
 Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators that commands reference internally; most are not read directly by end users. Rows below map each workflow file to its role (derived from the `<purpose>` block) and, where applicable, to the command that invokes it.
 
@@ -198,6 +200,7 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 | `code-review-fix.md` | Auto-fix issues from REVIEW.md via gsd-code-fixer with per-fix atomic commits. | `/gsd-code-review-fix` |
 | `code-review.md` | Review phase source changes via gsd-code-reviewer; produces REVIEW.md. | `/gsd-code-review` |
 | `complete-milestone.md` | Mark a shipped version as complete — MILESTONES.md entry, PROJECT.md evolution, tag. | `/gsd-complete-milestone` |
+| `create-sme.md` | Create or refresh an SME document for a named process by orchestrating gsd-sme-creator and analyzer sub-agents. | `/gsd-create-sme` |
 | `diagnose-issues.md` | Orchestrate parallel debug agents to investigate UAT gaps and find root causes. | `/gsd-verify-work` (auto-diagnosis) |
 | `discovery-phase.md` | Execute discovery at the appropriate depth level. | `/gsd-new-project` (discovery path) |
 | `discuss-phase-assumptions.md` | Assumptions-mode discuss — extract implementation decisions via codebase-first analysis. | `/gsd-discuss-phase` (when `discuss_mode=assumptions`) |
