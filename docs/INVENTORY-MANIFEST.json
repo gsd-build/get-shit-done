@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-03",
+  "generated": "2026-05-05",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -104,6 +104,7 @@
       "/gsd-workstreams"
     ],
     "workflows": [
+      "add-backlog.md",
       "add-phase.md",
       "add-tests.md",
       "add-todo.md",

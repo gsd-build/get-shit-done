@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
+const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 
 /**
  * Parse the YAML frontmatter from a skill .md file.
@@ -238,6 +239,35 @@ describe('#3131 re-wired workflows: parent command bodies dispatch to workflow f
     assert.ok(
       bodyContains('import', 'from-gsd2'),
       'import.md body does not reference from-gsd2 — --from-gsd2 flag dispatch is missing',
+    );
+  });
+});
+
+describe('command execution_context workflow references are loadable', () => {
+  test('every workflow referenced from commands/gsd/*.md exists', () => {
+    const missing = [];
+    const commandFiles = fs.readdirSync(COMMANDS_DIR)
+      .filter((file) => file.endsWith('.md'));
+
+    for (const file of commandFiles) {
+      const raw = fs.readFileSync(path.join(COMMANDS_DIR, file), 'utf8');
+      const blocks = [...raw.matchAll(/<execution_context(?:_extended)?>([\s\S]*?)<\/execution_context(?:_extended)?>/g)];
+
+      for (const block of blocks) {
+        const refs = [...block[1].matchAll(/get-shit-done\/workflows\/([^\s`]+?\.md)/g)];
+        for (const ref of refs) {
+          const workflowPath = path.join(WORKFLOWS_DIR, ref[1]);
+          if (!fs.existsSync(workflowPath)) {
+            missing.push(`${file} -> get-shit-done/workflows/${ref[1]}`);
+          }
+        }
+      }
+    }
+
+    assert.deepStrictEqual(
+      missing,
+      [],
+      'commands reference missing workflow files: ' + missing.join(', '),
     );
   });
 });
