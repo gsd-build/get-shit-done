@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads product workflow markdown (update.md) to verify structural invocation contract — not a source-grep test
 
 // Regression guard for bug #3130.
 //
