@@ -102,6 +102,13 @@ AskUserQuestion(
 )
 ```
 
+Resolve creator model and skills before spawning (per CONFIG-03, DETECT-04):
+
+```bash
+CREATOR_MODEL=$(gsd-sdk query resolve-model gsd-sme-creator --raw 2>/dev/null || echo "inherit")
+AGENT_SKILLS_CREATOR=$(gsd-sdk query agent-skills gsd-sme-creator 2>/dev/null || echo "")
+```
+
 For each accepted process name:
 
 1. Validate name (T-08-01 mitigation — prevent injection into gsd-sme-creator path):
@@ -128,7 +135,10 @@ Analyze the '{PROCESS_NAME}' process and produce .planning/smes/{PROCESS_NAME}-S
 )
 ```
 
-3. After creator returns: add process name to `SELECTED_SMES`.
+3. After creator returns: check the return for `## SME Creation Complete` marker.
+   If found: add process name to `SELECTED_SMES`.
+   If not found: log warning ("SME creation failed for {PROCESS_NAME} -- skipping") and
+   continue without adding to SELECTED_SMES.
 
 **Auto mode:** Skip creation offer (do not spawn agents without user consent).
 

@@ -138,13 +138,23 @@ Merge all findings (from .tmp files). Apply these rules:
 - **Apply severity:** verify every BLOCKER has historical evidence; downgrade to WARNING if not
 - **Count findings by severity:** tally blocker, warning, watch counts
 
+Read the project's configured block mode before writing the document:
+
+```bash
+BLOCK_MODE=$(gsd-sdk query config-get sme.blocking --raw 2>/dev/null || echo "soft")
+# Validate: only "soft" or "strict" are valid; default to "soft" for any other value
+if [ "$BLOCK_MODE" != "soft" ] && [ "$BLOCK_MODE" != "strict" ]; then
+  BLOCK_MODE="soft"
+fi
+```
+
 Write the final document atomically to `.planning/smes/{PROCESS_NAME}-SME.md` using the exact template format:
 
 ```yaml
 ---
 process_name: {PROCESS_NAME}
 last_analyzed_commit: {output of git rev-parse HEAD}
-block_mode: soft
+block_mode: {BLOCK_MODE}
 created_date: {today's date}
 finding_counts:
   blocker: {count}
