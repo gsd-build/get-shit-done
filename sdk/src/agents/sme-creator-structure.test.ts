@@ -257,3 +257,21 @@ describe('CREATE-03: eval config is valid YAML with >= 10 test cases', () => {
     expect(linesWithLeadingTabs.length).toBe(0);
   });
 });
+
+// ─── CONFIG-03: block_mode driven by sme.blocking config ─────────────────────
+
+describe('CONFIG-03: orchestrator reads sme.blocking config for block_mode (not hardcoded)', () => {
+  let orchestrator: string;
+
+  beforeAll(() => {
+    orchestrator = readAgent(ORCHESTRATOR_PATH);
+  });
+
+  it('orchestrator calls config-get to read sme.blocking before writing block_mode', () => {
+    expect(orchestrator).toContain('sme.blocking');
+  });
+
+  it('orchestrator does not hardcode "block_mode: soft" (must use BLOCK_MODE variable)', () => {
+    expect(orchestrator).not.toContain('block_mode: soft');
+  });
+});

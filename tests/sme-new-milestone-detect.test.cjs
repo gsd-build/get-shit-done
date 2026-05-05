@@ -95,3 +95,21 @@ describe('Ordering constraint: SME step after state.milestone-switch', () => {
       'SME step reference must appear AFTER state.milestone-switch in new-milestone.md (ordering constraint)');
   });
 });
+
+describe('DETECT-04/05 gap closure: creator spawn resolves placeholders and checks completion', () => {
+  test('sme-step.md resolves CREATOR_MODEL via resolve-model before spawning gsd-sme-creator', () => {
+    const content = fs.readFileSync(SME_STEP, 'utf-8');
+    assert.ok(content.includes('resolve-model'),
+      'sme-step.md must call resolve-model to resolve CREATOR_MODEL before spawning gsd-sme-creator');
+  });
+  test('sme-step.md resolves AGENT_SKILLS_CREATOR via agent-skills before spawning gsd-sme-creator', () => {
+    const content = fs.readFileSync(SME_STEP, 'utf-8');
+    assert.ok(content.includes('agent-skills'),
+      'sme-step.md must call agent-skills to resolve AGENT_SKILLS_CREATOR before spawning gsd-sme-creator');
+  });
+  test('sme-step.md checks SME Creation Complete marker after creator returns', () => {
+    const content = fs.readFileSync(SME_STEP, 'utf-8');
+    assert.ok(content.includes('SME Creation Complete'),
+      'sme-step.md must check for ## SME Creation Complete marker after Task() returns');
+  });
+});
