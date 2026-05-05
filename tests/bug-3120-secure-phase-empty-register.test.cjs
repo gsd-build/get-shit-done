@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: reads product workflow markdown (secure-phase.md) to verify structural guard contract — not a source-grep test
 
 // Regression guard for bug #3120.
 //
@@ -35,10 +36,7 @@ describe('bug #3120: secure-phase short-circuit guards', () => {
 
   test('Step 3 short-circuit requires both conditions', () => {
     assert.ok(
-      src.includes('register_authored_at_plan_time') &&
-      (src.includes('threats_open: 0 AND register_authored_at_plan_time') ||
-       src.includes('register_authored_at_plan_time.*threats_open') ||
-       src.includes('threats_open.*register_authored_at_plan_time')),
+      src.includes('threats_open: 0 AND register_authored_at_plan_time'),
       'Step 3 short-circuit does not gate on both threats_open:0 AND register_authored_at_plan_time',
     );
   });
