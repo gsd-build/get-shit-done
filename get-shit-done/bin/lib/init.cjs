@@ -1704,7 +1704,7 @@ function buildAgentSkillsBlock(config, agentType, projectRoot) {
         process.stderr.write(`[agent-skills] WARNING: Global skill "${skillName}" failed path check (symlink escape?) — skipping\n`);
         continue;
       }
-      validPaths.push({ ref: `${globalSkillDir}/SKILL.md`, display: `${displayPath}/${skillName}` });
+      validPaths.push({ ref: `${globalSkillDir}/SKILL.md`, display: displayPath });
       continue;
     }
 

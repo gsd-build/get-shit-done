@@ -1,4 +1,5 @@
 'use strict';
+// allow-test-rule: last three tests read init.cjs source to verify delegation contract to runtime-homes.cjs — structural guard, no behavioral IR exposed
 
 // Regression guard for bug #3126.
 //
