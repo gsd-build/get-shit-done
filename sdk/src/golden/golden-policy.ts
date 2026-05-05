@@ -51,6 +51,8 @@ const NO_CJS_SUBPROCESS_REASON: Record<string, string> = {
     'SDK-only structured plan parse (no CJS mirror). Covered in sdk/src/query/plan-task-structure.test.ts.',
   'requirements.extract-from-plans':
     'SDK-only requirements aggregation (no CJS mirror). Covered in sdk/src/query/requirements-extract-from-plans.test.ts.',
+  'commands':
+    'SDK-only registry introspection (no gsd-tools.cjs equivalent — the CJS layer has no self-describing verb). Covered in sdk/src/query/commands-list.test.ts. Closes #3121.',
 };
 
 const READ_HANDLER_ONLY_REASON = (cmd: string) =>

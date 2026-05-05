@@ -14,6 +14,7 @@ import { templateFill, templateSelect } from './template.js';
 import { verifySummary, verifyPathExists } from './verify.js';
 import { decisionsParse } from './decisions.js';
 import { checkDecisionCoveragePlan, checkDecisionCoverageVerify } from './check-decision-coverage.js';
+import { commandsList } from './commands-list.js';
 import { checkConfigGates } from './config-gates.js';
 import { checkAutoMode } from './check-auto-mode.js';
 import { checkPhaseReady } from './phase-ready.js';
@@ -95,4 +96,5 @@ export const DECISION_ROUTING_STATIC_CATALOG: ReadonlyArray<readonly [string, Qu
   ['check verification-status', checkVerificationStatus],
   ['check.ship-ready', checkShipReady],
   ['check ship-ready', checkShipReady],
+  ['commands', commandsList],
 ] as const;
