@@ -104,7 +104,7 @@ describe('bug #2136 part 1: bash hook sources carry gsd-hook-version placeholder
     // found regardless of how much of the file is read.
     for (const sh of SH_HOOKS) {
       const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').split('\n');
-      assert.strictEqual(lines[0], '#!/bin/bash', `${sh} line 1 must be #!/bin/bash`);
+      assert.strictEqual(lines[0], '#!/usr/bin/env bash', `${sh} line 1 must be #!/usr/bin/env bash`);
       assert.ok(
         lines[1].startsWith('# gsd-hook-version:'),
         `${sh} line 2 must be the gsd-hook-version header (got: "${lines[1]}")`
