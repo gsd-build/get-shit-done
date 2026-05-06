@@ -4881,6 +4881,10 @@ The plan's denylist included `'^commands/(?!gsd/intel-gate-)'`. That's PCRE nega
 
 The plan orders Task 24 after Tasks 17–23. But Task 17 (master runner) expects all validators to pass against the live repo, and `validate-workflow-patches.sh`/`validate-seamless-fork.sh` both require `tools/patch-workflows.sh` to exist. Task 24 was therefore executed early, before Task 17, to satisfy the dependency. No content change to Task 24 itself — only execution order.
 
+### Task 2 fix-up: customer overlay.json templates added before Task 23 (2026-05-06)
+
+Task 2 created `config-overlays/<customer>/.gitkeep` for the 5 customers (nga, nsa, nro, cia, dia) but no `overlay.json` files. The install entry-point's `wireOverlay()` (Task 21) requires `config-overlays/<customer>/overlay.json` to exist; without it, Task 23's end-to-end happy-path test would fail. Added empty `{"customer": "<name>", "agent_skills": {}}` templates to each customer directory as a Task 2 fix-up. Phase plans (1+) populate `agent_skills` per customer engagement.
+
 ### Plan-wide: install tests use node:test, not vitest (2026-05-06)
 
 Tasks 18-23 originally specified `vitest` for install tests with `.test.cjs` files. Vitest 1.6's `index.cjs` throws on direct `require('vitest')` — it's intended to be loaded only through vitest's own runner. The fix would require modifying upstream-owned `vitest.config.ts` (adding `globals: true` + a CJS shim), which violates the seamless-fork constraint (plan §"Seamless-fork guarantee" line 15). Switched to Node's built-in `node:test` runner instead: built into Node 20+ (already our `engines` floor), native CJS support, zero upstream impact, and no fragile shim. Test patterns converted: `expect(x).toBe(y)` → `assert.equal(x, y)`, `expect(...).toMatch(...)` → `assert.match(...)`, `expect(() => ...).toThrow(...)` → `assert.throws(() => ..., ...)`. Command runner: `node --test tests/install/<file>.test.cjs`. Production module code (verify-gsd, install-pack, wire-overlay, parse-args, gsd-ic-install) is unchanged — only test files and package.json's test:install script are affected.
