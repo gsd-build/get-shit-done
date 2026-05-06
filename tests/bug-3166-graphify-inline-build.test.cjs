@@ -16,9 +16,47 @@ const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const yaml = require('yaml');
 
 const SKILL_PATH = path.join(__dirname, '..', 'commands', 'gsd', 'graphify.md');
+
+/**
+ * Parse the narrow YAML subset used in this skill's frontmatter:
+ *   key: scalar
+ *   key:
+ *     - item
+ *     - item
+ *
+ * Avoids pulling in `yaml`/`js-yaml` (neither is a declared project dep —
+ * the existing tests/helpers.cjs `parseFrontmatter` deliberately scalars-only
+ * for the same reason). The skill's frontmatter shape is fixed; this is enough.
+ */
+function parseSkillFrontmatter(text) {
+  const lines = text.split(/\r?\n/);
+  const out = {};
+  let activeKey = null;
+  let activeList = null;
+  for (const raw of lines) {
+    const listItem = raw.match(/^\s+-\s+(.+?)\s*$/);
+    if (listItem && activeList) {
+      activeList.push(listItem[1]);
+      continue;
+    }
+    const kv = raw.match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (!kv) continue;
+    const [, key, rawValue] = kv;
+    const value = rawValue.trim();
+    if (value === '') {
+      activeKey = key;
+      activeList = [];
+      out[key] = activeList;
+    } else {
+      activeKey = null;
+      activeList = null;
+      out[key] = value;
+    }
+  }
+  return out;
+}
 
 function loadSkill() {
   const content = fs.readFileSync(SKILL_PATH, 'utf8');
@@ -31,7 +69,7 @@ function loadSkill() {
   assert.equal(delims.length, 2, 'graphify.md must have a closed frontmatter block');
   const frontmatterText = lines.slice(delims[0] + 1, delims[1]).join('\n');
   const body = lines.slice(delims[1] + 1).join('\n');
-  return { frontmatter: yaml.parse(frontmatterText), body };
+  return { frontmatter: parseSkillFrontmatter(frontmatterText), body };
 }
 
 describe('bug-3166: /gsd-graphify build runs inline (no Task sub-agent)', () => {
