@@ -61,10 +61,11 @@ GSD version: {version}
 **Skip this step entirely for feature requests and questions.**
 
 For bugs, ask once:
-> "Want to attach diagnostics? I'll run `/gsd-forensics` and include its findings. [y/N]"
+> "Want to attach diagnostics? I'll run the forensics investigation and include its findings. [y/N]"
 
 If **yes** and `.planning/` exists in the current directory:
-1. Run the forensics investigation by invoking `/gsd-forensics` with the issue title
+1. Run the forensics investigation by reading and executing
+   @~/.claude/get-shit-done/workflows/forensics.md with the issue title
    as the problem description. Let it complete its full investigation.
 2. Locate the report it just created:
    ```bash
@@ -119,30 +120,37 @@ gh issue create \
   --repo gsd-build/get-shit-done \
   --title "$ISSUE_TITLE" \
   --body "$ISSUE_BODY" \
-  $LABEL_FLAG
+  ${LABEL_FLAG}
 ```
 
 If this succeeds, go to Step 5.
 
 **Fallback — pre-filled browser URL** (if gh is unavailable or unauthenticated):
 
-Construct a URL-encoded link and display it:
+Build a URL-encoded link using Node.js (always available in GSD environments) and
+open it in the system browser:
 ```bash
-python3 -c "
-import urllib.parse, sys
-title = sys.argv[1]
-body  = sys.argv[2]
-label = sys.argv[3]
-url = ('https://github.com/gsd-build/get-shit-done/issues/new?title='
-       + urllib.parse.quote(title)
-       + '&body=' + urllib.parse.quote(body))
-if label:
-    url += '&labels=' + urllib.parse.quote(label)
-print(url)
-" "$ISSUE_TITLE" "$ISSUE_BODY" "$LABEL"
+BROWSER_URL=$(node -e "
+  const t = process.argv[1];
+  const b = process.argv[2];
+  const l = process.argv[3];
+  let url = 'https://github.com/gsd-build/get-shit-done/issues/new'
+    + '?title=' + encodeURIComponent(t)
+    + '&body='  + encodeURIComponent(b);
+  if (l) url += '&labels=' + encodeURIComponent(l);
+  console.log(url);
+" "$ISSUE_TITLE" "$ISSUE_BODY" "$LABEL")
+
+# Open in the system browser — portable across macOS, Linux, and Windows
+case "$(uname -s 2>/dev/null)" in
+  Darwin)               open "$BROWSER_URL" ;;
+  Linux)                xdg-open "$BROWSER_URL" 2>/dev/null || true ;;
+  CYGWIN*|MINGW*|MSYS*) cmd.exe /c start "" "$BROWSER_URL" 2>/dev/null || true ;;
+esac
+echo "$BROWSER_URL"
 ```
 
-Display: `Open this URL to file the issue (fields are pre-filled): {url}`
+Display: `Open this URL to file the issue (fields are pre-filled): {BROWSER_URL}`
 
 **Last resort — copy-paste markdown:**
 
