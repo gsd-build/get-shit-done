@@ -286,6 +286,169 @@ For the full command reference with all flags, see [`docs/COMMANDS.md`](COMMANDS
 
 ---
 
+## MVP Mode
+
+GSD ships two project disciplines side by side:
+
+- **Horizontal Layers** (the default; what the [End-to-End Walkthrough](#end-to-end-walkthrough) above demonstrates) — each phase ships a complete technical layer (data, API, UI). Best for infrastructure-heavy projects with well-understood domains.
+- **Vertical MVP** (this section) — each phase ships an end-to-end *user capability*: UI → API → DB for one user story per phase. Best for new products and rapid-iteration MVPs where you want a usable end-to-end slice as early as possible.
+
+You pick once at project init. Per-phase mode is stored in ROADMAP.md as `**Mode:** mvp`, so individual phases can opt in or out later via `/gsd-mvp-phase` and `/gsd-edit-phase`.
+
+### When to pick MVP mode
+
+- You're starting a new product and want a usable end-to-end slice in Phase 1.
+- The biggest project risk is "do users actually want this?" — not "can we build the platform?"
+- You can articulate the first user capability as a one-sentence story: *"As a [role], I want to [capability], so that [outcome]."*
+
+If you can't articulate a user story, that's a signal — pick Horizontal Layers and revisit MVP mode once the requirements clarify.
+
+### How the loop differs from the standard walkthrough
+
+Same four-step loop (`new-project → plan-phase → execute-phase → verify-work → ship`), three differences:
+
+| Step | Standard mode | MVP mode |
+|---|---|---|
+| **`new-project`** | Asks about the project, generates roadmap. | **Also** prompts: *"Vertical MVP or Horizontal Layers?"* Picking Vertical MVP writes `**Mode:** mvp` on every initial phase. |
+| **Before `plan-phase`** | Skip directly to plan. | Run `/gsd-mvp-phase <N>` first to capture the user story interactively. SPIDR splitting kicks in if the story is too large. |
+| **Phase 1 of new project under MVP** | Plan ordinary tasks. | Planner emits `SKELETON.md` — the "Walking Skeleton": thinnest end-to-end stack proving framework + DB + routing + UI + deployment all wire together. |
+| **`execute-phase`** | Standard execution. | When `MVP_MODE` and `TDD_MODE` are both on, the MVP+TDD Gate refuses to advance any *behavior-adding* task without a failing-test commit first. |
+| **`verify-work`** | Technical checks first. | UAT script asks *"can a real user complete the feature?"* before any technical correctness checks. Halts if the phase goal isn't a valid User Story. |
+| **`progress` / `stats` / `graphify`** | Same output for every phase. | MVP-mode phases get a "User-flow next up" panel; stats includes an `MVP phases: N` line; graphify renders MVP nodes in a distinct color with `(MVP)` label suffix. |
+
+### MVP walkthrough (the diff vs. standard)
+
+This continues the same webhook-validator example from the standard walkthrough — see those steps for the parts that don't change.
+
+#### 1. Pick MVP at init
+
+```
+/gsd-new-project
+```
+
+```
+> What are you building?
+  A webhook signature validator middleware for Express apps.
+
+[...]
+
+> Choose project mode:
+  > Vertical MVP — each phase delivers an end-to-end user capability (recommended for new products)
+    Horizontal Layers — build complete technical layers, assemble at the end
+
+[Roadmap generated with `**Mode:** mvp` on every initial phase.]
+```
+
+#### 2. Frame the phase as a user story
+
+```
+/gsd-mvp-phase 1
+```
+
+```
+> As a [user role]?
+  Backend developer
+
+> I want to [capability]?
+  validate incoming webhook signatures
+
+> So that [outcome]?
+  malicious requests are rejected before reaching my handlers
+
+[ROADMAP.md updated:
+   **Mode:** mvp
+   **Goal:** As a backend developer, I want to validate incoming webhook signatures, so that malicious requests are rejected before reaching my handlers.]
+```
+
+If your story is compound ("validate signatures **and** rate-limit") or too long, GSD walks you through SPIDR splitting and offers `/gsd-add-phase` invocations to break the work into multiple phases. See [`references/spidr-splitting.md`](../get-shit-done/references/spidr-splitting.md).
+
+The command then auto-delegates to `/gsd-plan-phase 1` — the planner sees `**Mode:** mvp` in the roadmap and plans accordingly.
+
+#### 3. Plan produces a Walking Skeleton on Phase 1
+
+Because this is Phase 1 of a new project under MVP mode, the planner emits `SKELETON.md` alongside the usual `01-PLAN.md`:
+
+```
+.planning/phases/01-validate-signatures/
+  SKELETON.md         # Walking skeleton: Express app + crypto + one route + one test + dev deploy
+  01-01-PLAN.md       # First slice of the user story
+```
+
+`SKELETON.md` captures the architectural decisions subsequent slices inherit (which framework, which DB, which deploy target). Phase 2 onward references it instead of re-deriving.
+
+#### 4. Execute with the MVP+TDD Gate
+
+If you have `workflow.tdd_mode: true` in your config (or pass `--tdd`), the MVP+TDD Gate activates during execution. Before running any *behavior-adding* task, the executor checks for a failing-test commit (`test(<phase>-<plan>): …`) on the branch. If absent, execution halts with a structured report. Pure doc-only / config-only / test-only tasks are exempt.
+
+Verify a task is gated by the predicate directly:
+
+```bash
+gsd-sdk query task.is-behavior-adding ./.planning/phases/01-validate-signatures/01-01-PLAN.md
+# → {"is_behavior_adding": true, "checks": {...}, "reason": null}
+```
+
+#### 5. Verify with user-flow-first UAT
+
+```
+/gsd-verify-work 1
+```
+
+The UAT script under MVP mode asks user-action steps **before** technical checks:
+
+```
+1. Open a fresh terminal in your example app's directory.
+2. Send a request with a valid HMAC signature header.
+3. Observe a 200 response.
+4. Send the same request with an invalid signature.
+5. Observe a 401 response.
+
+[Technical checks deferred — they run only after the user flow passes.]
+```
+
+If the phase's `**Goal:**` isn't in valid User Story format, verification halts with a pointer to re-run `/gsd-mvp-phase` to repair the goal.
+
+### How to confirm MVP mode is actually on
+
+The most common confusion: "I set `**Mode:** mvp` in ROADMAP.md but the planner ran in standard mode." The new query verb resolves this in one call:
+
+```bash
+gsd-sdk query phase.mvp-mode 1
+```
+
+```json
+{
+  "active": true,
+  "source": "roadmap",
+  "roadmap_mode": "mvp",
+  "config_mvp_mode": false,
+  "cli_flag_present": false
+}
+```
+
+- `active: true` means MVP mode applies to this phase.
+- `source` tells you *why* — `roadmap` (from ROADMAP.md), `cli_flag` (you passed `--mvp`), `config` (from `workflow.mvp_mode`), or `none` (not active).
+- If `active: false` and you expected `true`, check `roadmap_mode` (was the field actually parsed?) and `config_mvp_mode` (is the project default off?).
+
+### Configuration knobs
+
+| Config key | Default | Effect |
+|---|---|---|
+| `workflow.mvp_mode` | `false` | Project-wide default for MVP mode. Lowest precedence — overridden by ROADMAP `**Mode:** mvp` and by the `--mvp` CLI flag. |
+| `workflow.tdd_mode` | `false` | Enables the TDD gate. Combine with `MVP_MODE=true` to activate the MVP+TDD Gate during execution. |
+
+### Reference docs
+
+- [`references/planner-mvp-mode.md`](../get-shit-done/references/planner-mvp-mode.md) — vertical-slice planning rules.
+- [`references/skeleton-template.md`](../get-shit-done/references/skeleton-template.md) — Walking Skeleton template.
+- [`references/user-story-template.md`](../get-shit-done/references/user-story-template.md) — User Story format and slot definitions.
+- [`references/spidr-splitting.md`](../get-shit-done/references/spidr-splitting.md) — five-axis splitting discipline.
+- [`references/execute-mvp-tdd.md`](../get-shit-done/references/execute-mvp-tdd.md) — MVP+TDD Gate semantics.
+- [`references/verify-mvp-mode.md`](../get-shit-done/references/verify-mvp-mode.md) — UAT framing under MVP mode.
+- [`references/mvp-concepts.md`](../get-shit-done/references/mvp-concepts.md) — concept-to-file index for the six MVP references above.
+- [`docs/CLI-TOOLS.md → MVP Commands`](CLI-TOOLS.md#mvp-commands) — `phase.mvp-mode`, `task.is-behavior-adding`, `user-story.validate` query verb reference.
+
+---
+
 ## Workflow Diagrams
 
 ### Full Project Lifecycle

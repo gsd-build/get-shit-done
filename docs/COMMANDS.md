@@ -44,8 +44,10 @@ Initialize a new project with deep context gathering.
 **Prerequisites:** No existing `.planning/PROJECT.md`
 **Produces:** `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `config.json`, `research/`, `CLAUDE.md`
 
+**Project mode prompt (v1.50.0+).** During the interactive flow, GSD asks whether the project follows the **Vertical MVP** discipline (each phase delivers an end-to-end user capability — recommended for new products) or **Horizontal Layers** (build complete technical layers, assemble at the end — better for infrastructure-heavy projects). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase, which downstream commands (`/gsd-plan-phase`, `/gsd-execute-phase`, `/gsd-verify-work`, `/gsd-progress`, `/gsd-stats`, `/gsd-graphify`) detect automatically. See [docs/USER-GUIDE.md → MVP Mode](USER-GUIDE.md#mvp-mode) for the full walkthrough.
+
 ```bash
-/gsd-new-project                    # Interactive mode
+/gsd-new-project                    # Interactive mode (includes mode prompt)
 /gsd-new-project --auto @prd.md     # Auto-extract from PRD
 ```
 
@@ -153,9 +155,10 @@ Research, plan, and verify a phase.
 | `--validate` | Run state validation before planning begins |
 | `--bounce` | Run external plan bounce validation after planning (uses `workflow.plan_bounce_script`) |
 | `--skip-bounce` | Skip plan bounce even if enabled in config |
+| `--mvp` | Plan as a vertical MVP slice (UI → API → DB per task) instead of horizontal layers. Resolution chain: this flag → ROADMAP `**Mode:** mvp` → `workflow.mvp_mode` config → false. On Phase 1 of a new project, also triggers the **Walking Skeleton** gate — produces `SKELETON.md` capturing the thinnest end-to-end stack. See [`/gsd-mvp-phase`](#gsd-mvp-phase) for the guided entry point. |
 
 **Prerequisites:** `.planning/ROADMAP.md` exists
-**Produces:** `{phase}-RESEARCH.md`, `{phase}-{N}-PLAN.md`, `{phase}-VALIDATION.md`
+**Produces:** `{phase}-RESEARCH.md`, `{phase}-{N}-PLAN.md`, `{phase}-VALIDATION.md`. Under `--mvp` on a new-project Phase 1, also produces `SKELETON.md`.
 
 **Research-only mode (`--research-phase <N>`):**
 - No modifier: prompts `update / view / skip` if RESEARCH.md already exists.
@@ -171,7 +174,45 @@ Research, plan, and verify a phase.
 /gsd-plan-phase --research-phase 4             # Research only on phase 4 (prompts if RESEARCH.md exists)
 /gsd-plan-phase --research-phase 4 --view      # Print existing RESEARCH.md, no spawn
 /gsd-plan-phase --research-phase 4 --research  # Force-refresh research, no prompt
+/gsd-plan-phase 1 --mvp                        # Vertical-slice plan; on new-project Phase 1, emits SKELETON.md
 ```
+
+---
+
+### `/gsd-mvp-phase`
+
+Plan a phase as a vertical MVP slice — three structured user-story prompts → SPIDR splitting check → ROADMAP mutation → delegates to `/gsd-plan-phase` with MVP mode active.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `N` | **Yes** | Phase number to convert to MVP mode (integer or decimal like `2.1`). Phase must already exist in ROADMAP.md. |
+
+| Flag | Description |
+|------|-------------|
+| `--force` | Override the status guard. Required when the target phase is `in_progress` or `completed` — converting an active phase to MVP mode invalidates existing plans/summaries. |
+
+**What it does:**
+1. **User-story prompts** — three sequential `AskUserQuestion` calls capture an `As a [role] / I want to [capability] / So that [outcome]` story. Validated by `gsd-sdk query user-story.validate` (canonical regex `/^As a .+, I want to .+, so that .+\.$/`); empty fields are re-prompted.
+2. **SPIDR splitting check** — if the assembled story is too large (>120 chars, compound capabilities, multi-actor, or vague), walks the user through the **S**pike / **P**aths / **I**nterfaces / **D**ata / **R**ules axes and offers `/gsd-add-phase` invocations to split.
+3. **ROADMAP mutation** — writes `**Mode:** mvp` and replaces `**Goal:**` with the assembled user story.
+4. **Delegate to `/gsd-plan-phase <N>`** — the planner auto-detects MVP via the roadmap mode field (no `--mvp` flag needed at delegation time).
+
+**Prerequisites:** `.planning/ROADMAP.md` exists; phase `N` is present and not `in_progress`/`completed` (unless `--force`).
+**Produces:** ROADMAP.md edits (`**Mode:** mvp` + new `**Goal:**`), then everything `/gsd-plan-phase` produces.
+
+```bash
+/gsd-mvp-phase 1                  # Convert Phase 1 to MVP mode interactively
+/gsd-mvp-phase 2 --force          # Override status guard (use with care)
+```
+
+**Verifying MVP mode is active for a phase:**
+
+```bash
+gsd-sdk query phase.mvp-mode 1
+# → {"active": true, "source": "roadmap", "roadmap_mode": "mvp", ...}
+```
+
+See [docs/CLI-TOOLS.md → MVP Commands](CLI-TOOLS.md#mvp-commands) for the underlying query verbs and [docs/USER-GUIDE.md → MVP Mode](USER-GUIDE.md#mvp-mode) for the end-to-end walkthrough.
 
 ---
 

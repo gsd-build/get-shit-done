@@ -180,6 +180,119 @@ node gsd-tools.cjs roadmap analyze
 node gsd-tools.cjs roadmap update-plan-progress <N>
 ```
 
+> **Mode field (v1.50.0+).** `roadmap get-phase` returns a `mode` field extracted from `**Mode:**` (e.g. `"mvp"`). Lowercased + trimmed; unrecognized values preserved verbatim for forward-compat. The companion `gsd-sdk query phase.mvp-mode <N>` ([MVP Commands](#mvp-commands)) wraps this with the full precedence chain.
+
+---
+
+## MVP Commands
+
+SDK-only verbs that centralize MVP-mode resolution and validation. Three small focused queries; consumed by `/gsd-plan-phase`, `/gsd-execute-phase`, `/gsd-verify-work`, `/gsd-progress`, `/gsd-mvp-phase` and the gsd-executor and gsd-verifier agents. No `gsd-tools.cjs` mirror — these are native SDK handlers (registered in `NO_CJS_SUBPROCESS_REASON`).
+
+### `phase.mvp-mode`
+
+Resolve whether MVP mode applies to a phase. Single canonical seam — workflows call this verb instead of inlining the precedence chain.
+
+**Precedence (first hit wins):**
+1. `--cli-flag` arg (caller asserts the user passed `--mvp` on the CLI)
+2. ROADMAP.md `**Mode:** mvp` for the phase
+3. `workflow.mvp_mode` config (project-wide default)
+4. `false`
+
+```bash
+# Roadmap + config check (no CLI override)
+gsd-sdk query phase.mvp-mode 1
+
+# Caller saw --mvp on CLI — flag wins
+gsd-sdk query phase.mvp-mode 1 --cli-flag
+
+# Pluck just the boolean for shell composition
+MVP_MODE=$(gsd-sdk query phase.mvp-mode 1 --pick active)
+```
+
+**Returns** (`{ data: ... }`):
+```json
+{
+  "active": true,
+  "source": "roadmap",
+  "roadmap_mode": "mvp",
+  "config_mvp_mode": false,
+  "cli_flag_present": false
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `active` | boolean | True when MVP mode applies. |
+| `source` | `cli_flag` \| `roadmap` \| `config` \| `none` | Which signal in the chain decided. |
+| `roadmap_mode` | string \| null | Literal value from `**Mode:**` (lowercased), or null when absent. |
+| `config_mvp_mode` | boolean | The `workflow.mvp_mode` config value at resolution time. |
+| `cli_flag_present` | boolean | True when `--cli-flag` was passed. |
+
+### `task.is-behavior-adding`
+
+Predicate: does this PLAN.md task add user-visible behavior under the MVP+TDD Gate? Three checks, all required: (1) `tdd="true"` frontmatter, (2) non-empty `<behavior>` block, (3) `<files>` includes at least one non-test source file (excludes `*.md`, `*.json`, `*.test.*`, `*.spec.*`). Pure doc-only / config-only / test-only tasks return `false` and are exempt from the gate.
+
+```bash
+# From a plan file on disk
+gsd-sdk query task.is-behavior-adding ./plans/01-PLAN-auth.md
+
+# From an inline XML snippet
+gsd-sdk query task.is-behavior-adding --task-content '<task tdd="true"><behavior>User can log in</behavior><files>src/auth.ts</files></task>'
+```
+
+**Returns:**
+```json
+{
+  "is_behavior_adding": true,
+  "checks": {
+    "tdd_true": true,
+    "has_behavior_block": true,
+    "has_source_files": true
+  },
+  "reason": null
+}
+```
+
+When `is_behavior_adding` is `false`, `reason` is a human-readable diagnostic listing which of the three checks failed — used by the executor's halt-and-report message. Canonical specification: [`get-shit-done/references/execute-mvp-tdd.md`](../get-shit-done/references/execute-mvp-tdd.md).
+
+### `user-story.validate`
+
+Validate that a string matches the canonical User Story format used by MVP-mode phases. Owns the regex `/^As a .+, I want to .+, so that .+\.$/`. Consumed by `gsd-verifier` (phase-goal guard) and `/gsd-mvp-phase` (interactive-prompt validation) — single source of truth so the validator the user sees during `/gsd-mvp-phase` matches the validator the verifier applies later.
+
+```bash
+# Positional form
+gsd-sdk query user-story.validate "As a user, I want to log in, so that I see my data."
+
+# Flag form (when the story might contain shell metacharacters)
+gsd-sdk query user-story.validate --story "As a user, I want to log in, so that I see my data."
+```
+
+**Returns when valid:**
+```json
+{
+  "valid": true,
+  "input": "As a user, I want to log in, so that I see my data.",
+  "slots": {
+    "role": "user",
+    "capability": "log in",
+    "outcome": "I see my data"
+  },
+  "errors": []
+}
+```
+
+**Returns when invalid** (e.g. missing the terminal period):
+```json
+{
+  "valid": false,
+  "input": "As a user, I want to log in, so that I see my data",
+  "slots": null,
+  "errors": ["Must end with a period."]
+}
+```
+
+The `errors[]` array contains specific guidance per missing element (`Must begin with "As a "`, `Must contain ", I want to "`, `Must contain ", so that "`, `Must end with a period.`) so callers can surface targeted re-prompts.
+
 ---
 
 ## Config Commands
