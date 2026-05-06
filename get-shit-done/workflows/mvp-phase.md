@@ -84,6 +84,19 @@ USER_STORY="As a ${ROLE}, I want to ${CAPABILITY}, so that ${OUTCOME}."
 
 If any of the three answers is empty or whitespace-only, error and re-prompt that single field. Do NOT proceed with a partial story.
 
+**Validate via the centralized User Story validator.** The verb owns the canonical regex `/^As a .+, I want to .+, so that .+\.$/` and surfaces per-error guidance:
+
+```bash
+USER_STORY_RESULT=$(gsd-sdk query user-story.validate --story "$USER_STORY")
+if [ "$(echo "$USER_STORY_RESULT" | jq -r '.valid')" != "true" ]; then
+  echo "$USER_STORY_RESULT" | jq -r '.errors[]' >&2
+  # Re-prompt the offending field per the surfaced errors.
+  exit 1
+fi
+```
+
+This guarantees the goal stored in ROADMAP.md will satisfy the same guard the verifier applies later.
+
 ## 4. SPIDR splitting check
 
 Run the SPIDR rules from `@~/.claude/get-shit-done/references/spidr-splitting.md`. Briefly:

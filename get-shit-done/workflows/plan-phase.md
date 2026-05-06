@@ -78,18 +78,15 @@ fi
 
 Set `TEXT_MODE=true` if `--text` is present in $ARGUMENTS OR `text_mode` from init JSON is `true`. When `TEXT_MODE` is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for Claude Code remote sessions (`/rc` mode) where TUI menus don't work through the Claude App.
 
-**MVP_MODE resolution.** Resolve `MVP_MODE` once and reuse for the rest of the workflow. Order (first hit wins):
+**MVP_MODE resolution.** Resolve `MVP_MODE` once via the centralized `phase.mvp-mode` query verb. Precedence (first hit wins): CLI flag → ROADMAP.md `**Mode:** mvp` → `workflow.mvp_mode` config → false. The verb is the single source of truth — do not re-implement the chain.
 
-1. **CLI flag.** If `$ARGUMENTS` contains `--mvp`, set `MVP_MODE=true`.
-2. **Roadmap phase mode.** Otherwise, query the phase's mode field:
-   ```bash
-   PHASE_MODE=$(gsd-sdk query roadmap.get-phase "${PHASE}" --pick mode)
-   if [ "$PHASE_MODE" = "mvp" ]; then MVP_MODE=true; fi
-   ```
-3. **Config default.** Otherwise, `MVP_MODE="$MVP_MODE_CFG"` (resolved in Step 1).
-4. **Fallback.** `MVP_MODE=false`.
+```bash
+MVP_FLAG_ARG=""
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG="--cli-flag"; fi
+MVP_MODE=$(gsd-sdk query phase.mvp-mode "${PHASE}" $MVP_FLAG_ARG --pick active)
+```
 
-The mode is **all-or-nothing per phase** (per PRD decision Q1). Do not allow `--mvp` to apply selectively to a subset of tasks within a phase.
+The verb returns `true|false`. Full result also exposes `source` (`cli_flag` | `roadmap` | `config` | `none`) for diagnostics. The mode is **all-or-nothing per phase** (PRD decision Q1) — never selective per task.
 
 **Walking Skeleton gate.** When `MVP_MODE=true` AND `phase_number == "01"` AND there are zero prior phase summaries (new project), the planner runs in **Walking Skeleton mode** (per PRD decision Q2 — new projects only). Detect with:
 

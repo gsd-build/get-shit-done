@@ -138,19 +138,21 @@ if [[ ! "$ARGUMENTS" =~ --auto ]]; then
 fi
 ```
 
-Resolve MVP_MODE (CLI flag → roadmap phase mode → config → false):
+Resolve `MVP_MODE` once via the centralized `phase.mvp-mode` query verb (precedence chain: CLI flag → ROADMAP `**Mode:** mvp` → `workflow.mvp_mode` config → false):
 ```bash
-MVP_MODE_CFG=$(gsd-sdk query config-get workflow.mvp_mode 2>/dev/null || echo "false")
-PHASE_MODE=$(gsd-sdk query roadmap.get-phase "${PHASE_NUMBER}" --pick mode 2>/dev/null || echo "")
-MVP_MODE=false
-if [[ "$ARGUMENTS" =~ --mvp ]] || [ "$PHASE_MODE" = "mvp" ] || [ "$MVP_MODE_CFG" = "true" ]; then MVP_MODE=true; fi
+MVP_FLAG_ARG=""
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG="--cli-flag"; fi
+MVP_MODE=$(gsd-sdk query phase.mvp-mode "${PHASE_NUMBER}" $MVP_FLAG_ARG --pick active)
 ```
 
-**MVP+TDD gate.** When `MVP_MODE=true` AND `TDD_MODE=true` AND `TASK_TDD=true`, require a failing-test commit before the implementation step. Doc-only / config-only tasks are exempt. See `execute-mvp-tdd.md` for full halt report format and "behavior-adding task" definition.
+**MVP+TDD gate.** When `MVP_MODE=true` AND `TDD_MODE=true` AND the task is a Behavior-Adding Task, require a failing-test commit before the implementation step. The Behavior-Adding Task predicate is now machine-checked via `task.is-behavior-adding` instead of inlined three-line prose; pure doc-only / config-only / test-only tasks return `is_behavior_adding=false` and are exempt. See `execute-mvp-tdd.md` for the halt report format.
 ```bash
-if [ "$MVP_MODE" = "true" ] && [ "$TDD_MODE" = "true" ] && [ "$TASK_TDD" = "true" ]; then
-  RED_COMMIT=$(git log --oneline --grep="^test(${PHASE_NUMBER}-${PLAN_ID}):" -- "**/*.test.*" "**/*.spec.*" "tests/" | head -1)
-  if [ -z "$RED_COMMIT" ]; then echo "MVP+TDD GATE TRIPPED: missing RED commit for ${PLAN_ID}/${TASK_ID}"; exit 1; fi
+if [ "$MVP_MODE" = "true" ] && [ "$TDD_MODE" = "true" ]; then
+  IS_BEHAVIOR_ADDING=$(gsd-sdk query task.is-behavior-adding "$TASK_FILE" --pick is_behavior_adding)
+  if [ "$IS_BEHAVIOR_ADDING" = "true" ]; then
+    RED_COMMIT=$(git log --oneline --grep="^test(${PHASE_NUMBER}-${PLAN_ID}):" -- "**/*.test.*" "**/*.spec.*" "tests/" | head -1)
+    if [ -z "$RED_COMMIT" ]; then echo "MVP+TDD GATE TRIPPED: missing RED commit for ${PLAN_ID}/${TASK_ID}"; exit 1; fi
+  fi
 fi
 ```
 On trip, updates `STATE.md` with `last_gate_trip: {plan_id}/{task_id}`.

@@ -18,8 +18,8 @@ describe('verify-work — MVP mode UAT framing', () => {
     assert.match(content, /MVP_MODE/, 'workflow must declare MVP_MODE');
     assert.match(
       content,
-      /roadmap[^\n]*mode|phase[^\n]*\.mode|\.mode\s*=/i,
-      'must consult phase mode from roadmap'
+      /phase\.mvp-mode|phase mvp-mode/i,
+      'must resolve MVP mode via the centralized phase.mvp-mode verb (no inline roadmap+config bash)'
     );
   });
 

@@ -39,12 +39,10 @@ AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
 Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`, `uat_path`.
 
 ```bash
-# MVP mode detection — read the phase's mode field from ROADMAP.md
-PHASE_MODE=$(gsd-sdk query roadmap.get-phase "${phase_number}" --pick mode 2>/dev/null || echo "")
-MVP_MODE=false
-if [ "$PHASE_MODE" = "mvp" ]; then
-  MVP_MODE=true
-fi
+# MVP mode detection via the centralized phase.mvp-mode resolver.
+# verify-work has no --mvp CLI flag (mode is inherited from the planned phase),
+# so we omit --cli-flag — the verb falls through roadmap → config → false.
+MVP_MODE=$(gsd-sdk query phase.mvp-mode "${phase_number}" --pick active)
 ```
 </step>
 
@@ -153,11 +151,19 @@ Read each SUMMARY.md to extract testable deliverables.
 
 When `MVP_MODE=false` (mode is null, absent, or the phase has no `**Mode:**` line in ROADMAP.md), fall back to the standard UAT generation path — no behavioral change.
 
-**User-story format guard.** When `MVP_MODE=true`, also verify the phase's goal is in user-story format (matches `/^As a .+, I want to .+, so that .+\.$/`). If the goal is `mode: mvp` but NOT in user-story format, surface the discrepancy:
+**User-story format guard.** When `MVP_MODE=true`, also verify the phase's goal is in User Story format via the centralized validator:
 
-> "Phase ${PHASE} has `**Mode:** mvp` in ROADMAP.md but the **Goal:** is not in user-story format. Run `/gsd mvp-phase ${PHASE}` to set a user-story goal before verifying."
+```bash
+PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${phase_number}" --pick goal)
+USER_STORY_VALID=$(gsd-sdk query user-story.validate --story "$PHASE_GOAL" --pick valid)
+if [ "$USER_STORY_VALID" != "true" ]; then
+  echo "Phase ${PHASE} has '**Mode:** mvp' in ROADMAP.md but the **Goal:** is not in user-story format."
+  echo "Run /gsd mvp-phase ${PHASE} to set a user-story goal before verifying."
+  exit 1
+fi
+```
 
-Halt UAT generation and exit cleanly. Do not attempt to derive user-flow steps from a non-user-story goal — that would produce a low-quality UAT.
+The verb owns the canonical regex `/^As a .+, I want to .+, so that .+\.$/` and returns slot extractions plus per-error guidance when invalid. Halt UAT generation on failure — never attempt to derive user-flow steps from a non-User-Story goal (low-quality UAT).
 
 **Extract testable deliverables from SUMMARY.md:**
 

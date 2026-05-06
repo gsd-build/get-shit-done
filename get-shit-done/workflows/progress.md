@@ -143,14 +143,10 @@ CONTEXT: [✓ if has_context | - if not]
 <step name="mvp_display">
 **MVP-mode display (when phase has `**Mode:** mvp` in ROADMAP.md).**
 
-Resolve `MVP_MODE` per phase:
+Resolve `MVP_MODE` per phase via the centralized resolver. progress has no `--mvp` CLI flag (mode is inherited from the planned phase), so we omit `--cli-flag`:
 
 ```bash
-PHASE_MODE=$(gsd-sdk query roadmap.get-phase "${PHASE_NUMBER}" --pick mode 2>/dev/null || echo "")
-MVP_MODE=false
-if [ "$PHASE_MODE" = "mvp" ]; then
-  MVP_MODE=true
-fi
+MVP_MODE=$(gsd-sdk query phase.mvp-mode "${PHASE_NUMBER}" --pick active)
 ```
 
 When `MVP_MODE=true`, the per-phase progress block adds a **user-flow status** sub-block sourced from the phase's PLAN.md task names. Each task whose name reads like a user-visible capability (e.g., "Register flow", "Login flow", "Password reset") is rendered as a status line:

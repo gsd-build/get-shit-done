@@ -36,6 +36,13 @@ interface PhaseSection {
   phase_number: string;
   phase_name: string;
   goal?: string | null;
+  /**
+   * Phase-level mode flag from `**Mode:** mvp` in ROADMAP.md.
+   * Lowercased + trimmed for canonical comparison; null when the field is absent.
+   * Unrecognized values are preserved verbatim for forward-compat (mirrors `roadmap.cjs`).
+   * Read by the `phase.mvp-mode` resolver and downstream MVP-aware workflows.
+   */
+  mode?: string | null;
   success_criteria?: string[];
   section?: string;
   error?: string;
@@ -388,6 +395,12 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
   const goalMatch = section.match(/\*\*Goal(?::\*\*|\*\*:)\s*([^\n]+)/i);
   const goal = goalMatch ? goalMatch[1].trim() : null;
 
+  // Mode: vertical-MVP slice mode flag. Lowercased + trimmed for canonical
+  // comparison; unrecognized values preserved verbatim for forward-compat.
+  // Mirrors roadmap.cjs:120-123 — restoring parity that was missed in the SDK port.
+  const modeMatch = section.match(/\*\*Mode(?::\*\*|\*\*:)\s*([^\n]+)/i);
+  const mode = modeMatch ? modeMatch[1].trim().toLowerCase() : null;
+
   // Extract success criteria as structured array
   const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
   const success_criteria = criteriaMatch
@@ -399,6 +412,7 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
     phase_number: phaseNum,
     phase_name: phaseName,
     goal,
+    mode,
     success_criteria,
     section,
   };

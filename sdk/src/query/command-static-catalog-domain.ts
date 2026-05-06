@@ -15,6 +15,7 @@ import { detectCustomFiles } from './detect-custom-files.js';
 import { uatRenderCheckpoint, auditUat } from './uat.js';
 import { intelStatus, intelDiff, intelSnapshot, intelValidate, intelQuery, intelExtractExports, intelPatchMeta, intelUpdate } from './intel.js';
 import { writeProfile, generateClaudeProfile, generateDevPreferences, generateClaudeMd } from './profile-output.js';
+import { phaseMvpMode, taskIsBehaviorAdding, userStoryValidate } from './mvp.js';
 
 export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['agent-skills', agentSkills],
@@ -103,4 +104,11 @@ export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler
   ['profile-sample', profileSample],
   ['scan-sessions', scanSessions],
   ['generate-claude-md', generateClaudeMd],
+  // ── MVP umbrella (#2826) — centralized resolution seams ──
+  ['phase.mvp-mode', phaseMvpMode],
+  ['phase mvp-mode', phaseMvpMode],
+  ['task.is-behavior-adding', taskIsBehaviorAdding],
+  ['task is-behavior-adding', taskIsBehaviorAdding],
+  ['user-story.validate', userStoryValidate],
+  ['user-story validate', userStoryValidate],
 ] as const;

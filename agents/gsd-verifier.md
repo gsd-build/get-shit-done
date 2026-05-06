@@ -598,7 +598,13 @@ Deferred items are informational only — they do not require closure plans.
 1. Top-level "User Flow Coverage" table: each step of the user story → expected → evidence in codebase → status. (Format defined in `references/verify-mvp-mode.md`.)
 2. Standard technical-check sections (API verification, error handling, etc.) follow below — only if the user flow coverage is complete.
 
-**User-story-format guard:** If the phase has `mode: mvp` but the `**Goal:**` line is not in user-story format, refuse to verify. Surface the discrepancy and ask the user to run `/gsd mvp-phase ${PHASE}` to set a proper user-story goal. Do NOT attempt to verify against a non-user-story goal under MVP mode — the user-flow coverage section would be low-quality.
+**User Story format guard:** Apply via the centralized verb instead of inlining the regex:
+
+```bash
+USER_STORY_VALID=$(gsd-sdk query user-story.validate --story "$PHASE_GOAL" --pick valid)
+```
+
+If `valid != true`, refuse to verify. Surface the discrepancy and ask the user to run `/gsd mvp-phase ${PHASE}` to set a proper User Story goal. The verb owns the canonical regex `/^As a .+, I want to .+, so that .+\.$/` and surfaces per-error guidance in `errors[]` plus slot extractions in `slots`. Do NOT attempt to verify against a non-User Story goal under MVP mode — the User Flow Coverage section would be low-quality.
 
 **Mode is all-or-nothing per phase** (PRD decision Q1, inherited from Phase 1). The MVP Mode Verification rules apply to the whole phase or not at all.
 
