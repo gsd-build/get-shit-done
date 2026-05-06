@@ -138,7 +138,7 @@ Parse the JSON output:
 
 Display:
 
-```
+```text
 GSD > Building knowledge graph...
 ```
 
