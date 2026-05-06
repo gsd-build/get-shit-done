@@ -35,7 +35,10 @@ denylist=(
   '^sdk/'
   '^scripts/'
   '^get-shit-done/'
-  '^README\.[a-z]+\.md$'
+  '^README\.[A-Za-z][A-Za-z0-9_-]*\.md$'
+  '^agents/gsd-\*'
+  '^hooks/gsd-\*'
+  '^hooks/patterns'
 )
 
 files_arr="$(jq -r '.files // [] | .[]' "$PKG")"
@@ -58,7 +61,7 @@ done <<< "$files_arr"
 if command -v npm >/dev/null 2>&1; then
   pack_out="$(cd "$ROOT" && npm pack --dry-run --json 2>/dev/null || true)"
   if [ -n "$pack_out" ]; then
-    leaked="$(printf "%s" "$pack_out" | jq -r '.[0].files[]?.path // empty' 2>/dev/null | grep -E '^(sdk/|scripts/|get-shit-done/|bin/install\.js|bin/gsd-sdk\.js)' || true)"
+    leaked="$(printf "%s" "$pack_out" | jq -r '.[0].files[]?.path // empty' 2>/dev/null | grep -E '^(sdk/|scripts/|get-shit-done/|bin/install\.js|bin/gsd-sdk\.js|README\.[A-Za-z][A-Za-z0-9_-]*\.md$|agents/|hooks/)' || true)"
     if [ -n "$leaked" ]; then
       while IFS= read -r leak; do
         vfail "npm pack would include upstream-source path: $leak"

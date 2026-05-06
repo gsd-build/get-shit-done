@@ -11,9 +11,6 @@
     "gsd-ic": "bin/gsd-ic-install.js"
   },
   "files": [
-    "agents/gsd-*.md",
-    "hooks/gsd-*.js",
-    "hooks/patterns/",
     "skills/intel-coding-conventions/",
     "skills/prototyping-discipline/",
     "skills/classification-conventions/",
@@ -24,7 +21,7 @@
     "bin/gsd-ic-install.js",
     "bin/lib/gsd-ic/",
     "tools/patch-workflows.sh",
-    "tools/ci/",
+    "tools/ci/*.sh",
     "workflow-patches/",
     "references/agent-contracts.ic-pack.md",
     "VERSION",

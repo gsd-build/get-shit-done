@@ -74,6 +74,9 @@ sed -i.bak -E "s/^gsd_pinned:.*/gsd_pinned: $upstream_version/" VERSION
 rm -f VERSION.bak
 echo "==> VERSION updated: gsd_pinned: $upstream_version"
 
+echo "==> stripping upstream localized + docs READMEs (npm force-includes README*; we ship only the IC-pack README.md)..."
+rm -f README.ja-JP.md README.ko-KR.md README.pt-BR.md README.zh-CN.md docs/README.md
+
 echo "==> reapplying workflow patches..."
 bash tools/patch-workflows.sh
 

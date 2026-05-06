@@ -1,0 +1,21 @@
+# Localized upstream READMEs — npm force-includes README* by default; this
+# overrides that behavior for the language-suffixed variants.
+README.ja-JP.md
+README.ko-KR.md
+README.pt-BR.md
+README.zh-CN.md
+
+# Upstream-only content that may end up in the working tree but must not ship.
+sdk/
+scripts/
+get-shit-done/
+bin/install.js
+bin/gsd-sdk.js
+
+# Dev-only.
+tests/
+tools/ci/tests/
+tools/sync/
+tools/release/
+package.upstream.json
+package-lock.json

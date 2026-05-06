@@ -57,6 +57,20 @@ function isIcPackAgent(filePath) {
   return /\bic_pack:\s*true\b/.test(fm);
 }
 
+// IC pack hooks must declare themselves with a `// ic_pack: true` comment in
+// the first 10 lines. Without this marker, the file is treated as upstream
+// stock and skipped — necessary because upstream hooks share the gsd-* prefix.
+function isIcPackHook(filePath) {
+  if (!filePath.endsWith('.js')) return false;
+  let head;
+  try {
+    head = fs.readFileSync(filePath, 'utf8').split('\n', 10).join('\n');
+  } catch {
+    return false;
+  }
+  return /\/\/\s*ic_pack:\s*true\b/.test(head);
+}
+
 function copyAgents(srcRoot, target) {
   const srcDir = path.join(srcRoot, 'agents');
   const destDir = path.join(target, '.claude/agents');
@@ -74,14 +88,13 @@ function copyHooks(srcRoot, target) {
   const srcDir = path.join(srcRoot, 'hooks');
   const destDir = path.join(target, '.claude/hooks');
   if (!fs.existsSync(srcDir)) return;
-  ensureDir(destDir);
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-    if (entry.isFile() && entry.name.startsWith('gsd-') && entry.name.endsWith('.js')) {
-      copyFile(path.join(srcDir, entry.name), path.join(destDir, entry.name));
-    } else if (entry.isDirectory() && entry.name === 'patterns') {
-      copyDir(path.join(srcDir, 'patterns'), path.join(destDir, 'patterns'));
-    }
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const srcPath = path.join(srcDir, entry.name);
+    if (!isIcPackHook(srcPath)) continue;
+    copyFile(srcPath, path.join(destDir, entry.name));
   }
+  // Note: hooks/patterns/ is intentionally NOT copied — it belongs to upstream.
 }
 
 function copySkills(srcRoot, target) {
@@ -130,4 +143,5 @@ module.exports = {
   IC_PACK_SKILL_NAMES,
   // exposed for unit tests:
   isIcPackAgent,
+  isIcPackHook,
 };

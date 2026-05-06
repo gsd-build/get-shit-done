@@ -4677,10 +4677,10 @@ Expected: every test file reports `0 failed`; final line `[run-all] all validato
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install
+node --test tests/install/*.test.cjs
 ```
 
-Expected: 25 tests pass across 5 files (parse-args 9, verify-gsd 4, install-pack 5, wire-overlay 5, idempotency 2, end-to-end 4 — adjust counts to match what you actually wrote).
+Expected: 29 tests pass across 6 files (parse-args 9, verify-gsd 4, install-pack 5, wire-overlay 5, idempotency 2, end-to-end 4).
 
 - [ ] **Step 4: Manual end-to-end install simulation against a fake program**
 
@@ -4880,6 +4880,22 @@ The plan's denylist included `'^commands/(?!gsd/intel-gate-)'`. That's PCRE nega
 ### Task 24: executed before Task 17 (2026-05-06)
 
 The plan orders Task 24 after Tasks 17–23. But Task 17 (master runner) expects all validators to pass against the live repo, and `validate-workflow-patches.sh`/`validate-seamless-fork.sh` both require `tools/patch-workflows.sh` to exist. Task 24 was therefore executed early, before Task 17, to satisfy the dependency. No content change to Task 24 itself — only execution order.
+
+### Task 28 smoke uncovered five npm-publish-scope bugs (2026-05-06)
+
+The bottom-to-top smoke test revealed bugs that the validator + unit tests had missed. All fixed before declaring Plan 0 done.
+
+**Bug 1 — install-pack.cjs leaked upstream hooks.** `copyHooks` filtered only by filename (`gsd-*.js`), but upstream stock hooks share that prefix. Fix: added `isIcPackHook()` requiring a `// ic_pack: true` comment marker in the first 10 lines, mirroring the agents convention. Plan 0 ships zero IC-pack hooks (none have the marker), so no hooks ship in Plan 0. (`bin/lib/gsd-ic/install-pack.cjs`, `tests/install/install-pack.test.cjs` updated.)
+
+**Bug 2 — package.json `files` globs leaked upstream agents/hooks.** `"agents/gsd-*.md"` and `"hooks/gsd-*.js"` matched both upstream and IC-pack content. Fix: removed both globs from `files` for Plan 0 (no IC-pack agents/hooks exist yet). Plan 1+ must design a non-conflicting subdirectory layout (e.g., `agents/ic-pack/*.md`) when introducing the first IC-pack agents. Also dropped `hooks/patterns/` (upstream).
+
+**Bug 3 — validate-publish-scope denylist regex too narrow.** `^README\.[a-z]+\.md$` did not match `README.ja-JP.md` (uppercase + hyphen). Fix: broadened to `^README\.[A-Za-z][A-Za-z0-9_-]*\.md$`. Also added `agents/gsd-*`, `hooks/gsd-*`, `hooks/patterns` to the denylist + extended the actual-pack regex.
+
+**Bug 4 — npm force-includes README* regardless of `files`.** Localized upstream READMEs (`README.{ja-JP,ko-KR,pt-BR,zh-CN}.md` + `docs/README.md`) leaked into the pack despite restrictive `files`. `.npmignore` was insufficient because npm always includes README*. Fix: deleted the files from the working tree; updated `tools/sync/sync-from-upstream.sh` to strip them after each upstream merge so they never come back.
+
+**Bug 5 — `tools/ci/` glob shipped validator tests + scratch fixtures.** The `"tools/ci/"` recursive glob in `files` overrode `.npmignore` exclusion of `tools/ci/tests/`. Fix: narrowed to `"tools/ci/*.sh"` (only the validator scripts; no tests/, no fixtures/).
+
+After all five fixes: npm pack ships 59 files, all IC-pack-scoped (no upstream content). All 12 validators + all validator tests + all 29 install tests still green.
 
 ### Task 2 fix-up: customer overlay.json templates added before Task 23 (2026-05-06)
 

@@ -15,7 +15,8 @@ function makeFakePackSource() {
   fs.writeFileSync(path.join(src, 'agents', 'gsd-x.md'), '---\nic_pack: true\nclassification: UNCLASSIFIED\n---\n## X COMPLETE\n');
   fs.writeFileSync(path.join(src, 'agents', 'gsd-stock-keeper.md'), 'stock content (should NOT be copied; lacks ic_pack)');
   fs.mkdirSync(path.join(src, 'hooks'), { recursive: true });
-  fs.writeFileSync(path.join(src, 'hooks', 'gsd-x.js'), '// IC hook');
+  fs.writeFileSync(path.join(src, 'hooks', 'gsd-x.js'), '// ic_pack: true\n// IC hook\n');
+  fs.writeFileSync(path.join(src, 'hooks', 'gsd-stock.js'), '// stock upstream hook (should NOT be copied; lacks ic_pack marker)\n');
   fs.mkdirSync(path.join(src, 'intel-refs'), { recursive: true });
   fs.writeFileSync(path.join(src, 'intel-refs', 'MANIFEST.json'), '{"version":"2026.05","topics":{}}');
   fs.mkdirSync(path.join(src, 'config-overlays', 'nga'), { recursive: true });
@@ -36,11 +37,12 @@ describe('installPack', () => {
     assert.equal(fs.existsSync(path.join(target, '.claude/agents/gsd-stock-keeper.md')), false);
   });
 
-  it('copies hooks, intel-refs, the selected overlay, and skills', () => {
+  it('copies hooks (only those with `// ic_pack: true` marker), intel-refs, the selected overlay, and skills', () => {
     const src = makeFakePackSource();
     const target = tmp('tgt');
     installPack({ packSource: src, target, customer: 'nga' });
     assert.equal(fs.existsSync(path.join(target, '.claude/hooks/gsd-x.js')), true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/hooks/gsd-stock.js')), false);
     assert.equal(fs.existsSync(path.join(target, '.claude/intel-refs/MANIFEST.json')), true);
     assert.equal(fs.existsSync(path.join(target, '.claude/config-overlays/nga/overlay.json')), true);
     assert.equal(fs.existsSync(path.join(target, '.claude/skills/intel-coding-conventions/SKILL.md')), true);

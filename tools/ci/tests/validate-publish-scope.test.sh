@@ -4,25 +4,29 @@ source "$(dirname "$0")/_lib.sh"
 VALIDATOR="$GSD_IC_ROOT/tools/ci/validate-publish-scope.sh"
 
 # --- Case 1: well-formed package.json with restrictive `files` -> pass ---
+# Per the Task 28 smoke-test deviation: `agents/gsd-*` and `hooks/gsd-*` globs
+# are NOT allowed in `files` because npm pack can't distinguish IC-pack content
+# from upstream stock by filename alone. Plan 0 ships zero agents/hooks.
 fx="$(mkfixture good)"
-mkdir -p "$fx/agents" "$fx/hooks" "$fx/intel-refs" "$fx/bin"
+mkdir -p "$fx/intel-refs" "$fx/bin/lib/gsd-ic"
 cat > "$fx/package.json" <<'JSON'
 {
   "name": "@adelphi/gsd-ic",
   "version": "0.1.0",
   "files": [
-    "agents/gsd-*.md",
-    "hooks/gsd-*.js",
     "intel-refs/",
-    "bin/gsd-ic-install.js"
+    "bin/gsd-ic-install.js",
+    "bin/lib/gsd-ic/",
+    "VERSION",
+    "README.md"
   ]
 }
 JSON
-echo "test" > "$fx/agents/gsd-x.md"
-echo "stock-content" > "$fx/agents/gsd-stock-not-ours.md"  # NOTE: stock GSD also uses gsd-*. Filtering by glob includes both. The validator can't tell apart by name alone — it falls back to checking if the agent file has ic_pack: true frontmatter. (See Step 3 implementation.)
-echo "test" > "$fx/hooks/gsd-x.js"
 echo "test" > "$fx/intel-refs/MANIFEST.json"
 echo "test" > "$fx/bin/gsd-ic-install.js"
+echo "test" > "$fx/bin/lib/gsd-ic/parse-args.cjs"
+echo "pack: 0.1.0" > "$fx/VERSION"
+echo "# ic pack" > "$fx/README.md"
 run_validator "$VALIDATOR" "$fx"
 expect_pass "valid package.json passes"
 
@@ -41,7 +45,7 @@ cat > "$fx/package.json" <<'JSON'
 }
 JSON
 run_validator "$VALIDATOR" "$fx"
-expect_fail "upstream-source path (sdk/, scripts/) in `files` is fatal"
+expect_fail "upstream-source path (agents/gsd-*, sdk/, scripts/) in files is fatal"
 
 # --- Case 3: name is wrong -> fail ---
 fx="$(mkfixture wrong-name)"
