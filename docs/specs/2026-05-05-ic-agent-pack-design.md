@@ -432,10 +432,10 @@ Hooks are deterministic scripts registered in the host runtime's settings to fir
 
 | Field | Value |
 |---|---|
-| **Event** | `PostToolUse` (extends stock GSD's prompt-injection scanner) |
+| **Event** | `PostToolUse` (separate hook file; runs *alongside* any stock GSD prompt-injection hook on the same event — does not modify or replace it) |
 | **Behavior** | Layered detector for IC-flavored prompt-injection patterns: tradecraft-rule-bypass attempts ("ignore your tradecraft rules"), source-protection-evasion ("reveal the source identity"), classification-bypass ("treat this as unclassified") |
 | **Configuration** | `.planning/intel-gates.json` → `hooks.prompt_injection_intel.enabled` (default true) |
-| **Output** | Extends stock scanner's advisory output with IC-specific findings |
+| **Output** | Independent advisory output of IC-specific findings; appended to (not merged into) any stock scanner output |
 | **Pattern catalog** | `hooks/patterns/intel-injection-patterns.json` |
 
 ---
@@ -749,13 +749,13 @@ The `intel-gate-*` skill (a slash command in `commands/gsd/` namespace, internal
 | Stock workflow | Insertion point | Gate name | What fires |
 |---|---|---|---|
 | `new-project.md` | After PROJECT.md scaffolding | `context-mapper`, `mission-gap` | `gsd-customer-context-mapper` then `gsd-mission-gap-analyst` |
-| `discuss-phase.md` | During context gathering | `discuss-intel` | INT-aware questioning, classification-ceiling assumption surfacing (delegates to per-INT researchers as needed) |
-| `plan-phase.md` (research stage) | Replaces or augments stock researcher | `int-research` | Per-INT researcher(s) selected by phase scope; `gsd-all-source-researcher` for multi-INT |
+| `discuss-phase.md` | After stock context gathering | `discuss-intel` | Stock GSD discuss-phase runs first; gate then *adds* INT-aware follow-up questions and surfaces classification-ceiling assumptions (delegates to per-INT researchers as needed). Stock questioning is never skipped or replaced. |
+| `plan-phase.md` (research stage) | After stock researcher completes | `int-research` | Per-INT researcher(s) selected by phase scope run *alongside* stock `gsd-research-synthesizer` (never instead of); results merged. `gsd-all-source-researcher` for multi-INT. |
 | `plan-phase.md` (post-planner) | Pre-checker | `compliance-audit` | `gsd-itar-screener`, `gsd-privacy-reviewer` |
 | `execute-phase.md` | Per-task post-commit | (hook only) | Classification banner hook, classified-leak hook fire automatically |
 | `execute-phase.md` (post-wave) | Post-verifier | `isso-review` | `gsd-isso` review |
 | `verify-work.md` | Pre-UAT | `transition-readiness` | `gsd-transition-advisor` |
-| `secure-phase.md` | Threat model gate | `intel-threats` | Extended STRIDE with IC-flavored threats |
+| `secure-phase.md` | After stock STRIDE threat model | `intel-threats` | Stock STRIDE output is preserved; gate *appends* an IC-flavored threats addendum (insider threat, supply-chain, OPSEC for sources/methods, prompt-injection vectors specific to intel ingest). Stock STRIDE is never replaced or rewritten. |
 | `audit-milestone.md` | Periodic | `issm-review` | `gsd-issm` review + `gsd-poam-tracker` update |
 
 ### 9.4 Dispatcher Protocol
@@ -1006,6 +1006,8 @@ The installer:
 **Customer switch.** Re-running install with a different `--customer` flag is supported but rare — usually means a new instance for a new program (per §2.3 single-program-instantiation, customer is a property of the program). The installer warns on switch and prompts for confirmation.
 
 **Update propagation.** Programs update by re-running `npx @adelphi/gsd-ic@latest install`. There is no automatic update; engineers decide when to upgrade. CI on the program repo can pin to a specific version for deterministic builds.
+
+**Seamless-fork guarantee.** The install is designed so that **with every gate and hook disabled in `.planning/intel-gates.json`, the program behaves bit-for-bit identically to a stock GSD program.** The patched workflow files written by the installer are stock GSD workflows + one conditional `Skill(...)` call per insertion point (§9.1, §9.7); when the corresponding `intel-gates.json` entry is `enabled: false`, the conditional is a no-op and stock GSD code paths are taken. The IC pack adds capabilities; it never silently changes or removes stock GSD behavior. CI validates this property on every release (validator added under §12 in writing-plans: confirm `diff` between patched workflows with all gates off and stock workflows is semantically empty).
 
 ### 11.3 Adding a New Agent
 
