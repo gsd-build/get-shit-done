@@ -4863,3 +4863,7 @@ If anything in this list ends up tempting in the middle of Plan 0 execution, sto
 
 The plan's Case 2 and Case 5 fixtures wrote the completion marker as `\`## SAMPLE COMPLETE\`` inside an unquoted `<<MD` heredoc. After bash processes `\``, the file contains `` `## SAMPLE COMPLETE` `` (backtick-wrapped). The validator regex is `^##...` (no leading backtick), and the upstream GSD convention (verified against `agents/gsd-*.md` files) is the bare `## NAME COMPLETE` form. Fixture corrected to drop the backticks. Validator regex unchanged.
 
+### Task 9: docs/plans added to validator exclusion list (2026-05-06)
+
+The plan's `EXCLUDES` array did not include `docs/plans/`. The plan file itself contains the literal patterns from spec §12 row 6 inside its test-fixture heredocs (`S//NOFORN`, `TS//SI//`, `HCS-O//`, `ORCON`, `NOFORN`). Without excluding `docs/plans`, Step 5 fails on the plan's own content. Added `'docs/plans'` to EXCLUDES — same rationale as `docs/specs`/`docs/superpowers`: planning docs legitimately quote the spec patterns. No other change to validator behavior.
+
