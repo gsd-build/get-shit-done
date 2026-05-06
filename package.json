@@ -39,7 +39,7 @@
     "get-shit-done-cc": { "optional": true }
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "test": "vitest run",
@@ -53,6 +53,8 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "ws": "^8.20.0",
     "vitest": "^1.6.0"
   }
 }

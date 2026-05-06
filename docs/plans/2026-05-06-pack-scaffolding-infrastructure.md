@@ -170,7 +170,7 @@ Replace the contents of `/Users/romansky/gsd-ic/package.json` with the merged IC
     "get-shit-done-cc": { "optional": true }
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "test": "vitest run",
@@ -184,12 +184,18 @@ Replace the contents of `/Users/romansky/gsd-ic/package.json` with the merged IC
   },
   "dependencies": {},
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "ws": "^8.20.0",
     "vitest": "^1.6.0"
   }
 }
 ```
 
-**Note:** The `dependencies` field is intentionally empty; the install entry-point uses Node's stdlib only (no external deps to ship to consumers). `devDependencies` carries vitest for our test suite. If upstream sync brings new dev deps, merge them in here.
+**Note:** Two key choices in this `package.json`:
+
+1. **`dependencies` is empty.** The install entry-point uses Node's stdlib only — consumers installing `@adelphi/gsd-ic` should not pull any runtime deps from us. Keep this empty even when adding new IC pack code.
+2. **`devDependencies` includes upstream's runtime deps (`@anthropic-ai/claude-agent-sdk`, `ws`) AND our test runner (`vitest`).** The soft-fork repo contains upstream's SDK code that imports those packages; without them in `devDependencies`, `npm install` in the gsd-ic repo leaves upstream code uninstallable. They live in `devDependencies` (not `dependencies`) so consumers don't get them. Bump these versions whenever the soft-fork sync pulls in upstream package.json changes — the `tools/sync/sync-from-upstream.sh` script (Task 25) handles this automatically.
+3. **`engines.node` is `>=22.0.0`** to match upstream. Don't widen this; if upstream tightens it further, follow.
 
 - [ ] **Step 4: Write the `VERSION` file**
 
