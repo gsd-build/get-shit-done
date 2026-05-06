@@ -1,0 +1,4 @@
+---
+type: Fixed
+---
+**`/gsd-graphify build` now runs inline instead of spawning a sub-agent (#3166)** — graphify v0.7+ split the build into a fast AST-extraction phase (cached) followed by a separate clustering + report-write phase. The cached extraction phase survived sub-agent isolation, but the post-extraction phase was SIGTERM'd when the agent exited, leaving the cache populated and no `graph.json` / `graph.html` / `GRAPH_REPORT.md` artifacts written to `.planning/graphs/`. The skill now runs `graphify update .`, the three artifact copies, the snapshot, and the status report as a single foreground Bash call so the entire pipeline survives to completion. The CLI's `graphify build` pre-flight still returns `action: "spawn_agent"` so external callers and existing tests keep working. Adds a structural regression test parsing the skill's YAML frontmatter to fence against re-introducing `Task` to `allowed-tools`.
