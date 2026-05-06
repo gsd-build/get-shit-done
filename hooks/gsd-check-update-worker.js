@@ -93,6 +93,7 @@ try {
     encoding: 'utf8',
     timeout: 10000,
     windowsHide: true,
+    shell: true,
   }).trim();
 } catch (e) {}
 
