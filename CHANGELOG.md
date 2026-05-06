@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.39.1...HEAD)
 
+### Fixed
+
+- **Extended `fix-slash-commands` to cover `agents/`, `sdk/src/`, and `.clinerules`** — the fixer previously omitted these paths, leaving 8 stale `/gsd:<cmd>` references across 5 files (including the runtime agent prompt `agents/gsd-codebase-mapper.md`). All 8 references are now rewritten to the canonical `/gsd-<cmd>` form, `.ts` added to `EXTENSIONS`, a `TOP_LEVEL_FILES` constant handles non-directory targets, and a regression test guards against future regressions. (#3100)
+
 ### Feature
 
 - **Vertical MVP discovery & progress surfaces.** `/gsd new-project` now prompts the user to choose between **Vertical MVP** (each phase delivers an end-to-end user capability — recommended for new products) and **Horizontal Layers** (build complete technical layers, assemble at the end). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase. `/gsd progress` adds a user-flow status sub-block sourced from PLAN.md task names when a phase has `**Mode:** mvp`. `/gsd stats` adds a 'Phases: N total | M MVP | K standard' summary line when at least one MVP phase exists. `/gsd graphify` renders MVP-mode phase nodes with a distinct green fill (`#22c55e`) and a ` (MVP)` label suffix — two-channel signaling for color-blind and grayscale renders. Closes the umbrella PRD #2826. (#2826)

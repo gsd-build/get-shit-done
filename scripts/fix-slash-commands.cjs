@@ -18,8 +18,13 @@ const SEARCH_DIRS = [
   path.join(__dirname, '..', 'get-shit-done', 'templates'),
   path.join(__dirname, '..', 'get-shit-done', 'contexts'),
   path.join(__dirname, '..', 'commands', 'gsd'),
+  path.join(__dirname, '..', 'agents'),
+  path.join(__dirname, '..', 'sdk', 'src'),
 ];
-const EXTENSIONS = new Set(['.md', '.cjs', '.js']);
+const TOP_LEVEL_FILES = [
+  path.join(__dirname, '..', '.clinerules'),
+];
+const EXTENSIONS = new Set(['.md', '.cjs', '.js', '.ts']);
 
 function buildPattern(cmdNames) {
   // Empty input would compile `/gsd:()(?=[^a-zA-Z0-9_-]|$)/g`, which the regex
@@ -49,6 +54,19 @@ function readCmdNames() {
     .map(f => f.replace(/\.md$/, ''));
 }
 
+function processFile(filePath, cmdNames) {
+  const pattern = buildPattern(cmdNames);
+  if (!pattern) return;
+  let src;
+  try { src = fs.readFileSync(filePath, 'utf-8'); } catch { return; }
+  const replaced = transformContent(src, cmdNames);
+  if (replaced !== src) {
+    fs.writeFileSync(filePath, replaced, 'utf-8');
+    const count = (src.match(pattern) || []).length;
+    console.log(`  ${count} replacements: ${path.relative(path.join(__dirname, '..'), filePath)}`);
+  }
+}
+
 function processDir(dir, cmdNames) {
   const pattern = buildPattern(cmdNames);
   if (!pattern) return;
@@ -74,6 +92,9 @@ if (require.main === module) {
   const cmdNames = readCmdNames();
   for (const dir of SEARCH_DIRS) {
     processDir(dir, cmdNames);
+  }
+  for (const file of TOP_LEVEL_FILES) {
+    processFile(file, cmdNames);
   }
   console.log('Done.');
 }

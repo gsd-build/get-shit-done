@@ -172,7 +172,7 @@ export async function loadConfig(projectDir: string, workstream?: string): Promi
   }
 
   // Project config exists — user-level defaults are ignored (CJS parity).
-  // `buildNewProjectConfig` already baked them into config.json at /gsd:new-project.
+  // `buildNewProjectConfig` already baked them into config.json at /gsd-new-project.
   return mergeDefaults(parsed);
 }
 
