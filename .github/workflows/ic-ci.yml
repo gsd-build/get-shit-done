@@ -1,0 +1,49 @@
+name: IC pack CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validators:
+    name: Run IC pack validators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Install jq + python3
+        run: sudo apt-get update && sudo apt-get install -y jq python3
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install npm deps
+        run: npm ci || npm install
+      - name: Run all validators
+        run: bash tools/ci/_run-all.sh
+
+  validator-tests:
+    name: Run validator unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq + python3
+        run: sudo apt-get update && sudo apt-get install -y jq python3
+      - name: Run validator tests
+        run: bash tools/ci/tests/_run-all.sh
+
+  install-tests:
+    name: Run install entry-point tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install npm deps
+        run: npm ci || npm install
+      - name: Run install tests
+        run: npm run test:install
