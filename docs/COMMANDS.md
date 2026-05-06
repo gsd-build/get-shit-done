@@ -981,7 +981,7 @@ Build, query, and inspect the project knowledge graph stored in `.planning/graph
 
 | Subcommand | Description |
 |------------|-------------|
-| `build` | Build or rebuild the knowledge graph (spawns the graphify-builder agent) |
+| `build` | Build or rebuild the knowledge graph (runs `graphify update .` inline and refreshes `.planning/graphs/`) |
 | `query <term>` | Search the graph for a term |
 | `status` | Show graph freshness and statistics |
 | `diff` | Show changes since the last build |
