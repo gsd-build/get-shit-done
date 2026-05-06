@@ -1,14 +1,12 @@
 'use strict';
 
 /**
- * TDD RED — design capture for #3170 sub-enhancement 1 (commit-hash staleness).
+ * Contract for the #3170 commit-staleness signal on graphifyStatus().
  *
  * graphify v0.7+ embeds `built_at_commit` (full git HEAD) into graph.json at
- * write time. GSD currently ignores it; staleness is computed solely from file
- * mtime, which is a poor proxy for "does this graph reflect the current code."
- *
- * This file captures the proposed contract for an extension to graphifyStatus()
- * that surfaces the commit-stale signal as four new fields:
+ * write time. GSD's status used to be mtime-only, a poor proxy for "does
+ * this graph reflect the current code." This suite fences the four new
+ * fields surfaced by graphifyStatus():
  *
  *   built_at_commit  short hash from graph.built_at_commit, or null
  *   current_commit   short hash of HEAD, or null if cwd is not a git repo
@@ -19,10 +17,6 @@
  * (pre-v0.7 graph or no git), which is semantically distinct from false
  * ("known fresh"). Agents reading null should fall back to mtime; reading
  * false can confidently skip a rebuild.
- *
- * STATUS: this test file is RED until the enhancement is approved and
- * implemented. The fences here are the design contract — they should not
- * pass on main until the feature lands.
  */
 
 const { describe, test, beforeEach, afterEach } = require('node:test');
@@ -59,13 +53,7 @@ const SAMPLE_NODES = [
   { id: 'n2', label: 'B', description: '', type: 'model' },
 ];
 
-// SKIPPED until #3170 receives `approved-enhancement` and the implementation
-// lands. This file captures the design contract as failing assertions; remove
-// `.skip` in the same commit that adds the implementation to flip the suite
-// to green. Running this locally without `.skip` against current `main` will
-// produce 6 expected failures (the 4 new fields don't exist yet) and 2 passes
-// (the back-compat fences).
-describe.skip('enh-3170: graphifyStatus surfaces built_at_commit staleness', () => {
+describe('enh-3170: graphifyStatus surfaces built_at_commit staleness', () => {
   let tmpDir;
   let planningDir;
 

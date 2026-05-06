@@ -101,6 +101,16 @@ node $HOME/.claude/get-shit-done/bin/gsd-tools.cjs graphify status
 Parse the JSON output and display:
 - If `exists: false`, display the message field
 - Otherwise show last build time, node/edge/hyperedge counts, and STALE or FRESH indicator
+- If `built_at_commit` is non-null, also display a `Source commit:` line:
+  - `commit_stale === false` (rebuilt at HEAD): `Source commit: <built_at_commit> (current)`
+  - `commit_stale === true` (graph behind HEAD): `Source commit: <built_at_commit> (<commits_behind> commits behind HEAD)`
+  - `commit_stale === null` (unreachable commit / no git): `Source commit: <built_at_commit> (freshness unknown)`
+- If `built_at_commit` is null (pre-graphify-v0.7 graph), omit the source-commit line entirely — do not render "Source commit: unknown"
+
+The mtime-based STALE/FRESH flag and the commit-based `commit_stale` measure
+different things and can disagree (e.g., a CI-built graph rebuilt minutes ago
+against an old checkout reads as FRESH on mtime but `commit_stale: true`).
+Surface both so the agent can choose.
 
 **STOP** after displaying status. Do not spawn an agent.
 
