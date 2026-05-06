@@ -6,10 +6,13 @@
  * isolation SIGTERM'd the post-extraction phase (graphify v0.7+) before
  * graph.json / graph.html / GRAPH_REPORT.md were written.
  *
- * Fix: skill runs the build inline in a single foreground Bash call. The fence
- * here is *structural* — the YAML frontmatter must not list `Task` in
- * allowed-tools, and the body must not contain `Task(` invocation syntax. If a
- * future edit re-introduces either, this test fails.
+ * Fix: skill runs the build inline in a single foreground Bash call. The
+ * fence here is *structural* — the skill is parsed into (a) a YAML
+ * frontmatter map and (b) a list of fenced code blocks tagged by language.
+ * Assertions then run against those parsed structures, never against raw
+ * markdown text (per CONTRIBUTING.md no-source-grep convention). If a future
+ * edit re-introduces `Task` to allowed-tools or `Task(` invocation syntax to
+ * any code fence, this test fails.
  */
 
 const { describe, test } = require('node:test');
@@ -58,6 +61,34 @@ function parseSkillFrontmatter(text) {
   return out;
 }
 
+/**
+ * Walk markdown body line-by-line and return every fenced code block as
+ * { lang, content } records. Tracks fence state explicitly, so prose that
+ * happens to mention `Task(` or `graphify` does not appear in the parsed
+ * output. This is the structural representation the body assertions use —
+ * raw-text regex on the markdown body is the anti-pattern this replaces
+ * (per CONTRIBUTING.md "no source-grep tests" + CodeRabbit on PR #3169).
+ */
+function extractFencedBlocks(body) {
+  const lines = body.split(/\r?\n/);
+  const blocks = [];
+  let active = null;
+  for (const line of lines) {
+    const open = line.match(/^```(\S*)\s*$/);
+    if (active === null) {
+      if (open) active = { lang: open[1] || '', lines: [] };
+      continue;
+    }
+    if (line.trim() === '```') {
+      blocks.push({ lang: active.lang, content: active.lines.join('\n') });
+      active = null;
+      continue;
+    }
+    active.lines.push(line);
+  }
+  return blocks;
+}
+
 function loadSkill() {
   const content = fs.readFileSync(SKILL_PATH, 'utf8');
   const lines = content.split(/\r?\n/);
@@ -69,7 +100,11 @@ function loadSkill() {
   assert.equal(delims.length, 2, 'graphify.md must have a closed frontmatter block');
   const frontmatterText = lines.slice(delims[0] + 1, delims[1]).join('\n');
   const body = lines.slice(delims[1] + 1).join('\n');
-  return { frontmatter: parseSkillFrontmatter(frontmatterText), body };
+  return {
+    frontmatter: parseSkillFrontmatter(frontmatterText),
+    body,
+    fencedBlocks: extractFencedBlocks(body),
+  };
 }
 
 describe('bug-3166: /gsd-graphify build runs inline (no Task sub-agent)', () => {
@@ -91,20 +126,27 @@ describe('bug-3166: /gsd-graphify build runs inline (no Task sub-agent)', () => 
     assert.ok(tools.includes('Bash'), 'Bash required for inline build chain');
   });
 
-  test('skill body does not invoke Task() — agent spawn syntax', () => {
-    const { body } = loadSkill();
-    // Anchor on the call expression `Task(` so a passing reference to the
-    // string "Task" in prose doesn't false-positive.
-    assert.ok(!/\bTask\s*\(/.test(body),
-      'graphify.md body must not contain Task( invocation syntax — ' +
-      'inline build only (#3166)');
+  test('no fenced code block invokes Task() — agent spawn syntax', () => {
+    const { fencedBlocks } = loadSkill();
+    const offending = fencedBlocks.filter(b => b.content.includes('Task('));
+    assert.deepEqual(offending, [],
+      'no fenced code block in graphify.md may contain `Task(` invocation ' +
+      'syntax — sub-agent spawning truncates graphify v0.7+ post-extraction ' +
+      'phase (#3166). Prose mentioning the word "Task" is fine; only the ' +
+      'call expression inside a code block is forbidden.');
   });
 
-  test('skill body retains the inline graphify update . pipeline', () => {
-    const { body } = loadSkill();
-    assert.ok(/graphify\s+update\s+\./.test(body),
-      'skill must still invoke `graphify update .`');
-    assert.ok(/graphify build snapshot/.test(body),
-      'skill must still write the diff snapshot via gsd-tools');
+  test('a bash code block invokes the inline graphify update . pipeline', () => {
+    const { fencedBlocks } = loadSkill();
+    const bashBlocks = fencedBlocks.filter(b => b.lang === 'bash');
+    assert.ok(bashBlocks.length > 0, 'skill must contain at least one bash block');
+    assert.ok(
+      bashBlocks.some(b => b.content.includes('graphify update .')),
+      'a bash code block must invoke `graphify update .`'
+    );
+    assert.ok(
+      bashBlocks.some(b => b.content.includes('graphify build snapshot')),
+      'a bash code block must invoke `gsd-tools graphify build snapshot`'
+    );
   });
 });
