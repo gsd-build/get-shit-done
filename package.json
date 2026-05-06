@@ -1,71 +1,58 @@
 {
-  "name": "get-shit-done-cc",
-  "version": "1.39.0-rc.4",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
+  "name": "@adelphi/gsd-ic",
+  "version": "0.1.0",
+  "description": "Adelphi IC pack for the Get Shit Done framework — IC-flavored agents, hooks, skills, and tradecraft references for rapid prototyping in the intelligence community contracting space.",
+  "license": "UNLICENSED",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
   "bin": {
-    "get-shit-done-cc": "bin/install.js",
-    "gsd-sdk": "bin/gsd-sdk.js",
-    "gsd-tools": "bin/gsd-sdk.js"
+    "gsd-ic": "bin/gsd-ic-install.js"
   },
   "files": [
-    "bin",
-    "commands",
-    "get-shit-done",
-    "agents",
-    "hooks",
-    "scripts",
-    "sdk/src",
-    "sdk/prompts",
-    "sdk/dist",
-    "sdk/package.json",
-    "sdk/package-lock.json",
-    "sdk/tsconfig.json"
+    "agents/gsd-*.md",
+    "hooks/gsd-*.js",
+    "hooks/patterns/",
+    "skills/intel-coding-conventions/",
+    "skills/prototyping-discipline/",
+    "skills/classification-conventions/",
+    "skills/adelphi-house-style/",
+    "intel-refs/",
+    "config-overlays/",
+    "commands/gsd/intel-gate-*.md",
+    "bin/gsd-ic-install.js",
+    "bin/lib/gsd-ic/",
+    "tools/patch-workflows.sh",
+    "tools/ci/",
+    "workflow-patches/",
+    "references/agent-contracts.ic-pack.md",
+    "VERSION",
+    "README.md",
+    "LICENSE",
+    "docs/ic-pack/"
   ],
-  "keywords": [
-    "claude",
-    "claude-code",
-    "ai",
-    "meta-prompting",
-    "context-engineering",
-    "spec-driven-development",
-    "gemini",
-    "gemini-cli",
-    "codex",
-    "codex-cli"
-  ],
-  "author": "TÂCHES",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/gsd-build/get-shit-done.git"
+  "peerDependencies": {
+    "get-shit-done-cc": ">=1.39.0 <2.0.0"
   },
-  "homepage": "https://github.com/gsd-build/get-shit-done",
-  "bugs": {
-    "url": "https://github.com/gsd-build/get-shit-done/issues"
+  "peerDependenciesMeta": {
+    "get-shit-done-cc": { "optional": true }
   },
   "engines": {
-    "node": ">=22.0.0"
-  },
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
-    "ws": "^8.20.0"
-  },
-  "devDependencies": {
-    "c8": "^11.0.0"
+    "node": ">=20"
   },
   "scripts": {
-    "build:hooks": "node scripts/build-hooks.js",
-    "build:sdk": "cd sdk && npm ci && npm run build",
-    "check:alias-drift": "cd sdk && npm run check:alias-drift",
-    "prepublishOnly": "npm run build:hooks && npm run build:sdk",
-    "pretest": "npm run build:sdk",
-    "pretest:coverage": "npm run build:sdk",
-    "lint:descriptions": "node scripts/lint-descriptions.cjs",
-    "lint:tests": "node scripts/lint-no-source-grep.cjs",
-    "lint:changeset": "node scripts/changeset/lint.cjs",
-    "changeset": "node scripts/changeset/new.cjs",
-    "changelog:render": "node scripts/changeset/cli.cjs render",
-    "test": "node scripts/run-tests.cjs",
-    "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:install": "vitest run tests/install",
+    "test:validators": "bash tools/ci/tests/_run-all.sh",
+    "test:all": "npm run test && npm run test:validators",
+    "ci": "bash tools/ci/_run-all.sh",
+    "release": "bash tools/release/release-pack.sh",
+    "sync-upstream": "bash tools/sync/sync-from-upstream.sh"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^1.6.0"
   }
 }

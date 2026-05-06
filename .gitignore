@@ -67,3 +67,9 @@ vendor/
 tmp/
 .worktrees
 .envrc
+
+# IC pack additions
+*.tgz
+.test-tmp/
+tools/ci/tests/fixtures/_scratch/
+.npm-pack-output/
