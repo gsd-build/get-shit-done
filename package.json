@@ -44,7 +44,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:install": "vitest run tests/install",
+    "test:install": "node --test tests/install/*.test.cjs",
     "test:validators": "bash tools/ci/tests/_run-all.sh",
     "test:all": "npm run test && npm run test:validators",
     "ci": "bash tools/ci/_run-all.sh",

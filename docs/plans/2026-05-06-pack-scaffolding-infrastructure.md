@@ -3125,52 +3125,53 @@ The arg parser handles the `npx @adelphi/gsd-ic install --customer=<name> [--tar
 ```bash
 mkdir -p /Users/romansky/gsd-ic/tests/install
 cat > /Users/romansky/gsd-ic/tests/install/parse-args.test.cjs <<'EOF'
-const { describe, it, expect } = require('vitest');
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
 const { parseArgs, USAGE } = require('../../bin/lib/gsd-ic/parse-args.cjs');
 
 describe('parseArgs', () => {
   it('parses install --customer=nga', () => {
     const opts = parseArgs(['install', '--customer=nga']);
-    expect(opts.subcommand).toBe('install');
-    expect(opts.customer).toBe('nga');
-    expect(opts.target).toBe(process.cwd());
+    assert.equal(opts.subcommand, 'install');
+    assert.equal(opts.customer, 'nga');
+    assert.equal(opts.target, process.cwd());
   });
 
   it('parses --customer=<name> in any position', () => {
     const a = parseArgs(['--customer=nsa', 'install']);
-    expect(a.customer).toBe('nsa');
+    assert.equal(a.customer, 'nsa');
   });
 
   it('parses --target=<path>', () => {
     const opts = parseArgs(['install', '--customer=nga', '--target=/tmp/foo']);
-    expect(opts.target).toBe('/tmp/foo');
+    assert.equal(opts.target, '/tmp/foo');
   });
 
   it('rejects unknown subcommand', () => {
-    expect(() => parseArgs(['blammo'])).toThrow(/unknown subcommand/i);
+    assert.throws(() => parseArgs(['blammo']), /unknown subcommand/i);
   });
 
   it('requires --customer for install', () => {
-    expect(() => parseArgs(['install'])).toThrow(/--customer/);
+    assert.throws(() => parseArgs(['install']), /--customer/);
   });
 
   it('rejects unknown customer', () => {
-    expect(() => parseArgs(['install', '--customer=mars'])).toThrow(/unknown customer/i);
+    assert.throws(() => parseArgs(['install', '--customer=mars']), /unknown customer/i);
   });
 
   it('accepts each known customer name', () => {
     for (const c of ['nga', 'nsa', 'nro', 'cia', 'dia']) {
-      expect(parseArgs(['install', `--customer=${c}`]).customer).toBe(c);
+      assert.equal(parseArgs(['install', `--customer=${c}`]).customer, c);
     }
   });
 
   it('exports a USAGE string', () => {
-    expect(USAGE).toMatch(/npx @adelphi\/gsd-ic install/);
+    assert.match(USAGE, /npx @adelphi\/gsd-ic install/);
   });
 
   it('treats --help as a request to print usage and exit cleanly', () => {
     const opts = parseArgs(['--help']);
-    expect(opts.subcommand).toBe('help');
+    assert.equal(opts.subcommand, 'help');
   });
 });
 EOF
@@ -3180,7 +3181,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/parse-args.test.cjs 2>&1 | tail -20
+node --test tests/install/parse-args.test.cjs 2>&1 | tail -20
 ```
 
 Expected: ENOENT or `Cannot find module` error (parse-args.cjs not implemented yet).
@@ -3261,7 +3262,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/parse-args.test.cjs
+node --test tests/install/parse-args.test.cjs
 ```
 
 Expected: 9 tests passing.
@@ -3288,7 +3289,8 @@ Confirms the target program already has GSD installed and at a compatible versio
 
 ```bash
 cat > /Users/romansky/gsd-ic/tests/install/verify-gsd.test.cjs <<'EOF'
-const { describe, it, expect } = require('vitest');
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -3305,8 +3307,8 @@ describe('verifyGsd', () => {
     fs.mkdirSync(path.join(target, '.claude/skills/gsd-help'), { recursive: true });
     fs.writeFileSync(path.join(target, '.claude/skills/gsd-help/SKILL.md'), '');
     const r = verifyGsd({ target, gsdPinned: '1.39.0' });
-    expect(r.ok).toBe(true);
-    expect(r.detected).toBe('modern-skills');
+    assert.equal(r.ok, true);
+    assert.equal(r.detected, 'modern-skills');
   });
 
   it('returns ok=true when target has commands/gsd/ (legacy GSD)', () => {
@@ -3314,20 +3316,20 @@ describe('verifyGsd', () => {
     fs.mkdirSync(path.join(target, 'commands/gsd'), { recursive: true });
     fs.writeFileSync(path.join(target, 'commands/gsd/help.md'), '');
     const r = verifyGsd({ target, gsdPinned: '1.39.0' });
-    expect(r.ok).toBe(true);
-    expect(r.detected).toBe('legacy-commands');
+    assert.equal(r.ok, true);
+    assert.equal(r.detected, 'legacy-commands');
   });
 
   it('returns ok=false when no GSD signals found', () => {
     const target = tmp('empty');
     const r = verifyGsd({ target, gsdPinned: '1.39.0' });
-    expect(r.ok).toBe(false);
-    expect(r.reason).toMatch(/not detected/i);
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /not detected/i);
   });
 
   it('returns ok=false when target dir does not exist', () => {
     const r = verifyGsd({ target: '/path/that/does/not/exist/anywhere', gsdPinned: '1.39.0' });
-    expect(r.ok).toBe(false);
+    assert.equal(r.ok, false);
   });
 });
 EOF
@@ -3337,7 +3339,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/verify-gsd.test.cjs 2>&1 | tail -10
+node --test tests/install/verify-gsd.test.cjs 2>&1 | tail -10
 ```
 
 - [ ] **Step 3: Implement `verify-gsd.cjs`**
@@ -3407,7 +3409,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/verify-gsd.test.cjs
+node --test tests/install/verify-gsd.test.cjs
 ```
 
 Expected: 4 tests passing.
@@ -3434,7 +3436,8 @@ Copies pack content (agents, hooks, skills, intel-refs, the selected customer ov
 
 ```bash
 cat > /Users/romansky/gsd-ic/tests/install/install-pack.test.cjs <<'EOF'
-const { describe, it, expect, beforeEach } = require('vitest');
+const { describe, it, beforeEach } = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -3467,18 +3470,18 @@ describe('installPack', () => {
     const src = makeFakePackSource();
     const target = tmp('tgt');
     installPack({ packSource: src, target, customer: 'nga' });
-    expect(fs.existsSync(path.join(target, '.claude/agents/gsd-x.md'))).toBe(true);
-    expect(fs.existsSync(path.join(target, '.claude/agents/gsd-stock-keeper.md'))).toBe(false);
+    assert.equal(fs.existsSync(path.join(target, '.claude/agents/gsd-x.md')), true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/agents/gsd-stock-keeper.md')), false);
   });
 
   it('copies hooks, intel-refs, the selected overlay, and skills', () => {
     const src = makeFakePackSource();
     const target = tmp('tgt');
     installPack({ packSource: src, target, customer: 'nga' });
-    expect(fs.existsSync(path.join(target, '.claude/hooks/gsd-x.js'))).toBe(true);
-    expect(fs.existsSync(path.join(target, '.claude/intel-refs/MANIFEST.json'))).toBe(true);
-    expect(fs.existsSync(path.join(target, '.claude/config-overlays/nga/overlay.json'))).toBe(true);
-    expect(fs.existsSync(path.join(target, '.claude/skills/intel-coding-conventions/SKILL.md'))).toBe(true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/hooks/gsd-x.js')), true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/intel-refs/MANIFEST.json')), true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/config-overlays/nga/overlay.json')), true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/skills/intel-coding-conventions/SKILL.md')), true);
   });
 
   it('does NOT copy other customer overlays', () => {
@@ -3487,7 +3490,7 @@ describe('installPack', () => {
     fs.writeFileSync(path.join(src, 'config-overlays', 'nsa', 'overlay.json'), '{}');
     const target = tmp('tgt');
     installPack({ packSource: src, target, customer: 'nga' });
-    expect(fs.existsSync(path.join(target, '.claude/config-overlays/nsa'))).toBe(false);
+    assert.equal(fs.existsSync(path.join(target, '.claude/config-overlays/nsa')), false);
   });
 
   it('does not touch program-owned files in .planning/', () => {
@@ -3496,13 +3499,13 @@ describe('installPack', () => {
     fs.mkdirSync(path.join(target, '.planning'), { recursive: true });
     fs.writeFileSync(path.join(target, '.planning/intel-context.md'), 'program-specific content');
     installPack({ packSource: src, target, customer: 'nga' });
-    expect(fs.readFileSync(path.join(target, '.planning/intel-context.md'), 'utf8'))
-      .toBe('program-specific content');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/intel-context.md'), 'utf8'),
+      'program-specific content');
   });
 
   it('exports MANAGED_PATHS for documentation', () => {
-    expect(Array.isArray(MANAGED_PATHS)).toBe(true);
-    expect(MANAGED_PATHS).toContain('.claude/agents');
+    assert.equal(Array.isArray(MANAGED_PATHS), true);
+    assert.ok(MANAGED_PATHS.includes('.claude/agents'));
   });
 });
 EOF
@@ -3512,7 +3515,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/install-pack.test.cjs 2>&1 | tail -10
+node --test tests/install/install-pack.test.cjs 2>&1 | tail -10
 ```
 
 - [ ] **Step 3: Implement `install-pack.cjs`**
@@ -3659,7 +3662,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/install-pack.test.cjs
+node --test tests/install/install-pack.test.cjs
 ```
 
 Expected: 5 tests passing.
@@ -3686,7 +3689,8 @@ Reads the selected customer's `overlay.json` `agent_skills` map and merges it in
 
 ```bash
 cat > /Users/romansky/gsd-ic/tests/install/wire-overlay.test.cjs <<'EOF'
-const { describe, it, expect } = require('vitest');
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -3711,9 +3715,9 @@ describe('wireOverlay', () => {
     });
     wireOverlay({ packSource, target, customer: 'nga' });
     const cfg = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
-    expect(cfg.agent_skills['gsd-geoint-researcher']).toEqual(['.claude/skills/intel-coding-conventions']);
-    expect(cfg.__gsd_ic).toBeDefined();
-    expect(cfg.__gsd_ic.customer).toBe('nga');
+    assert.deepEqual(cfg.agent_skills['gsd-geoint-researcher'], ['.claude/skills/intel-coding-conventions']);
+    assert.notEqual(cfg.__gsd_ic, undefined);
+    assert.equal(cfg.__gsd_ic.customer, 'nga');
   });
 
   it('merges into existing .planning/config.json without disturbing other keys', () => {
@@ -3727,9 +3731,9 @@ describe('wireOverlay', () => {
     writeOverlay(packSource, 'nga', { 'gsd-geoint-researcher': ['.claude/skills/intel-coding-conventions'] });
     wireOverlay({ packSource, target, customer: 'nga' });
     const cfg = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
-    expect(cfg.workflow.auto_advance).toBe(true);
-    expect(cfg.agent_skills['gsd-planner']).toEqual(['.claude/skills/some-stock-skill']);
-    expect(cfg.agent_skills['gsd-geoint-researcher']).toEqual(['.claude/skills/intel-coding-conventions']);
+    assert.equal(cfg.workflow.auto_advance, true);
+    assert.deepEqual(cfg.agent_skills['gsd-planner'], ['.claude/skills/some-stock-skill']);
+    assert.deepEqual(cfg.agent_skills['gsd-geoint-researcher'], ['.claude/skills/intel-coding-conventions']);
   });
 
   it('replaces previously-IC-managed entries on re-install (idempotent)', () => {
@@ -3742,7 +3746,7 @@ describe('wireOverlay', () => {
     writeOverlay(packSource, 'nga', { 'gsd-geoint-researcher': ['.claude/skills/new-skill'] });
     wireOverlay({ packSource, target, customer: 'nga' });
     const cfg = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
-    expect(cfg.agent_skills['gsd-geoint-researcher']).toEqual(['.claude/skills/new-skill']);
+    assert.deepEqual(cfg.agent_skills['gsd-geoint-researcher'], ['.claude/skills/new-skill']);
   });
 
   it('records the customer + pack version in __gsd_ic metadata', () => {
@@ -3752,9 +3756,9 @@ describe('wireOverlay', () => {
     writeOverlay(packSource, 'cia', {});
     wireOverlay({ packSource, target, customer: 'cia' });
     const cfg = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
-    expect(cfg.__gsd_ic.customer).toBe('cia');
-    expect(cfg.__gsd_ic.pack_version).toBe('0.1.0');
-    expect(typeof cfg.__gsd_ic.installed_at).toBe('string');
+    assert.equal(cfg.__gsd_ic.customer, 'cia');
+    assert.equal(cfg.__gsd_ic.pack_version, '0.1.0');
+    assert.equal(typeof cfg.__gsd_ic.installed_at, 'string');
   });
 
   it('warns and prompts on customer switch (different customer than last install)', () => {
@@ -3763,14 +3767,14 @@ describe('wireOverlay', () => {
     writeOverlay(packSource, 'nga', { 'gsd-x': ['.claude/skills/y'] });
     wireOverlay({ packSource, target, customer: 'nga' });
     writeOverlay(packSource, 'nsa', { 'gsd-x': ['.claude/skills/z'] });
-    expect(() =>
-      wireOverlay({ packSource, target, customer: 'nsa', confirmCustomerSwitch: false })
-    ).toThrow(/customer switch/i);
+    assert.throws(() =>
+      wireOverlay({ packSource, target, customer: 'nsa', confirmCustomerSwitch: false }),
+      /customer switch/i);
     // With explicit confirmation, switch goes through.
     wireOverlay({ packSource, target, customer: 'nsa', confirmCustomerSwitch: true });
     const cfg = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
-    expect(cfg.__gsd_ic.customer).toBe('nsa');
-    expect(cfg.agent_skills['gsd-x']).toEqual(['.claude/skills/z']);
+    assert.equal(cfg.__gsd_ic.customer, 'nsa');
+    assert.deepEqual(cfg.agent_skills['gsd-x'], ['.claude/skills/z']);
   });
 });
 EOF
@@ -3780,7 +3784,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/wire-overlay.test.cjs 2>&1 | tail -10
+node --test tests/install/wire-overlay.test.cjs 2>&1 | tail -10
 ```
 
 - [ ] **Step 3: Implement `wire-overlay.cjs`**
@@ -3867,7 +3871,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/wire-overlay.test.cjs
+node --test tests/install/wire-overlay.test.cjs
 ```
 
 Expected: 5 tests passing.
@@ -3893,7 +3897,8 @@ This is an integration test that exercises `installPack` + `wireOverlay` togethe
 
 ```bash
 cat > /Users/romansky/gsd-ic/tests/install/idempotency.test.cjs <<'EOF'
-const { describe, it, expect } = require('vitest');
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -3952,10 +3957,10 @@ describe('install idempotency', () => {
     const cfg2 = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
     cfg1.__gsd_ic.installed_at = '<TS>';
     cfg2.__gsd_ic.installed_at = '<TS>';
-    expect(cfg1).toEqual(cfg2);
+    assert.deepEqual(cfg1, cfg2);
 
     // File set should be identical between runs.
-    expect(after1.map((f) => f.rel)).toEqual(after2.map((f) => f.rel));
+    assert.deepEqual(after1.map((f) => f.rel), after2.map((f) => f.rel));
   });
 
   it('preserves program-owned files across re-install', () => {
@@ -3969,16 +3974,16 @@ describe('install idempotency', () => {
     installPack({ packSource, target, customer: 'nga' });
     wireOverlay({ packSource, target, customer: 'nga' });
 
-    expect(fs.readFileSync(path.join(target, '.planning/intel-context.md'), 'utf8')).toBe('PROGRAM CONTEXT');
-    expect(fs.readFileSync(path.join(target, '.planning/audit.md'), 'utf8')).toBe('AUDIT LOG');
-    expect(fs.readFileSync(path.join(target, '.planning/decisions/2026-05-06-x.md'), 'utf8')).toBe('DECISION');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/intel-context.md'), 'utf8'), 'PROGRAM CONTEXT');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/audit.md'), 'utf8'), 'AUDIT LOG');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/decisions/2026-05-06-x.md'), 'utf8'), 'DECISION');
 
     installPack({ packSource, target, customer: 'nga' });
     wireOverlay({ packSource, target, customer: 'nga' });
 
-    expect(fs.readFileSync(path.join(target, '.planning/intel-context.md'), 'utf8')).toBe('PROGRAM CONTEXT');
-    expect(fs.readFileSync(path.join(target, '.planning/audit.md'), 'utf8')).toBe('AUDIT LOG');
-    expect(fs.readFileSync(path.join(target, '.planning/decisions/2026-05-06-x.md'), 'utf8')).toBe('DECISION');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/intel-context.md'), 'utf8'), 'PROGRAM CONTEXT');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/audit.md'), 'utf8'), 'AUDIT LOG');
+    assert.equal(fs.readFileSync(path.join(target, '.planning/decisions/2026-05-06-x.md'), 'utf8'), 'DECISION');
   });
 });
 EOF
@@ -3988,7 +3993,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/idempotency.test.cjs
+node --test tests/install/idempotency.test.cjs
 ```
 
 Expected: 2 tests passing (no implementation step — this test exercises modules from Tasks 20 and 21).
@@ -4015,7 +4020,8 @@ The shim that npm runs when a consumer invokes `npx @adelphi/gsd-ic install --cu
 
 ```bash
 cat > /Users/romansky/gsd-ic/tests/install/end-to-end.test.cjs <<'EOF'
-const { describe, it, expect } = require('vitest');
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -4044,31 +4050,31 @@ function runInstall(args, opts = {}) {
 describe('end-to-end install', () => {
   it('--help prints usage and exits 0', () => {
     const out = runInstall(['--help']);
-    expect(out).toMatch(/npx @adelphi\/gsd-ic install/);
+    assert.match(out, /npx @adelphi\/gsd-ic install/);
   });
 
   it('errors clearly when GSD is not installed in target', () => {
     const target = tmp('no-gsd');
-    expect(() => runInstall(['install', '--customer=nga', `--target=${target}`])).toThrow(/GSD not detected/);
+    assert.throws(() => runInstall(['install', '--customer=nga', `--target=${target}`]), /GSD not detected/);
   });
 
   it('happy path: install --customer=nga produces the expected file tree', () => {
     const target = tmp('happy');
     setupFakeGsdInstall(target);
     const out = runInstall(['install', '--customer=nga', `--target=${target}`]);
-    expect(out).toMatch(/install complete/i);
+    assert.match(out, /install complete/i);
     // managed paths exist (manifest copied)
-    expect(fs.existsSync(path.join(target, '.claude/intel-refs/MANIFEST.json'))).toBe(true);
+    assert.equal(fs.existsSync(path.join(target, '.claude/intel-refs/MANIFEST.json')), true);
     // config.json was created/wired
     const cfg = JSON.parse(fs.readFileSync(path.join(target, '.planning/config.json'), 'utf8'));
-    expect(cfg.__gsd_ic.customer).toBe('nga');
+    assert.equal(cfg.__gsd_ic.customer, 'nga');
   });
 
   it('errors on customer switch without --confirm-customer-switch', () => {
     const target = tmp('switch');
     setupFakeGsdInstall(target);
     runInstall(['install', '--customer=nga', `--target=${target}`]);
-    expect(() => runInstall(['install', '--customer=nsa', `--target=${target}`])).toThrow(/customer switch/i);
+    assert.throws(() => runInstall(['install', '--customer=nsa', `--target=${target}`]), /customer switch/i);
   });
 });
 EOF
@@ -4078,7 +4084,7 @@ EOF
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/end-to-end.test.cjs 2>&1 | tail -10
+node --test tests/install/end-to-end.test.cjs 2>&1 | tail -10
 ```
 
 - [ ] **Step 3: Implement `bin/gsd-ic-install.js`**
@@ -4159,7 +4165,7 @@ chmod +x /Users/romansky/gsd-ic/bin/gsd-ic-install.js
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install/end-to-end.test.cjs
+node --test tests/install/end-to-end.test.cjs
 ```
 
 Expected: 4 tests passing. (If "GSD not detected" assertion fails, double-check `setupFakeGsdInstall` writes `.claude/skills/gsd-help/SKILL.md` with the `gsd-` prefix exactly.)
@@ -4168,7 +4174,7 @@ Expected: 4 tests passing. (If "GSD not detected" assertion fails, double-check 
 
 ```bash
 cd /Users/romansky/gsd-ic
-npx vitest run tests/install
+node --test tests/install/*.test.cjs
 ```
 
 Expected: all 25 tests across the 5 install test files pass.
@@ -4874,4 +4880,8 @@ The plan's denylist included `'^commands/(?!gsd/intel-gate-)'`. That's PCRE nega
 ### Task 24: executed before Task 17 (2026-05-06)
 
 The plan orders Task 24 after Tasks 17–23. But Task 17 (master runner) expects all validators to pass against the live repo, and `validate-workflow-patches.sh`/`validate-seamless-fork.sh` both require `tools/patch-workflows.sh` to exist. Task 24 was therefore executed early, before Task 17, to satisfy the dependency. No content change to Task 24 itself — only execution order.
+
+### Plan-wide: install tests use node:test, not vitest (2026-05-06)
+
+Tasks 18-23 originally specified `vitest` for install tests with `.test.cjs` files. Vitest 1.6's `index.cjs` throws on direct `require('vitest')` — it's intended to be loaded only through vitest's own runner. The fix would require modifying upstream-owned `vitest.config.ts` (adding `globals: true` + a CJS shim), which violates the seamless-fork constraint (plan §"Seamless-fork guarantee" line 15). Switched to Node's built-in `node:test` runner instead: built into Node 20+ (already our `engines` floor), native CJS support, zero upstream impact, and no fragile shim. Test patterns converted: `expect(x).toBe(y)` → `assert.equal(x, y)`, `expect(...).toMatch(...)` → `assert.match(...)`, `expect(() => ...).toThrow(...)` → `assert.throws(() => ..., ...)`. Command runner: `node --test tests/install/<file>.test.cjs`. Production module code (verify-gsd, install-pack, wire-overlay, parse-args, gsd-ic-install) is unchanged — only test files and package.json's test:install script are affected.
 
