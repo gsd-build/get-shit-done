@@ -4867,3 +4867,7 @@ The plan's Case 2 and Case 5 fixtures wrote the completion marker as `\`## SAMPL
 
 The plan's `EXCLUDES` array did not include `docs/plans/`. The plan file itself contains the literal patterns from spec §12 row 6 inside its test-fixture heredocs (`S//NOFORN`, `TS//SI//`, `HCS-O//`, `ORCON`, `NOFORN`). Without excluding `docs/plans`, Step 5 fails on the plan's own content. Added `'docs/plans'` to EXCLUDES — same rationale as `docs/specs`/`docs/superpowers`: planning docs legitimately quote the spec patterns. No other change to validator behavior.
 
+### Task 16: PCRE negative-lookahead replaced with POSIX special-case (2026-05-06)
+
+The plan's denylist included `'^commands/(?!gsd/intel-gate-)'`. That's PCRE negative-lookahead syntax; `grep -E` (POSIX ERE) doesn't support `(?!...)`. The entry silently never matched (or errored under `ugrep`), so any `commands/*` entry slipped through. Replaced with an explicit `if [[ "$path" =~ ^commands/ ]] && ! [[ "$path" =~ ^commands/gsd/intel-gate- ]]` special-case before the denylist loop. Same intended semantics, POSIX-compatible.
+
