@@ -149,8 +149,8 @@ describe('bug-3166: /gsd-graphify build runs inline (no Task sub-agent)', () => 
       'a bash code block must invoke `graphify update .`'
     );
     assert.ok(
-      bashBlocks.some(b => b.content.includes('graphify build snapshot')),
-      'a bash code block must invoke `gsd-tools graphify build snapshot`'
+      bashBlocks.some(b => /gsd-tools\.cjs["']?\s+graphify build snapshot/.test(b.content)),
+      'a bash code block must invoke `gsd-tools.cjs graphify build snapshot`'
     );
   });
 });
