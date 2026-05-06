@@ -4855,3 +4855,11 @@ These items are **not** in Plan 0 and belong to subsequent plans. Listed here so
 
 If anything in this list ends up tempting in the middle of Plan 0 execution, stop and surface it — it likely belongs in a follow-up plan, not here.
 
+---
+
+## Deviations from plan during execution
+
+### Task 7: completion-marker fixture corrected (2026-05-06)
+
+The plan's Case 2 and Case 5 fixtures wrote the completion marker as `\`## SAMPLE COMPLETE\`` inside an unquoted `<<MD` heredoc. After bash processes `\``, the file contains `` `## SAMPLE COMPLETE` `` (backtick-wrapped). The validator regex is `^##...` (no leading backtick), and the upstream GSD convention (verified against `agents/gsd-*.md` files) is the bare `## NAME COMPLETE` form. Fixture corrected to drop the backticks. Validator regex unchanged.
+
