@@ -13,7 +13,7 @@
 
 ## 1. Executive Summary
 
-The IC Agent Pack is a soft-fork extension of GSD that adds **58 specialized agents, 3 deterministic hooks, and 5 behavioral skills** to enable rapid prototyping of any IC-shaped software application.
+The IC Agent Pack is a soft-fork extension of GSD that adds **58 specialized agents, 3 deterministic hooks, and 4 behavioral skills** to enable rapid prototyping of any IC-shaped software application. It is distributed as an npm package (`@adelphi/gsd-ic`) and installed per program via `npx @adelphi/gsd-ic install` (see §11.2). Each program instance serves exactly one customer/AO (see §2.3).
 
 The framework's north star is **first to demo, with full government-contracting administrative coverage** — the working prototype lands in front of the customer fast, and the contracting paperwork (SoW decomposition, CDRL mapping, capability statements, white papers, ATO drafts, ITAR / privacy / CMMC posture) lands alongside it. A demo without the paperwork loses the follow-on; the paperwork without the demo never gets read. Both are first-class deliverables.
 
@@ -59,7 +59,8 @@ The design optimizes three goals simultaneously:
 - All reference content is sourced from public/open-source IC-flavored knowledge (published doctrine, open standards, published tradecraft principles) plus company-IP unclassified material.
 - Customer-sensitive program details are not in the framework repo; they live in per-program `.planning/intel-context.md` files in customer projects.
 - **Staffing model assumption.** The framework assumes ≥ 2 engineers maintaining the reference library and ≥ 1 SME assigned per primary INT discipline (HUMINT, GEOINT, SIGINT, OSINT, MASINT, CYBINT, FININT). Without this minimum, references decay and the per-INT researcher agents lose accuracy. Customers and programs that don't have SME coverage in a given INT must source it before deploying agents in that discipline.
-- **Per-program isolation.** Per-program `.planning/` directories must not cross-contaminate. The framework enforces no shared state across programs at the file-system layer; cross-program artifact reuse is an explicit copy operation initiated by an engineer, not implicit. CI checks for cross-program path leaks.
+- **Single-program instantiation.** GSD-IC is installed *per program* as a tool (npm package, npx invocation — see §11.2). Each program runs its own GSD-IC instance in its own repo; the framework is not configured for multi-tenancy within a single repo. A program serving multiple customers is not supported in v1 (one program = one customer). If multiple AOs need their own prototype, they get their own program and their own GSD-IC instance.
+- **Per-program isolation.** Because each program has its own GSD-IC instance, isolation is enforced at the filesystem boundary (separate repos), not within a shared repo. Artifact reuse across programs is an inter-repo copy operation initiated explicitly by an engineer (not via in-framework logic in v1) — out of scope for the v1 framework, handled procedurally.
 
 ---
 
@@ -76,7 +77,7 @@ The design optimizes three goals simultaneously:
 
 ### 3.2 Multi-AO support
 
-Most prototypes target a single AO (NGA, NSA, NRO, CIA, DIA, or another customer). **Multi-AO prototypes are rare and handled ad hoc.** The default design assumes single-AO per program; `gsd-customer-context-mapper` writes one AO per `.planning/intel-context.md`. When a multi-AO prototype is genuinely required, an engineer manually composes overlays from `config-overlays/{nga,nsa,...}/` for the relevant AOs in that program's `agent_skills` map.
+Per the §2.3 single-program-instantiation constraint, every GSD-IC instance serves exactly one customer/AO. `gsd-customer-context-mapper` writes one AO per `.planning/intel-context.md`. **Multi-AO prototypes are out of scope at the framework level**: if a single capability needs to be demoed to multiple AOs, that's handled by spinning up a separate GSD-IC instance per AO (separate program repos, separate `.planning/`, separate customer overlay selected at install). This keeps the runtime architecture simple and isolation absolute.
 
 ### 3.3 Eventual transition target (relevant for design choices)
 
@@ -97,19 +98,20 @@ The framework runs entirely on the dev environment. Transition-target awareness 
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ Layer 5: Per-program project context                           │
+│ Layer 5: Program project context (this instance)               │
 │   .planning/intel-context.md (customer, mission, ceiling, etc.)│
+│   (one program per GSD-IC instance — see §2.3)                 │
 └────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────────────────────────────────────────┐
-│ Layer 4: Per-customer skill overlays                           │
-│   config-overlays/{nga,nsa,nro,cia,dia,...}/                   │
-│   (injected via agent_skills config per-program)               │
+│ Layer 4: Customer skill overlay (one active per instance)      │
+│   config-overlays/{nga,nsa,nro,cia,dia,...}/  (catalog)        │
+│   exactly one selected at install time and wired into          │
+│   agent_skills — no runtime composition, no precedence logic   │
 └────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────────────────────────────────────────┐
 │ Layer 3: Skills (4)                                            │
 │   skills/{intel-coding-conventions, prototyping-discipline,    │
-│   classification-conventions, cross-program-reuse,             │
-│   adelphi-house-style}/                                        │
+│   classification-conventions, adelphi-house-style}/            │
 │   (injected into stock + custom agents at spawn)               │
 └────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────────────────────────────────────────┐
@@ -118,7 +120,7 @@ The framework runs entirely on the dev environment. Transition-target awareness 
 │   (lazy-loaded by agents based on phase scope)                 │
 └────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────────────────────────────────────────┐
-│ Layer 1: Thin agent files (45)                                 │
+│ Layer 1: Thin agent files (58)                                 │
 │   agents/gsd-*.md                                              │
 │   (frontmatter + role + execution flow + completion marker)    │
 └────────────────────────────────────────────────────────────────┘
@@ -144,10 +146,10 @@ CI/validation is shown as a cross-cutting concern beneath the layered stack — 
 2. **Manifest-driven references.** Agents read `intel-refs/MANIFEST.json` at startup, match phase scope keywords against `applies_when` tags, lazy-load only relevant references. Adding a new reference = new file + manifest entry; no agent edits.
 3. **Skill injection for behavioral overlay.** Bend stock GSD agents (executor, planner, debugger, eval-planner) without forking them via `.planning/config.json`'s `agent_skills` map.
 4. **Hooks for deterministic always-on work.** Zero LLM tokens for banner stamping, leak detection, prompt-injection scanning.
-5. **Per-customer overlays + per-program project context.** Customer-specific knowledge (NGA flavor vs. NSA flavor) lives in `config-overlays/`. Per-project specifics in `.planning/intel-context.md`.
+5. **Customer overlay catalog + per-program project context.** Customer-specific knowledge (NGA flavor vs. NSA flavor) lives in `config-overlays/` as a distributed catalog. **Exactly one overlay is selected at install time** for the instance's program (one program = one customer per §2.3); program-specific specifics live in `.planning/intel-context.md`. No runtime overlay composition.
 6. **User-declared classification.** No agent ever determines classification. Files declare via frontmatter or comment header (see §4.5).
 7. **Soft fork with config-driven gate hooks.** Workflow modifications use one conditional `Skill(...)` call per insertion point; disabling all gates restores stock behavior exactly. Minimizes upstream merge conflicts.
-8. **Per-program isolation.** Per-program `.planning/` directories never share state across programs. Cross-program artifact reuse is an explicit copy operation, not implicit retrieval. Validators in §12 actively check for cross-program path leaks. This is what enables medium-scale concurrent program operation without state collisions.
+8. **Single-program-per-instance isolation.** Each GSD-IC instance serves exactly one program. Isolation is enforced at the filesystem boundary — separate program repos, separate `.planning/`, separate npm install. There is no within-repo cross-program logic to validate. Cross-program artifact reuse, if needed, is a procedural inter-repo copy by an engineer (out of v1 framework scope).
 
 ### 4.3 Single-responsibility per agent
 
@@ -315,7 +317,7 @@ Each agent's row lists role, primary inputs, primary outputs, completion marker,
 | 28 | `gsd-rfi-analyst` | RFI/RFP intake → prototype scope + win themes. Consumes per-program win-theme library at `.planning/win-themes.md`. | RFI/RFP doc, capability statement library, `.planning/win-themes.md` | `.planning/captures/{date}-{name}-RFI-ANALYSIS.md` | `## RFI ANALYSIS COMPLETE` | Read, Write, Bash, Grep, Glob | ecosystem |
 | 29 | `gsd-capability-statement-generator` | "What do you have on X?" — short on-demand response | Capability list, narrative blocks, target topic, past-performance entries from `gsd-past-performance-manager` (#30) | `.planning/capabilities/{topic}-STATEMENT.md` | `## CAPABILITY STATEMENT COMPLETE` | Read, Write, Bash, Grep, Glob | ecosystem |
 | 30 | `gsd-proposal-drafter` | Formal FAR 15 / OT contract response. **Drafts the full proposal — all written volumes (technical, management, past performance) plus a cost basis with stated assumptions.** Humans review and finalize cost figures; agent does not finalize numbers, only proposes them with documented assumptions. | RFP, narrative blocks (all three audience variants from #26), technical approach, past performance from #30, win themes | `.planning/proposals/{name}/{volume}.md` (one file per volume) | `## PROPOSAL DRAFT COMPLETE` | Read, Write, Bash, Grep, Glob | ecosystem |
-| 31 | `gsd-past-performance-manager` | **Per-program tracker** of delivered prototypes, customer feedback, lessons-learned, and citation-ready accomplishments. Output is the source of truth that `gsd-capability-statement-generator` (#28) and `gsd-proposal-drafter` (#29) consume for "we did X for customer Y" claims. Per-program scoped per the "not a corporate KB" non-goal; cross-program reuse via the cross-program-reuse skill (§7). | This program's SUMMARY.md files, AAR archives, customer references, milestone briefs | `.planning/past-performance/PP-LOG.md` (chronological); `.planning/past-performance/CITATIONS.md` (claim-by-claim) | `## PP UPDATE COMPLETE` | Read, Write, Bash, Grep, Glob | ecosystem |
+| 31 | `gsd-past-performance-manager` | **Per-program tracker** of delivered prototypes, customer feedback, lessons-learned, and citation-ready accomplishments. Output is the source of truth that `gsd-capability-statement-generator` (#28) and `gsd-proposal-drafter` (#29) consume for "we did X for customer Y" claims. Per-program scoped per the "not a corporate KB" non-goal *and* the §2.3 single-program-instantiation constraint. Reuse of past-performance content across programs is a procedural inter-repo copy by an engineer (not framework-mediated in v1). | This program's SUMMARY.md files, AAR archives, customer references, milestone briefs | `.planning/past-performance/PP-LOG.md` (chronological); `.planning/past-performance/CITATIONS.md` (claim-by-claim) | `## PP UPDATE COMPLETE` | Read, Write, Bash, Grep, Glob | ecosystem |
 
 ### Family H — Mission & Prototype Design (4 agents)
 
@@ -402,7 +404,7 @@ Hooks are deterministic scripts registered in the host runtime's settings to fir
 - **Bash / POSIX shell (`.sh`)** — for simple deterministic checks (single regex, file-presence, command-runs).
 - **Python (`.py`)** — only when explicit need arises (complex regex, ML-adjacent pattern detection); not used in v1.
 
-**Installation: per-project.** Hooks are installed into each program's `.claude/hooks/` (or runtime equivalent) via `tools/install-pack.sh`. This supports per-program activation, where a specific program may need a hook disabled (e.g., a leak-detector that conflicts with that program's local conventions). Engineers activate per-program rather than relying on a global install.
+**Installation: per-project.** Hooks are installed into each program's `.claude/hooks/` (or runtime equivalent) by the npm installer (`npx @adelphi/gsd-ic install`, see §11.2) — they ride along with the rest of the pack. This supports per-program activation, where a specific program may need a hook disabled (e.g., a leak-detector that conflicts with that program's local conventions); disabling is per-program in `.planning/intel-gates.json` rather than via a global toggle.
 
 **Default failure mode: all advisory.** All three hooks emit warnings (stderr / status output) but never block writes by default. `.planning/intel-gates.json` allows per-hook `block_on_match: true` to upgrade to blocking when a program demands it.
 
@@ -438,7 +440,7 @@ Hooks are deterministic scripts registered in the host runtime's settings to fir
 
 ---
 
-## 7. Skills (5)
+## 7. Skills (4)
 
 Skills are reference content injected into agents via `.planning/config.json`'s `agent_skills` map. They modify agent behavior without forking agent source.
 
@@ -482,15 +484,7 @@ Skills are not explicitly versioned. Stock GSD pattern is followed: each `SKILL.
 | **Content outline** | "Always declare classification in frontmatter/header when creating a file. Default declaration is UNCLASSIFIED unless explicitly told otherwise. Never auto-determine. Commit subjects prefixed `[U]`. If user explicitly directs CUI handling, FLAG and require human authorization before applying." |
 | **Activation** | Always active when injected |
 
-### 7.4 `skills/cross-program-reuse/SKILL.md`
-
-| Field | Value |
-|---|---|
-| **Injected into** | `gsd-executor`, optionally on-demand into any agent that needs to copy artifacts between programs |
-| **Content outline** | Procedure for explicit copy of artifacts (narrative blocks, demo scripts, capability statements) between programs. Steps: (1) confirm source artifact's classification ≤ target program's ceiling; (2) copy with new file path; (3) re-stamp classification banner per target program's `intel-context.md`; (4) append entries to BOTH programs' `.planning/audit.md` logs documenting the copy with source/target paths and rationale; (5) note in target's commit message that artifact is reused (`docs(reuse): copy <artifact> from <program> [U]`). Never an implicit operation — always engineer-initiated. |
-| **Activation** | Only when injected on-demand for a specific reuse operation |
-
-### 7.5 `skills/adelphi-house-style/SKILL.md`
+### 7.4 `skills/adelphi-house-style/SKILL.md`
 
 | Field | Value |
 |---|---|
@@ -598,15 +592,17 @@ intel-refs/
 
 Each reference doc starts with frontmatter declaring its classification, owner, and last-reviewed date. Body content is the actual reference material.
 
-### 8.3 Per-Customer Overlay Structure
+### 8.3 Customer Overlay Structure (catalog; exactly one selected per instance)
+
+`config-overlays/` ships as a **catalog** of customer-specific overlays in the gsd-ic distribution. At install time (§11.2), the consumer selects exactly one overlay for the instance's program; that overlay is wired into the per-program `agent_skills` config. There is no runtime composition or precedence logic.
 
 ```
-config-overlays/
-├── README.md          ← onboarding doc for adding a new customer
+config-overlays/                    ← shipped in the npm package
+├── README.md                       ← onboarding doc for adding a new customer to the catalog
 ├── nga/
-│   ├── overlay.json   ← agent_skills overlay map
-│   ├── overlay.md     ← human-readable customer notes (UNCLASSIFIED)
-│   └── refs/          ← customer-specific reference doc additions
+│   ├── overlay.json                ← agent_skills overlay map
+│   ├── overlay.md                  ← human-readable customer notes (UNCLASSIFIED)
+│   └── refs/                       ← customer-specific reference doc additions
 ├── nsa/
 ├── nro/
 ├── cia/
@@ -614,7 +610,7 @@ config-overlays/
 └── ...
 ```
 
-`overlay.json` example:
+`overlay.json` example (the one selected by the consumer at install time):
 ```json
 {
   "customer": "nga",
@@ -629,6 +625,8 @@ config-overlays/
   }
 }
 ```
+
+Selection at install: `npx @adelphi/gsd-ic@latest install --customer=nga` (see §11.2). Switching customer = re-running install with a different `--customer` flag (rare; usually means a new instance for a new program).
 
 ### 8.4 Per-Program Project Context (`.planning/intel-context.md`)
 
@@ -790,17 +788,7 @@ Trigger strings (e.g., `plan-phase.research-stage`) follow the convention `<work
 
 When upstream renames a workflow step, CI catches the dangling trigger reference and fails the upstream-sync until intel-gates.json is updated.
 
-### 9.7 Per-customer overlay precedence
-
-When two customer overlays both apply (rare multi-AO case where a program targets >1 customer), they compose by **first-wins**:
-
-- Order is the order overlays appear in the program's `agent_skills` config (e.g., `["config-overlays/nga", "config-overlays/nro"]`).
-- The first overlay's content takes precedence.
-- Later overlays supplement only where the first is silent.
-
-This forces engineers to intentionally rank customers when running multi-AO. CI does not warn on multi-overlay; the first-wins rule is deterministic and engineer-controlled.
-
-### 9.8 Workflow patch storage
+### 9.7 Workflow patch storage
 
 Workflow patches (modifications to stock GSD workflow files for the gate-hook insertion points) are stored as **a script-driven set of edits**, not as static `.diff` files:
 
@@ -812,7 +800,7 @@ The script applies edits programmatically (via `sed` / `awk` / structured `jq` o
 
 Engineers update the script when upstream restructures invalidate an edit; the diff for review is the script change, not a regenerated `.diff` file.
 
-### 9.9 Conflict Minimization Strategy
+### 9.8 Conflict Minimization Strategy
 
 - Each insertion point modifies at most one line of stock workflow content (the conditional `Skill(...)` call).
 - Disabling all gates restores stock behavior exactly. Upstream merges only conflict on the small set of touched lines.
@@ -823,8 +811,9 @@ Engineers update the script when upstream restructures invalidate an edit; the d
 ## 10. Repo Layout
 
 ```
-/Users/romansky/gsd-ic/                ← soft fork of canonical GSD
-├── agents/                            ← 45 custom agents alongside the stock 33
+/Users/romansky/gsd-ic/                ← soft fork of canonical GSD (dev repo);
+                                       ← npm publish ships pack-only content (§11.2)
+├── agents/                            ← 58 custom agents alongside the stock 33
 │   ├── gsd-rmf-control-mapper.md
 │   ├── gsd-itar-screener.md
 │   ├── gsd-isso.md
@@ -850,9 +839,8 @@ Engineers update the script when upstream restructures invalidate an edit; the d
 │   ├── intel-coding-conventions/
 │   ├── prototyping-discipline/
 │   ├── classification-conventions/
-│   ├── cross-program-reuse/
 │   └── adelphi-house-style/
-├── config-overlays/                   ← Layer 4 (per-customer)
+├── config-overlays/                   ← Layer 4 (catalog; one selected per instance)
 │   ├── README.md
 │   ├── nga/
 │   ├── nsa/
@@ -873,11 +861,13 @@ Engineers update the script when upstream restructures invalidate an edit; the d
 │   ├── verify-work.intel-gates.diff
 │   ├── secure-phase.intel-gates.diff
 │   └── audit-milestone.intel-gates.diff
+├── package.json                       ← npm package metadata (name: @adelphi/gsd-ic)
+├── bin/
+│   └── gsd-ic-install.js              ← entry-point invoked by `npx @adelphi/gsd-ic install`
 ├── tools/                             ← Maintenance and CI scripts (sub-organized for clarity)
-│   ├── install-pack.sh                ← installs custom artifacts into per-project .claude/ dirs
-│   ├── patch-workflows.sh             ← applies workflow gate-hook edits programmatically (§9.8)
-│   ├── reuse.sh                       ← cross-program-reuse helper (calls into the skill)
-│   ├── release-pack.sh                ← bumps pack version, tags release
+│   ├── install-pack.sh                ← legacy install helper; the npm `install` command above is canonical
+│   ├── patch-workflows.sh             ← applies workflow gate-hook edits programmatically (§9.7)
+│   ├── release-pack.sh                ← bumps pack version, tags release, runs `npm publish`
 │   ├── sync/
 │   │   └── sync-from-upstream.sh      ← merges upstream/main + reapplies workflow patches
 │   ├── ci/
@@ -898,14 +888,15 @@ Engineers update the script when upstream restructures invalidate an edit; the d
 │   ├── ic-pack/                       ← IC pack docs
 │   │   ├── README.md
 │   │   ├── ARCHITECTURE.md
-│   │   ├── QUICKSTART.md                ← 30-min path from clone to first agent invocation
-│   │   ├── PER-CUSTOMER-PLAYBOOK.md     ← onboarding a new customer (overlay setup, refs, gotchas)
+│   │   ├── QUICKSTART.md                ← 30-min path: `npx @adelphi/gsd-ic install` → first agent invocation
+│   │   ├── PER-CUSTOMER-PLAYBOOK.md     ← onboarding a new customer overlay to the catalog (refs, gotchas)
 │   │   ├── TROUBLESHOOTING.md           ← common failure modes and fixes
 │   │   ├── ADDING-AN-AGENT.md
 │   │   ├── ADDING-A-REFERENCE.md
 │   │   ├── ADDING-A-CUSTOMER-OVERLAY.md
 │   │   ├── ADDING-A-SKILL.md
-│   │   ├── UPGRADE-PROCEDURE.md
+│   │   ├── UPGRADE-PROCEDURE.md         ← dev-side: soft-fork sync from upstream gsd-build
+│   │   ├── CONSUMER-UPGRADE.md          ← consumer-side: re-running `npx ... install` to bump pack version
 │   │   └── ARCHITECTURE-DIAGRAMS/       ← rendered Mermaid diagrams (layer model, agent flows, gate dispatch)
 │   └── specs/
 │       └── 2026-05-05-ic-agent-pack-design.md   ← THIS FILE
@@ -948,23 +939,25 @@ When a program uses the IC pack, its `.planning/` directory has these IC-pack-sp
 
 ### 11.-1 Release cadence
 
-**Continuous + tagged.** Main is always releasable; explicit tagged releases happen at meaningful milestones (new agent families ship, batch of reference-doc updates, upstream-GSD-version-bump validation). Tagged releases bump the `pack` version in `VERSION` (date-shaped `YYYY.MM.N`).
+**Continuous + tagged + npm-published.** Main is always releasable; explicit tagged releases happen at meaningful milestones (new agent families ship, batch of reference-doc updates, upstream-GSD-version-bump validation). Tagged releases bump the `pack` version in `VERSION`, are git-tagged, and are published to npm as `@adelphi/gsd-ic@YYYY.MM.N` via `tools/release-pack.sh`.
 
-Engineers consuming the pack pin to a tag in their per-program install (`tools/install-pack.sh --version=YYYY.MM.N`); CI runs against the latest tag; main is the rolling integration branch where work happens.
+Programs consume the pack via npm (see §11.2). Main is the rolling integration branch where work happens; CI runs against the latest tag.
 
 ### 11.0 IC Pack version
 
 The IC pack maintains its own version, separate from but coupled to upstream GSD:
 
 - **`VERSION` file at repo root** — declares two values:
-  - `pack: YYYY.MM.N` (e.g., `2026.05.0`) — the IC pack's own release; bumped on every pack release; aligns date-shape with manifest version (§8.1).
-  - `gsd_pinned: vX.Y.Z` (e.g., `v1.40.0`) — the upstream GSD version this pack is known-compatible with; bumped on every upstream sync that has been validated against the pack.
+  - `pack: YYYY.MM.N` (e.g., `2026.05.0`) — the IC pack's own release; bumped on every pack release; aligns date-shape with manifest version (§8.1) and is mirrored into `package.json`'s `version` field on release.
+  - `gsd_pinned: vX.Y.Z` (e.g., `v1.40.0`) — the upstream GSD version this pack is known-compatible with; bumped on every upstream sync that has been validated against the pack. Mirrored into `package.json`'s `peerDependencies` so npm install in a program repo flags incompatible GSD versions.
 
-- `tools/sync-from-upstream.sh` updates `gsd_pinned` after a successful merge; `tools/release-pack.sh` bumps `pack` on a tagged release.
+- `tools/sync-from-upstream.sh` updates `gsd_pinned` after a successful merge; `tools/release-pack.sh` bumps `pack`, tags, and runs `npm publish`.
 
-- Engineers running the pack pin to a specific `pack` version via `tools/install-pack.sh --version=YYYY.MM.N`; CI uses the latest `pack` tag.
+- Programs install a specific version via `npx @adelphi/gsd-ic@YYYY.MM.N install ...` (see §11.2).
 
-### 11.1 Soft Fork Tracking Procedure
+### 11.1 Soft Fork Tracking Procedure (dev-side workflow)
+
+This is the **dev-side** maintenance workflow — how `gsd-ic` (the upstream-tracking soft-fork repo) consumes changes from `gsd-build/get-shit-done`. This is not how programs consume gsd-ic; consumer install is §11.2.
 
 ```bash
 # Pull GSD community improvements
@@ -986,33 +979,61 @@ bash /path/to/gsd-ic/tools/validate-no-classified-leak.sh
 git -C /path/to/gsd-ic push origin main
 ```
 
-### 11.2 Adding a New Agent
+### 11.2 NPM Distribution & Consumer Install
+
+**Distribution model.** GSD-IC is published to npm as `@adelphi/gsd-ic` (mirroring the upstream `get-shit-done-cc` packaging pattern). The npm package contains **pack-only content** — agents, hooks, skills, intel-refs, config-overlays, and the install entry-point `bin/gsd-ic-install.js`. The full forked GSD source tree is **not** included in the published package; the `package.json` `files` field is restricted to pack-only paths, and a CI validator (added under §12 in writing-plans) enforces this.
+
+**Consumer install (per program).** Programs install the IC pack into their existing GSD-enabled repo:
+
+```bash
+# Install latest, with customer overlay selection
+npx @adelphi/gsd-ic@latest install --customer=nga
+
+# Pin to a specific pack version
+npx @adelphi/gsd-ic@2026.05.0 install --customer=nga
+
+# Re-run to update (idempotent — overwrites managed paths only)
+npx @adelphi/gsd-ic@latest install --customer=nga
+```
+
+The installer:
+1. Verifies upstream GSD is installed and at a version compatible with `gsd_pinned` (§11.0); errors if missing or incompatible.
+2. Copies pack content into the program's `.claude/` (or runtime-equivalent) directory: agents, hooks, skills, the selected customer overlay, intel-refs, and patched workflow files.
+3. Wires the customer overlay into `.planning/config.json` `agent_skills` map.
+4. Idempotent: re-running with same `--customer` updates pack content without disturbing program-owned files (`.planning/intel-context.md`, `.planning/audit.md`, `.planning/decisions/`, etc.).
+5. **Does not** create or modify the program's `.planning/intel-context.md`; that is created by `gsd-customer-context-mapper` on first invocation.
+
+**Customer switch.** Re-running install with a different `--customer` flag is supported but rare — usually means a new instance for a new program (per §2.3 single-program-instantiation, customer is a property of the program). The installer warns on switch and prompts for confirmation.
+
+**Update propagation.** Programs update by re-running `npx @adelphi/gsd-ic@latest install`. There is no automatic update; engineers decide when to upgrade. CI on the program repo can pin to a specific version for deterministic builds.
+
+### 11.3 Adding a New Agent
 
 1. Create `agents/gsd-<name>.md` following the template in `docs/ic-pack/ADDING-AN-AGENT.md` (also Appendix A here)
 2. Register completion marker in `references/agent-contracts.md` (alongside the upstream registry)
 3. Register agent → model row in `MODEL_PROFILES` in `sdk/src/query/config-query.ts`
 4. (Optional) Register a workflow gate by editing `.planning/intel-gates.json` template; **do not edit workflow files**
-5. Run `tools/install-pack.sh` to sync into runtime dirs
+5. The agent ships in the next pack release; consumers pick it up by re-running `npx @adelphi/gsd-ic@latest install`
 6. Add a `.changeset/*.md` if the upstream `Changeset Required` CI check is enabled
 
-### 11.3 Adding a New Reference
+### 11.4 Adding a New Reference
 
 1. Write `intel-refs/<topic-area>/<name>.md` with classification frontmatter (must be `UNCLASSIFIED`)
 2. Add entry to `intel-refs/MANIFEST.json` with `applies_when`, `owner`, `last_reviewed`
 3. Run `tools/validate-manifest.sh` to confirm
-4. Commit
+4. Commit; ships with the next pack release
 
-### 11.4 Adding a New Customer Overlay
+### 11.5 Adding a New Customer Overlay (to the catalog)
 
-1. Create `config-overlays/<customer>/`
+1. Create `config-overlays/<customer>/` in the gsd-ic dev repo
 2. Drop in `overlay.json` with customer-specific `agent_skills` map
 3. (Optional) Drop customer-specific reference docs in `config-overlays/<customer>/refs/`
-4. Reference from per-program `.planning/config.json` `agent_skills`
+4. The overlay ships in the next pack release; programs select it via `--customer=<name>` at install time (§11.2)
 
-### 11.5 Adding a New Skill
+### 11.6 Adding a New Skill
 
 1. Create `skills/<skill-name>/SKILL.md` with the skill content
-2. Add to per-program `.planning/config.json` `agent_skills` map for the agents that should use it
+2. Wire it into the relevant agents' `agent_skills` defaults (in the pack's default config); programs pick it up on next install
 3. Run `tools/validate-skills.sh`
 
 ---
@@ -1046,7 +1067,7 @@ All 58 agents ship in v1; this section orders the build for fastest time-to-work
 | **1. Compliance core** | `gsd-itar-screener`, `gsd-privacy-reviewer`, `gsd-cmmc-auditor`, `gsd-rmf-control-mapper`, `gsd-fips-140-3-validator`, `gsd-sbom-generator`, `gsd-nist-800-171-auditor`, `gsd-dfars-incident-responder` | Compliance must work before custom development extends. All 8 Family A specialists + the privacy reviewer ship together so POA&M auto-population works end-to-end on first program. |
 | **2. Domain knowledge** | All 7 per-INT researchers + `gsd-all-source-researcher` + `gsd-domex-engineer` + supporting reference library | Enables domain-aware planning for any prototype |
 | **3. Mission/design** | `gsd-mission-gap-analyst`, `gsd-customer-context-mapper` (already in Phase 0), `gsd-sow-decomposer`, `gsd-mission-narrative-writer`, `gsd-capability-gap-analyst`, `gsd-fusion-architect` | Bridge from opportunity to capability |
-| **4. Customer engagement** | `gsd-capability-brief-generator`, `gsd-white-paper-drafter`, `gsd-demo-scripter`, `gsd-after-action-recorder`, `gsd-tim-facilitator`, `gsd-rfi-analyst`, `gsd-capability-statement-generator`, `gsd-proposal-drafter`, `gsd-past-performance-manager`, `prototyping-discipline` skill, `adelphi-house-style` skill, `cross-program-reuse` skill | Speed-to-demo deliverables; the demo *and* the contracting paperwork |
+| **4. Customer engagement** | `gsd-capability-brief-generator`, `gsd-white-paper-drafter`, `gsd-demo-scripter`, `gsd-after-action-recorder`, `gsd-tim-facilitator`, `gsd-rfi-analyst`, `gsd-capability-statement-generator`, `gsd-proposal-drafter`, `gsd-past-performance-manager`, `prototyping-discipline` skill, `adelphi-house-style` skill | Speed-to-demo deliverables; the demo *and* the contracting paperwork |
 | **5. Engineering enablement + mission framings** | `gsd-synthetic-data-engineer`, `gsd-intel-devops`, `gsd-stig-auditor`, `gsd-ci-analyst`, `gsd-targeting-analyst`, `gsd-insider-threat-analyst`, `gsd-adversary-modeler` | Specialty engineering and analytic roles. `gsd-stig-auditor` lives here (not Phase 1) because it depends on `gsd-intel-devops` producing IaC/container configs to audit. |
 | **6. Security personas + ATO docs + transition** | `gsd-isso`, `gsd-issm`, all Family D ATO doc specialists (SSP-drafter, POA&M-tracker, SAR-dryrun, IV&V-dryrun, ConMon-planner, IRP-author, contingency-planner, evidence-packager), `gsd-cdrl-mapper`, `gsd-milestone-brief-generator`, `gsd-transition-advisor` | Higher-level orchestrators built on top of compliance core |
 | **7. Round 4 expansion: tradecraft compliance + new INTs + always-on parallels + AI specialty** | `gsd-icd-203-enforcer`, `gsd-techint-researcher`, `gsd-medint-researcher`, `gsd-techsigint-researcher`, `gsd-tim-facilitator`, Family L always-on integration (CI / targeting / insider-threat / adversary-modeler — wiring into intel-gates.json), `gsd-ai-eval-auditor`, `gsd-fm-adaptation-engineer` | Surfaces that build on top of the foundation: analytic-quality enforcement, additional INTs, parallel mission-framing wiring, AI/ML specialty agents. These ship after Phase 6 because they consume artifacts from earlier-phase agents. |
@@ -1060,12 +1081,12 @@ All 58 agents ship in v1; this section orders the build for fastest time-to-work
 | R-01 | SME bottleneck on reference doc curation | High | High | Manifest-driven structure decouples knowledge from agents; SMEs edit Markdown without code touch. Reference owners assigned per topic; quarterly review cadence. |
 | R-02 | Upstream GSD makes incompatible workflow changes | Medium | Medium | Gate hooks minimize touch points; CI validates patches reapply cleanly; sync-from-upstream script automates re-application |
 | R-03 | Customer-sensitive content accidentally committed to framework repo | Low | High | CI `validate-no-classified-leak.sh` + `validate-classification.sh` + reference doc classification frontmatter required |
-| R-04 | Per-customer overlay drift across customers | Medium | Low | Each overlay has README; CI validates overlay schema; manifest validates customer-specific refs |
+| R-04 | Customer overlay catalog drift (overlays in the distribution become inconsistent in shape, naming, or content quality across customers) | Medium | Low | Each overlay has README; CI validates overlay schema (every overlay has `overlay.json` + `overlay.md` + optional `refs/`); manifest validates customer-specific refs. SME owners assigned per overlay; reviewed at the same cadence as their primary INT references. |
 | R-05 | Agent file size budget exceeded as references inline | Low | Medium | Manifest-driven loading prevents inline bloat; CI enforces ≤500-line agent files |
 | R-06 | Per-INT researcher knowledge insufficient depth for advanced prototypes | Medium | Medium | Per-INT split allows independent depth-of-knowledge growth; can promote to dedicated sub-discipline researcher (e.g., `gsd-imint-researcher`) when warranted |
 | R-07 | Soft fork diverges too far to merge upstream changes | Low | High | Architecture deliberately additive; only workflow patches modify stock files; quarterly upstream sync target |
 | R-08 | Hooks cause friction in dev workflow (false positives, blocking) | Medium | Low | All hooks default to advisory mode; block-on-match is opt-in per-project |
-| R-09 | `tools/patch-workflows.sh` fails unexpectedly when upstream restructures workflows | Medium | Medium | CI runs the patch script on every upstream-sync; failures gate the merge until script is updated. Script is the source of truth (§9.8). |
+| R-09 | `tools/patch-workflows.sh` fails unexpectedly when upstream restructures workflows | Medium | Medium | CI runs the patch script on every upstream-sync; failures gate the merge until script is updated. Script is the source of truth (§9.7). |
 | R-10 | Family L mission-framing analysts (always-on parallel) produce noise — engineers may start ignoring outputs | Medium | Medium | Gates can disable per-program via intel-gates.json; per-program review-threshold tuning when noise exceeds signal. SMEs review the trigger logic quarterly. |
 | R-11 | `gsd-ai-eval-auditor` "mission utility" metric defined inconsistently across programs | Medium | Low | Standardize the mission-utility metric definition in `intel-refs/ai-ml/eval-patterns.md`; auditor agent reads the standard and applies it consistently. |
 | R-12 | (mitigated by upstream architecture) Context rot — agents fill their context window | — | — | **Not a meaningful risk for this pack.** Stock GSD's fresh-context-per-agent design (each spawn gets ~200K) addresses this at the framework layer; the IC pack inherits the mitigation. Listed here for completeness, not as an open risk. |
@@ -1096,10 +1117,12 @@ Before any program can adopt, SMEs need to have curated the relevant `intel-refs
 
 - `docs/ic-pack/README.md` — what this is, when to use
 - `docs/ic-pack/ARCHITECTURE.md` — layered architecture explanation (subset of this spec)
-- `docs/ic-pack/ADDING-AN-AGENT.md` — how to add a new agent
-- `docs/ic-pack/ADDING-A-REFERENCE.md` — how to add a new reference doc
-- `docs/ic-pack/ADDING-A-CUSTOMER-OVERLAY.md` — onboarding a new customer
-- `docs/ic-pack/UPGRADE-PROCEDURE.md` — soft-fork upstream sync
+- `docs/ic-pack/QUICKSTART.md` — consumer-side: `npx @adelphi/gsd-ic install` to first agent invocation (30-min path)
+- `docs/ic-pack/ADDING-AN-AGENT.md` — how to add a new agent (dev-side, contributing to the pack)
+- `docs/ic-pack/ADDING-A-REFERENCE.md` — how to add a new reference doc (dev-side)
+- `docs/ic-pack/ADDING-A-CUSTOMER-OVERLAY.md` — adding a customer overlay to the catalog (dev-side)
+- `docs/ic-pack/UPGRADE-PROCEDURE.md` — dev-side soft-fork upstream sync (gsd-ic ↔ gsd-build)
+- `docs/ic-pack/CONSUMER-UPGRADE.md` — consumer-side: how a program updates its installed pack version (`npx ... install`)
 
 ### 15.3 Training
 
@@ -1117,11 +1140,12 @@ The following decisions are deferred to the implementation plan (writing-plans o
 |---|---|---|
 | O-01 | Exact frontmatter schema for `intel-refs/*.md` files (free-form text vs. structured sections beyond the manifest fields) | Decide in writing-plans Phase 0 |
 | O-02 | ~~Which `Trigger` strings the gate dispatcher recognizes — full enumeration~~ | **Resolved by §9.6** — vocabulary is open-ended; CI validates each trigger resolves to a real workflow step |
-| O-03 | ~~Per-customer overlay precedence rules when overlays conflict~~ | **Resolved by §9.7** — first-wins ordering by position in `agent_skills` config |
+| O-03 | ~~Per-customer overlay precedence rules when overlays conflict~~ | **Resolved by §2.3 single-program-instantiation constraint** — one program = one customer per instance; only one overlay active per instance; the former §9.7 "Per-customer overlay precedence" subsection was removed in the post-review revision and §9.8/§9.9 were renumbered up to §9.7/§9.8 |
 | O-04 | ~~Whether `gsd-intel-devops` should produce IaC stubs or only review them~~ | **Resolved by Round 4** — full implementation across 4 AWS service catalogs; produces IaC, CI/CD configs, hardening guidance |
 | O-05 | Posture-escalation flow specifics if/when CUI handling is later required (out of v1 scope) | Future v2 |
 | O-06 | ~~Whether the gate dispatcher should support agent fan-out + result-merge for parallel execution within a gate~~ | **Resolved by Family L always-on parallel decision (Round 4)** — gate dispatcher fans out to multiple agents in parallel; results collected and routed back to caller |
 | O-07 | Specific `applies_when` keyword vocabulary (controlled vocabulary vs. free tags) | Decide in writing-plans Phase 0 |
+| O-08 | ~~How programs consume gsd-ic (per-program fork-and-pull vs. tool install)~~ | **Resolved by §2.3 + §11.2 (post-review revision)** — gsd-ic distributed as `@adelphi/gsd-ic` npm package; programs install via `npx @adelphi/gsd-ic@latest install --customer=<name>`. Soft-fork dev repo persists for development; npm publish ships pack-only content. |
 
 ---
 
