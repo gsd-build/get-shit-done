@@ -4871,3 +4871,7 @@ The plan's `EXCLUDES` array did not include `docs/plans/`. The plan file itself 
 
 The plan's denylist included `'^commands/(?!gsd/intel-gate-)'`. That's PCRE negative-lookahead syntax; `grep -E` (POSIX ERE) doesn't support `(?!...)`. The entry silently never matched (or errored under `ugrep`), so any `commands/*` entry slipped through. Replaced with an explicit `if [[ "$path" =~ ^commands/ ]] && ! [[ "$path" =~ ^commands/gsd/intel-gate- ]]` special-case before the denylist loop. Same intended semantics, POSIX-compatible.
 
+### Task 24: executed before Task 17 (2026-05-06)
+
+The plan orders Task 24 after Tasks 17–23. But Task 17 (master runner) expects all validators to pass against the live repo, and `validate-workflow-patches.sh`/`validate-seamless-fork.sh` both require `tools/patch-workflows.sh` to exist. Task 24 was therefore executed early, before Task 17, to satisfy the dependency. No content change to Task 24 itself — only execution order.
+
