@@ -358,7 +358,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (42 shipped)
+## CLI Modules (43 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -385,7 +385,8 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `intel.cjs` | Codebase intel store backing `/gsd-map-codebase --query` and `gsd-intel-updater` |
 | `learnings.cjs` | Cross-phase learnings extraction for `/gsd-extract-learnings` |
 | `milestone.cjs` | Milestone archival, requirements marking |
-| `model-profiles.cjs` | Model profile resolution table (authoritative profile data) |
+| `model-catalog.cjs` | CJS adapter over the shared model catalog JSON; exports canonical runtime tier defaults, agent profile maps, alias maps, and routing metadata for all CLI consumers |
+| `model-profiles.cjs` | Backward-compatible profile helpers derived from `model-catalog.cjs`; no longer owns its own model table |
 | `phase-command-router.cjs` | Thin CJS subcommand router adapter for `gsd-tools phase` |
 | `phase.cjs` | Phase directory operations, decimal numbering, plan indexing |
 | `phases-command-router.cjs` | Thin CJS subcommand router adapter for `gsd-tools phases` |

@@ -434,9 +434,9 @@ describe('resolveModelInternal', () => {
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'sonnet');
     });
 
-    test('returns sonnet for unknown agent type even with inherit profile', () => {
+    test('returns inherit for unknown agent type with inherit profile', () => {
       writeConfig({ model_profile: 'inherit' });
-      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'sonnet');
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'inherit');
     });
 
     test('defaults to balanced profile when model_profile missing', () => {

@@ -94,9 +94,9 @@ describe('bug #1829: model_profile "inherit" — resolveModelInternal', () => {
     assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-verifier'), 'inherit');
   });
 
-  test('returns "sonnet" (default) for unknown agent even with inherit profile', () => {
+  test('returns "inherit" for unknown agent with inherit profile', () => {
     writeConfig(tmpDir, { model_profile: 'inherit' });
-    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'sonnet');
+    assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'inherit');
   });
 
   test('per-agent override takes precedence over inherit profile', () => {

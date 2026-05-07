@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-06",
+  "generated": "2026-05-07",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -277,6 +277,7 @@
       "intel.cjs",
       "learnings.cjs",
       "milestone.cjs",
+      "model-catalog.cjs",
       "model-profiles.cjs",
       "phase-command-router.cjs",
       "phase.cjs",
