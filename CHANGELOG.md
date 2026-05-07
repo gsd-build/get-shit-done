@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`/gsd-quick` worktree-merge resurrection guard no longer deletes brand-new `.planning/` files** — the inverted `PRE_MERGE_FILES` grep that caused any file absent from the pre-merge snapshot (including freshly created `SUMMARY.md`) to be deleted has been replaced with the git-history check already used by `execute-phase.md` since PR #2510; only files with a confirmed deletion event in main's ancestry are now removed. (#3195)
 - **Milestone-archive layout support** — `validate consistency`, `validate health`, and `find-phase` now scan `.planning/milestones/v*-phases/` directories in addition to the flat `.planning/phases/` layout. Projects that have graduated to milestone-archive layout no longer receive spurious W006 "Phase N in ROADMAP.md but no directory on disk" warnings for every active phase. (#3164)
 
 ### Feature
