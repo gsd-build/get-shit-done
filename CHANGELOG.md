@@ -4,7 +4,9 @@ All notable changes to GSD will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.39.1...HEAD)
+## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...HEAD)
+
+## [1.41.0](https://github.com/gsd-build/get-shit-done/compare/v1.40.0...v1.41.0) - 2026-05-07
 
 ### Fixed
 

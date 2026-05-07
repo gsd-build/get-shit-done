@@ -697,7 +697,7 @@ OpenCode's `task` interface do not accept an inline `model` parameter, so
 running `gsd install <runtime>` after editing `model_overrides` is required
 for the change to take effect. See issue #2256.
 
-### Per-Phase-Type Models (`models`) — added in v1.40
+### Per-Phase-Type Models (`models`) — added in v1.41
 
 > Express tuning at the **phase** level (planning, research, execution, verification) without learning the agent taxonomy. Added in [#3023](https://github.com/gsd-build/get-shit-done/pull/3030).
 
@@ -781,7 +781,7 @@ $ gsd config-set models.research sonnet
 
 Direct edits to `.planning/config.json` are looser — the resolver simply ignores values it doesn't recognize and falls through to the profile tier — so a typo doesn't silently break tier resolution.
 
-### Dynamic Routing with Failure-Tier Escalation (`dynamic_routing`) — added in v1.40
+### Dynamic Routing with Failure-Tier Escalation (`dynamic_routing`) — added in v1.41
 
 > Start cheap, escalate only when the agent fails the gate. Added in [#3024](https://github.com/gsd-build/get-shit-done/pull/3031).
 

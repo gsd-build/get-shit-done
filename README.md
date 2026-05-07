@@ -162,17 +162,7 @@ The main loop:
 | `/gsd-complete-milestone` | Archive milestone and tag release |
 | `/gsd-new-milestone` | Start next version |
 
-Notable extras:
-
-| Command | What it does |
-|---------|--------------|
-| `/gsd-quick` | Ad-hoc tasks with GSD guarantees — skips planning overhead |
-| `/gsd-map-codebase` | Analyze an existing codebase before starting a new project |
-| `/gsd-autonomous` | Drive all remaining phases without stopping |
-| `/gsd-forensics` | Post-mortem a failed or stuck run |
-| `/gsd-help` | Full command reference inside your runtime |
-
-For the complete command reference — workstreams, workspaces, phase management, code quality, backlog, session tools — see **[docs/COMMANDS.md](docs/COMMANDS.md)**.
+For ad-hoc tasks, autonomous mode, codebase analysis, forensics, and the full command surface — see **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 
 ---
 
