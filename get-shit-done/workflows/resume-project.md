@@ -69,11 +69,28 @@ cat .planning/HANDOFF.json 2>/dev/null || true
 # Check for continue-here files (mid-plan resumption)
 ls .planning/phases/*/.continue-here*.md 2>/dev/null || true
 
-# Check for plans without summaries (incomplete execution)
+# Check for plans without summaries (incomplete execution).
+# Post-#3212: when SUMMARY is missing we also ask the SDK whether the
+# plan is in a *drift* state (production commits already landed). The
+# SDK call is best-effort — if it fails or is unavailable, fall through
+# to the existing filesystem-only signal.
 for plan in .planning/phases/*/*-PLAN.md; do
   [ -e "$plan" ] || continue
   summary="${plan/PLAN/SUMMARY}"
-  [ ! -f "$summary" ] && echo "Incomplete: $plan"
+  if [ ! -f "$summary" ]; then
+    echo "Incomplete: $plan"
+    # Extract phase + plan ids from the filename, e.g. "04-03-PLAN.md" -> phase=04 plan=03.
+    base="$(basename "$plan")"
+    phase_id="${base%%-*}"
+    rest="${base#$phase_id-}"
+    plan_id="${rest%%-*}"
+    if [ -n "$phase_id" ] && [ -n "$plan_id" ]; then
+      pcc="$(gsd-sdk query plan.consistency-check --phase "$phase_id" --plan "$plan_id" 2>/dev/null || true)"
+      if [ -n "$pcc" ]; then
+        echo "Consistency: $pcc"
+      fi
+    fi
+  fi
 done 2>/dev/null || true
 
 # Check for interrupted agents (use has_interrupted_agent and interrupted_agent_id from init)
@@ -103,6 +120,7 @@ fi
 
 - Execution was started but not completed
 - Flag: "Found incomplete plan execution"
+- **Drift detection (#3212):** if the `Consistency:` line above (from `gsd-sdk query plan.consistency-check`) reports a `drift_*` state, the plan is in a partial close-out — see `docs/ATOMIC-CLOSEOUT-INVARIANT.md`. Surface the `advice` field to the user verbatim and **do NOT redispatch the executor** until the user confirms reconciliation. If the consistency-check output is missing (older SDK or call failure), fall through to the existing filesystem-only behavior.
 
 **If interrupted agent found:**
 

@@ -16,6 +16,8 @@ import { uatRenderCheckpoint, auditUat } from './uat.js';
 import { intelStatus, intelDiff, intelSnapshot, intelValidate, intelQuery, intelExtractExports, intelPatchMeta, intelUpdate } from './intel.js';
 import { writeProfile, generateClaudeProfile, generateDevPreferences, generateClaudeMd } from './profile-output.js';
 import { phaseMvpMode, taskIsBehaviorAdding, userStoryValidate } from './mvp.js';
+import { planConsistencyCheck } from './plan-consistency-check.js';
+import { dispatchCommitSince } from './dispatch-surveillance.js';
 
 export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['agent-skills', agentSkills],
@@ -111,4 +113,10 @@ export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler
   ['task is-behavior-adding', taskIsBehaviorAdding],
   ['user-story.validate', userStoryValidate],
   ['user-story validate', userStoryValidate],
+  // ── Plan close-out invariant (#3212) — read-only diagnostic ──
+  ['plan.consistency-check', planConsistencyCheck],
+  ['plan consistency-check', planConsistencyCheck],
+  // ── Stall surveillance (#3212) — read-only commit progress probe ──
+  ['dispatch.commit-since', dispatchCommitSince],
+  ['dispatch commit-since', dispatchCommitSince],
 ] as const;

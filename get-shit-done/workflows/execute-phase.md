@@ -657,6 +657,15 @@ increases monotonically across waves. `{status}` is `complete` (success),
    [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} checkpoint ({P}/{Q} plans done)
    ```
 
+   **Stall surveillance probe (#3212, optional):** for runtimes that can poll during
+   the await, an orchestrator can call `gsd-sdk query dispatch.commit-since --since $T0 --plan {plan_id}`
+   on a wall-clock cadence (e.g. every 60s) where $T0 is the Unix epoch captured immediately
+   before the `Agent()` dispatch. `count == 0` for an extended period (suggested: 5 minutes
+   for execution-heavy plans, 2 minutes for short plans) is a stall signal — surface it as a
+   warning and offer the user a continue/abort choice. The probe is read-only, returns
+   immediately, and is **complementary to** (not a replacement for) `workflow.subagent_timeout`.
+   Workflows that do not implement polling continue to work exactly as before — this is opt-in.
+
    **Completion signal fallback (Copilot and runtimes where Agent() may not return):**
 
    If a spawned agent does not return a completion signal but appears to have finished

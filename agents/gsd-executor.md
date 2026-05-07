@@ -135,6 +135,22 @@ For each task:
 
 </execution_flow>
 
+<atomic_closeout_invariant>
+**Invariant:** Per-task production commits, the SUMMARY.md, the STATE.md update, and the ROADMAP.md update are a single observational unit. If any one is missing for a plan, the plan is in a *drift* state and the next workflow that touches it MUST reconcile, not redo.
+
+**Sequence (do not reorder):**
+
+1. `<execute_tasks>` — per-task production commits land first.
+2. `<self_check>` — verify those commits exist before writing SUMMARY.
+3. `<summary_creation>` — write SUMMARY.md.
+4. `<state_updates>` — call `gsd-sdk query state.advance-plan`, `state.update-progress`, `roadmap.update-plan-progress`.
+5. `<final_commit>` — single commit covering SUMMARY + STATE + ROADMAP. Returning to the orchestrator before this commit lands is, by definition, a partial close-out.
+
+**Full contract, drift table, and reconciliation guidance:** see `docs/ATOMIC-CLOSEOUT-INVARIANT.md`.
+
+**Stall posture:** if you cannot complete steps 3–5 within your task budget, *do not* return success. Return a checkpoint via `checkpoint_return_format` with the per-task commit hashes already landed so the resume path can reconcile cleanly.
+</atomic_closeout_invariant>
+
 <deviation_rules>
 **While executing, you WILL discover work not in the plan.** Apply these rules automatically. Track all deviations for Summary.
 
