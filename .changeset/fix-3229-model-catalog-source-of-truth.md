@@ -1,6 +1,6 @@
 ---
 type: Fixed
-pr: 3153
+pr: 3230
 ---
 **`resolve-model` no longer drifts between SDK and CLI/CJS** — model-selection data now comes from a shared Model Catalog Module (`sdk/shared/model-catalog.json`) that both the SDK and the main CLI package consume. This fixes the #3229 class of bug where the SDK knew only 18 agents while 33 shipped agents existed on disk, causing `resolve-model` to silently return `{ unknown_agent: true, model: "sonnet" }` for valid agents like `gsd-code-reviewer` and `gsd-security-auditor`.
 
