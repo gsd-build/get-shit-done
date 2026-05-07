@@ -965,6 +965,13 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
     const config = loadConfig(cwd);
     if (config.claude_md_path) configClaudeMdPath = config.claude_md_path;
     if (config.claude_md_assembly) assemblyConfig = config.claude_md_assembly;
+    // #3163: When runtime is codex, override the output target to AGENTS.md
+    // regardless of claude_md_path, so Codex projects never write to CLAUDE.md.
+    // GSD_RUNTIME env var takes precedence over config.runtime, mirroring detectRuntime().
+    const effectiveRuntime = process.env.GSD_RUNTIME || config.runtime || null;
+    if (!options.output && effectiveRuntime === 'codex') {
+      configClaudeMdPath = './AGENTS.md';
+    }
   } catch { /* use default */ }
 
   let outputPath = options.output;
