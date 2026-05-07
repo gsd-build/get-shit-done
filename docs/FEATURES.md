@@ -2796,7 +2796,7 @@ Users who run a memory / knowledge-base MCP server (for example, ExoCortex-style
 **Document:** [`docs/issue-driven-orchestration.md`](issue-driven-orchestration.md)
 
 **Covered workflow:**
-1. Create an isolated workspace per issue (`/gsd-new-workspace`)
+1. Create an isolated workspace per issue (`/gsd-workspace --new`)
 2. Run the manager dashboard to get oriented (`/gsd-manager`)
 3. Execute autonomously (`/gsd-autonomous`)
 4. Verify and review (`/gsd-verify-work`, `/gsd-review`)
