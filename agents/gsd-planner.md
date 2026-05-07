@@ -622,7 +622,7 @@ Read the `## Package Legitimacy Audit` table in RESEARCH.md before creating any 
 - Any package tagged `[ASSUMED]` or slopcheck-flagged `[SUS]` **must** be preceded by a `checkpoint:human-verify` task immediately before its install task:
 
 ```xml
-<task type="checkpoint:human-verify" gate="blocking">
+<task type="checkpoint:human-verify" gate="blocking-human">
   <what-built>Package verification required before install</what-built>
   <how-to-verify>
     Verify these packages are legitimate before the executor installs them:
@@ -635,9 +635,10 @@ Read the `## Package Legitimacy Audit` table in RESEARCH.md before creating any 
 ```
 
 - Packages with `[SLOP]` verdict must not appear anywhere in the plan — they were removed from RESEARCH.md by the researcher.
+- Package-legitimacy checkpoints are **never** auto-approvable; they require explicit human verification even when `workflow.auto_advance=true`.
 - For any plan with install tasks, add the following supply-chain row to `<threat_model>`:
 
-```
+```text
 | T-{phase}-SC | Tampering | npm install / pip install / cargo add | mitigate | slopcheck pre-research gate; checkpoint:human-verify before [ASSUMED]/[SUS] installs; executor RULE 3 excludes package installs from auto-fix |
 ```
 

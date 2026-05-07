@@ -4,18 +4,7 @@
  * Package Legitimacy Gate — structural contract tests (#2827)
  *
  * Verifies that the three agents (researcher, planner, executor) contain the
- * interlocking instruction text that forms the slopsquatting defence gate:
- *
- *  researcher → runs slopcheck, emits Package Legitimacy Audit table,
- *               graceful-degrades, uses ecosystem-specific verification,
- *               never auto-downloads via npx --yes
- *  planner    → gates [ASSUMED]/[SUS] packages behind checkpoint:human-verify,
- *               adds supply-chain row to threat_model template
- *  executor   → RULE 3 explicitly excludes package installs from auto-fix
- *
- * Assertions are structural: content is verified at the correct structural
- * position (inside the RESEARCH.md template block, inside a code block, inside
- * the threat_model XML element) not merely present anywhere in the file.
+ * interlocking instruction text that forms the slopsquatting defence gate.
  */
 
 const { describe, test, before } = require('node:test');
@@ -23,20 +12,11 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-// ── path constants ────────────────────────────────────────────────────────────
-
 const AGENTS = path.join(__dirname, '..', 'agents');
 const RESEARCHER = path.join(AGENTS, 'gsd-phase-researcher.md');
-const PLANNER    = path.join(AGENTS, 'gsd-planner.md');
-const EXECUTOR   = path.join(AGENTS, 'gsd-executor.md');
+const PLANNER = path.join(AGENTS, 'gsd-planner.md');
+const EXECUTOR = path.join(AGENTS, 'gsd-executor.md');
 
-// ── structural helpers ────────────────────────────────────────────────────────
-
-/**
- * Split a markdown string into sections by ## headings, respecting fenced
- * code blocks (# inside a code block is not a heading).
- * Returns [{heading, body}] where body is the raw text under the heading.
- */
 function parseSections(md) {
   const lines = md.split('\n');
   const sections = [];
@@ -48,336 +28,445 @@ function parseSections(md) {
     if (!inFence && /^#{1,3} /.test(line)) {
       sections.push(current);
       current = { heading: line.replace(/^#+\s*/, '').trim(), body: [] };
-    } else {
-      current.body.push(line);
+      continue;
     }
+    current.body.push(line);
   }
+
   sections.push(current);
   return sections;
 }
 
-/**
- * Extract all fenced code block contents from a string.
- * Returns an array of strings (one per block, without the fence lines).
- */
 function extractCodeBlocks(text) {
   const blocks = [];
   const lines = text.split('\n');
   let inside = false;
   let buf = [];
+
   for (const line of lines) {
     if (line.trimStart().startsWith('```')) {
-      if (inside) { blocks.push(buf.join('\n')); buf = []; }
+      if (inside) {
+        blocks.push(buf.join('\n'));
+        buf = [];
+      }
       inside = !inside;
-    } else if (inside) {
-      buf.push(line);
+      continue;
     }
+    if (inside) buf.push(line);
   }
+
   return blocks;
 }
 
-/** True if any extracted code block contains the substring. */
-function codeBlockContains(text, sub) {
-  return extractCodeBlocks(text).some(b => b.includes(sub));
-}
-
-/**
- * Extract the RESEARCH.md output template from gsd-phase-researcher.md.
- * The template is the ```markdown block that begins with "# Phase".
- */
 function extractResearchTemplate(content) {
   const lines = content.split('\n');
   let inside = false;
   let isMarkdownFence = false;
   let buf = [];
+
   for (const line of lines) {
     if (!inside && line.startsWith('```markdown')) {
       inside = true;
       isMarkdownFence = true;
       buf = [];
-    } else if (inside && line.startsWith('```') && isMarkdownFence) {
+      continue;
+    }
+
+    if (inside && line.startsWith('```') && isMarkdownFence) {
       const candidate = buf.join('\n');
-      if (candidate.trimStart().startsWith('# Phase')) return candidate;
+      if (/^\s*#\s+Phase\b/m.test(candidate)) return candidate;
       inside = false;
       isMarkdownFence = false;
-    } else if (inside) {
-      buf.push(line);
+      continue;
     }
+
+    if (inside) buf.push(line);
+  }
+
+  return '';
+}
+
+function extractPlanTemplate(content) {
+  const blocks = extractCodeBlocks(content);
+  for (const block of blocks) {
+    if (/^\s*<threat_model>/m.test(block)) return block;
   }
   return '';
 }
 
-/**
- * Extract the PLAN.md output template from gsd-planner.md.
- * Finds the code block that contains <threat_model>.
- */
-function extractPlanTemplate(content) {
-  const blocks = extractCodeBlocks(content);
-  return blocks.find(b => b.includes('<threat_model>')) || '';
-}
-
-/**
- * Extract the text content inside <tag>...</tag> (first match).
- */
 function extractXmlElement(text, tag) {
   const start = text.indexOf(`<${tag}>`);
-  const end   = text.indexOf(`</${tag}>`);
+  const end = text.indexOf(`</${tag}>`);
   if (start === -1 || end === -1) return '';
   return text.slice(start, end + tag.length + 3);
 }
 
-// ── 1. researcher — slopcheck invocation ─────────────────────────────────────
+function normalizeTokens(text) {
+  return text
+    .toLowerCase()
+    .replace(/https?:\/\//g, ' ')
+    .replace(/[\[\]]/g, '')
+    .replace(/[^a-z0-9{}:_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function hasAllTokens(text, required) {
+  const tokenSet = new Set(normalizeTokens(text));
+  return required.every((token) => tokenSet.has(token.toLowerCase()));
+}
+
+function anyLineHasAll(lines, required) {
+  return lines.some((line) => hasAllTokens(line, required));
+}
+
+function parseMarkdownTable(lines) {
+  const tableLines = lines.filter((line) => /^\s*\|/.test(line));
+  if (tableLines.length < 2) return null;
+
+  const toCells = (line) => line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim());
+
+  const headers = toCells(tableLines[0]);
+  const rows = tableLines
+    .slice(2)
+    .map(toCells)
+    .filter((cells) => cells.length === headers.length)
+    .map((cells) => ({
+      cells,
+      fields: Object.fromEntries(headers.map((h, i) => [h, cells[i]])),
+    }));
+
+  return { headers, rows };
+}
+
+function parseMarkdownTables(lines) {
+  const groups = [];
+  let current = [];
+
+  for (const line of lines) {
+    if (/^\s*\|/.test(line)) {
+      current.push(line);
+      continue;
+    }
+    if (current.length > 0) {
+      groups.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0) groups.push(current);
+
+  return groups
+    .map((group) => parseMarkdownTable(group))
+    .filter(Boolean);
+}
+
+function lineIndexes(lines, predicate) {
+  const indexes = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (predicate(lines[i], i)) indexes.push(i);
+  }
+  return indexes;
+}
+
+function inNearbyWindow(sourceIndexes, targetIndexes, distance) {
+  return sourceIndexes.some((src) => targetIndexes.some((dst) => Math.abs(src - dst) <= distance));
+}
+
+function readModel(filePath) {
+  const text = fs.readFileSync(filePath, 'utf-8');
+  return {
+    text,
+    lines: text.split('\n'),
+    sections: parseSections(text),
+    codeBlocks: extractCodeBlocks(text),
+  };
+}
 
 describe('gsd-phase-researcher.md — slopcheck invocation', () => {
-  let content;
-  before(() => { content = fs.readFileSync(RESEARCHER, 'utf-8'); });
+  let model;
+
+  before(() => {
+    model = readModel(RESEARCHER);
+  });
 
   test('contains slopcheck install command in a fenced code block', () => {
-    assert.ok(
-      codeBlockContains(content, 'slopcheck install'),
-      'researcher must invoke "slopcheck install" inside a fenced code block'
-    );
+    const found = model.codeBlocks.some((block) => hasAllTokens(block, ['slopcheck', 'install']));
+    assert.ok(found, 'researcher must invoke slopcheck install inside a fenced code block');
   });
 
   test('slopcheck invocation includes --json flag', () => {
-    const hasJson = extractCodeBlocks(content).some(
-      b => b.includes('slopcheck install') && b.includes('--json')
+    const found = model.codeBlocks.some((block) =>
+      hasAllTokens(block, ['slopcheck', 'install']) && hasAllTokens(block, ['json'])
     );
-    assert.ok(hasJson, 'slopcheck invocation must pass --json');
+    assert.ok(found, 'slopcheck invocation must pass --json');
   });
 
-  test('guards slopcheck invocation with a command availability check', () => {
-    assert.ok(
-      codeBlockContains(content, 'command -v slopcheck') ||
-        codeBlockContains(content, 'which slopcheck'),
-      'researcher must check for slopcheck binary before invoking it'
-    );
+  test('guards slopcheck invocation with command availability check', () => {
+    const hasCommandV = model.codeBlocks.some((block) => hasAllTokens(block, ['command', '-v', 'slopcheck']));
+    const hasWhich = model.codeBlocks.some((block) => hasAllTokens(block, ['which', 'slopcheck']));
+    assert.ok(hasCommandV || hasWhich, 'researcher must guard slopcheck invocation with command -v or which');
   });
 
   test('documents graceful degradation when slopcheck is unavailable', () => {
-    const hasDegradation =
-      content.includes('[ASSUMED]') &&
-      content.includes('slopcheck') &&
-      (content.includes('not available') ||
-        content.includes('not found') ||
-        content.includes('unavailable') ||
-        content.includes('cannot be installed'));
-    assert.ok(hasDegradation, 'researcher must document [ASSUMED] fallback when slopcheck cannot run');
+    const hasAssumedLine = anyLineHasAll(model.lines, ['assumed']);
+    const hasSlopcheckUnavailableLine = model.lines.some((line) => {
+      const slopcheckMention = hasAllTokens(line, ['slopcheck']);
+      const unavailableMention =
+        hasAllTokens(line, ['not', 'available']) ||
+        hasAllTokens(line, ['not', 'found']) ||
+        hasAllTokens(line, ['unavailable']) ||
+        hasAllTokens(line, ['cannot', 'installed']);
+      return slopcheckMention && unavailableMention;
+    });
+
+    assert.ok(
+      hasAssumedLine && hasSlopcheckUnavailableLine,
+      'researcher must document [ASSUMED] fallback when slopcheck cannot run'
+    );
   });
 });
 
-// ── 2. researcher — Package Legitimacy Audit section in RESEARCH.md template ─
-
 describe('gsd-phase-researcher.md — Package Legitimacy Audit section in template', () => {
-  let template, templateSections;
+  let templateSections;
+
   before(() => {
-    const content = fs.readFileSync(RESEARCHER, 'utf-8');
-    template = extractResearchTemplate(content);
+    const model = readModel(RESEARCHER);
+    const template = extractResearchTemplate(model.text);
     templateSections = parseSections(template);
   });
 
-  test('RESEARCH.md template contains a Package Legitimacy Audit section', () => {
-    const hasSection = templateSections.some(s => s.heading === 'Package Legitimacy Audit');
-    assert.ok(hasSection, 'RESEARCH.md template must include a ## Package Legitimacy Audit section');
+  test('RESEARCH.md template contains Package Legitimacy Audit section', () => {
+    const section = templateSections.find((s) => s.heading === 'Package Legitimacy Audit');
+    assert.ok(section, 'RESEARCH.md template must include a Package Legitimacy Audit section');
   });
 
-  test('Package Legitimacy Audit table has all required columns', () => {
-    const sec = templateSections.find(s => s.heading === 'Package Legitimacy Audit');
-    assert.ok(sec, 'Package Legitimacy Audit section must exist');
-    const body = sec.body.join('\n');
-    for (const col of ['Package', 'Registry', 'Age', 'Downloads', 'slopcheck', 'Disposition']) {
-      assert.ok(body.includes(col), `audit table must have "${col}" column`);
+  test('Package Legitimacy Audit table has required columns', () => {
+    const section = templateSections.find((s) => s.heading === 'Package Legitimacy Audit');
+    assert.ok(section, 'Package Legitimacy Audit section must exist');
+
+    const table = parseMarkdownTable(section.body);
+    assert.ok(table, 'Package Legitimacy Audit section must include a markdown table');
+
+    const expected = ['Package', 'Registry', 'Age', 'Downloads', 'slopcheck', 'Disposition'];
+    for (const column of expected) {
+      assert.ok(table.headers.includes(column), `audit table must have "${column}" column`);
     }
   });
 
-  test('audit section documents [SLOP] disposition', () => {
-    const sec = templateSections.find(s => s.heading === 'Package Legitimacy Audit');
-    assert.ok(sec, 'Package Legitimacy Audit section must exist');
-    assert.ok(sec.body.join('\n').includes('[SLOP]'), 'audit section must document [SLOP] disposition');
-  });
+  test('audit section documents [SLOP], [SUS], and [OK] dispositions', () => {
+    const section = templateSections.find((s) => s.heading === 'Package Legitimacy Audit');
+    assert.ok(section, 'Package Legitimacy Audit section must exist');
 
-  test('audit section documents [SUS] disposition', () => {
-    const sec = templateSections.find(s => s.heading === 'Package Legitimacy Audit');
-    assert.ok(sec, 'Package Legitimacy Audit section must exist');
-    assert.ok(sec.body.join('\n').includes('[SUS]'), 'audit section must document [SUS] disposition');
-  });
+    const table = parseMarkdownTable(section.body);
+    assert.ok(table, 'Package Legitimacy Audit section must include a markdown table');
 
-  test('audit section documents [OK] disposition', () => {
-    const sec = templateSections.find(s => s.heading === 'Package Legitimacy Audit');
-    assert.ok(sec, 'Package Legitimacy Audit section must exist');
-    assert.ok(sec.body.join('\n').includes('[OK]'), 'audit section must document [OK] disposition');
+    const rowTexts = table.rows.map((row) => row.cells.join(' '));
+    const slop = rowTexts.some((value) => hasAllTokens(value, ['slop']));
+    const sus = rowTexts.some((value) => hasAllTokens(value, ['sus']));
+    const ok = rowTexts.some((value) => hasAllTokens(value, ['ok']));
+
+    assert.ok(slop, 'audit section must document [SLOP] disposition');
+    assert.ok(sus, 'audit section must document [SUS] disposition');
+    assert.ok(ok, 'audit section must document [OK] disposition');
   });
 });
 
-// ── 3. researcher — ecosystem-specific verification ───────────────────────────
-
 describe('gsd-phase-researcher.md — ecosystem-specific package verification', () => {
-  let content;
-  before(() => { content = fs.readFileSync(RESEARCHER, 'utf-8'); });
+  let model;
+
+  before(() => {
+    model = readModel(RESEARCHER);
+  });
 
   test('documents pip index versions for Python phases', () => {
-    assert.ok(
-      content.includes('pip index versions'),
-      'researcher must document "pip index versions" for Python package verification'
-    );
+    assert.ok(anyLineHasAll(model.lines, ['pip', 'index', 'versions']), 'researcher must document pip index versions');
   });
 
   test('documents cargo search for Rust phases', () => {
-    assert.ok(
-      content.includes('cargo search'),
-      'researcher must document "cargo search" for Rust package verification'
-    );
+    assert.ok(anyLineHasAll(model.lines, ['cargo', 'search']), 'researcher must document cargo search');
   });
 });
-
-// ── 4. researcher — no npx --yes, ctx7 guard ─────────────────────────────────
 
 describe('gsd-phase-researcher.md — no npx --yes auto-download', () => {
-  let content;
-  before(() => { content = fs.readFileSync(RESEARCHER, 'utf-8'); });
+  let model;
 
-  test('does not invoke "npx --yes" inside a code block', () => {
-    assert.ok(
-      !codeBlockContains(content, 'npx --yes'),
-      'researcher must not invoke "npx --yes" in any code block (silently auto-executes unverified packages)'
-    );
+  before(() => {
+    model = readModel(RESEARCHER);
   });
 
-  test('ctx7 CLI fallback uses command -v guard instead of npx --yes', () => {
-    assert.ok(
-      codeBlockContains(content, 'command -v ctx7'),
-      'ctx7 CLI fallback must guard with "command -v ctx7" before invocation'
-    );
+  test('does not invoke npx --yes inside a code block', () => {
+    const found = model.codeBlocks.some((block) => hasAllTokens(block, ['npx', '--yes']));
+    assert.equal(found, false, 'researcher must not invoke npx --yes in any code block');
+  });
+
+  test('ctx7 CLI fallback uses command -v guard', () => {
+    const found = model.codeBlocks.some((block) => hasAllTokens(block, ['command', '-v', 'ctx7']));
+    assert.ok(found, 'ctx7 CLI fallback must guard with command -v ctx7 before invocation');
   });
 });
-
-// ── 5. researcher — WebSearch packages tagged [ASSUMED] ──────────────────────
 
 describe('gsd-phase-researcher.md — WebSearch-origin package tagging', () => {
-  let content;
-  before(() => { content = fs.readFileSync(RESEARCHER, 'utf-8'); });
+  let model;
 
-  test('instructs that packages discovered only via WebSearch are tagged [ASSUMED]', () => {
-    const wsIdx = content.indexOf('WebSearch');
-    assert.ok(wsIdx !== -1, 'researcher file must mention WebSearch');
-    // [ASSUMED] must appear within ~1000 chars of a WebSearch reference
-    const nearby = content.slice(Math.max(0, wsIdx - 200), wsIdx + 1200);
+  before(() => {
+    model = readModel(RESEARCHER);
+  });
+
+  test('packages discovered via WebSearch are tagged [ASSUMED]', () => {
+    const webSearchLines = lineIndexes(model.lines, (line) => hasAllTokens(line, ['websearch']));
+    const assumedLines = lineIndexes(model.lines, (line) => hasAllTokens(line, ['assumed']));
+
+    assert.ok(webSearchLines.length > 0, 'researcher file must mention WebSearch');
+    assert.ok(assumedLines.length > 0, 'researcher file must mention [ASSUMED]');
     assert.ok(
-      nearby.includes('[ASSUMED]'),
-      'researcher must instruct that packages discovered via WebSearch are tagged [ASSUMED]'
+      inNearbyWindow(webSearchLines, assumedLines, 25),
+      'researcher must instruct WebSearch-discovered packages are tagged [ASSUMED] in nearby guidance'
     );
   });
 });
 
-// ── 6. planner — checkpoint gate on [ASSUMED]/[SUS] packages ─────────────────
-
 describe('gsd-planner.md — checkpoint gate for [ASSUMED]/[SUS] packages', () => {
-  let content;
-  before(() => { content = fs.readFileSync(PLANNER, 'utf-8'); });
+  let model;
 
-  test('instructs inserting checkpoint:human-verify before install of [ASSUMED] packages', () => {
-    assert.ok(
-      content.includes('checkpoint:human-verify') && content.includes('[ASSUMED]'),
-      'planner must instruct inserting a checkpoint:human-verify before installing [ASSUMED] packages'
-    );
+  before(() => {
+    model = readModel(PLANNER);
   });
 
-  test('instructs inserting checkpoint:human-verify before install of [SUS] packages', () => {
-    assert.ok(
-      content.includes('checkpoint:human-verify') && content.includes('[SUS]'),
-      'planner must instruct inserting a checkpoint:human-verify before installing [SUS] packages'
+  test('checkpoint:human-verify guidance references [ASSUMED] and [SUS]', () => {
+    const hasCheckpoint = anyLineHasAll(model.lines, ['checkpoint:human-verify']);
+    const hasAssumed = anyLineHasAll(model.lines, ['assumed']);
+    const hasSus = anyLineHasAll(model.lines, ['sus']);
+
+    assert.ok(hasCheckpoint && hasAssumed, 'planner must gate [ASSUMED] packages behind checkpoint:human-verify');
+    assert.ok(hasCheckpoint && hasSus, 'planner must gate [SUS] packages behind checkpoint:human-verify');
+  });
+
+  test('package-legitimacy checkpoint uses blocking-human gate and non-auto-approvable language', () => {
+    const hasBlockingHumanGate = anyLineHasAll(model.lines, ['checkpoint:human-verify', 'blocking-human']);
+    const hasNeverAutoApproveRule = model.lines.some((line) =>
+      hasAllTokens(line, ['never', 'auto-approvable']) ||
+      hasAllTokens(line, ['never', 'auto', 'approvable'])
     );
+
+    assert.ok(hasBlockingHumanGate, 'planner legitimacy checkpoint must use gate="blocking-human"');
+    assert.ok(hasNeverAutoApproveRule, 'planner must state legitimacy checkpoints are never auto-approvable');
   });
 
   test('package verification checkpoint includes registry URL guidance', () => {
-    assert.ok(
-      content.includes('npmjs.com/package') ||
-        content.includes('pypi.org/project') ||
-        content.includes('crates.io/crates'),
-      'planner package-verify checkpoint must include a registry URL example'
+    const hasRegistryGuidance = model.lines.some((line) =>
+      hasAllTokens(line, ['npmjs', 'package']) ||
+      hasAllTokens(line, ['pypi', 'project']) ||
+      hasAllTokens(line, ['crates', 'crates'])
     );
+
+    assert.ok(hasRegistryGuidance, 'planner package-verify checkpoint must include registry URL examples');
   });
 });
-
-// ── 7. planner — supply-chain threat model row in PLAN.md template ───────────
 
 describe('gsd-planner.md — supply-chain row in threat_model template', () => {
-  let planTemplate, threatBlock;
+  let planTemplate;
+  let threatModelBlock;
+
   before(() => {
-    const content = fs.readFileSync(PLANNER, 'utf-8');
-    planTemplate = extractPlanTemplate(content);
-    threatBlock  = extractXmlElement(planTemplate, 'threat_model');
+    const model = readModel(PLANNER);
+    planTemplate = extractPlanTemplate(model.text);
+    threatModelBlock = extractXmlElement(planTemplate, 'threat_model');
   });
 
-  test('PLAN.md template contains a threat_model element', () => {
-    assert.ok(planTemplate.includes('<threat_model>'), 'PLAN.md template must include <threat_model>');
+  test('PLAN.md template contains threat_model element', () => {
+    assert.ok(/^\s*<threat_model>/m.test(planTemplate), 'PLAN.md template must include <threat_model>');
   });
 
-  test('threat_model template includes a supply-chain row', () => {
-    assert.ok(
-      threatBlock.includes('SC') ||
-        threatBlock.includes('supply') ||
-        threatBlock.includes('install'),
-      'threat_model template must include a supply-chain (SC) row for install-bearing plans'
-    );
-  });
+  test('threat_model template includes supply-chain row with mitigate disposition', () => {
+    const tables = parseMarkdownTables(threatModelBlock.split('\n'));
+    const strideTable = tables.find((table) => table.headers.includes('Threat ID'));
+    assert.ok(strideTable, 'threat_model must include STRIDE threat register table');
 
-  test('supply-chain row disposition is mitigate', () => {
-    assert.ok(
-      threatBlock.includes('mitigate'),
-      'supply-chain threat disposition must be "mitigate"'
-    );
+    const supplyChainRow = strideTable.rows.find((row) => hasAllTokens(row.cells[0] || '', ['t-{phase}-sc']));
+    assert.ok(supplyChainRow, 'threat_model must include T-{phase}-SC supply-chain row');
+
+    const disposition = supplyChainRow.cells[3] || '';
+    assert.ok(hasAllTokens(disposition, ['mitigate']), 'supply-chain threat disposition must be mitigate');
   });
 });
-
-// ── 8. planner — no npx --yes ────────────────────────────────────────────────
 
 describe('gsd-planner.md — no npx --yes auto-download', () => {
-  test('does not invoke "npx --yes" inside a code block', () => {
-    const content = fs.readFileSync(PLANNER, 'utf-8');
-    assert.ok(!codeBlockContains(content, 'npx --yes'), 'planner must not invoke "npx --yes" in any code block');
+  test('does not invoke npx --yes inside a code block', () => {
+    const model = readModel(PLANNER);
+    const found = model.codeBlocks.some((block) => hasAllTokens(block, ['npx', '--yes']));
+    assert.equal(found, false, 'planner must not invoke npx --yes in any code block');
   });
 });
 
-// ── 9. executor — RULE 3 excludes package installs, failed installs → checkpoint
-
 describe('gsd-executor.md — package installs excluded from RULE 3 auto-fix', () => {
-  let content;
-  before(() => { content = fs.readFileSync(EXECUTOR, 'utf-8'); });
+  let model;
 
-  test('does not invoke "npx --yes" inside a code block', () => {
-    assert.ok(!codeBlockContains(content, 'npx --yes'), 'executor must not invoke "npx --yes" in any code block');
+  before(() => {
+    model = readModel(EXECUTOR);
   });
 
-  test('RULE 3 section explicitly excludes package manager install commands', () => {
-    const rule3Idx = content.indexOf('RULE 3');
-    assert.ok(rule3Idx !== -1, 'executor must contain RULE 3 section');
-    const rule3Body = content.slice(rule3Idx, rule3Idx + 1500);
-    const excludesInstall =
-      (rule3Body.includes('npm install') ||
-        rule3Body.includes('pip install') ||
-        rule3Body.includes('package install')) &&
-      (rule3Body.includes('NOT') ||
-        rule3Body.includes('exclude') ||
-        rule3Body.includes('never') ||
-        rule3Body.includes('prohibited') ||
-        rule3Body.includes('do not'));
+  test('does not invoke npx --yes inside a code block', () => {
+    const found = model.codeBlocks.some((block) => hasAllTokens(block, ['npx', '--yes']));
+    assert.equal(found, false, 'executor must not invoke npx --yes in any code block');
+  });
+
+  test('RULE 3 section explicitly excludes package-manager installs', () => {
+    const rule3Line = lineIndexes(model.lines, (line) => hasAllTokens(line, ['rule', '3']))[0];
+    assert.notEqual(rule3Line, undefined, 'executor must contain RULE 3 section');
+
+    const window = model.lines.slice(rule3Line, rule3Line + 35);
+
+    const hasInstallCommands =
+      anyLineHasAll(window, ['npm', 'install']) ||
+      anyLineHasAll(window, ['pip', 'install']) ||
+      anyLineHasAll(window, ['cargo', 'add']);
+
+    const hasExclusionLanguage =
+      anyLineHasAll(window, ['excluded']) ||
+      anyLineHasAll(window, ['not', 'auto-fixable']) ||
+      anyLineHasAll(window, ['do', 'not']);
+
+    assert.ok(hasInstallCommands && hasExclusionLanguage, 'RULE 3 must explicitly exclude package-manager installs');
+  });
+
+  test('failed package installs surface checkpoint:human-verify', () => {
+    const rule3Line = lineIndexes(model.lines, (line) => hasAllTokens(line, ['rule', '3']))[0];
+    assert.notEqual(rule3Line, undefined, 'executor must contain RULE 3 section');
+
+    const window = model.lines.slice(rule3Line, rule3Line + 50);
+    const hasFailureLanguage =
+      anyLineHasAll(window, ['failed', 'install']) ||
+      anyLineHasAll(window, ['install', 'fails']) ||
+      anyLineHasAll(window, ['install', 'failed']);
+
+    const hasCheckpoint = anyLineHasAll(window, ['checkpoint:human-verify']);
+
     assert.ok(
-      excludesInstall,
-      'RULE 3 must explicitly state that package manager installs are NOT auto-fixable'
+      hasFailureLanguage && hasCheckpoint,
+      'executor must emit checkpoint:human-verify when package install fails'
     );
   });
 
-  test('failed package installs must surface a checkpoint, not an auto-fix attempt', () => {
-    const hasCheckpointForInstall =
-      content.includes('install') && content.includes('checkpoint') &&
-      (content.includes('install fails') ||
-        content.includes('install fail') ||
-        content.includes('failed install') ||
-        (content.includes('package') && content.includes('checkpoint:human-verify')));
+  test('auto mode does not auto-approve package-legitimacy checkpoints', () => {
+    const autoModeLine = lineIndexes(model.lines, (line) => hasAllTokens(line, ['auto-mode', 'checkpoint', 'behavior']))[0];
+    assert.notEqual(autoModeLine, undefined, 'executor must define auto-mode checkpoint behavior');
+
+    const window = model.lines.slice(autoModeLine, autoModeLine + 25);
+
+    const hasExceptionRule =
+      anyLineHasAll(window, ['except', 'package-legitimacy', 'checkpoints']) ||
+      anyLineHasAll(window, ['do', 'not', 'auto-approve']) ||
+      anyLineHasAll(window, ['blocking-human']);
+
     assert.ok(
-      hasCheckpointForInstall,
-      'executor must instruct emitting a checkpoint when a package install fails (not auto-fix)'
+      hasExceptionRule,
+      'executor auto mode must explicitly block auto-approval for package-legitimacy checkpoints'
     );
   });
 });

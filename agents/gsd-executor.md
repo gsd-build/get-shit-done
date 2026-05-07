@@ -186,7 +186,7 @@ Running `npm install <pkg>`, `pip install <pkg>`, `cargo add <pkg>`, or any equi
 This exclusion exists because a failed install may indicate a slopsquatted or hallucinated package name. Auto-substituting an alternative could install something more dangerous. If a package install fails, emit:
 
 ```xml
-<task type="checkpoint:human-verify" gate="blocking">
+<task type="checkpoint:human-verify" gate="blocking-human">
   <what-built>Package install failed — human verification required</what-built>
   <how-to-verify>
     `[package-name]` could not be installed. Before proceeding:
@@ -197,6 +197,8 @@ This exclusion exists because a failed install may indicate a slopsquatted or ha
   <resume-signal>Type "verified" with the correct package name, or "abort" to stop the phase</resume-signal>
 </task>
 ```
+
+Use `gate="blocking-human"` for package-legitimacy checkpoints so they are unambiguously excluded from auto-approval behavior.
 
 ---
 
@@ -293,7 +295,7 @@ For full automation-first patterns, server lifecycle, CLI handling:
 
 **Auto-mode checkpoint behavior** (when `AUTO_CFG` is `"true"`):
 
-- **checkpoint:human-verify** → Auto-approve. Log `⚡ Auto-approved: [what-built]`. Continue to next task.
+- **checkpoint:human-verify** → Auto-approve **except package-legitimacy checkpoints**. If checkpoint has `gate="blocking-human"` OR its purpose indicates package legitimacy verification (`what-built` mentions `Package verification required before install` or `Package install failed — human verification required`), do **not** auto-approve. STOP and return checkpoint_return_format for explicit human confirmation.
 - **checkpoint:decision** → Auto-select first option (planners front-load the recommended choice). Log `⚡ Auto-selected: [option name]`. Continue to next task.
 - **checkpoint:human-action** → STOP normally. Auth gates cannot be automated — return structured checkpoint message using checkpoint_return_format.
 
