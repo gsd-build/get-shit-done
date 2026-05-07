@@ -35,6 +35,12 @@ function writeConfig(dir: string, config: Record<string, unknown>): void {
   writeFileSync(join(dir, '.planning', 'config.json'), JSON.stringify(config));
 }
 
+function writeWorkstreamConfig(dir: string, workstream: string, config: Record<string, unknown>): void {
+  const wsDir = join(dir, '.planning', 'workstreams', workstream);
+  mkdirSync(wsDir, { recursive: true });
+  writeFileSync(join(wsDir, 'config.json'), JSON.stringify(config));
+}
+
 // ─── roadmap.get-phase mode field regression ────────────────────────────────
 
 describe('roadmap.get-phase: mode field (regression)', () => {
@@ -108,12 +114,37 @@ describe('phase.mvp-mode', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  it('roadmap mode is normalized before comparison (MVP/whitespace still activates)', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 1: X\n\n**Mode:**  MVP  \n**Goal:** Test.\n`);
+      writeConfig(dir, { workflow: { mvp_mode: false } });
+      const result = await phaseMvpMode(['1'], dir);
+      expect(result.data.active).toBe(true);
+      expect(result.data.source).toBe('roadmap');
+      expect(result.data.roadmap_mode).toBe('mvp');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('config workflow.mvp_mode=true activates when CLI and roadmap absent', async () => {
     const dir = tmpProject();
     try {
       writeRoadmap(dir, `## Phase 1: X\n\n**Goal:** Test.\n`);
       writeConfig(dir, { workflow: { mvp_mode: true } });
       const result = await phaseMvpMode(['1'], dir);
+      expect(result.data.active).toBe(true);
+      expect(result.data.source).toBe('config');
+      expect(result.data.config_mvp_mode).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('workstream config overrides root config when workstream is provided', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 1: X\n\n**Goal:** Test.\n`);
+      writeConfig(dir, { workflow: { mvp_mode: false } });
+      writeWorkstreamConfig(dir, 'alpha', { workflow: { mvp_mode: true } });
+      const result = await phaseMvpMode(['1'], dir, 'alpha');
       expect(result.data.active).toBe(true);
       expect(result.data.source).toBe('config');
       expect(result.data.config_mvp_mode).toBe(true);
@@ -206,13 +237,40 @@ describe('task.is-behavior-adding', () => {
   });
 
   it('reads from a file path on disk', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'gsd-task-'));
+    const dir = tmpProject();
     try {
       const file = join(dir, 'plan.md');
       writeFileSync(file, `<task tdd="true">\n<behavior>X</behavior>\n<files>src/a.ts</files>\n</task>`);
-      const result = await taskIsBehaviorAdding([file], '/tmp');
+      const result = await taskIsBehaviorAdding([file], dir);
       expect(result.data.is_behavior_adding).toBe(true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('rejects task file path outside project scope', async () => {
+    const dir = tmpProject();
+    try {
+      await expect(taskIsBehaviorAdding(['/tmp/outside-plan.md'], dir))
+        .rejects
+        .toThrow(/outside project scope/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('config-only files in <files> are excluded from behavior-adding', async () => {
+    const result = await taskIsBehaviorAdding([
+      '--task-content',
+      `<task tdd="true">\n<behavior>Update settings</behavior>\n<files>\nconfig/app.yaml\n.env.local\nsettings.toml\n</files>\n</task>`,
+    ], '/tmp');
+    expect(result.data.is_behavior_adding).toBe(false);
+    expect(result.data.checks.has_source_files).toBe(false);
+  });
+
+  it('files under tests/ are excluded from behavior-adding source-file detection', async () => {
+    const result = await taskIsBehaviorAdding([
+      '--task-content',
+      `<task tdd="true">\n<behavior>Adjust tests only</behavior>\n<files>\ntests/user-flow.spec.ts\ntest/helpers.ts\n</files>\n</task>`,
+    ], '/tmp');
+    expect(result.data.is_behavior_adding).toBe(false);
+    expect(result.data.checks.has_source_files).toBe(false);
   });
 });
 

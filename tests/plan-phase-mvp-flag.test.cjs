@@ -12,40 +12,48 @@ const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
 const WORKFLOW = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'plan-phase.md');
 
+function parseWorkflowContract(content) {
+  const lines = content.split(/\r?\n/).map(line => line.trim());
+  const argExtractionLine = lines.find(line => line.includes('Extract from $ARGUMENTS:')) || '';
+  const hasMvpModeVariable = lines.some(line => line.includes('MVP_MODE'));
+  const hasWorkflowConfigRead = lines.some(line => line.includes('workflow.mvp_mode'));
+  const hasRoadmapModeRead = lines.some(line => line.includes('phase.mvp-mode') || line.includes('roadmap'));
+  const hasSkeletonReference = lines.some(line => line.includes('SKELETON.md'));
+  const hasWalkingSkeletonLabel = lines.some(line => line.toLowerCase().includes('walking skeleton'));
+  const plannerLines = lines.filter(line => line.includes('planner') || line.includes('gsd-planner'));
+  const plannerUsesMvpMode = plannerLines.some(line => line.includes('MVP_MODE')) || lines.some(line => line.includes('MVP_MODE') && line.includes('planner'));
+  return {
+    argExtractionLine,
+    hasMvpModeVariable,
+    hasWorkflowConfigRead,
+    hasRoadmapModeRead,
+    hasSkeletonReference,
+    hasWalkingSkeletonLabel,
+    plannerUsesMvpMode,
+  };
+}
+
 describe('plan-phase workflow — --mvp flag', () => {
-  const content = fs.readFileSync(WORKFLOW, 'utf-8');
+  const contract = parseWorkflowContract(fs.readFileSync(WORKFLOW, 'utf-8'));
 
   test('argument list documents --mvp flag', () => {
-    const argsLine = content.match(/Extract from \$ARGUMENTS:[^\n]*/);
-    assert.ok(argsLine, 'Step 2 arg-extraction line not found');
-    assert.match(argsLine[0], /--mvp/, 'argument list must mention --mvp');
+    assert.ok(contract.argExtractionLine.length > 0, 'Step 2 arg-extraction line not found');
+    assert.ok(contract.argExtractionLine.includes('--mvp'), 'argument list must mention --mvp');
   });
 
   test('workflow defines MVP_MODE resolution block', () => {
-    assert.match(content, /MVP_MODE/, 'workflow must declare MVP_MODE');
-    assert.match(content, /workflow\.mvp_mode/, 'must read workflow.mvp_mode config');
-    assert.match(
-      content,
-      /roadmap[^\n]*mode|phase[^\n]*\.mode/i,
-      'must consult phase mode from roadmap'
-    );
+    assert.ok(contract.hasMvpModeVariable, 'workflow must declare MVP_MODE');
+    assert.ok(contract.hasWorkflowConfigRead, 'must read workflow.mvp_mode config');
+    assert.ok(contract.hasRoadmapModeRead, 'must consult phase mode from roadmap/phase.mvp-mode');
   });
 
   test('Walking Skeleton gate references new-project + Phase 1', () => {
-    assert.match(content, /SKELETON\.md/, 'workflow must mention SKELETON.md');
-    assert.match(
-      content,
-      /Walking Skeleton|walking_skeleton/i,
-      'workflow must label the gate as Walking Skeleton'
-    );
+    assert.ok(contract.hasSkeletonReference, 'workflow must mention SKELETON.md');
+    assert.ok(contract.hasWalkingSkeletonLabel, 'workflow must label the gate as Walking Skeleton');
   });
 
   test('planner spawn passes MVP_MODE to gsd-planner', () => {
-    assert.match(
-      content,
-      /MVP_MODE[^\n]*planner|planner[^\n]*MVP_MODE/i,
-      'workflow must wire MVP_MODE into the planner subagent prompt'
-    );
+    assert.ok(contract.plannerUsesMvpMode, 'workflow must wire MVP_MODE into the planner subagent prompt');
   });
 });
 

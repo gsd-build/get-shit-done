@@ -40,13 +40,24 @@ PHASE_NAME=$(echo "$PHASE_INFO" | jq -r '.phase_name')
 PHASE_GOAL=$(echo "$PHASE_INFO" | jq -r '.goal')
 PHASE_MODE=$(echo "$PHASE_INFO" | jq -r '.mode // ""')
 PHASE_COMPLETE=$(echo "$PHASE_INFO" | jq -r '.roadmap_complete // false')
+
+ANALYZE=$(gsd-sdk query roadmap.analyze)
+if [[ "$ANALYZE" == @file:* ]]; then ANALYZE=$(cat "${ANALYZE#@file:}"); fi
+DISK_STATUS=$(echo "$ANALYZE" | jq -r --arg p "$PHASE" '.phases[] | select((.phase_number|tostring)==$p) | .disk_status' | head -1)
+if [[ "$DISK_STATUS" == "complete" || "$PHASE_COMPLETE" == "true" ]]; then
+  STATUS="completed"
+elif [[ "$DISK_STATUS" == "planned" || "$DISK_STATUS" == "partial" ]]; then
+  STATUS="in_progress"
+else
+  STATUS="not_started"
+fi
 ```
 
 If `PHASE_FOUND` is `false`: error and exit. Suggest `/gsd add-phase` or `/gsd insert-phase` to create the phase first.
 
 **Status guard.** If the phase is `in_progress` (has plans but not complete) or `completed`, refuse unless `--force` is in `$ARGUMENTS`:
 
-```
+```text
 ERROR: Phase ${PHASE} is currently ${STATUS}.
 Converting an active or completed phase to MVP mode mid-flight will
 invalidate any existing plans and summaries.
@@ -90,12 +101,14 @@ If any of the three answers is empty or whitespace-only, error and re-prompt tha
 USER_STORY_RESULT=$(gsd-sdk query user-story.validate --story "$USER_STORY")
 if [ "$(echo "$USER_STORY_RESULT" | jq -r '.valid')" != "true" ]; then
   echo "$USER_STORY_RESULT" | jq -r '.errors[]' >&2
-  # Re-prompt the offending field per the surfaced errors.
-  exit 1
+  # Re-prompt the offending field(s) per surfaced errors, then re-run validation.
+  # Do not abort the workflow on first invalid draft.
+  RE_PROMPT_USER_STORY=true
 fi
 ```
 
 This guarantees the goal stored in ROADMAP.md will satisfy the same guard the verifier applies later.
+If `RE_PROMPT_USER_STORY=true`, re-run only the offending prompt field(s), rebuild `USER_STORY`, and validate again before continuing.
 
 ## 4. SPIDR splitting check
 

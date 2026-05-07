@@ -143,19 +143,24 @@ Resolve `MVP_MODE` once via the centralized `phase.mvp-mode` query verb (precede
 MVP_FLAG_ARG=""
 if [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG="--cli-flag"; fi
 MVP_MODE=$(gsd-sdk query phase.mvp-mode "${PHASE_NUMBER}" $MVP_FLAG_ARG --pick active)
+TDD_MODE=$(gsd-sdk query config-get workflow.tdd_mode 2>/dev/null || echo "false")
 ```
 
-**MVP+TDD gate.** When `MVP_MODE=true` AND `TDD_MODE=true` AND the task is a Behavior-Adding Task, require a failing-test commit before the implementation step. The Behavior-Adding Task predicate is now machine-checked via `task.is-behavior-adding` instead of inlined three-line prose; pure doc-only / config-only / test-only tasks return `is_behavior_adding=false` and are exempt. See `execute-mvp-tdd.md` for the halt report format.
+**MVP+TDD gate.** Task-scoped enforcement runs inside plan execution (immediately before each implementation step), where `TASK_FILE`, `PLAN_ID`, and `TASK_ID` are defined. Keep the same predicate and RED-commit contract:
 ```bash
 if [ "$MVP_MODE" = "true" ] && [ "$TDD_MODE" = "true" ]; then
   IS_BEHAVIOR_ADDING=$(gsd-sdk query task.is-behavior-adding "$TASK_FILE" --pick is_behavior_adding)
   if [ "$IS_BEHAVIOR_ADDING" = "true" ]; then
     RED_COMMIT=$(git log --oneline --grep="^test(${PHASE_NUMBER}-${PLAN_ID}):" -- "**/*.test.*" "**/*.spec.*" "tests/" | head -1)
-    if [ -z "$RED_COMMIT" ]; then echo "MVP+TDD GATE TRIPPED: missing RED commit for ${PLAN_ID}/${TASK_ID}"; exit 1; fi
+    if [ -z "$RED_COMMIT" ]; then
+      gsd-sdk query state-set "last_gate_trip=${PLAN_ID}/${TASK_ID}" || true
+      echo "MVP+TDD GATE TRIPPED: missing RED commit for ${PLAN_ID}/${TASK_ID}"
+      exit 1
+    fi
   fi
 fi
 ```
-On trip, updates `STATE.md` with `last_gate_trip: {plan_id}/{task_id}`.
+Pure doc-only / config-only / test-only tasks return `is_behavior_adding=false` and are exempt. See `execute-mvp-tdd.md` for the halt report format.
 </step>
 
 <step name="check_blocking_antipatterns" priority="first">
@@ -1099,14 +1104,15 @@ TDD_PLANS=$(grep -rl "^type: tdd" "${PHASE_DIR}"/*-PLAN.md 2>/dev/null | wc -l |
    ```
 
 **Escalation under MVP+TDD.** When `MVP_MODE=true` AND `TDD_MODE=true`, the review verdict escalates from advisory to **blocking**: missing RED or GREEN gate commits prevent marking the phase complete.
-```
+```text
 Phase blocked: {N} TDD plan(s) violate the RED→GREEN gate sequence under MVP+TDD.
 Resolve and re-run /gsd execute-phase, or override with
 /gsd execute-phase {phase} --force-mvp-gate to ship anyway.
 ```
-`--force-mvp-gate` is the escape hatch (documented, not yet implemented). Without both modes active, the existing advisory behavior is preserved.
-
-**Gate violations are advisory** — they do not block execution but are surfaced to the user for review. The verifier agent (step `verify_phase_goal`) will also check TDD discipline as part of its quality assessment.
+`--force-mvp-gate` is the escape hatch (documented, not yet implemented). Policy is:
+- `MVP_MODE=true` AND `TDD_MODE=true`: violations are **blocking** unless explicitly overridden.
+- otherwise: violations are advisory/non-blocking and are surfaced for review.
+The verifier agent (step `verify_phase_goal`) still checks TDD discipline in both cases.
 </step>
 
 <step name="handle_partial_wave_execution">

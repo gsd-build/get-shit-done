@@ -33,9 +33,9 @@ const COMMANDS_DIR = path.join(ROOT, 'commands', 'gsd');
 
 /** Parse the YAML frontmatter block between the first two `---` delimiters. */
 function parseFrontmatter(content) {
-  const lines = content.split('\n');
+  const lines = content.split(/\r?\n/);
   if (lines[0].trim() !== '---') return {};
-  const end = lines.indexOf('---', 1);
+  const end = lines.findIndex((line, idx) => idx > 0 && line.trim() === '---');
   if (end === -1) return {};
   const fm = {};
   let currentKey = null;

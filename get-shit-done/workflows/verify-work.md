@@ -157,8 +157,8 @@ When `MVP_MODE=false` (mode is null, absent, or the phase has no `**Mode:**` lin
 PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${phase_number}" --pick goal)
 USER_STORY_VALID=$(gsd-sdk query user-story.validate --story "$PHASE_GOAL" --pick valid)
 if [ "$USER_STORY_VALID" != "true" ]; then
-  echo "Phase ${PHASE} has '**Mode:** mvp' in ROADMAP.md but the **Goal:** is not in user-story format."
-  echo "Run /gsd mvp-phase ${PHASE} to set a user-story goal before verifying."
+  echo "Phase ${phase_number} has '**Mode:** mvp' in ROADMAP.md but the **Goal:** is not in user-story format."
+  echo "Run /gsd mvp-phase ${phase_number} to set a user-story goal before verifying."
   exit 1
 fi
 ```

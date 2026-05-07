@@ -28,7 +28,7 @@ If any check fails, the gate trips.
 A task is behavior-adding when:
 - Its frontmatter has `tdd="true"` AND
 - Its `<behavior>` block names at least one user-visible outcome (not a config-only or doc-only task) AND
-- Its `<files>` list includes at least one source file (not exclusively `*.md`, `*.json`, or `*.test.*`)
+- Its `<files>` list includes at least one source file (not exclusively docs/tests/config files such as `*.md`, `*.json`, `*.test.*`, `*.spec.*`, `*.yml`, `*.yaml`, `*.toml`, `*.ini`, `.env*`)
 
 Pure documentation, configuration, or test-only tasks are skipped by this gate even when both modes are active.
 

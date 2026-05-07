@@ -25,6 +25,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 
 import { GSDError, ErrorClassification } from '../errors.js';
 import { loadConfig } from '../config.js';
@@ -72,10 +73,12 @@ export const phaseMvpMode: QueryHandler<MvpModeResult> = async (args, projectDir
   // Precedence #2: ROADMAP.md
   const phaseResult = await roadmapGetPhase([phaseNum], projectDir, workstream);
   const phaseData = phaseResult.data as { found?: boolean; mode?: string | null };
-  const roadmapMode = phaseData.found && phaseData.mode ? phaseData.mode : null;
+  const roadmapMode = phaseData.found && typeof phaseData.mode === 'string'
+    ? phaseData.mode.trim().toLowerCase()
+    : null;
 
   // Precedence #3: config
-  const config = await loadConfig(projectDir);
+  const config = await loadConfig(projectDir, workstream);
   const wf = (config.workflow ?? {}) as unknown as Record<string, unknown>;
   const configMvpMode = Boolean(wf.mvp_mode ?? false);
 
@@ -136,19 +139,28 @@ interface BehaviorAddingResult {
  *   gsd-sdk query task.is-behavior-adding ./plans/01-PLAN-auth.md
  *   gsd-sdk query task.is-behavior-adding --task-content "<task>...</task>"
  */
-export const taskIsBehaviorAdding: QueryHandler<BehaviorAddingResult> = async (args, _projectDir) => {
+export const taskIsBehaviorAdding: QueryHandler<BehaviorAddingResult> = async (args, projectDir) => {
   let content: string | null = null;
   if (args[0] === '--task-content') {
     content = args[1] ?? null;
   } else if (args[0]) {
-    const path = args[0];
-    if (!existsSync(path)) {
+    const requestedPath = args[0];
+    const projectRoot = resolve(projectDir ?? process.cwd());
+    const resolvedTaskPath = resolve(projectRoot, requestedPath);
+    const rel = relative(projectRoot, resolvedTaskPath);
+    if (rel === '..' || rel.startsWith(`..${sep}`)) {
       throw new GSDError(
-        `Task file not found: ${path}`,
+        `Task file is outside project scope: ${requestedPath}`,
         ErrorClassification.Validation,
       );
     }
-    content = await readFile(path, 'utf-8');
+    if (!existsSync(resolvedTaskPath)) {
+      throw new GSDError(
+        `Task file not found: ${requestedPath}`,
+        ErrorClassification.Validation,
+      );
+    }
+    content = await readFile(resolvedTaskPath, 'utf-8');
   }
   if (!content) {
     throw new GSDError(
@@ -178,7 +190,10 @@ export const taskIsBehaviorAdding: QueryHandler<BehaviorAddingResult> = async (a
       !/\.md$/i.test(f) &&
       !/\.json$/i.test(f) &&
       !/\.test\.[^.]+$/i.test(f) &&
-      !/\.spec\.[^.]+$/i.test(f)
+      !/\.spec\.[^.]+$/i.test(f) &&
+      !/(^|[\\/])tests?[\\/]/i.test(f) &&
+      !/\.(yml|yaml|toml|ini|cfg|conf|properties)$/i.test(f) &&
+      !/(^|[\\/])\.env(\..+)?$/i.test(f)
     );
   }
 

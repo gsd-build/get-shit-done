@@ -56,6 +56,7 @@ If no `.planning/` directory exists, inform the user to run `/gsd-new-project` f
 
 ```bash
 ANALYZE=$(gsd-sdk query roadmap.analyze)
+if [[ "$ANALYZE" == @file:* ]]; then ANALYZE=$(cat "${ANALYZE#@file:}"); fi
 MVP_COUNT=$(echo "$ANALYZE" | jq '[.phases[] | select(.mode == "mvp")] | length')
 TOTAL_COUNT=$(echo "$ANALYZE" | jq '.phases | length')
 ```
