@@ -15,10 +15,8 @@ const path = require('node:path');
 const { createTempProject, cleanup, runGsdTools } = require('./helpers.cjs');
 
 describe('#3197 — gsd-tools.cjs config-set workflow._auto_chain_active', () => {
-  let tmpDir;
-
   test('config-set workflow._auto_chain_active true succeeds via gsd-tools.cjs (CJS path)', (t) => {
-    tmpDir = createTempProject();
+    const tmpDir = createTempProject();
     t.after(() => cleanup(tmpDir));
 
     const result = runGsdTools(['config-set', 'workflow._auto_chain_active', 'true'], tmpDir);
@@ -29,7 +27,7 @@ describe('#3197 — gsd-tools.cjs config-set workflow._auto_chain_active', () =>
   });
 
   test('config-set workflow._auto_chain_active true writes value to config.json', (t) => {
-    tmpDir = createTempProject();
+    const tmpDir = createTempProject();
     t.after(() => cleanup(tmpDir));
 
     runGsdTools(['config-set', 'workflow._auto_chain_active', 'true'], tmpDir);
@@ -45,7 +43,7 @@ describe('#3197 — gsd-tools.cjs config-set workflow._auto_chain_active', () =>
   });
 
   test('config-set workflow._auto_chain_active false writes false to config.json', (t) => {
-    tmpDir = createTempProject();
+    const tmpDir = createTempProject();
     t.after(() => cleanup(tmpDir));
 
     runGsdTools(['config-set', 'workflow._auto_chain_active', 'false'], tmpDir);
