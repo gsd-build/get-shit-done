@@ -153,7 +153,7 @@ if [ "$MVP_MODE" = "true" ] && [ "$TDD_MODE" = "true" ]; then
   if [ "$IS_BEHAVIOR_ADDING" = "true" ]; then
     RED_COMMIT=$(git log --oneline --grep="^test(${PHASE_NUMBER}-${PLAN_ID}):" -- "**/*.test.*" "**/*.spec.*" "tests/" | head -1)
     if [ -z "$RED_COMMIT" ]; then
-      gsd-sdk query state-set "last_gate_trip=${PLAN_ID}/${TASK_ID}" || true
+      gsd-sdk query state.update last_gate_trip "${PLAN_ID}/${TASK_ID}" || true
       echo "MVP+TDD GATE TRIPPED: missing RED commit for ${PLAN_ID}/${TASK_ID}"
       exit 1
     fi
