@@ -135,6 +135,42 @@ describe('agentSkills', () => {
     expect(r.format).toBe('text');
   });
 
+  it('resolves global: skills through runtime-aware global skills dir policy', async () => {
+    const codexHome = join(tmpDir, 'codex-home');
+    await writeSkill(join(codexHome, 'skills'), 'global-skill');
+    await writeConfig(tmpDir, {
+      runtime: 'codex',
+      agent_skills: { 'gsd-planner': ['global:global-skill'] },
+    });
+
+    const prevCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const r = await agentSkills(['gsd-planner'], tmpDir);
+      expect(r.data).toBe(
+        '<agent_skills>\n' +
+          'Read these user-configured skills:\n' +
+          `- @${join(codexHome, 'skills', 'global-skill', 'SKILL.md')}\n` +
+          '</agent_skills>',
+      );
+      expect(r.format).toBe('text');
+    } finally {
+      if (prevCodexHome === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = prevCodexHome;
+    }
+  });
+
+  it('returns empty string for global: skills on runtimes without a skills dir', async () => {
+    await writeConfig(tmpDir, {
+      runtime: 'cline',
+      agent_skills: { 'gsd-planner': ['global:nope'] },
+    });
+
+    const r = await agentSkills(['gsd-planner'], tmpDir);
+    expect(r.data).toBe('');
+    expect(r.format).toBeUndefined();
+  });
+
   it('does not signal format:"text" for empty result', async () => {
     const r = await agentSkills(['gsd-planner'], tmpDir);
     expect(r.format).toBeUndefined();

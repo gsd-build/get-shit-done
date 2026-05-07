@@ -7,7 +7,7 @@ import { mkdtemp, writeFile, mkdir, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { writeProfile } from './profile-output.js';
+import { generateDevPreferences, writeProfile } from './profile-output.js';
 import { learningsCopy } from './profile.js';
 
 describe('writeProfile', () => {
@@ -49,6 +49,68 @@ describe('writeProfile', () => {
     const md = await readFile(outPath, 'utf-8');
     expect(md).toContain('Developer Profile');
     expect(md).toMatch(/Communication Style/i);
+  });
+});
+
+describe('generateDevPreferences', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-dev-preferences-'));
+    await mkdir(join(tmpDir, '.planning'), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes to runtime-global skills dir by default', async () => {
+    const analysisPath = join(tmpDir, 'analysis.json');
+    const codexHome = join(tmpDir, 'codex-home');
+    await writeFile(
+      analysisPath,
+      JSON.stringify({
+        data_source: 'test',
+        dimensions: {
+          communication_style: { rating: 'terse', confidence: 'HIGH', claude_instruction: 'Keep it short.' },
+        },
+      }),
+      'utf-8',
+    );
+    await writeFile(join(tmpDir, '.planning', 'config.json'), JSON.stringify({ runtime: 'codex' }), 'utf-8');
+
+    const prevCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const result = await generateDevPreferences(['--analysis', analysisPath], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      const expectedPath = join(codexHome, 'skills', 'gsd-dev-preferences', 'SKILL.md');
+      expect(data.command_path).toBe(expectedPath);
+      const md = await readFile(expectedPath, 'utf-8');
+      expect(md).toContain('Behavioral Directives');
+    } finally {
+      if (prevCodexHome === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = prevCodexHome;
+    }
+  });
+
+  it('requires --output when runtime has no skills dir', async () => {
+    const analysisPath = join(tmpDir, 'analysis.json');
+    await writeFile(
+      analysisPath,
+      JSON.stringify({
+        data_source: 'test',
+        dimensions: {
+          communication_style: { rating: 'terse', confidence: 'HIGH', claude_instruction: 'Keep it short.' },
+        },
+      }),
+      'utf-8',
+    );
+    await writeFile(join(tmpDir, '.planning', 'config.json'), JSON.stringify({ runtime: 'cline' }), 'utf-8');
+
+    await expect(generateDevPreferences(['--analysis', analysisPath], tmpDir)).rejects.toThrow(
+      'Runtime "cline" does not use a skills directory; pass --output to choose a path explicitly.',
+    );
   });
 });
 

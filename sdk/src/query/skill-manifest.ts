@@ -12,7 +12,9 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
 import { extractFrontmatterLeading } from './frontmatter.js';
+import { resolveGlobalSkillsBase, renderGlobalSkillsBaseDisplayPath } from './helpers.js';
 import type { QueryHandler } from './utils.js';
+import { resolveLegacySkillsDir } from '../sdk-package-compatibility.js';
 
 export interface SkillManifestSkill {
   name: string;
@@ -64,11 +66,11 @@ export function buildSkillManifest(cwd: string, skillsDir: string | null = null)
       { root: '.cursor/skills', path: join(cwd, '.cursor', 'skills'), scope: 'project', kind: 'skills' as const },
       { root: '.github/skills', path: join(cwd, '.github', 'skills'), scope: 'project', kind: 'skills' as const },
       { root: '.codex/skills', path: join(cwd, '.codex', 'skills'), scope: 'project', kind: 'skills' as const },
-      { root: '~/.claude/skills', path: join(homedir(), '.claude', 'skills'), scope: 'global', kind: 'skills' as const },
-      { root: '~/.codex/skills', path: join(homedir(), '.codex', 'skills'), scope: 'global', kind: 'skills' as const },
+      { root: renderGlobalSkillsBaseDisplayPath('claude')!, path: resolveGlobalSkillsBase('claude')!, scope: 'global', kind: 'skills' as const },
+      { root: renderGlobalSkillsBaseDisplayPath('codex')!, path: resolveGlobalSkillsBase('codex')!, scope: 'global', kind: 'skills' as const },
       {
         root: '.claude/get-shit-done/skills',
-        path: join(homedir(), '.claude', 'get-shit-done', 'skills'),
+        path: resolveLegacySkillsDir(),
         scope: 'import-only',
         kind: 'skills' as const,
         deprecated: true,

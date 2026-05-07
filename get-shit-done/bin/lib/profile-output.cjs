@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { output, error, safeReadFile, loadConfig } = require('./core.cjs');
+const { getGlobalSkillDir } = require('./runtime-homes.cjs');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -786,7 +787,18 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
   // string) so the cline-install leaked-path lint does not flag it.
   let outputPath = options.output;
   if (!outputPath) {
-    outputPath = path.join(os.homedir(), '.claude', 'skills', 'gsd-dev-preferences', 'SKILL.md');
+    let effectiveRuntime = 'claude';
+    try {
+      const config = loadConfig(cwd);
+      effectiveRuntime = process.env.GSD_RUNTIME || config.runtime || 'claude';
+    } catch {
+      effectiveRuntime = process.env.GSD_RUNTIME || 'claude';
+    }
+    const skillDir = getGlobalSkillDir(effectiveRuntime, 'gsd-dev-preferences');
+    if (!skillDir) {
+      error(`Runtime "${effectiveRuntime}" does not use a skills directory; pass --output to choose a path explicitly.`);
+    }
+    outputPath = path.join(skillDir, 'SKILL.md');
   } else if (!path.isAbsolute(outputPath)) {
     outputPath = path.join(cwd, outputPath);
   }

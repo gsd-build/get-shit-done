@@ -127,4 +127,19 @@ describe('skill-manifest', () => {
     assert.ok(Array.isArray(manifest.skills));
     assert.ok(manifest.installation);
   });
+
+  test('global roots honor runtime-home env overrides instead of hardcoded home paths', () => {
+    const result = runGsdTools(['skill-manifest'], tmpDir, {
+      HOME: homeDir,
+      CLAUDE_CONFIG_DIR: path.join(homeDir, 'claude-custom'),
+      CODEX_HOME: path.join(homeDir, 'codex-custom'),
+    });
+    assert.ok(result.success, `Command should succeed: ${result.error || result.output}`);
+
+    const manifest = JSON.parse(result.output);
+    const claudeRoot = manifest.roots.find((root) => root.root === '~/.claude/skills');
+    const codexRoot = manifest.roots.find((root) => root.root === '~/.codex/skills');
+    assert.strictEqual(claudeRoot.path, path.join(homeDir, 'claude-custom', 'skills'));
+    assert.strictEqual(codexRoot.path, path.join(homeDir, 'codex-custom', 'skills'));
+  });
 });

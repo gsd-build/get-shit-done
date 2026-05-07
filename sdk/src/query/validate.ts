@@ -17,7 +17,6 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 
 import { MODEL_PROFILES } from './config-query.js';
@@ -25,6 +24,7 @@ import { GSDError, ErrorClassification } from '../errors.js';
 import { extractFrontmatter, parseMustHavesBlock } from './frontmatter.js';
 import { escapeRegex, normalizePhaseName, planningPaths, resolvePathUnderProject } from './helpers.js';
 import type { QueryHandler } from './utils.js';
+import { resolveBundledAgentsDir } from '../sdk-package-compatibility.js';
 
 /** Max length for key_links regex patterns (ReDoS mitigation). */
 const MAX_KEY_LINK_PATTERN_LEN = 512;
@@ -790,8 +790,7 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
  */
 function getAgentsDirForValidateAgents(): string {
   if (process.env.GSD_AGENTS_DIR) return process.env.GSD_AGENTS_DIR;
-  const here = dirname(fileURLToPath(import.meta.url));
-  return resolve(here, '..', '..', '..', 'agents');
+  return resolveBundledAgentsDir();
 }
 
 /**

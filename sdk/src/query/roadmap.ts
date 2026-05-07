@@ -21,6 +21,7 @@ import { existsSync } from 'node:fs';
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
+import { resolveGsdToolsPath } from '../sdk-package-compatibility.js';
 import {
   escapeRegex,
   normalizePhaseName,
@@ -737,11 +738,7 @@ export const roadmapAnnotateDependencies: QueryHandler = async (args, projectDir
   }
 
   const { spawnSync } = await import('node:child_process');
-  const { fileURLToPath } = await import('node:url');
-
-  const toolsPath = fileURLToPath(
-    new URL('../../../get-shit-done/bin/gsd-tools.cjs', import.meta.url),
-  );
+  const toolsPath = resolveGsdToolsPath(projectDir);
 
   const result = spawnSync(process.execPath, [toolsPath, 'roadmap', 'annotate-dependencies', phase], {
     cwd: projectDir,

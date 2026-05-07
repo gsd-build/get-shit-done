@@ -211,4 +211,45 @@ describe('generate-dev-preferences command', () => {
     const out = JSON.parse(result.output);
     assert.ok(out.command_path || out.command_name, 'should return command output');
   });
+
+  test('uses runtime-aware skills dir for codex by default', () => {
+    const analysis = {
+      profile_version: '1.0',
+      dimensions: {
+        communication_style: { rating: 'terse-direct', confidence: 'HIGH' },
+      },
+    };
+    const analysisPath = path.join(tmpDir, 'analysis.json');
+    const codexHome = path.join(tmpDir, 'codex-home');
+    fs.writeFileSync(analysisPath, JSON.stringify(analysis));
+
+    const result = runGsdTools(
+      ['generate-dev-preferences', '--analysis', analysisPath, '--raw'],
+      tmpDir,
+      { CODEX_HOME: codexHome, GSD_RUNTIME: 'codex' }
+    );
+    assert.ok(result.success, `Failed: ${result.error}`);
+    const out = JSON.parse(result.output);
+    assert.strictEqual(out.command_path, path.join(codexHome, 'skills', 'gsd-dev-preferences', 'SKILL.md'));
+    assert.ok(fs.existsSync(out.command_path), 'runtime-aware output should be written');
+  });
+
+  test('errors for cline unless --output is supplied', () => {
+    const analysis = {
+      profile_version: '1.0',
+      dimensions: {
+        communication_style: { rating: 'terse-direct', confidence: 'HIGH' },
+      },
+    };
+    const analysisPath = path.join(tmpDir, 'analysis.json');
+    fs.writeFileSync(analysisPath, JSON.stringify(analysis));
+
+    const result = runGsdTools(
+      ['generate-dev-preferences', '--analysis', analysisPath, '--raw'],
+      tmpDir,
+      { GSD_RUNTIME: 'cline' }
+    );
+    assert.ok(!result.success, 'cline should require explicit --output');
+    assert.ok(result.error.includes('does not use a skills directory'), 'should explain unsupported runtime');
+  });
 });

@@ -13,15 +13,15 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from '../config.js';
 import { GSDError, ErrorClassification } from '../errors.js';
-import { detectRuntime } from './helpers.js';
+import { detectRuntime, resolveGlobalSkillMarkdownPath } from './helpers.js';
 import { CLAUDE_INSTRUCTIONS } from './profile-questionnaire-data.js';
 import type { QueryHandler } from './utils.js';
+import { resolveBundledTemplatesDir } from '../sdk-package-compatibility.js';
 
-const TEMPLATE_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../get-shit-done/templates');
+const TEMPLATE_DIR = resolveBundledTemplatesDir();
 
 const DIMENSION_KEYS = [
   'communication_style',
@@ -601,7 +601,21 @@ export const generateDevPreferences: QueryHandler = async (args, projectDir) => 
 
   let outPath = outputPathOpt;
   if (!outPath) {
-    outPath = join(homedir(), '.claude', 'commands', 'gsd', 'dev-preferences.md');
+    let runtime = detectRuntime();
+    try {
+      const config = await loadConfig(projectDir);
+      runtime = detectRuntime(config as { runtime?: unknown });
+    } catch {
+      /* default runtime */
+    }
+    const defaultSkillPath = resolveGlobalSkillMarkdownPath(runtime, 'gsd-dev-preferences');
+    if (!defaultSkillPath) {
+      throw new GSDError(
+        `Runtime "${runtime}" does not use a skills directory; pass --output to choose a path explicitly.`,
+        ErrorClassification.Validation,
+      );
+    }
+    outPath = defaultSkillPath;
   } else if (!isAbsolute(outPath)) {
     outPath = join(projectDir, outPath);
   }

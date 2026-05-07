@@ -5,7 +5,9 @@
  * Ports `buildAgentSkillsBlock` semantics from
  * `get-shit-done/bin/lib/init.cjs` so the SDK path honors
  * `config.agent_skills[agentType]` the same way the legacy
- * `gsd-tools.cjs agent-skills <type>` path does. Fixes #2555.
+ * `gsd-tools.cjs agent-skills <type>` path does. Project-relative skills stay
+ * project-root validated; `global:<name>` now resolves through runtime-aware
+ * global skills dir policy rather than a Claude-only hardcoded path. Fixes #2555.
  *
  * @example
  * ```typescript
@@ -23,9 +25,9 @@
 
 import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
-import { homedir } from 'node:os';
 
 import type { QueryHandler } from './utils.js';
+import { detectRuntime, renderGlobalSkillDisplayPath, resolveGlobalSkillDir, resolveGlobalSkillsBase } from './helpers.js';
 import { loadConfig } from '../config.js';
 
 const GLOBAL_SKILL_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -76,13 +78,14 @@ export const agentSkills: QueryHandler = async (args, projectDir) => {
   }
   if (skillPaths.length === 0) return { data: '' };
 
-  const globalSkillsBase = join(homedir(), '.claude', 'skills');
+  const runtime = detectRuntime(config as { runtime?: unknown });
+  const globalSkillsBase = resolveGlobalSkillsBase(runtime);
   const validEntries: Array<{ ref: string }> = [];
 
   for (const entry of skillPaths) {
     if (typeof entry !== 'string') continue;
 
-    // `global:<name>` — skill installed under ~/.claude/skills/<name>/ (#1992).
+    // `global:<name>` — skill installed under the runtime-global skills dir (#1992, #3126).
     if (entry.startsWith('global:')) {
       const skillName = entry.slice(7);
       if (!skillName) {
@@ -93,17 +96,22 @@ export const agentSkills: QueryHandler = async (args, projectDir) => {
         process.stderr.write(`[agent-skills] WARNING: Invalid global skill name "${skillName}" — skipping\n`);
         continue;
       }
-      const skillDir = join(globalSkillsBase, skillName);
-      const skillMd = join(skillDir, 'SKILL.md');
-      if (!existsSync(skillMd)) {
-        process.stderr.write(`[agent-skills] WARNING: Global skill not found at "~/.claude/skills/${skillName}/SKILL.md" — skipping\n`);
+      if (globalSkillsBase === null) {
+        process.stderr.write(`[agent-skills] WARNING: Runtime "${runtime}" does not use a skills directory — "global:${skillName}" is not supported on this runtime\n`);
+        continue;
+      }
+      const skillDir = resolveGlobalSkillDir(runtime, skillName);
+      const skillMd = skillDir ? join(skillDir, 'SKILL.md') : null;
+      const displayPath = renderGlobalSkillDisplayPath(runtime, skillName);
+      if (!skillMd || !existsSync(skillMd)) {
+        process.stderr.write(`[agent-skills] WARNING: Global skill not found at "${displayPath}/SKILL.md" — skipping\n`);
         continue;
       }
       if (resolveWithinBase(skillMd, globalSkillsBase) === null) {
         process.stderr.write(`[agent-skills] WARNING: Global skill "${skillName}" failed path check (symlink escape?) — skipping\n`);
         continue;
       }
-      validEntries.push({ ref: `~/.claude/skills/${skillName}/SKILL.md` });
+      validEntries.push({ ref: skillMd });
       continue;
     }
 
