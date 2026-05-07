@@ -23,18 +23,10 @@ import { existsSync, statSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { relPlanningPath } from '../workstream-utils.js';
+export { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
+import { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 
 // ─── Runtime-aware agents directory resolution ─────────────────────────────
-
-/**
- * Supported GSD runtimes. Kept in sync with `bin/install.js:getGlobalDir()`.
- */
-export const SUPPORTED_RUNTIMES = [
-  'claude', 'opencode', 'kilo', 'gemini', 'codex', 'copilot', 'antigravity',
-  'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'codebuddy', 'cline',
-] as const;
-
-export type Runtime = (typeof SUPPORTED_RUNTIMES)[number];
 
 function expandTilde(p: string): string {
   return p.startsWith('~/') || p === '~' ? join(homedir(), p.slice(1)) : p;
@@ -82,6 +74,10 @@ export function getRuntimeConfigDir(runtime: Runtime): string {
       return process.env.CODEBUDDY_CONFIG_DIR ? expandTilde(process.env.CODEBUDDY_CONFIG_DIR) : join(homedir(), '.codebuddy');
     case 'cline':
       return process.env.CLINE_CONFIG_DIR ? expandTilde(process.env.CLINE_CONFIG_DIR) : join(homedir(), '.cline');
+    case 'hermes':
+      return process.env.HERMES_HOME ? expandTilde(process.env.HERMES_HOME) : join(homedir(), '.hermes');
+    default:
+      throw new Error(`Unknown runtime: ${String(runtime)}`);
   }
 }
 

@@ -1071,12 +1071,40 @@ describe('resolve-model command', () => {
     assert.strictEqual(output.unknown_agent, undefined, 'should not have unknown_agent for known agent');
   });
 
+  test('shipped-but-previously-missing agent resolves under quality profile (#3229)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ model_profile: 'quality' }));
+    const result = runGsdTools('resolve-model gsd-code-reviewer', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'opus');
+    assert.strictEqual(output.profile, 'quality');
+    assert.strictEqual(output.unknown_agent, undefined);
+  });
+
   test('unknown agent returns unknown_agent=true', () => {
     const result = runGsdTools('resolve-model fake-nonexistent-agent', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.unknown_agent, true, 'should flag unknown agent');
+  });
+
+  test('unknown agent uses quality-semantic fallback (opus)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ model_profile: 'quality' }));
+    const result = runGsdTools('resolve-model fake-nonexistent-agent', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'opus');
+    assert.strictEqual(output.unknown_agent, true);
+  });
+
+  test('unknown agent uses budget-semantic fallback (haiku)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ model_profile: 'budget' }));
+    const result = runGsdTools('resolve-model fake-nonexistent-agent', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'haiku');
+    assert.strictEqual(output.unknown_agent, true);
   });
 
   test('default profile fallback when no config exists', () => {

@@ -15,6 +15,7 @@
     "hooks",
     "scripts",
     "sdk/src",
+    "sdk/shared",
     "sdk/prompts",
     "sdk/dist",
     "sdk/package.json",

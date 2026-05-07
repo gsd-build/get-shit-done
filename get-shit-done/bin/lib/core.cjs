@@ -7,6 +7,7 @@ const os = require('os');
 const path = require('path');
 const { execSync, execFileSync, spawnSync } = require('child_process');
 const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES, AGENT_DEFAULT_TIERS, VALID_AGENT_TIERS, nextTier } = require('./model-profiles.cjs');
+const { MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT } = require('./model-catalog.cjs');
 // Compatibility shim: new imports should use planning-workspace.cjs directly.
 const {
   planningDir,
@@ -1301,102 +1302,9 @@ function checkAgentsInstalled() {
 
 // ─── Model alias resolution ───────────────────────────────────────────────────
 
-/**
- * Map short model aliases to full model IDs.
- * Updated each release to match current model versions.
- * Users can override with model_overrides in config.json for custom/latest models.
- */
-const MODEL_ALIAS_MAP = {
-  'opus': 'claude-opus-4-7',
-  'sonnet': 'claude-sonnet-4-6',
-  'haiku': 'claude-haiku-4-5',
-};
-
-/**
- * #2517 — runtime-aware tier resolution.
- * Maps `model_profile` tiers (opus/sonnet/haiku) to runtime-native model IDs and
- * (where supported) reasoning_effort settings.
- *
- * Each entry: { model: <id>, reasoning_effort?: <level> }
- *
- * `claude` mirrors MODEL_ALIAS_MAP — present for symmetry so `runtime: "claude"`
- * resolves through the same code path. `codex` defaults are taken from the spec
- * in #2517. Unknown runtimes fall back to the Claude alias to avoid emitting
- * provider-specific IDs the runtime cannot accept.
- */
-const RUNTIME_PROFILE_MAP = {
-  claude: Object.fromEntries(
-    Object.entries(MODEL_ALIAS_MAP).map(([tier, model]) => [tier, { model }])
-  ),
-  codex: {
-    opus:   { model: 'gpt-5.4',        reasoning_effort: 'xhigh' },
-    sonnet: { model: 'gpt-5.3-codex',  reasoning_effort: 'medium' },
-    haiku:  { model: 'gpt-5.4-mini',   reasoning_effort: 'medium' },
-  },
-  gemini: {
-    opus:   { model: 'gemini-3-pro' },
-    sonnet: { model: 'gemini-3-flash' },
-    haiku:  { model: 'gemini-2.5-flash-lite' },
-  },
-  qwen: {
-    opus:   { model: 'qwen3-max-2026-01-23' },
-    sonnet: { model: 'qwen3-coder-plus' },
-    haiku:  { model: 'qwen3-coder-next' },
-  },
-  opencode: {
-    opus:   { model: 'anthropic/claude-opus-4-7' },
-    sonnet: { model: 'anthropic/claude-sonnet-4-6' },
-    haiku:  { model: 'anthropic/claude-haiku-4-5' },
-  },
-  copilot: {
-    opus:   { model: 'claude-opus-4-7' },
-    sonnet: { model: 'claude-sonnet-4-6' },
-    haiku:  { model: 'claude-haiku-4-5' },
-  },
-  hermes: {
-    // Hermes Agent is provider-agnostic; users pick any provider in ~/.hermes/config.yaml.
-    // Defaults use OpenRouter slugs because (a) OpenRouter is Hermes' default provider and
-    // (b) the same slugs resolve on OpenRouter, native Anthropic, and Copilot via Hermes'
-    // aggregator-aware resolver. Users on a different provider override per-tier via
-    // model_profile_overrides.hermes.{opus,sonnet,haiku} in .planning/config.json.
-    opus:   { model: 'anthropic/claude-opus-4-7' },
-    sonnet: { model: 'anthropic/claude-sonnet-4-6' },
-    haiku:  { model: 'anthropic/claude-haiku-4-5' },
-  },
-};
-
-const RUNTIMES_WITH_REASONING_EFFORT = new Set(['codex']);
-
-/**
- * Tier enum allowed under `model_profile_overrides[runtime][tier]`. Mirrors the
- * regex in `config-schema.cjs` (DYNAMIC_KEY_PATTERNS) so loadConfig surfaces the
- * same constraint at read time, not only at config-set time (review finding #10).
- */
 const RUNTIME_OVERRIDE_TIERS = new Set(['opus', 'sonnet', 'haiku']);
-
-/**
- * Allowlist of runtime names the install pipeline currently knows how to emit
- * native model IDs for. Synced with `getDirName` in `bin/install.js` and the
- * runtime list in `docs/CONFIGURATION.md`. Free-string runtimes outside this
- * set are still accepted (#2517 deliberately leaves the runtime field open) —
- * a warning fires once at loadConfig so a typo like `runtime: "codx"` does not
- * silently fall back to Claude defaults (review findings #10, #13).
- */
-const KNOWN_RUNTIMES = new Set([
-  'claude', 'codex', 'opencode', 'kilo', 'gemini', 'qwen',
-  'copilot', 'cursor', 'windsurf', 'augment', 'trae', 'codebuddy',
-  'antigravity', 'cline', 'hermes',
-]);
-
 const _warnedConfigKeys = new Set();
-/**
- * Emit a one-time stderr warning for unknown runtime/tier keys in a parsed
- * config blob. Idempotent across calls — the same (file, key) pair only warns
- * once per process so loadConfig can be called repeatedly without spamming.
- *
- * Does NOT reject — preserves back-compat for users on a runtime not yet in the
- * allowlist (the new-runtime case must always be possible without code changes).
- */
+
 function _warnUnknownProfileOverrides(parsed, configLabel) {
   if (!parsed || typeof parsed !== 'object') return;
 
@@ -1574,7 +1482,12 @@ function resolveModelInternal(cwd, agentType) {
   }
 
   // 5. Profile lookup (Claude-native default).
-  if (!agentModels) return 'sonnet';
+  if (!agentModels) {
+    return profile === 'quality' ? 'opus'
+      : profile === 'budget' ? 'haiku'
+      : profile === 'inherit' ? 'inherit'
+      : 'sonnet';
+  }
   // Gate on tier (not profile) so a valid phase-type override beats
   // profile=inherit (#3030 CR Major).
   if (tier === 'inherit') return 'inherit';

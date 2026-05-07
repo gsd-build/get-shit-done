@@ -14,6 +14,7 @@ import { buildExecutorPrompt, parseAgentTools, DEFAULT_ALLOWED_TOOLS } from './p
 import type { GSDEventStream, EventStreamContext } from './event-stream.js';
 import { getToolsForPhase } from './tool-scoping.js';
 import { detectRuntime } from './query/helpers.js';
+import { resolveRuntimeTierDefault } from './model-catalog.js';
 
 // ─── Model resolution ────────────────────────────────────────────────────────
 
@@ -50,12 +51,13 @@ function resolveModel(options?: SessionOptions, config?: GSDConfig): string | un
   }
 
   if (config?.model_profile) {
-    const profileMap: Record<string, string> = {
-      balanced: 'claude-sonnet-4-6',
-      quality: 'claude-opus-4-6',
-      speed: 'claude-haiku-4-5',
-    };
-    return profileMap[config.model_profile] ?? config.model_profile;
+    const profile = String(config.model_profile).toLowerCase();
+    const tier = profile === 'quality' ? 'opus'
+      : (profile === 'budget' || profile === 'speed') ? 'haiku'
+      : (profile === 'balanced' || profile === 'adaptive') ? 'sonnet'
+      : null;
+    if (!tier) return config.model_profile;
+    return resolveRuntimeTierDefault('claude', tier)?.model;
   }
 
   return undefined; // Let SDK use its default

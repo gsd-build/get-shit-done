@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { GSDError, ErrorClassification, exitCodeFor } from '../errors.js';
 
@@ -121,16 +121,36 @@ describe('resolveModel', () => {
     expect(data).not.toHaveProperty('unknown_agent');
   });
 
-  it('returns unknown_agent flag for unknown agent', async () => {
+  it('resolves shipped-but-previously-missing agents without unknown_agent (#3229)', async () => {
     const { resolveModel } = await import('./config-query.js');
     await writeFile(
       join(tmpDir, '.planning', 'config.json'),
-      JSON.stringify({ model_profile: 'balanced' }),
+      JSON.stringify({ model_profile: 'quality' }),
     );
-    const result = await resolveModel(['unknown-agent'], tmpDir);
+    const result = await resolveModel(['gsd-code-reviewer'], tmpDir);
     const data = result.data as Record<string, unknown>;
-    expect(data).toHaveProperty('model', 'sonnet');
-    expect(data).toHaveProperty('unknown_agent', true);
+    expect(data).toHaveProperty('model', 'opus');
+    expect(data).toHaveProperty('profile', 'quality');
+    expect(data).not.toHaveProperty('unknown_agent');
+  });
+
+  it('returns profile-semantic fallback for truly unknown agents (#3229)', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' }),
+    );
+    const quality = (await resolveModel(['unknown-agent'], tmpDir)).data as Record<string, unknown>;
+    expect(quality).toHaveProperty('model', 'opus');
+    expect(quality).toHaveProperty('unknown_agent', true);
+
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'budget' }),
+    );
+    const budget = (await resolveModel(['unknown-agent'], tmpDir)).data as Record<string, unknown>;
+    expect(budget).toHaveProperty('model', 'haiku');
+    expect(budget).toHaveProperty('unknown_agent', true);
   });
 
   it('throws GSDError when no agent type provided', async () => {
@@ -195,12 +215,17 @@ describe('resolveModel', () => {
 // ─── MODEL_PROFILES ─────────────────────────────────────────────────────────
 
 describe('MODEL_PROFILES', () => {
-  it('contains all 18 agent entries (sync with model-profiles.cjs)', async () => {
+  it('contains every shipped gsd agent file on disk (#3229)', async () => {
     const { MODEL_PROFILES } = await import('./config-query.js');
-    expect(Object.keys(MODEL_PROFILES)).toHaveLength(18);
+    const repoRoot = resolve(process.cwd(), '..');
+    const agentFiles = (await readdir(join(repoRoot, 'agents')))
+      .filter((f) => /^gsd-.*\.md$/.test(f))
+      .map((f) => f.replace(/\.md$/, ''))
+      .sort();
+    expect(Object.keys(MODEL_PROFILES).sort()).toEqual(agentFiles);
   });
 
-  it('has quality/balanced/budget/adaptive for each agent', async () => {
+  it('has quality/balanced/budget/adaptive for each shipped agent', async () => {
     const { MODEL_PROFILES } = await import('./config-query.js');
     for (const agent of Object.keys(MODEL_PROFILES)) {
       expect(MODEL_PROFILES[agent]).toHaveProperty('quality');
@@ -214,9 +239,9 @@ describe('MODEL_PROFILES', () => {
 // ─── VALID_PROFILES ─────────────────────────────────────────────────────────
 
 describe('VALID_PROFILES', () => {
-  it('contains the four profile names', async () => {
+  it('contains quality, balanced, budget, adaptive, and inherit', async () => {
     const { VALID_PROFILES } = await import('./config-query.js');
-    expect(VALID_PROFILES).toEqual(['quality', 'balanced', 'budget', 'adaptive']);
+    expect(VALID_PROFILES.sort()).toEqual(['adaptive', 'balanced', 'budget', 'inherit', 'quality']);
   });
 });
 
