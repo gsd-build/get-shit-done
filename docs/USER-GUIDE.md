@@ -723,19 +723,82 @@ The `security.cjs` module scans for known injection patterns (role overrides, in
 
 ### Package Legitimacy Gate (v1.51)
 
-GSD's research → plan → execute pipeline is uniquely exposed to *slopsquatting*: AI-hallucinated package names that attackers pre-register on npm/PyPI/crates.io with malicious post-install scripts. A hallucinated name that passes `npm view` can flow all the way through to `gsd-executor` running `npm install <malicious-pkg>` with no human gate. v1.51 closes this gap.
+AI coding tools hallucinate package names. Attackers pre-register those names on npm, PyPI, and crates.io with malicious post-install scripts — a technique called *slopsquatting*. A hallucinated name that passes `npm view` looks legitimate, so it would flow undetected through GSD's research → plan → execute pipeline all the way to `npm install <malicious-pkg>` running on your machine.
 
-**How it works:**
+v1.51 adds a three-layer gate that stops this before it reaches your shell.
 
-1. **Researcher** — runs `slopcheck install <pkg> --json` against every recommended package. Results are recorded in a new `## Package Legitimacy Audit` section of RESEARCH.md with columns for Registry, Age, Downloads, Source Repo, and slopcheck verdict (`[OK]` / `[SUS]` / `[SLOP]`). `[SLOP]` packages are removed from RESEARCH.md entirely before the planner sees them.
+#### What you'll see
 
-2. **Planner** — reads the Package Legitimacy Audit table. Any package tagged `[ASSUMED]` (WebSearch-sourced, not registry-verified) or `[SUS]` (slopcheck suspicious) must be preceded by a `checkpoint:human-verify` task before the install task in PLAN.md. Plans that install packages also get a standing `T-{phase}-SC` supply-chain STRIDE row in `<threat_model>`.
+**In RESEARCH.md** — every phase that recommends external packages now includes a `## Package Legitimacy Audit` table:
 
-3. **Executor** — RULE 3 (auto-fix blocking issues) explicitly excludes package installation from auto-fix scope. If an install fails, the executor surfaces a `checkpoint:human-verify` rather than silently trying a similarly-named alternative.
+```markdown
+## Package Legitimacy Audit
 
-**Graceful degradation:** If `slopcheck` is unavailable at research time, the researcher tags every recommended package `[ASSUMED]` — the planner then gates every install with a human checkpoint. The system fails safe, never silently.
+| Package | Registry | Age | Downloads | Source Repo | slopcheck | Disposition |
+|---------|----------|-----|-----------|-------------|-----------|-------------|
+| express | npm | 13 yrs | 100M+/wk | github.com/expressjs/express | [OK] | Approved |
+| some-new-util | npm | 3 days | 47 | none | [SLOP] | REMOVED |
+| api-bridge | npm | 6 mo | 1.2k/wk | github.com/user/api-bridge | [SUS] | Flagged |
 
-**slopcheck dependency:** `slopcheck` is a MIT-licensed Python tool (`pip install slopcheck`). It checks packages across npm, PyPI, crates.io, RubyGems, Go, Maven, and Packagist. If unavailable, GSD continues with the `[ASSUMED]`-gate fallback.
+**Packages removed due to slopcheck:** some-new-util
+**Packages flagged as suspicious:** api-bridge — planner will require human verification before install
+```
+
+`[SLOP]` packages are removed from RESEARCH.md entirely. They never reach the planner.
+
+**In PLAN.md** — if a package is tagged `[ASSUMED]` (sourced from WebSearch, not registry-verified) or `[SUS]` (slopcheck suspicious), the plan includes a verification checkpoint *before* the install task:
+
+```xml
+<task type="checkpoint:human-verify">
+  <what-built>Package verification required before install</what-built>
+  <how-to-verify>
+    Verify these packages before proceeding:
+    - `api-bridge` [SUS — 6 months old, 1.2k downloads/week, GitHub repo present]
+      Check: https://npmjs.com/package/api-bridge
+      Look for: maintainer history, issue tracker activity, no suspicious install scripts
+  </how-to-verify>
+  <resume-signal>Type "verified" once you've confirmed all packages are legitimate</resume-signal>
+</task>
+```
+
+**During execution** — if an install fails, the executor surfaces a checkpoint and stops. It does not silently try a similarly-named alternative (which could be even more dangerous).
+
+#### Slopcheck verdicts
+
+| Verdict | Meaning | GSD action |
+|---------|---------|------------|
+| `[OK]` | Package passes all legitimacy checks | Proceeds — no checkpoint added |
+| `[SUS]` | Suspicious signals (new, low downloads, no source repo, etc.) | Flagged in Audit table; planner adds `checkpoint:human-verify` before install |
+| `[SLOP]` | High-confidence hallucination or attacker-registered package | Removed from RESEARCH.md; never reaches planner |
+
+#### Claim provenance and WebSearch packages
+
+Package names discovered through WebSearch are always tagged `[ASSUMED]` in RESEARCH.md, regardless of whether `npm view` succeeds. A package that exists on the registry is not the same as a package that's safe to install — `npm view` only proves registration, not legitimacy.
+
+`[ASSUMED]` packages trigger the same `checkpoint:human-verify` gate as `[SUS]` packages. You'll see the checkpoint with a link to the registry page and guidance on what to look for.
+
+#### If slopcheck isn't installed
+
+GSD attempts `pip install slopcheck` at research time. If that fails:
+
+- Every recommended package is tagged `[ASSUMED]`
+- The planner gates every install with a `checkpoint:human-verify` task
+- Research and planning complete normally — nothing hard-fails
+
+This is intentionally stricter than the normal flow: slopcheck unavailability means every package install gets a human checkpoint, which is the safest fallback.
+
+To install slopcheck manually:
+
+```bash
+pip install slopcheck
+# verify: slopcheck install express --json
+```
+
+#### slopcheck dependency
+
+`slopcheck` is a MIT-licensed Python tool maintained by ToxSec (the researcher who documented the slopsquatting attack surface). It checks packages across npm, PyPI, crates.io, RubyGems, Go modules, Maven, and Packagist using multi-signal heuristics: registry age, download count, source-repo linkage, naming distance to popular packages, and registry-specific suspicion patterns.
+
+If `slopcheck` is ever unavailable or abandoned, GSD's `[ASSUMED]`-gate fallback ensures you always get a human checkpoint before any install — the system never silently degrades to the pre-v1.51 behavior.
 
 ---
 
