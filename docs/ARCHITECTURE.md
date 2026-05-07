@@ -433,7 +433,11 @@ ui-phase → UI-SPEC.md (design contract, optional)
 plan-phase
     ├── Research gate (blocks if RESEARCH.md has unresolved open questions)
     ├── Phase Researcher → RESEARCH.md
+    │       └── Package Legitimacy Gate: slopcheck on every package; [SLOP] removed,
+    │           [SUS]/[ASSUMED] flagged; Audit table written to RESEARCH.md
     ├── Planner (with reachability check) → PLAN.md files
+    │       └── checkpoint:human-verify injected before [ASSUMED]/[SUS] installs;
+    │           T-{phase}-SC STRIDE row added for install-bearing plans
     ├── Plan Checker → Verify loop (max 3x)
     ├── Requirements coverage gate (REQ-IDs → plans)
     └── Decision coverage gate (CONTEXT.md `<decisions>` → plans, BLOCKING — #2492)
@@ -652,6 +656,17 @@ Debounce: 5 tool uses between repeated warnings. Severity escalation (WARNING→
 - Stale metrics (>60s old) are ignored
 - Missing bridge files handled gracefully (subagents, fresh sessions)
 - Context monitor is advisory — never issues imperative commands that override user preferences
+
+### Package Legitimacy Gate (v1.51)
+
+The researcher → planner → executor pipeline includes a supply-chain gate against slopsquatting (AI-hallucinated package names pre-registered with malicious install hooks):
+
+- **Researcher**: runs `slopcheck install <pkg> --json` on every recommended package; writes a `## Package Legitimacy Audit` table to RESEARCH.md; strips `[SLOP]` packages entirely.
+- **Planner**: inserts `checkpoint:human-verify` before any `[ASSUMED]` or `[SUS]` install task; adds `T-{phase}-SC` STRIDE row to `<threat_model>` for install-bearing plans.
+- **Executor**: RULE 3 excludes package installation from auto-fix; failed installs become checkpoints, never silent substitutions.
+- **Graceful degradation**: if `slopcheck` is unavailable, every recommended package is tagged `[ASSUMED]` and gated with a checkpoint — strictly safer than the previous behavior.
+
+---
 
 ### Security Hooks (v1.27)
 

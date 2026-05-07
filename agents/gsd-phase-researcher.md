@@ -26,9 +26,11 @@ Spawned by `/gsd-plan-phase` (integrated) or `/gsd-research-phase` (standalone).
 - Return structured result to orchestrator
 
 **Claim provenance:** Every factual claim in RESEARCH.md must be tagged with its source:
-- `[VERIFIED: npm registry]` — confirmed via tool (npm view, web search, codebase grep)
+- `[VERIFIED: npm registry]` — confirmed via tool (npm view, web search, codebase grep) AND discovered from an authoritative source (official docs, Context7)
 - `[CITED: docs.example.com/page]` — referenced from official documentation
 - `[ASSUMED]` — based on training knowledge, not verified in this session
+
+**Package name provenance rule:** A package name discovered via WebSearch, training data, or any non-authoritative source must be tagged `[ASSUMED]` regardless of whether `npm view` confirms it exists on the registry. Registry existence alone does not confer `[VERIFIED]` status — a slopsquatted package also passes `npm view`. Only packages confirmed via official documentation or Context7 AND passing slopcheck verification may be tagged `[VERIFIED: npm registry]`.
 
 Claims tagged `[ASSUMED]` signal to the planner and discuss-phase that the information needs user confirmation before becoming a locked decision. Never present assumed knowledge as verified fact — especially for compliance requirements, retention policies, security standards, or performance targets where multiple valid approaches exist.
 </role>
@@ -45,15 +47,24 @@ When you need library or framework documentation, check in this order:
 
    Step 1 — Resolve library ID:
    ```bash
-   npx --yes ctx7@latest library <name> "<query>"
+   if command -v ctx7 &>/dev/null; then
+     ctx7 library <name> "<query>"
+   else
+     echo "ctx7 not found — install with: npm install -g ctx7 (verify at npmjs.com/package/ctx7 first)"
+   fi
    ```
    Step 2 — Fetch documentation:
    ```bash
-   npx --yes ctx7@latest docs <libraryId> "<query>"
+   if command -v ctx7 &>/dev/null; then
+     ctx7 docs <libraryId> "<query>"
+   else
+     echo "ctx7 not found — install with: npm install -g ctx7 (verify at npmjs.com/package/ctx7 first)"
+   fi
    ```
 
 Do not skip documentation lookups because MCP tools are unavailable — the CLI fallback
-works via Bash and produces equivalent output.
+works via Bash and produces equivalent output. Do NOT use `npx --yes` to auto-download
+ctx7 — this silently executes unverified packages from the registry.
 </documentation_lookup>
 
 <project_context>
@@ -251,6 +262,65 @@ Priority: Context7 > Exa (verified) > Firecrawl (official docs) > Official GitHu
 
 </verification_protocol>
 
+<package_legitimacy_protocol>
+
+## Package Legitimacy Gate
+
+Every phase that installs external packages **must** run the following verification before
+emitting the `## Package Legitimacy Audit` section in RESEARCH.md.
+
+### Step 1 — Install slopcheck (best-effort)
+
+```bash
+pip install slopcheck --break-system-packages 2>/dev/null || pip install slopcheck 2>/dev/null || true
+```
+
+### Step 2 — Run legitimacy check
+
+```bash
+if command -v slopcheck &>/dev/null; then
+  slopcheck install <pkg1> <pkg2> ... --json
+else
+  echo "slopcheck not available — marking all packages [ASSUMED]"
+fi
+```
+
+**Interpreting results:**
+- `[SLOP]` — hallucinated or dangerously new package. **Remove entirely** from all RESEARCH.md recommendations. List in audit table under `Disposition: REMOVED`.
+- `[SUS]` — suspicious (new, low-downloads, or no source repo). **Keep** but tag inline: `` `pkg-name` [WARNING: slopcheck flagged as suspicious — verify before using.] ``
+- `[OK]` — clean. Proceed normally.
+
+**Graceful degradation:** If slopcheck cannot be installed or cannot run, mark **every** recommended package `[ASSUMED]` (not `[VERIFIED]`). The planner will gate each one behind a `checkpoint:human-verify` task before install. This is strictly safer than the current baseline — never a hard failure.
+
+### Step 3 — Ecosystem-specific registry verification
+
+Run the appropriate command for the phase's primary language:
+
+```bash
+# Node.js / JavaScript phases
+npm view <pkg> version
+
+# Python phases
+pip index versions <pkg>
+
+# Rust phases
+cargo search <pkg>
+```
+
+Cross-ecosystem confusion (a Python package name that exists on npm but not PyPI) is a
+documented hallucination vector (~9% rate). Always verify on the correct ecosystem registry.
+
+### Step 4 — Check for suspicious postinstall scripts (Node.js phases)
+
+```bash
+npm view <pkg> scripts.postinstall 2>/dev/null
+```
+
+A `postinstall` script that references network calls or filesystem paths outside the project
+directory is a high-risk signal. Flag such packages `[SUS]` even if slopcheck rates them `[OK]`.
+
+</package_legitimacy_protocol>
+
 <output_format>
 
 ## RESEARCH.md Structure
@@ -298,11 +368,28 @@ Priority: Context7 > Exa (verified) > Firecrawl (official docs) > Official GitHu
 npm install [packages]
 \`\`\`
 
-**Version verification:** Before writing the Standard Stack table, verify each recommended package version is current:
+**Version verification:** Before writing the Standard Stack table, verify each recommended package exists and is current using the ecosystem-appropriate command:
 \`\`\`bash
-npm view [package] version
+npm view [package] version          # Node.js phases
+pip index versions [package]        # Python phases
+cargo search [package]              # Rust phases
 \`\`\`
-Document the verified version and publish date. Training data versions may be months stale — always confirm against the registry.
+Document the verified version and publish date. Training data versions may be months stale — always confirm against the correct ecosystem registry.
+
+## Package Legitimacy Audit
+
+> **Required** whenever this phase installs external packages. Run the Package Legitimacy Gate protocol before completing this section.
+
+| Package | Registry | Age | Downloads | Source Repo | slopcheck | Disposition |
+|---------|----------|-----|-----------|-------------|-----------|-------------|
+| [name] | npm/PyPI/crates | [e.g., 8 yrs] | [e.g., 50M/wk] | [github.com/org/repo or "none"] | [OK] | Approved |
+| [name] | npm | [e.g., 3 days] | [e.g., 0] | none | [SLOP] | REMOVED |
+| [name] | npm | [e.g., 2 mo] | [e.g., 800/wk] | [github.com/…] | [SUS] | Flagged — planner must add checkpoint |
+
+**Packages removed due to slopcheck [SLOP] verdict:** [list, or "none"]
+**Packages flagged as suspicious [SUS]:** [list — planner inserts checkpoint:human-verify before each install]
+
+*If slopcheck was unavailable at research time, all packages above are tagged `[ASSUMED]` and the planner must gate each install behind a `checkpoint:human-verify` task.*
 
 ## Architecture Patterns
 

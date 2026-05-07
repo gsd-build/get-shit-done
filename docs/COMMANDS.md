@@ -162,6 +162,9 @@ Research, plan, and verify a phase.
 - With `--research`: force-refresh — re-spawn researcher unconditionally, no prompt.
 - With `--view`: print existing RESEARCH.md to stdout, no spawn. Errors if RESEARCH.md missing.
 
+**Package Legitimacy Gate (v1.51):**
+When the researcher recommends external packages, it runs `slopcheck install <pkg> --json` and emits a `## Package Legitimacy Audit` table in RESEARCH.md. `[SLOP]` packages (hallucinated/attacker-registered) are removed before RESEARCH.md is written. `[ASSUMED]` or `[SUS]` packages cause the planner to insert a `checkpoint:human-verify` task before the corresponding install task in PLAN.md. The executor never auto-installs a substitute when an install fails. See the [Security section in the User Guide](USER-GUIDE.md#package-legitimacy-gate-v151) for full details.
+
 ```bash
 /gsd-plan-phase 1                              # Research + plan + verify phase 1
 /gsd-plan-phase 3 --skip-research              # Plan without research (familiar domain)

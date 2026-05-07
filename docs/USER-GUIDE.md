@@ -721,6 +721,24 @@ The `security.cjs` module scans for known injection patterns (role overrides, in
 
 ---
 
+### Package Legitimacy Gate (v1.51)
+
+GSD's research → plan → execute pipeline is uniquely exposed to *slopsquatting*: AI-hallucinated package names that attackers pre-register on npm/PyPI/crates.io with malicious post-install scripts. A hallucinated name that passes `npm view` can flow all the way through to `gsd-executor` running `npm install <malicious-pkg>` with no human gate. v1.51 closes this gap.
+
+**How it works:**
+
+1. **Researcher** — runs `slopcheck install <pkg> --json` against every recommended package. Results are recorded in a new `## Package Legitimacy Audit` section of RESEARCH.md with columns for Registry, Age, Downloads, Source Repo, and slopcheck verdict (`[OK]` / `[SUS]` / `[SLOP]`). `[SLOP]` packages are removed from RESEARCH.md entirely before the planner sees them.
+
+2. **Planner** — reads the Package Legitimacy Audit table. Any package tagged `[ASSUMED]` (WebSearch-sourced, not registry-verified) or `[SUS]` (slopcheck suspicious) must be preceded by a `checkpoint:human-verify` task before the install task in PLAN.md. Plans that install packages also get a standing `T-{phase}-SC` supply-chain STRIDE row in `<threat_model>`.
+
+3. **Executor** — RULE 3 (auto-fix blocking issues) explicitly excludes package installation from auto-fix scope. If an install fails, the executor surfaces a `checkpoint:human-verify` rather than silently trying a similarly-named alternative.
+
+**Graceful degradation:** If `slopcheck` is unavailable at research time, the researcher tags every recommended package `[ASSUMED]` — the planner then gates every install with a human checkpoint. The system fails safe, never silently.
+
+**slopcheck dependency:** `slopcheck` is a MIT-licensed Python tool (`pip install slopcheck`). It checks packages across npm, PyPI, crates.io, RubyGems, Go, Maven, and Packagist. If unavailable, GSD continues with the `[ASSUMED]`-gate fallback.
+
+---
+
 ### Execution Wave Coordination
 
 ```

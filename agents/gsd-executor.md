@@ -33,19 +33,26 @@ When you need library or framework documentation, check in this order:
 
    Step 1 — Resolve library ID:
    ```bash
-   npx --yes ctx7@latest library <name> "<query>"
+   if command -v ctx7 &>/dev/null; then
+     ctx7 library <name> "<query>"
+   else
+     echo "ctx7 not found — install with: npm install -g ctx7 (verify at npmjs.com/package/ctx7 first)"
+   fi
    ```
-   Example: `npx --yes ctx7@latest library react "useEffect hook"`
 
    Step 2 — Fetch documentation:
    ```bash
-   npx --yes ctx7@latest docs <libraryId> "<query>"
+   if command -v ctx7 &>/dev/null; then
+     ctx7 docs <libraryId> "<query>"
+   else
+     echo "ctx7 not found — install with: npm install -g ctx7 (verify at npmjs.com/package/ctx7 first)"
+   fi
    ```
-   Example: `npx --yes ctx7@latest docs /facebook/react "useEffect hook"`
 
 Do not skip documentation lookups because MCP tools are unavailable — the CLI fallback
 works via Bash and produces equivalent output. Do not rely on training knowledge alone
-for library APIs where version-specific behavior matters.
+for library APIs where version-specific behavior matters. Do NOT use `npx --yes` to
+auto-download ctx7 — this silently executes unverified packages from the registry.
 </documentation_lookup>
 
 <project_context>
@@ -168,7 +175,28 @@ No user permission needed for Rules 1-3.
 
 **Trigger:** Something prevents completing current task
 
-**Examples:** Missing dependency, wrong types, broken imports, missing env var, DB connection error, build config error, missing referenced file, circular dependency
+**Examples:** Wrong types, broken imports, missing env var, DB connection error, build config error, missing referenced file, circular dependency
+
+**EXCLUDED from RULE 3 — package manager installs:**
+Running `npm install <pkg>`, `pip install <pkg>`, `cargo add <pkg>`, or any equivalent package-manager install command is **NOT** auto-fixable. If a referenced package fails to install or cannot be found:
+1. Do NOT attempt to install a similarly-named alternative.
+2. Do NOT retry with a different package name.
+3. Return a `checkpoint:human-verify` task — the user must verify the package is legitimate before the executor proceeds.
+
+This exclusion exists because a failed install may indicate a slopsquatted or hallucinated package name. Auto-substituting an alternative could install something more dangerous. If a package install fails, emit:
+
+```xml
+<task type="checkpoint:human-verify" gate="blocking">
+  <what-built>Package install failed — human verification required</what-built>
+  <how-to-verify>
+    `[package-name]` could not be installed. Before proceeding:
+    1. Verify the package exists and is legitimate: https://npmjs.com/package/[package-name]
+    2. Confirm the package name is spelled correctly in PLAN.md
+    3. If the package does not exist, return to /gsd-research-phase to find the correct package
+  </how-to-verify>
+  <resume-signal>Type "verified" with the correct package name, or "abort" to stop the phase</resume-signal>
+</task>
+```
 
 ---
 
