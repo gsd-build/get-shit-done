@@ -25,9 +25,11 @@ describe('/gsd mvp-phase command frontmatter', () => {
     assert.match(content, /argument-hint:[^\n]*phase/i);
   });
 
-  test('allowed-tools includes Read, Write, Bash, Task, AskUserQuestion', () => {
+  test('allowed-tools includes Read, Write, Bash, Agent, AskUserQuestion', () => {
+    // Agent (not Task) is the subagent-spawner tool. Task was the old name before
+    // the dispatcher rename (#3168). mvp-phase is an orchestrator, so it needs Agent.
     const content = fs.readFileSync(CMD, 'utf-8');
-    for (const tool of ['Read', 'Write', 'Bash', 'Task', 'AskUserQuestion']) {
+    for (const tool of ['Read', 'Write', 'Bash', 'Agent', 'AskUserQuestion']) {
       assert.match(content, new RegExp(`-\\s*${tool}\\b`), `allowed-tools must include ${tool}`);
     }
   });
