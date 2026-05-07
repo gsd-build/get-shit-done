@@ -43,6 +43,9 @@ describe('gsd-check-update-worker: Windows npm spawn platform gate', () => {
 
   test('shell option is gated to process.platform === "win32"', () => {
     const src = fs.readFileSync(WORKER_PATH, 'utf8');
+
+    // Strip line and block comments so prose mentions of "shell:true" in
+    // documentation comments do not trigger the regression check.
     const codeOnly = src
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
