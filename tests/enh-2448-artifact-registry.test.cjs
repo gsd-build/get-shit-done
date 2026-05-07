@@ -47,6 +47,10 @@ describe('artifacts.cjs — isCanonicalPlanningFile', () => {
     assert.ok(isCanonicalPlanningFile('v2.3.1-MILESTONE-AUDIT.md'));
   });
 
+  test('returns true for RETROSPECTIVE.md (produced by /gsd-complete-milestone)', () => {
+    assert.strictEqual(isCanonicalPlanningFile('RETROSPECTIVE.md'), true);
+  });
+
   test('returns false for clearly non-canonical names', () => {
     assert.strictEqual(isCanonicalPlanningFile('MY-NOTES.md'), false);
     assert.strictEqual(isCanonicalPlanningFile('scratch.md'), false);

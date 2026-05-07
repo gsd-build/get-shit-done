@@ -22,6 +22,7 @@ These files live directly at `.planning/` — not inside phase subdirectories.
 | `THREADS.md` | *(inline)* | `/gsd-thread` | Persistent discussion threads |
 | `config.json` | `config.json` | `/gsd-new-project`, `/gsd-health --repair` | Project-specific GSD configuration |
 | `CLAUDE.md` | `claude-md.md` | `/gsd-profile` | Auto-assembled Claude Code context file |
+| `RETROSPECTIVE.md` | *(inline)* | `/gsd-complete-milestone` | Living milestone retrospective updated at each milestone close |
 
 ### Version-stamped artifacts (pattern: `vX.Y-*.md`)
 
