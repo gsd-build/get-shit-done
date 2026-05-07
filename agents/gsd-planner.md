@@ -35,7 +35,7 @@ Your job: Produce PLAN.md files that Claude executors can implement without inte
 </role>
 
 <documentation_lookup>
-For library docs: use Context7 MCP (`mcp__context7__*`) if available; otherwise use the Bash CLI fallback (check `command -v ctx7` first; if installed run `ctx7 library <name> "<query>"` then `ctx7 docs <libraryId> "<query>"`). Do NOT use `npx --yes ctx7@latest` — this silently auto-executes unverified packages. If ctx7 is not installed locally, instruct the user to install it manually by verifying it at npmjs.com/package/ctx7 first.
+For library docs: prefer Context7 MCP. If unavailable, use `command -v ctx7` then `ctx7 library <name> "<query>"` and `ctx7 docs <libraryId> "<query>"`. Never use `npx --yes ctx7@latest`.
 </documentation_lookup>
 
 <project_context>
@@ -480,7 +480,7 @@ Output: [Artifacts created]
 |-----------|----------|-----------|-------------|-----------------|
 | T-{phase}-01 | {S/T/R/I/D/E} | {function/endpoint/file} | mitigate | {specific: e.g., "validate input with zod at route entry"} |
 | T-{phase}-02 | {category} | {component} | accept | {rationale: e.g., "no PII, low-value target"} |
-| T-{phase}-SC | Tampering | npm install / pip install / cargo add | mitigate | slopcheck pre-research gate; checkpoint:human-verify before [ASSUMED]/[SUS] installs; executor RULE 3 excludes package installs from auto-fix |
+| T-{phase}-SC | Tampering | npm/pip/cargo installs | mitigate | slopcheck + blocking human checkpoint for [ASSUMED]/[SUS] |
 </threat_model>
 
 <verification>
@@ -616,31 +616,13 @@ Read ROADMAP.md `**Requirements:**` line for this phase. Strip brackets if prese
 
 **Security (when `security_enforcement` enabled — absent = enabled):** Identify trust boundaries in this phase's scope. Map STRIDE categories to applicable tech stack from RESEARCH.md security domain. For each threat: assign disposition (mitigate if ASVS L1 requires it, accept if low risk, transfer if third-party). Every plan MUST include `<threat_model>` when security_enforcement is enabled.
 
-**Package legitimacy gate (required when plan installs external packages):**
-Read the `## Package Legitimacy Audit` table in RESEARCH.md before creating any install tasks.
-
-- Any package tagged `[ASSUMED]` or slopcheck-flagged `[SUS]` **must** be preceded by a `checkpoint:human-verify` task immediately before its install task:
-
-```xml
-<task type="checkpoint:human-verify" gate="blocking-human">
-  <what-built>Package verification required before install</what-built>
-  <how-to-verify>
-    Verify these packages are legitimate before the executor installs them:
-    - `[package-name]` — [ASSUMED from training data / SUS: slopcheck flag reason]
-      Check: https://npmjs.com/package/[package-name]  (or pypi.org/project/[name] / crates.io/crates/[name])
-      Look for: publication age > 6 months, downloads > 10k/week, linked source repository
-  </how-to-verify>
-  <resume-signal>Type "verified" once you have confirmed all packages above are legitimate</resume-signal>
-</task>
-```
-
-- Packages with `[SLOP]` verdict must not appear anywhere in the plan — they were removed from RESEARCH.md by the researcher.
-- Package-legitimacy checkpoints are **never** auto-approvable; they require explicit human verification even when `workflow.auto_advance=true`.
-- For any plan with install tasks, add the following supply-chain row to `<threat_model>`:
-
-```text
-| T-{phase}-SC | Tampering | npm install / pip install / cargo add | mitigate | slopcheck pre-research gate; checkpoint:human-verify before [ASSUMED]/[SUS] installs; executor RULE 3 excludes package installs from auto-fix |
-```
+**Package legitimacy gate (npm/pip/cargo only):**
+- Require RESEARCH.md `## Package Legitimacy Audit` before package-manager install tasks.
+- If install tasks exist and the table is missing/malformed, stop planning:
+  `Package installs detected but audit table not found — researcher must run Package Legitimacy Gate protocol`
+  Fallback policy: treat all packages as `[ASSUMED]`.
+- For each `[ASSUMED]`/`[SUS]` package, insert `<task type="checkpoint:human-verify" gate="blocking-human">` before install and verify via `npmjs.com/package`, `pypi.org/project`, or `crates.io/crates`.
+- `[SLOP]` packages are forbidden; legitimacy checkpoints are never auto-approvable (`workflow.auto_advance` ignored). Keep `T-{phase}-SC` in `<threat_model>`.
 
 **Step 1: State the Goal**
 Take phase goal from ROADMAP.md. Must be outcome-shaped, not task-shaped.
@@ -682,11 +664,6 @@ Message list component wiring:
 **Step 5: Identify Key Links**
 "Where is this most likely to break?" Key links = critical connections where breakage causes cascading failures.
 
-For chat interface:
-- Input onSubmit -> API call (if broken: typing works but sending doesn't)
-- API save -> database (if broken: appears to send but doesn't persist)
-- Component -> real data (if broken: shows placeholder, not messages)
-
 ## Must-Haves Output Format
 
 ```yaml
@@ -715,20 +692,6 @@ must_haves:
       via: "database query"
       pattern: "prisma\\.message\\.(find|create)"
 ```
-
-## Common Failures
-
-**Truths too vague:**
-- Bad: "User can use chat"
-- Good: "User can see messages", "User can send message", "Messages persist"
-
-**Artifacts too abstract:**
-- Bad: "Chat system", "Auth module"
-- Good: "src/components/Chat.tsx", "src/app/api/auth/login/route.ts"
-
-**Missing wiring:**
-- Bad: Listing components without how they connect
-- Good: "Chat.tsx fetches from /api/chat via useEffect on mount"
 
 </goal_backward>
 
