@@ -51,7 +51,7 @@ AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper)
 Then spawn `gsd-codebase-mapper` agents with the `--paths` hint:
 
 ```text
-Task(
+Agent(
   subagent_type="gsd-codebase-mapper",
   description="Incremental codebase remap (drift)",
   prompt="Focus: arch
@@ -64,7 +64,7 @@ ${AGENT_SKILLS_MAPPER}"
 )
 ```
 
-> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
 If the spawn fails or the agent reports an error: log `Codebase drift
 auto-remap failed: {reason}` and continue to `verify_phase_goal`. The phase

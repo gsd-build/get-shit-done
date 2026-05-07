@@ -200,3 +200,142 @@ describe('checkCommit', () => {
     expect((result.data as { can_commit: boolean }).can_commit).toBe(true);
   });
 });
+
+// ─── pathspec scope regression (#3061) ────────────────────────────────────
+//
+// The handler must commit only the paths it staged itself, even when the
+// caller's git index already had unrelated entries staged before the call.
+// Before the fix, `git commit` ran without a pathspec and swept those
+// pre-staged entries into the commit alongside the requested files.
+
+describe('commit pathspec scope (#3061)', () => {
+  // Each test needs an existing HEAD so we can pre-stage a deletion against it.
+  beforeEach(async () => {
+    await writeFile(join(tmpDir, 'README.md'), 'init\n');
+    execSync('git add README.md', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ commit_docs: true }),
+    );
+  });
+
+  it('--files commits only the named paths when an unrelated change is pre-staged', async () => {
+    const { commit } = await import('./commit.js');
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), '# State\n');
+
+    // Operator scenario from the issue: a `git rm` is already in the index
+    // before the workflow's commit step runs.
+    execSync('git rm README.md', { cwd: tmpDir, stdio: 'pipe' });
+
+    const result = await commit(['docs: state only', '--files', '.planning/STATE.md'], tmpDir);
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+
+    const committed = execSync('git show --name-only --format= HEAD', { cwd: tmpDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n');
+    expect(committed).toContain('.planning/STATE.md');
+    expect(committed).not.toContain('README.md');
+
+    // The pre-staged deletion must remain staged-but-uncommitted.
+    const status = execSync('git status --porcelain', { cwd: tmpDir, encoding: 'utf-8' });
+    expect(status).toMatch(/^D {2}README\.md/m);
+  });
+
+  it('.planning/ fallback commits only planning paths when an unrelated change is pre-staged', async () => {
+    const { commit } = await import('./commit.js');
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), '# State\n');
+
+    execSync('git rm README.md', { cwd: tmpDir, stdio: 'pipe' });
+
+    const result = await commit(['docs: planning'], tmpDir);
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+
+    const committed = execSync('git show --name-only --format= HEAD', { cwd: tmpDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n');
+    expect(committed).not.toContain('README.md');
+    expect(committed.some(f => f.startsWith('.planning/'))).toBe(true);
+
+    const status = execSync('git status --porcelain', { cwd: tmpDir, encoding: 'utf-8' });
+    expect(status).toMatch(/^D {2}README\.md/m);
+  });
+
+  it('--amend with --files keeps the amend within the named pathspec', async () => {
+    const { commit } = await import('./commit.js');
+
+    // Land an initial planning commit to amend, and assert the setup landed.
+    // If it silently failed the amend would target the wrong HEAD and the
+    // assertions below would still pass for the wrong reason.
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), '# State v1\n');
+    const setup = await commit(['docs: initial state', '--files', '.planning/STATE.md'], tmpDir);
+    expect((setup.data as { committed: boolean }).committed).toBe(true);
+
+    // Modify STATE.md, then pre-stage an unrelated change before amending.
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), '# State v2\n');
+    execSync('git rm README.md', { cwd: tmpDir, stdio: 'pipe' });
+
+    const result = await commit(['docs: amended', '--amend', '--files', '.planning/STATE.md'], tmpDir);
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+
+    const committed = execSync('git show --name-only --format= HEAD', { cwd: tmpDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n');
+    expect(committed).toContain('.planning/STATE.md');
+    expect(committed).not.toContain('README.md');
+
+    const status = execSync('git status --porcelain', { cwd: tmpDir, encoding: 'utf-8' });
+    expect(status).toMatch(/^D {2}README\.md/m);
+  });
+});
+
+// ─── input validation and option-injection safety (#3061 follow-ups) ──────
+//
+// Two guards that travel with the pathspec rewrite:
+//   1. --files with no usable paths fails fast instead of falling back to
+//      .planning/, which would silently swap the caller's intended scope.
+//   2. Every git add invocation uses the `--` separator so a path that
+//      starts with `-` is treated as a pathspec rather than an option.
+
+describe('commit input validation and option safety (#3061)', () => {
+  beforeEach(async () => {
+    await writeFile(join(tmpDir, 'README.md'), 'init\n');
+    execSync('git add README.md', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ commit_docs: true }),
+    );
+  });
+
+  it('--files with no usable paths is rejected instead of silently using .planning/', async () => {
+    const { commit } = await import('./commit.js');
+    // Drop a planning change that the .planning/ fallback would otherwise pick up.
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), '# State\n');
+
+    const result = await commit(['msg', '--files', '--no-verify'], tmpDir);
+    expect((result.data as { committed: boolean }).committed).toBe(false);
+    expect((result.data as { reason: string }).reason).toContain('--files requires at least one path');
+
+    // The handler must not have staged anything: if it had silently fallen
+    // back to .planning/, STATE.md would now show up in the staged list.
+    const stagedAfter = execSync('git diff --cached --name-only', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+    expect(stagedAfter).toBe('');
+  });
+
+  it('stages a file whose name starts with "-" instead of misparsing it as a git option', async () => {
+    const { commit } = await import('./commit.js');
+    // A filename like `-A.md` is the canonical option-injection trap:
+    // without the `--` separator, `git add -A.md` would be parsed as a flag.
+    const dashName = '-A.md';
+    await writeFile(join(tmpDir, dashName), 'dash content\n');
+
+    const result = await commit(['feat: add dash file', '--files', dashName], tmpDir);
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+
+    const committed = execSync('git show --name-only --format= HEAD', { cwd: tmpDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n');
+    expect(committed).toContain(dashName);
+  });
+});

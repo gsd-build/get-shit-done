@@ -99,6 +99,20 @@ describe('stripShippedMilestones', () => {
     expect(stripShippedMilestones(content)).toBe('middleend');
   });
 
+  // Bug #2641 (symmetry): tolerate attributes on <details> tag, matching
+  // extractCurrentMilestone's attribute-tolerant fallback. Without this,
+  // shipped content wrapped in `<details open>` (a common GitHub pattern for
+  // sections that should default to expanded) would leak through the strip.
+  it('removes <details open> blocks (attribute-bearing tags)', () => {
+    const content = 'before\n<details open>\nshipped content\n</details>\nafter';
+    expect(stripShippedMilestones(content)).toBe('before\n\nafter');
+  });
+
+  it('removes <details class="..."> blocks (attribute-bearing tags)', () => {
+    const content = 'a<details class="milestone" data-version="v0.5">x</details>b';
+    expect(stripShippedMilestones(content)).toBe('ab');
+  });
+
   it('returns content unchanged when no details blocks', () => {
     expect(stripShippedMilestones('no details here')).toBe('no details here');
   });
@@ -389,6 +403,391 @@ describe('extractCurrentMilestone', () => {
     expect(result).toContain('### Phase 19: Security Audit');
   });
 
+  // ─── Bug #2641: <details><summary>vX.Y …</summary> not recognized as anchor ───
+  it('bug-2641: finds active milestone wrapped in <details><summary>vX.Y …</summary>', async () => {
+    // Many projects (GitHub-friendly collapse) wrap the active milestone's
+    // phase details inside <details><summary>v0.9 …</summary>. Without the
+    // <details>-aware fallback, extractCurrentMilestone misses the heading
+    // anchor (because <summary> is HTML), falls through to
+    // stripShippedMilestones, and loses all <details> blocks — including
+    // the active one. Result: roadmapGetPhase returns {found:false} for
+    // phases that ARE in the active ROADMAP.
+    const roadmapWithActiveDetails = `# Roadmap
+
+## Milestones
+- ✅ **v0.8 Foundation** — shipped
+- 📋 **v0.9 Local-First Bus** — active
+
+## Phases
+
+<details>
+<summary>✅ v0.8 Foundation — SHIPPED 2026-04-15</summary>
+
+### Phase 1: Old phase
+**Goal:** Old goal.
+</details>
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 1: Library
+**Goal:** Build the library.
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithActiveDetails);
+
+    const result = await extractCurrentMilestone(roadmapWithActiveDetails, tmpDir);
+
+    // Active milestone's phases must survive
+    expect(result).toContain('### Phase 1: Library');
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toContain('Add polish.');
+    // Shipped milestone phases must not bleed in
+    expect(result).not.toContain('Old phase');
+    // The <summary> text is normalized as a `## ` milestone heading so
+    // downstream consumers (e.g. roadmapAnalyze's data.milestones scan) see
+    // the active milestone anchor — not just the body.
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus \(active\) — Phase Details/m);
+  });
+
+  // ─── Bug #2641 (CodeRabbit follow-up): quoted YAML version normalization ───
+  it('bug-2641: handles quoted YAML version (milestone: "v0.9") in STATE.md', async () => {
+    // STATE.md may use quoted YAML (`milestone: "v0.9"`). Without quote-stripping,
+    // version would carry literal quotes, escapedVersion would be `\"v0\.9\"`,
+    // and neither the markdown-heading regex nor the <details><summary> fallback
+    // would match — falling through to stripShippedMilestones and reintroducing
+    // the archived-milestone misrouting this PR addresses. Parity with
+    // parseMilestoneFromState() and getMilestoneInfo() (which both strip quotes).
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const stateQuoted = `---\nmilestone: "v0.9"\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), stateQuoted);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
+  });
+
+  // ─── Bug #2641: tolerate attributes on <details> tag (e.g. <details open>) ───
+  it('bug-2641: finds active milestone in <details open><summary>vX.Y …</summary>', async () => {
+    // GitHub auto-renders <details open> for sections that should default to
+    // expanded. The <details>-aware fallback regex must use <details\b[^>]*>
+    // (not literal <details>) so attribute-bearing tags also anchor correctly.
+    const roadmapWithDetailsOpen = `# Roadmap
+
+## Phases
+
+<details open>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmapWithDetailsOpen);
+
+    const result = await extractCurrentMilestone(roadmapWithDetailsOpen, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toContain('Add polish.');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
+  });
+
+  it('bug-2641: v0.1 must not substring-match v0.10 in markdown heading anchor path', async () => {
+    const roadmap = `# Roadmap
+
+## v0.10 Future Milestone
+
+### Phase 7: Wrong Phase
+**Goal:** This is from v0.10, not v0.1.
+
+## v0.1 Active Milestone
+
+### Phase 1: Right Phase
+**Goal:** This is the active milestone.
+`;
+    const state = `---\nmilestone: v0.1\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 1: Right Phase');
+    expect(result).toContain('This is the active milestone');
+    expect(result).not.toContain('Phase 7: Wrong Phase');
+    expect(result).not.toContain('This is from v0.10');
+  });
+
+  // ─── Bug #2641 (review hardening): substring-version trap ───
+  it('bug-2641: v0.1 must not substring-match <summary>v0.10 …</summary>', async () => {
+    // The fallback regex anchors on `escapedVersion` inside `<summary>` text.
+    // Without a non-version-character lookahead, `v0.1` matches inside `v0.10`,
+    // and the function returns the v0.10 block's body as the active milestone
+    // — confidently-wrong content (worse than the pre-fix fall-through, which
+    // returned known-incomplete content). The synthesized `## v0.10 …` heading
+    // would then mask the bug from downstream debugging. Lock the boundary.
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.10 Future Milestone — Phase Details</summary>
+
+### Phase 7: Wrong Phase
+**Goal:** This is from v0.10, not v0.1.
+</details>
+
+<details>
+<summary>v0.1 Active — Phase Details</summary>
+
+### Phase 1: Right Phase
+**Goal:** This is the active milestone.
+</details>
+`;
+    const state = `---\nmilestone: v0.1\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 1: Right Phase');
+    expect(result).toContain('This is the active milestone');
+    expect(result).not.toContain('Phase 7: Wrong Phase');
+    expect(result).not.toContain('This is from v0.10');
+  });
+
+  // ─── Bug #2641 (review hardening): nested <details> guard ───
+  it('bug-2641: nested <details> falls through (does not silently truncate)', async () => {
+    // The lazy [\s\S]*?</details> terminates on the FIRST </details>, which
+    // is the inner closer when nesting is present. Without a guard, the
+    // function returns truncated body and silently loses everything after the
+    // inner </details>. Detect nesting and fall through to the existing
+    // stripShippedMilestones path so the failure mode is loud (no match) not
+    // silent (truncated content).
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details</summary>
+
+### Phase 1: Library
+<details>
+<summary>Implementation notes</summary>
+Detail
+</details>
+
+### Phase 2: Polish — would be silently lost without the guard
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // The critical contract: must NOT return a synthesized `## v0.9` heading
+    // anchored to truncated body. The truncation case (without the nested-
+    // guard) would emit `## v0.9 Local-First Bus\n\n### Phase 1: Library\n
+    // <details><summary>Implementation notes</summary>\nDetail` and silently
+    // lose Phase 2 — confidently-wrong content. Falling through to
+    // stripShippedMilestones() may leak unrelated content but doesn't claim
+    // to be the active milestone. Loud failure > silent truncation.
+    expect(result).not.toMatch(/^##\s+v0\.9 Local-First Bus/m);
+    // The Phase 1 detail block (which sits between the outer <details> open
+    // and the inner </details>) must not appear under a v0.9 heading.
+    expect(result).not.toMatch(/##\s+v0\.9[\s\S]*Phase 1: Library/);
+  });
+
+  // ─── Bug #2641 (review hardening): empty <details> body guard ───
+  it('bug-2641: empty <details> body falls through (no phantom milestone)', async () => {
+    // <details><summary>v0.9</summary></details> with no body would synthesize
+    // `## v0.9\n` — a phantom milestone with zero phases. roadmapAnalyze would
+    // then return {phases: []} with no error signal. Treat as no-match.
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Empty</summary>
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // Must not synthesize a phantom heading
+    expect(result).not.toMatch(/^##\s+v0\.9/m);
+  });
+
+  // ─── Bug #2641 (lockdown): leading `#` in <summary> stripped from synthesized heading ───
+  it('bug-2641: strips leading # from <summary> text in synthesized heading', async () => {
+    // Prevents a `<summary># v0.9 …</summary>` from producing `## # v0.9 …`,
+    // which downstream `#{2,4}` heading regexes would parse as a 4-hash
+    // header. The implementation uses `.replace(/^#+\s*/, '')` on the captured
+    // summary; this test pins that path so a future refactor doesn't drop it.
+    const roadmap = `# Roadmap
+
+<details>
+<summary># v0.9 Hash-Prefixed</summary>
+
+### Phase 1: Test
+**Goal:** Works.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // Synthesized heading must be `## v0.9 …`, not `## # v0.9 …`
+    expect(result).toMatch(/^##\s+v0\.9 Hash-Prefixed/m);
+    expect(result).not.toMatch(/^##\s+#+/m);
+  });
+
+  // ─── Bug #2641 (review hardening): inline HTML in <summary> + leading # ───
+  it('bug-2641: tolerates inline HTML in <summary> and strips it from synthesized heading', async () => {
+    // GitHub-rendered summaries commonly contain inline tags like
+    // <em>(active)</em> or <code>v0.9</code>. The summary capture must allow
+    // them through and the synthesized `## ` heading must strip the tags so
+    // the result is clean markdown (no `## <em>...</em>`).
+    const roadmap = `# Roadmap
+
+<details open>
+<summary><strong>v0.9 Local-First Bus</strong> <em>(active)</em></summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus\s+\(active\)/m);
+    // Tags must be stripped from the synthesized heading
+    expect(result).not.toMatch(/^##.*<strong>/m);
+    expect(result).not.toMatch(/^##.*<em>/m);
+  });
+
+  // ─── Bug #2641 (lockdown): single-quote YAML version ───
+  it('bug-2641: handles single-quote YAML version (milestone: \'v0.9\') in STATE.md', async () => {
+    // Parity coverage with the double-quote test. The strip pattern
+    // `/^["']|["']$/g` handles both — locked here so a future change to
+    // either character class doesn't silently regress one form.
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details</summary>
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const stateSingle = `---\nmilestone: 'v0.9'\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), stateSingle);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 3: Polish');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus/m);
+  });
+
+  // ─── Bug #2641 (lockdown): heading wins when BOTH heading and <details> match ───
+  it('bug-2641: markdown heading anchor wins over <details><summary> fallback', async () => {
+    // The <details> fallback only fires when the heading-level lookup MISSES.
+    // If a ROADMAP has both `### v0.9 …` heading AND `<details><summary>v0.9 …</summary>`
+    // for the same version, the heading anchor must win. Locks precedence so a
+    // future refactor doesn't accidentally flip the order and silently change
+    // which slice gets returned.
+    const roadmap = `# Roadmap
+
+### v0.9 Local-First Bus (heading-anchored)
+
+### Phase 1: Heading-anchored Phase
+**Goal:** From the heading slice.
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details (details-anchored)</summary>
+
+### Phase 99: Details-anchored Phase
+**Goal:** From the details slice.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // Heading slice is what got returned — original `### v0.9` heading
+    // present, Phase 1 from the heading slice present.
+    expect(result).toContain('### v0.9 Local-First Bus (heading-anchored)');
+    expect(result).toContain('### Phase 1: Heading-anchored Phase');
+    // Critical: the <details> fallback did NOT fire, so no synthesized
+    // `## ` heading is prepended. (The heading-anchor slice extends to the
+    // next milestone boundary and includes the downstream <details> block
+    // verbatim — that's a property of the heading-anchor path, not the
+    // fallback. We're locking which CODE PATH ran, not how its output looks.)
+    expect(result).not.toMatch(/^##\s+v0\.9 Local-First Bus.*details-anchored/im);
+    // The original heading must appear at the START of the slice (the
+    // heading-anchor path returns content starting at the matched heading).
+    expect(result.indexOf('### v0.9 Local-First Bus (heading-anchored)')).toBe(0);
+  });
+
+  // ─── Bug #2641 (lockdown): multiple <details> blocks for same version ───
+  it('bug-2641: when multiple <details> match the version, the FIRST is returned', async () => {
+    // `content.match(detailsPattern)` (non-`g`) returns the first match in
+    // document order. Lock this so a future change to the matcher (e.g.
+    // switching to `matchAll` and picking the last) doesn't silently change
+    // which block is treated as the active milestone. Document-order-first is
+    // intentional: in real ROADMAPs, the active milestone is conventionally
+    // listed before any duplicates (e.g. retro-active or branch-merge artefacts).
+    const roadmap = `# Roadmap
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details (FIRST)</summary>
+
+### Phase 1: First-block Phase
+**Goal:** Should be returned.
+</details>
+
+<details>
+<summary>v0.9 Local-First Bus — Phase Details (SECOND)</summary>
+
+### Phase 99: Second-block Phase
+**Goal:** Should NOT be returned.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await extractCurrentMilestone(roadmap, tmpDir);
+
+    expect(result).toContain('### Phase 1: First-block Phase');
+    expect(result).not.toContain('### Phase 99: Second-block Phase');
+    expect(result).toMatch(/^##\s+v0\.9 Local-First Bus.*FIRST/m);
+  });
+
   // ─── Bug #2422: same-version sub-heading truncation ───────────────────
   it('bug-2422: does not truncate at same-version sub-heading (## v2.0 Phase Details)', async () => {
     const roadmapWithDetails = `# ROADMAP
@@ -455,6 +854,41 @@ describe('roadmapGetPhase', () => {
     const data = result.data as Record<string, unknown>;
     expect(data.found).toBe(false);
     expect(data.error).toBe('ROADMAP.md not found');
+  });
+
+  // ─── Bug #2641 (regression): end-to-end via roadmapGetPhase ───
+  it('bug-2641: returns found:true for phase inside <details>-wrapped active milestone', async () => {
+    // End-to-end coverage: roadmapGetPhase calls extractCurrentMilestone
+    // internally. Without the <details>-aware fallback, the active
+    // milestone's phases were stripped before the phase-heading lookup,
+    // and roadmapGetPhase returned {found:false} for phases that exist.
+    const roadmap = `# Roadmap
+
+## Milestones
+- 📋 **v0.9 Local-First Bus** — active
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 3: Polish
+
+**Goal:** Add polish.
+
+**Success Criteria**:
+1. Polish applied
+2. Tests pass
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await roadmapGetPhase(['3'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.found).toBe(true);
+    expect(data.phase_number).toBe('3');
+    expect(data.phase_name).toBe('Polish');
+    expect(data.goal).toBe('Add polish.');
   });
 });
 
@@ -537,6 +971,51 @@ describe('roadmapAnalyze', () => {
     const data2 = result2.data as Record<string, unknown>;
 
     expect((data1.phases as unknown[]).length).toBe((data2.phases as unknown[]).length);
+  });
+
+  // ─── Bug #2641 (regression): roadmapAnalyze populates milestones array
+  //    for <details>-wrapped active milestones via the synthesized `## ` heading. ───
+  it('bug-2641: data.milestones contains the active milestone when wrapped in <details>', async () => {
+    // Without the synthesized heading injected by extractCurrentMilestone's
+    // <details>-aware fallback, the milestone-heading scan at the bottom of
+    // roadmapAnalyze (`/##\s*(.*v(\d+(?:\.\d+)+)[^(\n]*)/gi`) would find
+    // nothing useful inside the body of a <details>-wrapped active milestone
+    // and `data.milestones` would be empty / wrong.
+    const roadmap = `# Roadmap
+
+## Milestones
+- 📋 **v0.9 Local-First Bus** — active
+
+<details>
+<summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+
+### Phase 1: Library
+**Goal:** Build the library.
+
+### Phase 3: Polish
+**Goal:** Add polish.
+</details>
+`;
+    const state = `---\nmilestone: v0.9\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await roadmapAnalyze([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    // Defensive guard: fail with a clear message if roadmapAnalyze didn't
+    // populate data.milestones, rather than throwing TypeError on `.some()`.
+    expect(data.milestones).toBeDefined();
+    const milestones = data.milestones as Array<{ heading: string; version: string }>;
+
+    // Active milestone surfaces with correct version
+    expect(milestones.some(m => m.version === 'v0.9')).toBe(true);
+    expect(milestones.some(m => m.heading.includes('Local-First Bus'))).toBe(true);
+
+    // Phases are also surfaced (the original bug)
+    const phases = data.phases as Array<Record<string, unknown>>;
+    expect(phases.length).toBe(2);
+    expect(phases.some(p => p.number === '1')).toBe(true);
+    expect(phases.some(p => p.number === '3')).toBe(true);
   });
 });
 

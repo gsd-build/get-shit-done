@@ -7,6 +7,8 @@
  * #2532 — workflow.ui_review is used in autonomous.md but missing from VALID_CONFIG_KEYS
  * #2533 — workflow.max_discuss_passes is used in discuss-phase.md but missing from VALID_CONFIG_KEYS
  * #2535 — sub_repos and plan_checker legacy keys need CONFIG_KEY_SUGGESTIONS migration hints
+ * #3162 — resolve_model_ids missing from VALID_CONFIG_KEYS; workflow._auto_chain_active must be
+ *          accepted by isValidConfigKey (written by workflows) without being user-visible
  */
 
 const { describe, test } = require('node:test');
@@ -14,7 +16,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { createTempProject, cleanup, runGsdTools } = require('./helpers.cjs');
 
-const { VALID_CONFIG_KEYS } = require('../get-shit-done/bin/lib/config-schema.cjs');
+const { VALID_CONFIG_KEYS, isValidConfigKey } = require('../get-shit-done/bin/lib/config-schema.cjs');
 
 describe('VALID_CONFIG_KEYS correctness', () => {
   test('#2530: workflow._auto_chain_active must not be in VALID_CONFIG_KEYS (internal state)', () => {
@@ -42,6 +44,21 @@ describe('VALID_CONFIG_KEYS correctness', () => {
     assert.ok(
       VALID_CONFIG_KEYS.has('workflow.max_discuss_passes'),
       'workflow.max_discuss_passes is read in discuss-phase.md via gsd-sdk query config-get'
+    );
+  });
+
+  test('#3162: resolve_model_ids must be in VALID_CONFIG_KEYS (documented user-facing key)', () => {
+    assert.ok(
+      VALID_CONFIG_KEYS.has('resolve_model_ids'),
+      'resolve_model_ids is documented in CONFIGURATION.md and read by core.cjs/session-runner.ts'
+    );
+  });
+
+  test('#3162: workflow._auto_chain_active must be accepted by isValidConfigKey (written by workflows)', () => {
+    assert.strictEqual(
+      isValidConfigKey('workflow._auto_chain_active'),
+      true,
+      'workflow._auto_chain_active is written by plan-phase, execute-phase, discuss-phase, transition workflows via config-set'
     );
   });
 });

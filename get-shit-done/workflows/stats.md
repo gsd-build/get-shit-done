@@ -51,6 +51,25 @@ X/Y plans complete (Z%)
 If no `.planning/` directory exists, inform the user to run `/gsd-new-project` first.
 </step>
 
+<step name="mvp_summary">
+**MVP phase summary.** Read all phases via `gsd-sdk query roadmap.analyze` (Phase 1's `cmdRoadmapAnalyze` surfaces a `mode` field per phase). Count phases by mode:
+
+```bash
+ANALYZE=$(gsd-sdk query roadmap.analyze)
+if [[ "$ANALYZE" == @file:* ]]; then ANALYZE=$(cat "${ANALYZE#@file:}"); fi
+MVP_COUNT=$(echo "$ANALYZE" | jq '[.phases[] | select(.mode == "mvp")] | length')
+TOTAL_COUNT=$(echo "$ANALYZE" | jq '.phases | length')
+```
+
+Emit a summary line in the stats output:
+
+```
+Phases: ${TOTAL_COUNT} total | ${MVP_COUNT} MVP | $((TOTAL_COUNT - MVP_COUNT)) standard
+```
+
+If `MVP_COUNT == 0`, the project has no MVP-mode phases — omit the line (no clutter for non-MVP projects).
+</step>
+
 </process>
 
 <success_criteria>

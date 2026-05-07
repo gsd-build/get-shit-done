@@ -362,6 +362,38 @@ Toggle optional capabilities via the `features.*` config namespace. Feature flag
 | `graphify.enabled` | boolean | `false` | Enable the project knowledge graph. When `true`, `/gsd-graphify` builds and queries a graph in `.planning/graphs/`. Added in v1.36 |
 | `graphify.build_timeout` | number (seconds) | `300` | Maximum seconds allowed for a `/gsd-graphify build` run before it aborts. Added in v1.36 |
 
+#### Multi-developer setup
+
+If multiple developers will rebuild the graph in the same repo, run once per
+clone after enabling graphify:
+
+```bash
+graphify hook install
+```
+
+This installs a git merge driver that union-merges concurrent `graph.json`
+writes (no conflict markers in the knowledge graph), plus the post-commit
+rebuild hook. It writes `.gitattributes` and registers `graphify
+merge-driver` in `.git/config`. Solo projects can skip this step; running it
+anyway is harmless. Introduced upstream in graphify v0.7.0 alongside the
+`built_at_commit` freshness signal that `/gsd-graphify status` surfaces.
+
+#### Commit-based staleness
+
+`/gsd-graphify status` reports two orthogonal staleness signals:
+
+- **`stale`** (mtime-based, 24-hour window) — when the graph file was last
+  written. Useful when graphify isn't run automatically.
+- **`commit_stale`** (commit-based, requires graphify v0.7+) — whether the
+  graph was built against the current `git HEAD`. Trustworthy when present.
+  Tri-state: `true` / `false` / `null`. `null` means the signal is
+  unavailable (pre-v0.7 graph, no git, or unreachable commit) — fall back
+  to the mtime flag.
+
+A CI-built graph rebuilt minutes ago against an old checkout will read as
+fresh on mtime but `commit_stale: true`. Surface both when answering
+architecture questions.
+
 ### Usage
 
 ```bash

@@ -5,7 +5,6 @@ argument-hint: "[build|query <term>|status|diff]"
 allowed-tools:
   - Read
   - Bash
-  - Task
 ---
 
 **STOP -- DO NOT READ THIS FILE. You are already reading it. This prompt was injected into your context by Claude Code's command system. Using the Read tool on this file wastes tokens. Begin executing Step 0 immediately.**
@@ -54,7 +53,7 @@ Parse `$ARGUMENTS` to determine the operation mode:
 
 | Argument | Action |
 |----------|--------|
-| `build` | Spawn graphify-builder agent (Step 3) |
+| `build` | Run inline build (Step 3) |
 | `query <term>` | Run inline query (Step 2a) |
 | `status` | Run inline status check (Step 2b) |
 | `diff` | Run inline diff check (Step 2c) |
@@ -101,6 +100,16 @@ node $HOME/.claude/get-shit-done/bin/gsd-tools.cjs graphify status
 Parse the JSON output and display:
 - If `exists: false`, display the message field
 - Otherwise show last build time, node/edge/hyperedge counts, and STALE or FRESH indicator
+- If `built_at_commit` is non-null, also display a `Source commit:` line:
+  - `commit_stale === false` (rebuilt at HEAD): `Source commit: <built_at_commit> (current)`
+  - `commit_stale === true` (graph behind HEAD): `Source commit: <built_at_commit> (<commits_behind> commits behind HEAD)`
+  - `commit_stale === null` (unreachable commit / no git): `Source commit: <built_at_commit> (freshness unknown)`
+- If `built_at_commit` is null (pre-graphify-v0.7 graph), omit the source-commit line entirely — do not render "Source commit: unknown"
+
+The mtime-based STALE/FRESH flag and the commit-based `commit_stale` measure
+different things and can disagree (e.g., a CI-built graph rebuilt minutes ago
+against an old checkout reads as FRESH on mtime but `commit_stale: true`).
+Surface both so the agent can choose.
 
 **STOP** after displaying status. Do not spawn an agent.
 
@@ -122,80 +131,68 @@ If no snapshot exists, suggest running `build` twice (first to create, second to
 
 ---
 
-## Step 3 -- Build (Agent Spawn)
+## Step 3 -- Build (Inline)
 
-Run pre-flight check first:
+Run the pre-flight check first:
 
-```
-PREFLIGHT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" graphify build)
-```
-
-If pre-flight returns `disabled: true` or `error`, display the message and **STOP**.
-
-If pre-flight returns `action: "spawn_agent"`, display:
-
-```
-GSD > Spawning graphify-builder agent...
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" graphify build
 ```
 
-Spawn a Task:
+Parse the JSON output:
+- If `disabled: true`: display the disabled message from Step 1 and **STOP**
+- If `error`: display the error message and **STOP**
+- If `action: "spawn_agent"`: pre-flight passed -- proceed with the inline build below
 
-```
-Task(
-  description="Build or rebuild the project knowledge graph",
-  prompt="You are the graphify-builder agent. Your job is to build or rebuild the project knowledge graph using the graphify CLI.
+(The `spawn_agent` action name is historical. The skill now performs the build inline because graphify v0.7+ split the build into a fast AST-extraction phase and a separate clustering + report-write phase. Sub-agent isolation kept the cached extraction phase alive but SIGTERM'd the post-extraction phase when the agent exited, leaving the cache populated but no `graph.json` artifacts written. The CLI still emits the `spawn_agent` signal so external callers and tests keep working.)
 
-Project root: ${CWD}
-gsd-tools path: $HOME/.claude/get-shit-done/bin/gsd-tools.cjs
+Display:
 
-## Instructions
-
-1. **Invoke graphify:**
-   Run from the project root:
-   ```
-   graphify update .
-   ```
-   This builds the knowledge graph with SHA256 incremental caching.
-   Timeout: up to 5 minutes (or as configured via graphify.build_timeout).
-
-2. **Validate output:**
-   Check that graphify-out/graph.json exists and is valid JSON with nodes[] and edges[] arrays.
-   If graphify exited non-zero or graph.json is not parseable, output:
-   ## GRAPHIFY BUILD FAILED
-   Include the stderr output for debugging. Do NOT delete .planning/graphs/ -- prior valid graph remains available.
-
-3. **Copy artifacts to .planning/graphs/:**
-   ```
-   cp graphify-out/graph.json .planning/graphs/graph.json
-   cp graphify-out/graph.html .planning/graphs/graph.html
-   cp graphify-out/GRAPH_REPORT.md .planning/graphs/GRAPH_REPORT.md
-   ```
-   These three files are the build output consumed by query, status, and diff commands.
-
-4. **Write diff snapshot:**
-   ```
-   node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" graphify build snapshot
-   ```
-   This creates .planning/graphs/.last-build-snapshot.json for future diff comparisons.
-
-5. **Report build summary:**
-   ```
-   node \"$HOME/.claude/get-shit-done/bin/gsd-tools.cjs\" graphify status
-   ```
-   Display the node count, edge count, and hyperedge count from the status output.
-
-When complete, output: ## GRAPHIFY BUILD COMPLETE with the summary counts.
-If something fails at any step, output: ## GRAPHIFY BUILD FAILED with details."
-)
+```text
+GSD > Building knowledge graph...
 ```
 
-Wait for the agent to complete.
+Run the build, copy artifacts, write the diff snapshot, and report the summary in a single foreground Bash call so the whole pipeline survives to completion. Use a `timeout` of `600000` ms (10 minutes), which covers the `graphify.build_timeout` ceiling (default 300 s) with margin:
+
+```bash
+graphify update . \
+  && cp graphify-out/graph.json .planning/graphs/graph.json \
+  && cp graphify-out/graph.html .planning/graphs/graph.html \
+  && cp graphify-out/GRAPH_REPORT.md .planning/graphs/GRAPH_REPORT.md \
+  && node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" graphify build snapshot \
+  && node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" graphify status
+```
+
+Do NOT pass `run_in_background: true`. Typical builds complete in 15-60 seconds and the entire chain must run foreground.
+
+If the chain fails (non-zero exit):
+- Display: `## GRAPHIFY BUILD FAILED` followed by the captured stderr
+- Do NOT delete `.planning/graphs/` -- the prior valid graph remains available
+- **STOP**
+
+If the chain succeeds:
+- Parse the trailing `graphify status` JSON
+- Display: `## GRAPHIFY BUILD COMPLETE` with the node, edge, and hyperedge counts
+
+---
+
+## MVP-Mode Node Rendering
+
+**MVP-mode rendering.** When a phase has `**Mode:** mvp` in ROADMAP.md (resolved via `gsd-sdk query roadmap.get-phase --pick mode`), render its graph node with two distinct visual signals:
+
+1. **Distinct fill color.** Use `#22c55e` (green) for MVP-mode phase nodes. Standard phases keep the default fill color. Two-channel signaling (color + label) handles color-blind and grayscale renders.
+2. **`MVP` label suffix.** Append ` (MVP)` to the node's label text. Example: a phase originally labeled `Phase 1: User Auth` renders as `Phase 1: User Auth (MVP)`.
+
+Both signals fire together — never just one. Per PRD Q5 decision, the goal is unambiguous visual distinction in any render context.
+
+When the phase mode is null/absent, render with the standard color and label — no behavioral change for non-MVP phases.
 
 ---
 
 ## Anti-Patterns
 
-1. DO NOT spawn an agent for query/status/diff operations -- these are inline CLI calls
-2. DO NOT modify graph files directly -- the build agent handles writes
-3. DO NOT skip the config gate check
-4. DO NOT use gsd-tools config get-value for the config gate -- it exits on missing keys
+1. DO NOT spawn an agent for any operation -- build, query, status, and diff all run inline. Sub-agent isolation terminates background bash when the agent exits, which previously truncated graphify builds mid-write and left only the cache populated (#3166).
+2. DO NOT pass `run_in_background: true` for the build chain -- the operation is fast and must complete in the foreground.
+3. DO NOT modify graph files directly -- always go through `graphify update .` and the snapshot CLI.
+4. DO NOT skip the config gate check.
+5. DO NOT use `gsd-tools config get-value` for the config gate -- it exits on missing keys.

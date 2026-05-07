@@ -23,6 +23,7 @@ const PROSE_ALLOWLIST = new Set([
   'intel',
   'into',
   'or',
+  'init',   // bare "init" appears in prose examples; real commands are init.<subcommand>
   'init.',
 ]);
 

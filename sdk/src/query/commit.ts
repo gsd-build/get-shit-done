@@ -132,27 +132,40 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
   // Sanitize message
   const sanitized = message ? sanitizeCommitMessage(message) : message;
 
-  // Stage files
-  const filesToStage = filePaths.length > 0 ? filePaths : ['.planning/'];
-  for (const file of filesToStage) {
-    const addResult = execGit(projectDir, ['add', file]);
+  // If --files was passed explicitly, the caller asked for an explicit scope.
+  // Falling back to .planning/ when every following token got filtered out
+  // would silently swap the requested scope, so reject the call instead.
+  if (filesIndex !== -1 && filePaths.length === 0) {
+    return { data: { committed: false, reason: '--files requires at least one path' } };
+  }
+
+  // Compute pathspec once: the handler commits exactly the paths it staged,
+  // never anything that was pre-staged externally (#3061).
+  const pathsToCommit = filePaths.length > 0 ? filePaths : ['.planning/'];
+  for (const file of pathsToCommit) {
+    // The `--` separator keeps any path that starts with `-` from being
+    // interpreted as a git option (e.g. a file literally named `-A`).
+    const addResult = execGit(projectDir, ['add', '--', file]);
     if (addResult.exitCode !== 0) {
       return { data: { committed: false, reason: addResult.stderr || `failed to stage ${file}`, exitCode: addResult.exitCode } };
     }
   }
 
-  // Check if anything is staged
-  const diffResult = execGit(projectDir, ['diff', '--cached', '--name-only']);
+  // Check if anything is staged within the pathspec we're about to commit.
+  const diffResult = execGit(projectDir, ['diff', '--cached', '--name-only', '--', ...pathsToCommit]);
   const stagedFiles = diffResult.stdout ? diffResult.stdout.split('\n').filter(Boolean) : [];
   if (stagedFiles.length === 0) {
     return { data: { committed: false, reason: 'nothing staged' } };
   }
 
-  // Build commit command
+  // Build commit command. The trailing `-- pathsToCommit` ensures the commit
+  // captures only files within the requested scope, even when the caller's
+  // index already had unrelated entries staged before this handler ran.
   const commitArgs: string[] = hasAmend
     ? ['commit', '--amend', '--no-edit']
     : ['commit', '-m', sanitized ?? ''];
   if (hasNoVerify) commitArgs.push('--no-verify');
+  commitArgs.push('--', ...pathsToCommit);
 
   const commitResult = execGit(projectDir, commitArgs);
   if (commitResult.exitCode !== 0) {
@@ -276,13 +289,17 @@ export const commitToSubrepo: QueryHandler = async (args, projectDir, workstream
     }
 
     const fileArgs = files.length > 0 ? files : ['.'];
-    const addResult = spawnSync('git', ['-C', projectDir, 'add', ...fileArgs], { stdio: 'pipe', encoding: 'utf-8' });
+    // The `--` separator keeps any path that starts with `-` from being
+    // interpreted as a git option (e.g. a file literally named `-A`).
+    const addResult = spawnSync('git', ['-C', projectDir, 'add', '--', ...fileArgs], { stdio: 'pipe', encoding: 'utf-8' });
     if (addResult.status !== 0) {
       return { data: { committed: false, reason: addResult.stderr || 'git add failed' } };
     }
 
+    // Pathspec on the commit keeps the scope identical to what was just staged,
+    // so any pre-staged external changes do not leak in (#3061).
     const commitResult = spawnSync(
-      'git', ['-C', projectDir, 'commit', '-m', sanitized],
+      'git', ['-C', projectDir, 'commit', '-m', sanitized, '--', ...fileArgs],
       { stdio: 'pipe', encoding: 'utf-8' },
     );
     if (commitResult.status !== 0) {

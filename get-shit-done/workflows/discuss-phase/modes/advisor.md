@@ -87,10 +87,10 @@ research agents.
 
 1. Display brief status: `Researching {N} areas...`
 
-2. For EACH user-selected gray area, spawn a `Task()` in parallel:
+2. For EACH user-selected gray area, spawn a `Agent()` in parallel:
 
    ```
-   Task(
+   Agent(
      prompt="First, read @~/.claude/agents/gsd-advisor-researcher.md for your role and instructions.
 
      <gray_area>{area_name}: {area_description from gray area identification}</gray_area>
@@ -106,10 +106,10 @@ research agents.
    )
    ```
 
-   All `Task()` calls spawn simultaneously — do NOT wait for one before
+   All `Agent()` calls spawn simultaneously — do NOT wait for one before
    starting the next.
 
-   > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling all Task() calls above to spawn research agents, do NOT independently research or analyze any of the gray areas while the subagents are active. Wait for all subagents to return before synthesizing results. This prevents duplicate work and wasted context.
+   > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling all Agent() calls above to spawn research agents, do NOT independently research or analyze any of the gray areas while the subagents are active. Wait for all subagents to return before synthesizing results. This prevents duplicate work and wasted context.
 
 3. After ALL agents return, **synthesize results** before presenting:
 

@@ -23,18 +23,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const { VALID_CONFIG_KEYS: CJS_KEYS, DYNAMIC_KEY_PATTERNS: CJS_PATTERNS } =
+const {
+  VALID_CONFIG_KEYS: CJS_KEYS,
+  RUNTIME_STATE_KEYS: CJS_RUNTIME_KEYS,
+  DYNAMIC_KEY_PATTERNS: CJS_PATTERNS,
+} =
   require('../get-shit-done/bin/lib/config-schema.cjs');
 
 const SDK_SCHEMA_PATH = path.join(ROOT, 'sdk', 'src', 'query', 'config-schema.ts');
 const SDK_SRC = fs.readFileSync(SDK_SCHEMA_PATH, 'utf8');
 
-function extractSdkKeys(src) {
-  const start = src.indexOf('VALID_CONFIG_KEYS');
-  assert.ok(start > -1, 'SDK config-schema.ts must export VALID_CONFIG_KEYS');
+function extractSdkSet(src, setName) {
+  const start = src.indexOf(setName);
+  assert.ok(start > -1, `SDK config-schema.ts must export ${setName}`);
   const setOpen = src.indexOf('new Set([', start);
   const setClose = src.indexOf('])', setOpen);
-  assert.ok(setOpen > -1 && setClose > -1, 'VALID_CONFIG_KEYS must be a new Set([...]) literal');
+  assert.ok(setOpen > -1 && setClose > -1, `${setName} must be a new Set([...]) literal`);
   const body = src.slice(setOpen + 'new Set(['.length, setClose);
   const keys = new Set();
   for (const match of body.matchAll(/'([^']+)'/g)) keys.add(match[1]);
@@ -52,7 +56,7 @@ function extractSdkPatternSources(src) {
 }
 
 test('#2653 — SDK VALID_CONFIG_KEYS matches CJS VALID_CONFIG_KEYS', () => {
-  const sdkKeys = extractSdkKeys(SDK_SRC);
+  const sdkKeys = extractSdkSet(SDK_SRC, 'VALID_CONFIG_KEYS');
   const missingInSdk = [...CJS_KEYS].filter((k) => !sdkKeys.has(k));
   const extraInSdk = [...sdkKeys].filter((k) => !CJS_KEYS.has(k));
   assert.deepStrictEqual(
@@ -65,6 +69,24 @@ test('#2653 — SDK VALID_CONFIG_KEYS matches CJS VALID_CONFIG_KEYS', () => {
     extraInSdk,
     [],
     'SDK keys missing from get-shit-done/bin/lib/config-schema.cjs:\n' +
+      extraInSdk.map((k) => '  ' + k).join('\n'),
+  );
+});
+
+test('#3162 — SDK RUNTIME_STATE_KEYS matches CJS RUNTIME_STATE_KEYS', () => {
+  const sdkRuntimeKeys = extractSdkSet(SDK_SRC, 'RUNTIME_STATE_KEYS');
+  const missingInSdk = [...CJS_RUNTIME_KEYS].filter((k) => !sdkRuntimeKeys.has(k));
+  const extraInSdk = [...sdkRuntimeKeys].filter((k) => !CJS_RUNTIME_KEYS.has(k));
+  assert.deepStrictEqual(
+    missingInSdk,
+    [],
+    'CJS runtime-state keys missing from sdk/src/query/config-schema.ts:\n' +
+      missingInSdk.map((k) => '  ' + k).join('\n'),
+  );
+  assert.deepStrictEqual(
+    extraInSdk,
+    [],
+    'SDK runtime-state keys missing from get-shit-done/bin/lib/config-schema.cjs:\n' +
       extraInSdk.map((k) => '  ' + k).join('\n'),
   );
 });

@@ -6,7 +6,7 @@ allowed-tools:
   - Read
   - Bash
   - Write
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 <runtime_note>

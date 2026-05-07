@@ -244,7 +244,7 @@ After discuss completes, loop back to dashboard step.
 Planning runs autonomously. Spawn a background agent that delegates to the Skill pipeline with any configured flags:
 
 ```
-Task(
+Agent(
   description="Plan phase {N}: {phase_name}",
   run_in_background=true,
   prompt="You are running the GSD plan-phase workflow for phase {N} of the project.
@@ -263,7 +263,7 @@ Important: You are running in the background. Do NOT use AskUserQuestion — mak
 )
 ```
 
-> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above with `run_in_background=true`, do NOT do any planning work for this phase independently. Return to the dashboard immediately and wait for the background agent to report back. Only resume planning-related work when the subagent result is available.
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above with `run_in_background=true`, do NOT do any planning work for this phase independently. Return to the dashboard immediately and wait for the background agent to report back. Only resume planning-related work when the subagent result is available.
 
 Display:
 
@@ -278,7 +278,7 @@ Loop back to dashboard step.
 Execution runs autonomously. Spawn a background agent that delegates to the Skill pipeline with any configured flags:
 
 ```
-Task(
+Agent(
   description="Execute phase {N}: {phase_name}",
   run_in_background=true,
   prompt="You are running the GSD execute-phase workflow for phase {N} of the project.
@@ -297,7 +297,7 @@ Important: You are running in the background. Do NOT use AskUserQuestion — mak
 )
 ```
 
-> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above with `run_in_background=true`, do NOT do any execution work for this phase independently. Return to the dashboard immediately and wait for the background agent to report back. Only resume execution-related work when the subagent result is available.
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above with `run_in_background=true`, do NOT do any execution work for this phase independently. Return to the dashboard immediately and wait for the background agent to report back. Only resume execution-related work when the subagent result is available.
 
 Display:
 

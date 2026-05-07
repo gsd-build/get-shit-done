@@ -526,6 +526,36 @@ function computePathPrefix({ isGlobal, isOpencode, isWindowsHost: _isWindowsHost
 }
 
 /**
+ * Normalize a raw `process.execPath` to a stable, upgrade-safe node binary
+ * path. On Homebrew installs, `process.execPath` resolves symlinks and returns
+ * the versioned Cellar path (e.g.
+ * `/usr/local/Cellar/node/25.8.1/bin/node`). Baking that path into hook
+ * commands causes `dyld: Library not loaded` errors after `brew upgrade node`
+ * because the shared libraries referenced by the Cellar binary have changed
+ * SOVERSION. (#3181)
+ *
+ * The stable Homebrew symlinks (`/usr/local/bin/node` for Intel,
+ * `/opt/homebrew/bin/node` for Apple Silicon) survive upgrades — Homebrew
+ * re-points them atomically. We prefer those when a Cellar path is detected.
+ *
+ * Non-Homebrew installs (NVM, system node, Windows, etc.) are returned as-is.
+ */
+function normalizeNodePath(execPath) {
+  if (!execPath) return execPath;
+  // Intel Homebrew: /usr/local/Cellar/node/<version>/bin/node
+  // or /usr/local/Cellar/node@20/<version>/bin/node
+  if (/^\/usr\/local\/Cellar\/node(@\d+)?\/[^/]+\/bin\/node(\.exe)?$/.test(execPath)) {
+    return '/usr/local/bin/node';
+  }
+  // Apple Silicon Homebrew: /opt/homebrew/Cellar/node/<version>/bin/node
+  // or /opt/homebrew/Cellar/node@18/<version>/bin/node
+  if (/^\/opt\/homebrew\/Cellar\/node(@\d+)?\/[^/]+\/bin\/node(\.exe)?$/.test(execPath)) {
+    return '/opt/homebrew/bin/node';
+  }
+  return execPath;
+}
+
+/**
  * Resolve the absolute path to the node binary running the installer.
  * Used as the runner for .js hooks so they execute in GUI/minimal-PATH
  * runtimes (Gemini, Antigravity, Codex CLIs launched from a Finder
@@ -537,13 +567,17 @@ function computePathPrefix({ isGlobal, isOpencode, isWindowsHost: _isWindowsHost
  * gives the absolute path of the node binary actively running the
  * installer — that is the version the user just installed under, and
  * the right default runtime for hooks invoked under the same install.
+ *
+ * When `process.execPath` is a versioned Homebrew Cellar path, the stable
+ * Homebrew symlink is returned instead to survive `brew upgrade node` (#3181).
  */
 function resolveNodeRunner() {
   const execPath = typeof process.execPath === 'string' ? process.execPath : '';
   if (!execPath) return null;
+  const stablePath = normalizeNodePath(execPath);
   // JSON.stringify produces a properly escaped double-quoted shell token,
   // safe for paths containing spaces or unusual characters.
-  return JSON.stringify(execPath.replace(/\\/g, '/'));
+  return JSON.stringify(stablePath.replace(/\\/g, '/'));
 }
 
 /**
@@ -580,20 +614,49 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
       for (const h of entry.hooks) {
         if (!h || typeof h.command !== 'string') continue;
         const trimmed = h.command.trim();
-        // Match the EXACT legacy form: `node <script>` with optional quoting.
+        // Match two runner forms:
+        //   1. Legacy bare-node form: `node <script>` (#2979/#3002)
+        //   2. Cellar-path form: `"/usr/local/Cellar/node/<v>/bin/node" <script>`
+        //      or `"/opt/homebrew/Cellar/node/<v>/bin/node" <script>` (#3181)
+        //
+        // Both patterns use the same script-token capture group so the rewrite
+        // is uniform. We detect the Cellar form by extracting the runner token
+        // and running it through normalizeNodePath.
+        //
         // The previous shape used `trimmed.includes(<filename>)` which would
         // false-positive on user-authored hooks whose path merely contained
         // a managed filename as a substring (e.g.
         // /home/me/scripts/wraps-gsd-check-update.js-and-more.js). #3002 CR.
-        const m = trimmed.match(/^node\s+("([^"]+)"|'([^']+)'|(\S+))\s*$/);
+        const m = trimmed.match(/^node\s+("([^"]+)"|'([^']+)'|(\S+))\s*$/) ||
+                  trimmed.match(/^("([^"]+)"|'([^']+)'|(\S+))\s+("([^"]+)"|'([^']+)'|(\S+))\s*$/);
         if (!m) continue;
-        const scriptToken = m[1];
-        const scriptPath = m[2] || m[3] || m[4] || '';
+
+        let runnerToken, scriptToken, scriptPath;
+        if (/^node\s+/.test(trimmed)) {
+          // bare-node form
+          runnerToken = 'node';
+          scriptToken = m[1];
+          scriptPath = m[2] || m[3] || m[4] || '';
+        } else {
+          // quoted/unquoted runner form — check whether runner is a Cellar path
+          runnerToken = m[1];
+          const runnerPath = (m[2] || m[3] || m[4] || '').replace(/\\/g, '/');
+          const stableRunner = normalizeNodePath(runnerPath);
+          // Only process if the runner IS a Cellar path that normalizes to something different
+          if (stableRunner === runnerPath) continue;
+          scriptToken = m[5];
+          scriptPath = m[6] || m[7] || m[8] || '';
+        }
+
         // Take the basename — match against MANAGED_HOOK_FILES by exact
         // equality, not substring containment. Handles both forward and
         // backslash separators (Windows).
         const scriptBase = scriptPath.split(/[\\/]/).pop() || '';
         if (!MANAGED_HOOK_FILES.has(scriptBase)) continue;
+
+        // Skip if already using the desired stable runner
+        if (runnerToken !== 'node' && runnerToken === absoluteRunner) continue;
+
         h.command = `${absoluteRunner} ${scriptToken}`;
         changed = true;
       }
@@ -709,10 +772,16 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
-  // .sh hooks run under /bin/bash (POSIX std PATH always includes /bin),
-  // so bare `bash` is fine. .js hooks need the absolute node path because
-  // GUI-launched runtimes start with a minimal PATH that does not include
-  // nvm/Homebrew/Volta-installed node binaries (#2979).
+  // .sh hooks run under bare `bash` (PATH-resolved). POSIX guarantees
+  // /bin/sh but not /bin/bash, and distros like NixOS do not ship
+  // /bin/bash by default — so PATH-resolved `bash` is more portable than
+  // an absolute /bin/bash. The wrapping `bash <path>` invocation also
+  // means the script's own shebang (#!/usr/bin/env bash) is read as a
+  // comment in this code path; it only matters when the script is run
+  // directly (e.g. tests or future installer changes). .js hooks still
+  // need the absolute node path because GUI-launched runtimes start with
+  // a minimal PATH that does not include nvm/Homebrew/Volta-installed
+  // node binaries (#2979).
   const nodeRunner = resolveNodeRunner();
   const runner = hookName.endsWith('.sh') ? 'bash' : nodeRunner;
   // resolveNodeRunner returns null when process.execPath is unavailable.
@@ -9332,7 +9401,12 @@ function installSdkIfNeeded(opts) {
   // so a self-link into a user-writable PATH dir makes `gsd-sdk` callable
   // from local-mode installs too. Only when the dist is genuinely missing
   // do we bail out with a non-fatal warning.
-  if (opts.isLocal && !fs.existsSync(sdkCliPath)) {
+  //
+  // #3033: --sdk (opts.forceSdk) overrides the local-install early-return —
+  // the user explicitly requested SDK deployment, so treat the missing-dist
+  // case like a global install (fail fast with an actionable diagnostic)
+  // instead of silently skipping.
+  if (opts.isLocal && !opts.forceSdk && !fs.existsSync(sdkCliPath)) {
     console.warn(`\n  ${yellow}⚠${reset}  Skipping SDK check for local install — sdk/dist/cli.js not found at ${sdkCliPath}.`);
     return;
   }
@@ -9807,7 +9881,8 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
     // prebuilt in the tarball (fix/2441-sdk-decouple); gsd-sdk reaches users via
     // the parent package's bin/gsd-sdk.js shim, so no sub-install is needed.
     // Skip with --no-sdk. Skip with isLocal (#2678 — local installs don't own global npm).
-    installSdkIfNeeded({ isLocal: !isGlobal });
+    // #3033: pass forceSdk so --sdk overrides the local-install skip.
+    installSdkIfNeeded({ isLocal: !isGlobal, forceSdk: hasSdk });
 
     const printSummaries = () => {
       for (const result of results) {
@@ -9977,6 +10052,7 @@ if (process.env.GSD_TEST_MODE) {
     parseUpdateBannerInput,
     buildUpdateBannerHookEntry,
     buildHookCommand,
+    normalizeNodePath,
     resolveNodeRunner,
     rewriteLegacyManagedNodeHookCommands,
     buildCodexHookBlock,

@@ -6,7 +6,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
-  - Task
+  - Agent
   - AskUserQuestion
 ---
 <objective>

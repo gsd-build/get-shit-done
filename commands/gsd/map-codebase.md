@@ -8,7 +8,7 @@ allowed-tools:
   - Glob
   - Grep
   - Write
-  - Task
+  - Agent
 ---
 
 <objective>

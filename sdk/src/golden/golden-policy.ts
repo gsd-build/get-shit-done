@@ -53,6 +53,12 @@ const NO_CJS_SUBPROCESS_REASON: Record<string, string> = {
     'SDK-only requirements aggregation (no CJS mirror). Covered in sdk/src/query/requirements-extract-from-plans.test.ts.',
   'commands':
     'SDK-only registry introspection (no gsd-tools.cjs equivalent — the CJS layer has no self-describing verb). Covered in sdk/src/query/commands-list.test.ts. Closes #3121.',
+  'phase.mvp-mode':
+    'SDK-only MVP precedence resolver (CLI flag → roadmap → config → false). Centralizes the chain previously duplicated across plan-phase/execute-phase/verify-work/progress workflows. Covered in sdk/src/query/mvp.test.ts.',
+  'task.is-behavior-adding':
+    'SDK-only Behavior-Adding Task predicate for the MVP+TDD Gate (tdd=true + <behavior> block + non-test source files). Replaces prose-only specification in references/execute-mvp-tdd.md. Covered in sdk/src/query/mvp.test.ts.',
+  'user-story.validate':
+    'SDK-only User Story regex validator. Centralizes /^As a .+, I want to .+, so that .+\\.$/ previously hardcoded in verify-work workflow. Covered in sdk/src/query/mvp.test.ts.',
 };
 
 const READ_HANDLER_ONLY_REASON = (cmd: string) =>

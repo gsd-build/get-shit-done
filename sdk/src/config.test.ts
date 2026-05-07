@@ -186,7 +186,7 @@ describe('loadConfig', () => {
   // resolveModel/MODEL_PROFILES do not emit aliases when resolve_model_ids
   // is "omit". Once a project is initialized, config.json is authoritative,
   // because buildNewProjectConfig bakes user defaults into project config
-  // at /gsd:new-project time.
+  // at /gsd-new-project time.
 
   it('pre-project: ignores user defaults and uses built-in defaults', async () => {
     await writeUserDefaults({ resolve_model_ids: 'omit' });

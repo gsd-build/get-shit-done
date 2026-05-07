@@ -10,7 +10,7 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - Skill
-  - Task
+  - Agent
 ---
 <objective>
 Single-terminal command center for managing a milestone. Shows a dashboard of all phases with visual status indicators, recommends optimal next actions, and dispatches work — discuss runs inline, plan/execute run as background agents.

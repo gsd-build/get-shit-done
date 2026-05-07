@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 3156
+---
+**`/gsd-plan-phase` no longer auto-dispatches to a subagent on OpenCode (#3156)** — `commands/gsd/plan-phase.md` carried `agent: gsd-planner` in its frontmatter. Per the OpenCode commands spec, `agent: <name>` causes the runtime to auto-dispatch the command to a named subagent context where the `Agent` (subagent-spawner) tool is unavailable. The `/gsd-plan-phase` orchestrator relies on `Agent` to spawn `gsd-phase-researcher`, `gsd-planner`, and `gsd-plan-checker` subagents; in the auto-dispatched context it fell back to doing all work inline. The `agent: gsd-planner` directive has been removed from `plan-phase.md` so the command runs in the main agent context where `Agent` is available. The same fix was applied to `commands/gsd/mvp-phase.md`, which carried the same directive and had the identical failure mode. A structural regression test parses the YAML frontmatter of every `commands/gsd/*.md` file and asserts that no command carries an `agent:` directive.

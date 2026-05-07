@@ -9,7 +9,7 @@ allowed-tools:
   - Glob
   - Grep
   - AskUserQuestion
-  - Task
+  - Agent
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
 ---

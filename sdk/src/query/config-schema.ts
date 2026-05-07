@@ -71,6 +71,16 @@ export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'claude_md_assembly.mode',
   // #2517 — runtime-aware model profiles
   'runtime',
+  // #3162 — documented top-level key: controls model ID resolution for non-Claude runtimes
+  'resolve_model_ids',
+]);
+
+/**
+ * Internal runtime-state keys accepted by config-set workflows but not exposed
+ * as user-facing config options.
+ */
+export const RUNTIME_STATE_KEYS: ReadonlySet<string> = new Set([
+  'workflow._auto_chain_active',
 ]);
 
 /**
@@ -125,8 +135,9 @@ export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
   },
 ];
 
-/** Returns true if keyPath is a valid config key (exact or dynamic pattern). */
+/** Returns true if keyPath is a valid config key (exact, runtime-state, or dynamic pattern). */
 export function isValidConfigKeyPath(keyPath: string): boolean {
   if (VALID_CONFIG_KEYS.has(keyPath)) return true;
+  if (RUNTIME_STATE_KEYS.has(keyPath)) return true;
   return DYNAMIC_KEY_PATTERNS.some((p) => p.test(keyPath));
 }

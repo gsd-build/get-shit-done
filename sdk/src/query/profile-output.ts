@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from '../config.js';
 import { GSDError, ErrorClassification } from '../errors.js';
+import { detectRuntime } from './helpers.js';
 import { CLAUDE_INSTRUCTIONS } from './profile-questionnaire-data.js';
 import type { QueryHandler } from './utils.js';
 
@@ -807,6 +808,12 @@ export const generateClaudeMd: QueryHandler = async (args, projectDir) => {
       const config = await loadConfig(projectDir);
       const p = config.claude_md_path;
       if (typeof p === 'string' && p) configClaudeMdPath = p;
+      // #3163: When runtime is codex, override the output target to AGENTS.md
+      // regardless of claude_md_path, so Codex projects never write to CLAUDE.md.
+      const runtime = detectRuntime(config as { runtime?: unknown });
+      if (runtime === 'codex') {
+        configClaudeMdPath = './AGENTS.md';
+      }
     } catch {
       /* default */
     }

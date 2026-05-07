@@ -93,6 +93,13 @@ try {
     encoding: 'utf8',
     timeout: 10000,
     windowsHide: true,
+    // On Windows, 'npm' is distributed as npm.cmd. Node's execFileSync does
+    // not apply PATHEXT resolution and looks for a literal 'npm' binary,
+    // failing with ENOENT. Setting shell:true on Windows routes through
+    // cmd.exe which resolves npm.cmd via PATHEXT.
+    // POSIX (Linux/macOS) is left untouched — no shell spawn, no extra
+    // signal/exit-code semantics, no overhead.
+    shell: process.platform === 'win32',
   }).trim();
 } catch (e) {}
 

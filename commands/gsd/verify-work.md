@@ -9,7 +9,7 @@ allowed-tools:
   - Grep
   - Edit
   - Write
-  - Task
+  - Agent
 ---
 <objective>
 Validate built features through conversational testing with persistent state.

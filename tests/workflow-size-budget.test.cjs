@@ -32,7 +32,11 @@ const path = require('path');
 
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 
-const XL_BUDGET = 1700;
+// Bumped from 1700 → 1800 in #3181 to absorb MVP-mode verb-call additions
+// in execute-phase.md (1727 → ) and plan-phase.md (1714 → ) from #3178.
+// Follow-up #3182 (TBD): extract MVP-mode bodies to `<workflow>/modes/mvp.md`
+// per the discuss-phase/modes/ precedent and revert this back to 1700.
+const XL_BUDGET = 1800;
 const LARGE_BUDGET = 1500;
 const DEFAULT_BUDGET = 1000;
 
@@ -40,8 +44,8 @@ const DEFAULT_BUDGET = 1000;
 // Grandfathered at current sizes — see PR #2551 for #2551 progressive-disclosure
 // pattern that future shrinks should follow.
 const XL_WORKFLOWS = new Set([
-  'execute-phase',  // 1622
-  'plan-phase',     // 1493
+  'execute-phase',  // 1727 (post-MVP-verb-integration; was 1622)
+  'plan-phase',     // 1714 (post-MVP-verb-integration; was 1493)
   'new-project',    // 1391
 ]);
 

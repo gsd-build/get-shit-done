@@ -36,6 +36,13 @@ interface PhaseSection {
   phase_number: string;
   phase_name: string;
   goal?: string | null;
+  /**
+   * Phase-level mode flag from `**Mode:** mvp` in ROADMAP.md.
+   * Lowercased + trimmed for canonical comparison; null when the field is absent.
+   * Unrecognized values are preserved verbatim for forward-compat (mirrors `roadmap.cjs`).
+   * Read by the `phase.mvp-mode` resolver and downstream MVP-aware workflows.
+   */
+  mode?: string | null;
   success_criteria?: string[];
   section?: string;
   error?: string;
@@ -50,8 +57,13 @@ interface PhaseSection {
  * Port of stripShippedMilestones from core.cjs line 1082-1084.
  */
 export function stripShippedMilestones(content: string): string {
-  // Pattern 1: <details>...</details> blocks (explicit collapse)
-  let result = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  // Pattern 1: <details>...</details> blocks (explicit collapse).
+  // <details\b[^>]*> tolerates attributes (e.g. <details open>, <details class="…">).
+  // Symmetry with extractCurrentMilestone()'s <details>-aware fallback (#2641):
+  // both functions must agree on what counts as a <details> opening tag, or
+  // shipped content wrapped in attributed tags would leak through here while
+  // the active-milestone anchor in extractCurrentMilestone() correctly fires.
+  let result = content.replace(/<details\b[^>]*>[\s\S]*?<\/details>/gi, '');
   // Pattern 2: inline milestone headings marked as shipped.
   // Keep aligned with heading levels accepted by extractCurrentMilestone() (## and ###).
   const sections = result.split(/(?=^#{2,3}\s)/m);
@@ -146,20 +158,40 @@ export async function getMilestoneInfo(projectDir: string, workstream?: string):
 /**
  * Extract the current milestone section from ROADMAP.md.
  *
- * Port of extractCurrentMilestone from core.cjs lines 1102-1170.
+ * Two anchoring strategies, tried in order:
+ *   1. Markdown heading containing the active version (`^#{1,3}\s+.*vX.Y…`).
+ *   2. `<details><summary>vX.Y…</summary>…</details>` block (the GitHub-friendly
+ *      collapse pattern; see #2641). When this fallback fires, the captured
+ *      `<summary>` text is synthesized as a `##` heading prepended to the
+ *      returned slice so downstream consumers that scan for milestone headings
+ *      (e.g. the `data.milestones` loop in `roadmapAnalyze`) still see an
+ *      active-milestone anchor.
+ *
+ * If neither strategy matches the active version, falls through to
+ * `stripShippedMilestones(content)`.
+ *
+ * Originally ported from core.cjs lines 1102-1170; the TS implementation has
+ * since diverged (Backlog-leak fix #2422, phase-vX.Y truncation fix #2619,
+ * fenced-code-block tracking #2787, `<details><summary>` fallback #2641).
  *
  * @param content - Full ROADMAP.md content
  * @param projectDir - Working directory for reading STATE.md
  * @returns Content scoped to current milestone
  */
 export async function extractCurrentMilestone(content: string, projectDir: string, workstream?: string): Promise<string> {
-  // Get version from STATE.md frontmatter
+  // Get version from STATE.md frontmatter.
+  // Strip optional surrounding YAML quotes (e.g. `milestone: "v0.9"`) for parity
+  // with parseMilestoneFromState() above and getMilestoneInfo()'s STATE.md path.
+  // Without this, a quoted version yields `escapedVersion = '\\"v0\\.9\\"'`
+  // which matches neither markdown headings nor <summary> text, falling
+  // through to stripShippedMilestones() — and reintroducing the same archived-
+  // milestone misrouting this fallback addresses.
   let version: string | null = null;
   try {
     const stateRaw = await readFile(planningPaths(projectDir, workstream).state, 'utf-8');
     const milestoneMatch = stateRaw.match(/^milestone:\s*(.+)/m);
     if (milestoneMatch) {
-      version = milestoneMatch[1].trim();
+      version = milestoneMatch[1].trim().replace(/^["']|["']$/g, '');
     }
   } catch { /* intentionally empty */ }
 
@@ -176,12 +208,77 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
   // Find section matching this version
   const escapedVersion = escapeRegex(version);
   const sectionPattern = new RegExp(
-    `(^#{1,3}\\s+.*${escapedVersion}[^\\n]*)`,
+    `(^#{1,3}\\s+.*${escapedVersion}(?![\\d.])[^\\n]*)`,
     'mi'
   );
   const sectionMatch = content.match(sectionPattern);
 
-  if (!sectionMatch || sectionMatch.index === undefined) return stripShippedMilestones(content);
+  if (!sectionMatch || sectionMatch.index === undefined) {
+    // Fallback: <details><summary> matching the active version (issue #2641).
+    //
+    // Many projects (GitHub-friendly collapse pattern) wrap the active
+    // milestone's phase details inside a collapsible block whose <summary>
+    // names the version, e.g.:
+    //
+    //   <details>
+    //   <summary>v0.9 Local-First Bus (active) — Phase Details</summary>
+    //   ### Phase 1: ...
+    //   </details>
+    //
+    // The markdown-heading lookup above misses this because <summary> is HTML,
+    // not a heading. Without this fallback, control falls through to
+    // stripShippedMilestones() which removes ALL <details> blocks
+    // indiscriminately — including the active milestone's — causing
+    // roadmapGetPhase() to return {found:false} for phases that ARE in the
+    // active ROADMAP. The init.phase-op safety guard then misfires and can
+    // route phase lookups into archived milestones.
+    //
+    // Regex anatomy:
+    //   <details\b[^>]*>          tolerate attributes (e.g. <details open>)
+    //   \s*<summary\b[^>]*>       tolerate attributes on <summary>
+    //   ((?:(?!</summary>).)*?    non-greedy summary capture; tolerates
+    //     ${escapedVersion}        inline HTML in the summary text
+    //     (?![\d.])                non-version-character lookahead — prevents
+    //                                 `v0.1` from substring-matching `v0.10`
+    //     (?:(?!</summary>).)*)
+    //   </summary>                 end of summary
+    //   ([\s\S]*?)</details>       lazy body capture to the FIRST </details>
+    //
+    // Contract: any consumer that scans the returned slice for milestone
+    // headings (e.g. /##\s*.*vX.Y/) sees the active milestone's anchor. We
+    // synthesize that heading from the captured <summary> text rather than
+    // returning the body alone.
+    //
+    // Hardening guards:
+    //   - Nested <details>: the lazy quantifier truncates at the inner
+    //     </details>, silently losing trailing phases. Detect and fall through
+    //     to stripShippedMilestones() instead of returning truncated content.
+    //   - Empty body: a <details> block with no body would synthesize a heading
+    //     with nothing under it. Treat as no-match.
+    //   - Summary sanitization: strip inline HTML (e.g. <em>active</em>) and
+    //     leading `#` tokens before promoting to a `##` heading, so the result
+    //     is a single well-formed markdown heading.
+    const detailsPattern = new RegExp(
+      `<details\\b[^>]*>\\s*<summary\\b[^>]*>` +
+      `((?:(?!</summary>).)*?${escapedVersion}(?![\\d.])(?:(?!</summary>).)*)` +
+      `</summary>([\\s\\S]*?)</details>`,
+      'i'
+    );
+    const detailsMatch = content.match(detailsPattern);
+    if (
+      detailsMatch &&
+      detailsMatch[2].trim() &&                    // empty-body guard
+      !detailsMatch[2].includes('<details')        // nested-<details> guard
+    ) {
+      const summary = detailsMatch[1]
+        .replace(/<[^>]+>/g, '')                   // strip inline HTML
+        .replace(/^#+\s*/, '')                     // strip leading `#`
+        .trim();
+      const body = detailsMatch[2];
+      return `## ${summary}\n${body}`;
+    }
+    return stripShippedMilestones(content);
+  }
 
   const sectionStart = sectionMatch.index;
 
@@ -388,6 +485,12 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
   const goalMatch = section.match(/\*\*Goal(?::\*\*|\*\*:)\s*([^\n]+)/i);
   const goal = goalMatch ? goalMatch[1].trim() : null;
 
+  // Mode: vertical-MVP slice mode flag. Lowercased + trimmed for canonical
+  // comparison; unrecognized values preserved verbatim for forward-compat.
+  // Mirrors roadmap.cjs:120-123 — restoring parity that was missed in the SDK port.
+  const modeMatch = section.match(/\*\*Mode(?::\*\*|\*\*:)\s*([^\n]+)/i);
+  const mode = modeMatch ? modeMatch[1].trim().toLowerCase() : null;
+
   // Extract success criteria as structured array
   const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
   const success_criteria = criteriaMatch
@@ -399,6 +502,7 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
     phase_number: phaseNum,
     phase_name: phaseName,
     goal,
+    mode,
     success_criteria,
     section,
   };

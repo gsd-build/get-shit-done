@@ -40,6 +40,27 @@ Module owning command resolution, policy projection (`mutation`, `output_mode`),
 ### Query Pre-Project Config Policy Module
 Module policy that defines query-time behavior when `.planning/config.json` is absent: use built-in defaults for parity-sensitive query Interfaces, and emit parity-aligned empty model ids for pre-project model resolution surfaces.
 
+### MVP Mode
+Phase-level planning mode that frames work as a vertical slice (UI → API → DB) of one user-visible capability instead of horizontal layers. Resolved at workflow init via the precedence chain: `--mvp` CLI flag → ROADMAP.md `**Mode:** mvp` field → `workflow.mvp_mode` config → false. All-or-nothing per phase (PRD #2826 Q1). Surfaced as `MVP_MODE=true|false` to the planner, executor, verifier, and discovery surfaces (progress, stats, graphify). Canonical parser: `roadmap.cjs` `**Mode:**` field; canonical resolution chain documented in `workflows/plan-phase.md`. Concept index: `references/mvp-concepts.md`.
+
+### User Story
+Phase-goal format under MVP Mode: `As a [role], I want to [capability], so that [outcome].` Required regex shape: `/^As a .+, I want to .+, so that .+\.$/`. Used as the framing input by `gsd-planner` (emits as bolded `## Phase Goal` header in PLAN.md) and as the verification target by `gsd-verifier` (the `[outcome]` clause is the goal-backward verification anchor). Authored interactively by `/gsd-mvp-phase`, validated by SPIDR Splitting when too large.
+
+### Walking Skeleton
+Phase 1 deliverable under `--mvp` on a new project: the thinnest end-to-end stack proving every layer (framework, DB, routing, deployment) works together. Emitted as `SKELETON.md` capturing the architectural decisions subsequent vertical slices inherit. Gate fires when `phase_number == "01"` AND `prior_summaries == 0` AND `MVP_MODE=true`. Scope intentionally narrow (PRD #2826 Q2) — does not retrofit existing projects.
+
+### Vertical Slice
+Single-feature task that moves one user capability from open-to-close (happy path) end-to-end. Contrast with the horizontal layer (all models, then all APIs, then all UI). The MVP Mode planning unit; SPIDR Splitting axes (Spike, Paths, Interfaces, Data, Rules) are the canonical decomposition tools when a slice is too large for one phase.
+
+### Behavior-Adding Task
+Predicate over a PLAN.md task: `tdd="true"` frontmatter AND `<behavior>` block names a user-visible outcome AND `<files>` includes at least one non-`*.md` / non-`*.json` / non-`*.test.*` source file. Pure doc/config/test-only tasks are exempt. The MVP+TDD Gate (in `references/execute-mvp-tdd.md`) only halts execution on this predicate; the gsd-executor agent applies all three checks at runtime. Currently a prose-only specification — no shared utility.
+
+### MVP+TDD Gate
+Per-task runtime gate in `/gsd-execute-phase` that, when both `MVP_MODE` and `TDD_MODE` are true, refuses to advance a Behavior-Adding Task until a failing-test commit (`test({phase}-{plan})`) exists for it. The `tdd_review_checkpoint` end-of-phase review escalates from advisory to blocking under the same condition. Documented contract: `references/execute-mvp-tdd.md`. Reserved escape hatch `--force-mvp-gate` is documented but not implemented.
+
+### SPIDR Splitting
+Five-axis story decomposition discipline (**S**pike, **P**aths, **I**nterfaces, **D**ata, **R**ules) used by `/gsd-mvp-phase` when a User Story is too large for one phase. Full interactive flow per PRD #2826 Q3 (not a lightweight filter). Reference: `get-shit-done/references/spidr-splitting.md`.
+
 ---
 
 ## Recurring PR mistakes (distilled from CodeRabbit reviews, 2026-05-05)

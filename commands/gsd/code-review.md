@@ -8,7 +8,7 @@ allowed-tools:
   - Glob
   - Grep
   - Write
-  - Task
+  - Agent
 ---
 <objective>
 Review source files changed during a phase for bugs, security vulnerabilities, and code quality problems.

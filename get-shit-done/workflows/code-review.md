@@ -347,7 +347,7 @@ done
 Spawn the gsd-code-reviewer agent:
 
 ```
-Task(subagent_type="gsd-code-reviewer", prompt="
+Agent(subagent_type="gsd-code-reviewer", prompt="
 <files_to_read>
 ${FILES_TO_READ}
 </files_to_read>
@@ -366,11 +366,11 @@ Do NOT commit the output — the orchestrator handles that.
 ")
 ```
 
-> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Task() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
+> **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
 **Agent failure handling:**
 
-If the Task() call fails (agent error, timeout, or exception):
+If the Agent() call fails (agent error, timeout, or exception):
 ```
 Error: Code review agent failed: ${error_message}
 

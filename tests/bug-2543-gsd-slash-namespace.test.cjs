@@ -39,7 +39,19 @@ const SEARCH_DIRS = [
   path.join(ROOT, 'get-shit-done', 'templates'),
   path.join(ROOT, 'get-shit-done', 'contexts'),
   COMMANDS_DIR,
+  path.join(ROOT, 'agents'),
+  path.join(ROOT, 'sdk', 'src'),
 ];
+
+const TOP_LEVEL_FILES = [
+  path.join(ROOT, '.clinerules'),
+];
+
+// Re-use SKIP_DIRS from the production script so the test's directory walker
+// stays in lockstep with the fixer's. EXTENSIONS legitimately diverges (the
+// guard scans only `.md`/`.cjs`/`.js` per the no-source-grep standard, while
+// the fixer also rewrites `.ts`/`.tsx`), so it is not shared.
+const { SKIP_DIRS } = require(path.join(ROOT, 'scripts', 'fix-slash-commands.cjs'));
 
 // Discover user-facing markdown surfaces dynamically so a freshly added
 // doc (a new RELEASE-*.md, a new top-level guide) is automatically scanned
@@ -80,6 +92,11 @@ function discoverDocSearchFiles(root) {
 
 const DOC_SEARCH_FILES = discoverDocSearchFiles(ROOT);
 
+// Limited to .md (and pre-existing .cjs/.js) by the no-source-grep standard:
+// markdown text IS the deployed product, but .ts/.tsx source must be guarded
+// via runtime behavior. The fixer (scripts/fix-slash-commands.cjs) covers
+// .ts/.tsx auto-rewrites at build time; idempotency (a no-op second run) is
+// the runtime guard for those extensions.
 const EXTENSIONS = new Set(['.md', '.cjs', '.js']);
 
 function collectFiles(dir, results = []) {
@@ -87,7 +104,10 @@ function collectFiles(dir, results = []) {
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return results; }
   for (const e of entries) {
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) collectFiles(full, results);
+    if (e.isDirectory()) {
+      if (SKIP_DIRS.has(e.name)) continue;
+      collectFiles(full, results);
+    }
     else if (EXTENSIONS.has(path.extname(e.name))) results.push(full);
   }
   return results;
@@ -103,7 +123,10 @@ const cmdNames = fs.readdirSync(COMMANDS_DIR)
 const retiredPattern = new RegExp(`/gsd:(${cmdNames.join('|')})(?=[^a-zA-Z0-9_-]|$)`);
 
 const allFiles = SEARCH_DIRS.flatMap(d => collectFiles(d));
-const allUserFacingFiles = allFiles.concat(DOC_SEARCH_FILES.filter((file) => fs.existsSync(file)));
+const topLevelFiles = TOP_LEVEL_FILES.filter((file) => fs.existsSync(file));
+const allUserFacingFiles = allFiles
+  .concat(topLevelFiles)
+  .concat(DOC_SEARCH_FILES.filter((file) => fs.existsSync(file)));
 
 describe('slash-command namespace invariant (#2697)', () => {
   test('commands/gsd/ directory contains known command files', () => {
@@ -183,7 +206,7 @@ describe('slash-command namespace invariant (#2697)', () => {
   });
 
   test('gsd-sdk and gsd-tools identifiers are not rewritten', () => {
-    for (const file of allFiles) {
+    for (const file of allUserFacingFiles) {
       const src = fs.readFileSync(file, 'utf-8');
       assert.ok(
         !src.includes('/gsd:sdk'),
