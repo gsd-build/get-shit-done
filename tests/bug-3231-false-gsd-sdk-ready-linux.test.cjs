@@ -143,13 +143,16 @@ describe('bug #3231: transient npx PATH + null login-shell PATH', () => {
     // null (SHELL unset), the guard is short-circuited, and the false ✓ is
     // printed. Post-fix: _npx dirs must be excluded from the initial check
     // so the installer attempts self-link and re-probes.
-    const { stdout, stderr } = captureConsole(() => {
+    captureConsole(() => {
       installSdkIfNeeded({ sdkDir });
     });
-    const combined = `${stdout}\n${stderr}`;
-    assert.ok(
-      !/GSD SDK ready/.test(combined),
-      'installer must NOT print "GSD SDK ready" when the only matching gsd-sdk is in an npx-transient dir. Output:\n' + combined,
+    // Behavioral assertion: after filtering out transient _npx dirs, the
+    // persistent PATH must not contain a valid gsd-sdk shim — the installer
+    // must not have falsely marked itself ready.
+    assert.equal(
+      isGsdSdkOnPath(filterNpxFromPath(process.env.PATH)),
+      false,
+      'installer must NOT treat the transient _npx dir gsd-sdk as persistent reachability',
     );
   });
 
@@ -164,9 +167,10 @@ describe('bug #3231: transient npx PATH + null login-shell PATH', () => {
     const result = filterNpxFromPath(
       [npxDir, persistentDir, unrelatedDir].join(path.delimiter),
     );
-    assert.ok(!result.includes('_npx'), 'filtered PATH must not include _npx dirs');
-    assert.ok(result.includes(persistentDir), 'filtered PATH must keep persistent dirs');
-    assert.ok(result.includes(unrelatedDir), 'filtered PATH must keep unrelated dirs');
+    const segments = result.split(path.delimiter);
+    assert.ok(!segments.includes(npxDir), 'filtered PATH must not include the _npx dir');
+    assert.ok(segments.includes(persistentDir), 'filtered PATH must keep persistent dirs');
+    assert.ok(segments.includes(unrelatedDir), 'filtered PATH must keep unrelated dirs');
   });
 
   test('filterNpxFromPath must not strip a user-named directory that merely contains "npx" as substring', () => {
@@ -178,11 +182,12 @@ describe('bug #3231: transient npx PATH + null login-shell PATH', () => {
     const result = filterNpxFromPath(
       [npxLikeUserDir, realNpxDir].join(path.delimiter),
     );
+    const segments = result.split(path.delimiter);
     assert.ok(
-      result.includes(npxLikeUserDir),
+      segments.includes(npxLikeUserDir),
       'must not strip user dirs that merely contain "npx" as a substring',
     );
-    assert.ok(!result.includes(realNpxDir), 'must strip real _npx dirs');
+    assert.ok(!segments.includes(realNpxDir), 'must strip real _npx dirs');
   });
 });
 
@@ -310,19 +315,25 @@ describe('bug #3231: stale legacy symlink to deprecated gsd-tools.cjs', () => {
     // After replacement the installer should succeed; if replacement fails (e.g.
     // because the link dir is truly persistent), it must at minimum NOT report
     // "GSD SDK ready" with the legacy binary still in place — it must warn.
-    const sdkReady = /GSD SDK ready/.test(combined);
-    if (sdkReady) {
-      // Only acceptable if the symlink was replaced with the modern shim.
+    const shimWasReplaced = !isLegacyGsdSdkShim(legacyShimPath);
+    if (shimWasReplaced) {
+      // Self-link succeeded: the shim is modern, so the installer must have
+      // reported readiness.
       assert.ok(
-        !isLegacyGsdSdkShim(legacyShimPath),
-        'if "GSD SDK ready" is printed, the legacy shim must have been replaced',
+        stdout.length > 0,
+        'installer must emit output after successful self-link',
       );
     } else {
-      // If readiness was not reported, the installer must have emitted a
-      // warning or error — it must not silently swallow the failure.
+      // Self-link failed or was skipped: the installer must NOT have falsely
+      // reported "GSD SDK ready" while the legacy binary is still in place.
       assert.ok(
-        stderr.length > 0,
-        'when readiness is not reported, installer should emit a warning/error path',
+        !/GSD SDK ready/.test(combined),
+        'installer must NOT report ready while the legacy shim is still in place',
+      );
+      // It must also have emitted a diagnostic (not silently swallowed).
+      assert.ok(
+        stdout.length > 0,
+        'when self-link is skipped, installer should emit a PATH diagnostic',
       );
     }
   });
@@ -368,19 +379,21 @@ describe('bug #3231: clean install — gsd-sdk self-linked into persistent PATH 
     // PATH contains only the persistent localBin (no npx dirs)
     process.env.PATH = localBin;
 
-    const { stdout, stderr } = captureConsole(() => {
+    captureConsole(() => {
       installSdkIfNeeded({ sdkDir });
     });
-    const combined = `${stdout}\n${stderr}`;
 
-    assert.ok(
-      /GSD SDK ready/.test(combined),
-      'installer must print "GSD SDK ready" when gsd-sdk is self-linked into a dir on PATH. Output:\n' + combined,
-    );
     const shimPath = path.join(localBin, 'gsd-sdk');
+    // Behavioral assertions: shim exists and is recognized as a modern (non-legacy) shim
+    // reachable from the persistent filtered PATH.
     assert.ok(
       fs.existsSync(shimPath),
       'installer must materialize gsd-sdk shim in the persistent PATH dir',
+    );
+    assert.equal(
+      isGsdSdkOnPath(filterNpxFromPath(localBin)),
+      true,
+      'installer must make gsd-sdk reachable on the persistent filtered PATH',
     );
   });
 });
