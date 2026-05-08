@@ -152,9 +152,9 @@ describe('bug #3243: CJS dispatcher accepts dotted canonical command form', () =
     const result = runGsdTools(['foo.bar'], tmpDir);
     assert.strictEqual(result.success, false, '"foo.bar" must fail');
     assert.ok(
-      result.error.includes('foo bar') || result.error.includes('foo.bar'),
+      result.error.includes('foo bar'),
       [
-        'error for unknown dotted command should mention the command or suggest spaced form.',
+        'error for unknown dotted command should suggest spaced form "foo bar".',
         'Got:', result.error,
       ].join('\n')
     );
