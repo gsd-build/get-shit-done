@@ -54,18 +54,21 @@ jobs:
             function shouldDismissReviewer(login, roleName) {
               const reviewer = norm(login);
               const isBlocked = blockedReviewers.has(reviewer);
+              // 'unknown' means a transient API error — fail-safe: keep the approval.
+              // Only 'none' (true 404) is a confirmed non-collaborator.
+              const isKnownRole = roleName !== 'unknown';
               const isAllowedRole = allowedRoles.has(roleName);
 
               const reasons = [];
               if (isBlocked) {
                 reasons.push(`reviewer is blocked (${reviewer})`);
               }
-              if (!isAllowedRole) {
+              if (isKnownRole && !isAllowedRole) {
                 reasons.push(`reviewer is not a collaborator or higher (detected role: ${roleName})`);
               }
 
               return {
-                dismiss: isBlocked || !isAllowedRole,
+                dismiss: isBlocked || (isKnownRole && !isAllowedRole),
                 message: `Auto-dismissed approval: ${reasons.join('; ')}.`,
               };
             }
