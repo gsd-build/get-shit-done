@@ -169,15 +169,14 @@ describe('#3242 Bug A: body-only state.update preserves curated progress frontma
     );
     assert.ok(updateResult.success, `state update failed: ${updateResult.error}`);
 
-    const content = fs.readFileSync(statePath, 'utf-8');
-    // Confirm the body field was indeed updated — parse the body line by line
-    // to find "Last Activity: <value>" rather than raw-text matching.
-    const lines = content.split(/\r?\n/);
-    const lastActivityLine = lines.find((l) => l.startsWith('Last Activity:'));
-    assert.ok(lastActivityLine, 'STATE.md must contain a "Last Activity:" line');
-    const lastActivityValue = lastActivityLine.replace(/^Last Activity:\s*/, '').trim();
+    // Assert via structured JSON output — not raw file text scanning.
+    // state json extracts Last Activity from the body and surfaces it as
+    // fm.last_activity, matching the no-source-grep testing standard.
+    const jsonResult = runGsdTools('state json', tmpDir);
+    assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
+    const fm = JSON.parse(jsonResult.output);
     assert.strictEqual(
-      lastActivityValue,
+      fm.last_activity,
       '2026-05-07',
       'state.update should have written the new date to the Last Activity body field',
     );
