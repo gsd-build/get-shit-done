@@ -3689,23 +3689,32 @@ function parseTomlValue(text, i) {
     }
   }
 
-  // Number (integer with optional sign). Float / date / time / hex / oct / bin
-  // are NOT supported — we reject them explicitly instead of silently truncating
-  // an integer prefix off a `0.5` float or `1979-05-27` date. (#2760 CR4 finding 3)
+  // Number — integer or TOML 1.0 float. (#2760 CR4 finding 3 required explicit
+  // rejection of floats; #3245 inverts that: Codex CLI's serde schema requires
+  // f64 for tool_timeout_sec / startup_timeout_sec, so integers are what Codex
+  // rejects. Accept TOML floats and store as JS Number.)
+  //
+  // Still rejected: date/time literals (`-`, `:`, `T`, `Z` after integer prefix)
+  // and hex/oct/bin literals (`0x`, `0o`, `0b` — `x`, `o`, `b` fall through to
+  // the unsupported-value throw below because `\d[\d_]*` won't match `x`).
   const numMatch = text.slice(i).match(/^[+-]?\d[\d_]*/);
   if (numMatch) {
-    const after = text[i + numMatch[0].length];
-    // Reject: float (`.`, `e`, `E`), date/time (`-`, `:`, `T`, `Z`), or any
-    // continuation digit/letter that suggests an unsupported numeric form.
-    if (after !== undefined && /[.eE:\-TZ]/.test(after)) {
+    const afterInt = text[i + numMatch[0].length];
+    // Reject date/time separators that cannot be part of a float.
+    if (afterInt !== undefined && /[:\-TZ]/.test(afterInt)) {
       throw new Error(
-        `unsupported TOML value at offset ${i}: floats, dates, and times are not supported (got ${text.slice(i, i + 20)})`
+        `unsupported TOML value at offset ${i}: dates and times are not supported (got ${text.slice(i, i + 20)})`
       );
     }
-    const digits = numMatch[0].replace(/_/g, '');
-    const n = Number(digits);
-    if (!Number.isFinite(n)) throw new Error(`invalid number: ${numMatch[0]}`);
-    return { value: n, end: i + numMatch[0].length };
+    // Accept float: optional decimal part, optional exponent part.
+    // Regex matches the FULL float literal including underscore separators.
+    // Pattern: integer-prefix (already matched) + optional(. digits) + optional(eE sign digits)
+    const floatMatch = text.slice(i).match(/^[+-]?\d[\d_]*(?:\.[\d_]+)?(?:[eE][+-]?\d[\d_]*)?/);
+    const raw = floatMatch ? floatMatch[0] : numMatch[0];
+    const normalized = raw.replace(/_/g, '');
+    const n = Number(normalized);
+    if (!Number.isFinite(n)) throw new Error(`invalid number: ${raw}`);
+    return { value: n, end: i + raw.length };
   }
 
   throw new Error(`unsupported value at offset ${i}: ${text.slice(i, i + 20)}`);
@@ -7436,6 +7445,48 @@ function install(isGlobal, runtime = 'claude') {
   // Clean up orphaned files from previous versions
   cleanupOrphanedFiles(targetDir);
 
+  // #3245 — Codex idempotent rollback. Capture pre-install state of ALL
+  // directories and files GSD will mutate so that any post-install validation
+  // failure (config.toml schema check, write failure, etc.) can revert the
+  // entire install atomically — not just config.toml.
+  //
+  // Captured BEFORE the first Codex-specific write (skills/) so the snapshots
+  // reflect the true pre-GSD state. Non-Codex runtimes skip this block.
+  //
+  // Snapshot contents:
+  //   codexPreInstallSkillNames  — Set of gsd-* skill dir names that existed
+  //   codexPreInstallAgentFiles  — Set of gsd-*.{md,toml} filenames in agents/
+  //   codexPreInstallVersionBytes — Buffer (or null) of get-shit-done/VERSION
+  //
+  // These are referenced by restoreCodexSnapshot(), defined below inside the
+  // config block. Defining the variables here (outer scope) makes them
+  // accessible by closure.
+  const codexPreInstallSkillNames = new Set();
+  const codexPreInstallAgentFiles = new Set();
+  let codexPreInstallVersionBytes = null;
+  if (isCodex && !isMinimalMode(installMode)) {
+    const _preSkillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(_preSkillsDir)) {
+      for (const entry of fs.readdirSync(_preSkillsDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          codexPreInstallSkillNames.add(entry.name);
+        }
+      }
+    }
+    const _preAgentsDir = path.join(targetDir, 'agents');
+    if (fs.existsSync(_preAgentsDir)) {
+      for (const file of fs.readdirSync(_preAgentsDir)) {
+        if (file.startsWith('gsd-') && (file.endsWith('.md') || file.endsWith('.toml'))) {
+          codexPreInstallAgentFiles.add(file);
+        }
+      }
+    }
+    const _preVersionPath = path.join(targetDir, 'get-shit-done', 'VERSION');
+    if (fs.existsSync(_preVersionPath)) {
+      try { codexPreInstallVersionBytes = fs.readFileSync(_preVersionPath); } catch (_) { /* best-effort */ }
+    }
+  }
+
   // OpenCode/Kilo use command/ (flat), Codex uses skills/, Claude/Gemini use commands/gsd/
   if (isOpencode || isKilo) {
     // OpenCode/Kilo: flat structure in command/ directory
@@ -8041,13 +8092,78 @@ function install(isGlobal, runtime = 'claude') {
       ? fs.readFileSync(codexConfigPathPreInstall)
       : null;
 
+    // #3245 — unified idempotent rollback. Reverts ALL Codex-specific mutations:
+    //   config.toml  — restore pre-install bytes (or remove if was absent)
+    //   skills/gsd-* — remove any gsd-* skill dirs written this session
+    //   agents/gsd-* — remove any gsd-*.{md,toml} agent files written this session
+    //   get-shit-done/VERSION — restore or remove
+    //   *.tmp-*      — best-effort cleanup of orphaned atomic-write temp files
+    //
+    // Safe to call multiple times (idempotent): each remove/write is guarded by
+    // existence checks. Safe to call before any snapshots are captured (variables
+    // default to empty Set / null). Does NOT touch non-gsd-* user content.
     const restoreCodexSnapshot = () => {
+      // 1. config.toml
       if (codexConfigPreInstallSnapshot !== null) {
         try { fs.writeFileSync(codexConfigPathPreInstall, codexConfigPreInstallSnapshot); }
         catch (_) { /* best-effort restore — surface the original error */ }
       } else if (fs.existsSync(codexConfigPathPreInstall)) {
         try { fs.rmSync(codexConfigPathPreInstall); } catch (_) { /* best-effort */ }
       }
+
+      // 2. skills/gsd-* — remove dirs that did not exist before this install.
+      const _rollbackSkillsDir = path.join(targetDir, 'skills');
+      if (fs.existsSync(_rollbackSkillsDir)) {
+        try {
+          for (const entry of fs.readdirSync(_rollbackSkillsDir, { withFileTypes: true })) {
+            if (entry.isDirectory() && entry.name.startsWith('gsd-') &&
+                !codexPreInstallSkillNames.has(entry.name)) {
+              try { fs.rmSync(path.join(_rollbackSkillsDir, entry.name), { recursive: true, force: true }); }
+              catch (_) { /* best-effort */ }
+            }
+          }
+        } catch (_) { /* best-effort */ }
+      }
+
+      // 3. agents/gsd-*.{md,toml} — remove files that did not exist before this install.
+      const _rollbackAgentsDir = path.join(targetDir, 'agents');
+      if (fs.existsSync(_rollbackAgentsDir)) {
+        try {
+          for (const file of fs.readdirSync(_rollbackAgentsDir)) {
+            if (file.startsWith('gsd-') && (file.endsWith('.md') || file.endsWith('.toml')) &&
+                !codexPreInstallAgentFiles.has(file)) {
+              try { fs.unlinkSync(path.join(_rollbackAgentsDir, file)); } catch (_) { /* best-effort */ }
+            }
+          }
+        } catch (_) { /* best-effort */ }
+      }
+
+      // 4. get-shit-done/VERSION
+      const _rollbackVersionPath = path.join(targetDir, 'get-shit-done', 'VERSION');
+      if (codexPreInstallVersionBytes !== null) {
+        try { fs.writeFileSync(_rollbackVersionPath, codexPreInstallVersionBytes); }
+        catch (_) { /* best-effort */ }
+      } else if (fs.existsSync(_rollbackVersionPath)) {
+        try { fs.unlinkSync(_rollbackVersionPath); } catch (_) { /* best-effort */ }
+      }
+
+      // 5. Orphaned atomic-write temp files (<file>.tmp-<pid>-<n>) in targetDir.
+      // These can accumulate if an atomic write fails mid-rename. Best-effort scan.
+      const _tmpPattern = /\.tmp-\d+-\d+$/;
+      function _cleanTmpFiles(dir) {
+        if (!fs.existsSync(dir)) return;
+        let entries;
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+        for (const entry of entries) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            _cleanTmpFiles(full);
+          } else if (_tmpPattern.test(entry.name)) {
+            try { fs.unlinkSync(full); } catch (_) { /* best-effort */ }
+          }
+        }
+      }
+      _cleanTmpFiles(targetDir);
     };
 
     let agentCount;

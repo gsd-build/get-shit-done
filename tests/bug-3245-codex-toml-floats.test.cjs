@@ -181,9 +181,11 @@ describe('#3245 — parseTomlToObject accepts TOML floats', () => {
       'x = 0x1A',
       '',
     ].join('\n');
+    // 0 is parsed, then 'x1A' is trailing garbage — rejected with "trailing bytes"
+    // or "unsupported value" depending on where the parser catches it.
     assert.throws(
       () => parseTomlToObject(content),
-      /unsupported (TOML value|value)/,
+      /trailing bytes|unsupported (TOML value|value)/,
       'hex literals must remain unsupported'
     );
   });
@@ -223,12 +225,14 @@ describe('#3245 — install succeeds with TOML float in pre-existing config', { 
   });
 
   test('install completes when config.toml contains tool_timeout_sec = 20.0', () => {
+    // Floats at the root level (before any table header) — this is where Codex
+    // CLI reads tool_timeout_sec / startup_timeout_sec according to its serde schema.
     const preInstall = [
-      '[model]',
-      'name = "o3"',
-      '',
       'tool_timeout_sec = 20.0',
       'startup_timeout_sec = 60.0',
+      '',
+      '[model]',
+      'name = "o3"',
       '',
     ].join('\n');
     writeCodexConfig(codexHome, preInstall);
@@ -239,7 +243,7 @@ describe('#3245 — install succeeds with TOML float in pre-existing config', { 
       'install must not throw when config.toml contains TOML floats'
     );
 
-    // The merged config.toml must still contain the float values.
+    // The merged config.toml must still contain the float values at root scope.
     const after = fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8');
     const parsed = parseTomlToObject(after);
     assert.strictEqual(parsed.tool_timeout_sec, 20.0,
