@@ -20,7 +20,7 @@ later. The file is never gated behind questions.
 Parse `$ARGUMENTS` for the idea summary.
 
 If empty, ask:
-```
+```text
 What's the idea? (one sentence)
 ```
 
@@ -113,7 +113,7 @@ gsd-sdk query commit "docs: plant seed — {$IDEA}" --files .planning/seeds/SEED
 </step>
 
 <step name="confirm">
-```
+```text
 ✅ Seed planted: SEED-{PADDED}
 
 "{$IDEA}"
@@ -136,7 +136,7 @@ If `--enrich` flag is in `$ARGUMENTS`:
 
 **Text mode (`workflow.text_mode: true` in config or `--text` flag):** Set `TEXT_MODE=true` if `--text` is present in `$ARGUMENTS` OR `text_mode` from init JSON is `true`. When TEXT_MODE is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for non-Claude runtimes (OpenAI Codex, Gemini CLI, etc.) where `AskUserQuestion` is not available.
 
-```
+```text
 AskUserQuestion(
   header: "Trigger",
   question: "When should this idea surface? (e.g., 'when we add user accounts', 'next major version', 'when performance becomes a priority')",
@@ -146,7 +146,7 @@ AskUserQuestion(
 
 Store as `$TRIGGER`.
 
-```
+```text
 AskUserQuestion(
   header: "Why",
   question: "Why does this matter? What problem does it solve or what opportunity does it create?",
@@ -156,7 +156,7 @@ AskUserQuestion(
 
 Store as `$WHY`.
 
-```
+```text
 AskUserQuestion(
   header: "Scope",
   question: "How big is this? (rough estimate)",
@@ -183,7 +183,7 @@ gsd-sdk query commit "docs: enrich seed SEED-{PADDED} — trigger + why + scope"
 ```
 
 Confirm:
-```
+```text
 ✅ Seed enriched: SEED-{PADDED}
 Trigger: {$TRIGGER}
 Scope: {$SCOPE}
