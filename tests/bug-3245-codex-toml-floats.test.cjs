@@ -390,7 +390,9 @@ describe('#3245 — idempotent rollback reverts skills/, agents/, and VERSION', 
       reason: 'simulated failure — user skill must survive',
     });
 
-    try { runCodexInstall(codexHome); } catch (_) { /* expected */ }
+    let threw = false;
+    try { runCodexInstall(codexHome); } catch (_) { threw = true; }
+    assert.strictEqual(threw, true, 'expected runCodexInstall to throw under simulated validation failure (user-skill-survives scenario)');
 
     assert.strictEqual(
       fs.existsSync(path.join(userSkill, 'SKILL.md')),
@@ -410,7 +412,9 @@ describe('#3245 — idempotent rollback reverts skills/, agents/, and VERSION', 
       reason: 'simulated failure for temp-file cleanup test',
     });
 
-    try { runCodexInstall(codexHome); } catch (_) { /* expected */ }
+    let threw = false;
+    try { runCodexInstall(codexHome); } catch (_) { threw = true; }
+    assert.strictEqual(threw, true, 'expected runCodexInstall to throw under simulated validation failure (temp-file cleanup scenario)');
 
     // Scan for any *.tmp-* files left in codexHome after rollback.
     const tmpPattern = /\.tmp-\d+-\d+$/;
