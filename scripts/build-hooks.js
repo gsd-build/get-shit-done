@@ -12,12 +12,15 @@ const vm = require('vm');
 
 const HOOKS_DIR = path.join(__dirname, '..', 'hooks');
 const DIST_DIR = path.join(HOOKS_DIR, 'dist');
-// Sibling directory used to stage atomic writes. Lives under hooks/ so it
-// shares a filesystem with DIST_DIR (POSIX rename(2) is only atomic within
-// the same filesystem) but is NOT inside DIST_DIR — so readers that
-// readdirSync(DIST_DIR) (e.g. bin/install.js, install-hooks-copy tests)
-// never observe a transient ".tmp" sibling file there.
-const STAGE_DIR = path.join(HOOKS_DIR, '.dist-staging');
+// Per-process staging directory for atomic writes. Using process.pid in the
+// name eliminates all contention between concurrent builders: each process
+// owns its own staging dir and never races with another builder's cleanup.
+// Lives under hooks/ so it shares a filesystem with DIST_DIR (POSIX
+// rename(2) is only atomic within the same filesystem) but is NOT inside
+// DIST_DIR — so readers that readdirSync(DIST_DIR) (e.g. bin/install.js,
+// install-hooks-copy tests) never observe a transient ".tmp" sibling.
+// The parent pattern hooks/.dist-staging-*/ is gitignored.
+const STAGE_DIR = path.join(HOOKS_DIR, `.dist-staging-${process.pid}`);
 
 // Hooks to copy (pure Node.js, no bundling needed)
 const HOOKS_TO_COPY = [
@@ -143,7 +146,7 @@ function build() {
     }
 
     console.log(`\x1b[32m✓\x1b[0m Copying ${hook}...`);
-    // Atomic write: copy to a per-process staging file in the sibling
+    // Atomic write: copy to a per-process staging file in the per-PID sibling
     // STAGE_DIR (same filesystem as DIST_DIR so rename(2) is atomic), then
     // rename into place. Multiple test files invoke this script concurrently
     // from their before() hooks; fs.copyFileSync truncates then writes the
@@ -154,7 +157,9 @@ function build() {
     // makes the swap atomic so readers see either the old file or the new
     // file. The staging file lives outside DIST_DIR so readdirSync(DIST_DIR)
     // (in install.js and tests) never observes a transient ".tmp" sibling.
-    const stagedDest = path.join(STAGE_DIR, `${hook}.${process.pid}.${Date.now()}`);
+    // Each process uses its own STAGE_DIR (keyed by PID) so concurrent
+    // builders never race on staging-dir creation or cleanup.
+    const stagedDest = path.join(STAGE_DIR, `${hook}.${Date.now()}`);
     fs.copyFileSync(src, stagedDest);
     // Preserve executable bit for shell scripts before rename so the
     // installed file is executable from the very first observation.
@@ -164,22 +169,12 @@ function build() {
     renameAtomicWithRetry(stagedDest, dest, hook);
   }
 
-  // Best-effort cleanup of the staging dir. If concurrent builders are still
-  // running, their staged files will be left in STAGE_DIR and cleaned up by
-  // whichever builder calls fs.rmdirSync last. fs.rmdirSync throws ENOTEMPTY
-  // on a non-empty directory (it is NOT a silent no-op), so we first read
-  // the directory via fs.readdirSync(STAGE_DIR) -> leftovers and only call
-  // fs.rmdirSync(STAGE_DIR) when leftovers.length === 0. A TOCTOU window
-  // remains: another builder can drop a staged file between the readdirSync
-  // and the rmdirSync, in which case rmdirSync still throws ENOTEMPTY — the
-  // outer try/catch swallows that, plus ENOENT if the dir was already
-  // removed by a peer. Either way, build proceeds; cleanup is best-effort.
+  // Best-effort cleanup of this process's own staging dir. Since STAGE_DIR
+  // is per-PID (`.dist-staging-<pid>/`), no other builder touches it — so
+  // rmSync with recursive:true is safe and leaves no race window.
   try {
-    const leftovers = fs.readdirSync(STAGE_DIR);
-    if (leftovers.length === 0) {
-      fs.rmdirSync(STAGE_DIR);
-    }
-  } catch (e) { /* tolerate TOCTOU ENOTEMPTY or ENOENT from peer cleanup */ }
+    fs.rmSync(STAGE_DIR, { recursive: true, force: true });
+  } catch (e) { /* tolerate ENOENT if the dir was never created (e.g. all hooks skipped) */ }
 
   if (hasErrors) {
     console.error('\n\x1b[31mBuild failed: fix syntax errors above before publishing.\x1b[0m');

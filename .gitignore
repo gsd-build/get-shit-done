@@ -14,8 +14,8 @@ commands.html
 # Build artifacts (committed to npm, not git)
 hooks/dist/
 
-# Atomic-write staging dir used by scripts/build-hooks.js (see comment there)
-hooks/.dist-staging/
+# Per-process atomic-write staging dirs used by scripts/build-hooks.js (see comment there)
+hooks/.dist-staging-*/
 
 # Coverage artifacts
 coverage/
