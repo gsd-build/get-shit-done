@@ -133,6 +133,12 @@ export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
     description: 'dynamic_routing.<enabled|escalate_on_failure|max_escalations|tier_models.<light|standard|heavy>>',
     test: (k) => /^dynamic_routing\.(enabled|escalate_on_failure|max_escalations|tier_models\.(light|standard|heavy))$/.test(k),
   },
+  // #3227 — per-agent model overrides: model_overrides.<agent-id>
+  {
+    source: '^model_overrides\\.[a-zA-Z0-9_-]+$',
+    description: 'model_overrides.<agent-id>',
+    test: (k) => /^model_overrides\.[a-zA-Z0-9_-]+$/.test(k),
+  },
 ];
 
 /** Returns true if keyPath is a valid config key (exact, runtime-state, or dynamic pattern). */
