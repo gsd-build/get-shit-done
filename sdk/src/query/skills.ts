@@ -101,9 +101,13 @@ export const agentSkills: QueryHandler = async (args, projectDir) => {
         continue;
       }
       const skillDir = resolveGlobalSkillDir(runtime, skillName);
-      const skillMd = skillDir ? join(skillDir, 'SKILL.md') : null;
       const displayPath = renderGlobalSkillDisplayPath(runtime, skillName);
-      if (!skillMd || !existsSync(skillMd)) {
+      if (!skillDir) {
+        process.stderr.write(`[agent-skills] WARNING: Could not resolve global skill directory for "${skillName}" on runtime "${runtime}" — skipping\n`);
+        continue;
+      }
+      const skillMd = join(skillDir, 'SKILL.md');
+      if (!existsSync(skillMd)) {
         process.stderr.write(`[agent-skills] WARNING: Global skill not found at "${displayPath}/SKILL.md" — skipping\n`);
         continue;
       }
