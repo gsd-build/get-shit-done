@@ -453,6 +453,103 @@ describe('phaseAdd', () => {
     // Should detect CK-45 and CK-46, so new phase = 47
     expect(data.phase_number).toBe(47);
   });
+
+  // ── Symptom A: --dry-run flag (#3226) ─────────────────────────────────
+
+  it('--dry-run returns JSON result without creating any files or modifying ROADMAP', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+    await setupTestProject(tmpDir, {
+      phases: ['09-foundation', '10-read-only-queries'],
+    });
+
+    const roadmapBefore = await readFile(join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    const result = await phaseAdd(['Dry Run Phase', '--dry-run'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    // Result must include the computed fields
+    expect(data.phase_number).toBe(11);
+    expect(data.padded).toBe('11');
+    expect(data.name).toBe('Dry Run Phase');
+    expect(data.slug).toBe('dry-run-phase');
+    expect(data.dry_run).toBe(true);
+    expect(typeof data.roadmap_entry).toBe('string');
+    expect((data.roadmap_entry as string)).toContain('### Phase 11: Dry Run Phase');
+
+    // ROADMAP.md must be unchanged
+    const roadmapAfter = await readFile(join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    expect(roadmapAfter).toBe(roadmapBefore);
+
+    // No new phase directory must have been created
+    const phasesDir = join(tmpDir, '.planning', 'phases');
+    const entries = await readdir(phasesDir, { withFileTypes: true });
+    const newDir = entries.find(e => e.isDirectory() && e.name.includes('11-dry-run-phase'));
+    expect(newDir).toBeUndefined();
+  });
+
+  it('--dry-run works when flag appears after customId position', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+    await setupTestProject(tmpDir, {
+      phases: ['09-foundation', '10-read-only-queries'],
+    });
+
+    const roadmapBefore = await readFile(join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    // description + --dry-run — no customId; flag must not be mistaken for customId
+    const result = await phaseAdd(['My Feature', '--dry-run'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.dry_run).toBe(true);
+    expect(data.phase_number).toBe(11);
+
+    // ROADMAP must still be untouched
+    const roadmapAfter = await readFile(join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    expect(roadmapAfter).toBe(roadmapBefore);
+  });
+
+  // ── Symptom C: unknown flag rejection (#3226) ──────────────────────────
+
+  it('rejects unknown --flags with a validation error naming the flag', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+    await setupTestProject(tmpDir);
+
+    await expect(phaseAdd(['My Feature', '--bogus-flag'], tmpDir)).rejects.toThrow('--bogus-flag');
+  });
+
+  it('rejects any unknown --flag even when mixed with dry-run', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+    await setupTestProject(tmpDir);
+
+    await expect(phaseAdd(['Desc', '--dry-run', '--unknown'], tmpDir)).rejects.toThrow('--unknown');
+  });
+
+  // ── Symptom B: ROADMAP heading scan counts ### Phase N: (#3226 verify) ─
+
+  it('scans ### Phase N: headings in ROADMAP when no on-disk dirs exist (B already fixed)', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v5.0',
+      '',
+      '### Phase 5: Foundation',
+      '',
+      '**Goal:** Build foundation',
+      '**Plans:** 0 plans',
+      '',
+    ].join('\n');
+
+    await setupTestProject(tmpDir, {
+      roadmap,
+      state: MINIMAL_STATE,
+      phases: [], // no on-disk dirs — must rely on ROADMAP scan
+    });
+
+    const result = await phaseAdd(['Next Phase'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    // Must detect Phase 5 from ### heading → next = 6, not 1
+    expect(data.phase_number).toBe(6);
+  });
 });
 
 // ─── phaseAddBatch ─────────────────────────────────────────────────────
