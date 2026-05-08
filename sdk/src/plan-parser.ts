@@ -25,13 +25,17 @@ import type {
  * Uses a stack-based parser that handles nested objects, inline arrays,
  * multi-line arrays, and boolean/numeric coercion. Ported from the CJS
  * reference implementation with the same edge-case coverage.
+ *
+ * Anchored at the start of the file — only the leading `---...---` block is
+ * considered canonical frontmatter. Body `---` separators and embedded YAML
+ * inside fenced code blocks are never picked up.
  */
 export function extractFrontmatter(content: string): Record<string, unknown> {
   const frontmatter: Record<string, unknown> = {};
 
-  // Find ALL frontmatter blocks — if multiple exist (corruption), use the last one
-  const allBlocks = [...content.matchAll(/(?:^|\n)\s*---\r?\n([\s\S]+?)\r?\n---/g)];
-  const match = allBlocks.length > 0 ? allBlocks[allBlocks.length - 1] : null;
+  // Anchored at file start — only the leading ---...--- block is canonical frontmatter.
+  // Body `---` separators and embedded YAML inside fenced code blocks are not matched.
+  const match = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
   if (!match) return frontmatter;
 
   const yaml = match[1];
