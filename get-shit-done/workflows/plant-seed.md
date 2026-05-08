@@ -110,6 +110,16 @@ After writing the file, search the codebase for relevant references:
 Extract one or two key terms from `$IDEA` (the most distinctive noun or phrase) and store as `$KEYWORD`.
 
 ```bash
+# Derive a single keyword for breadcrumb search.
+# Lower-case, strip punctuation, take the first token longer than 2 chars.
+KEYWORD=$(printf '%s' "$IDEA" \
+  | tr '[:upper:]' '[:lower:]' \
+  | tr -cs 'a-z0-9' '\n' \
+  | awk 'length > 2 {print; exit}')
+KEYWORD="${KEYWORD:-seed}"  # fallback to literal "seed" if extraction yields nothing
+```
+
+```bash
 # Find files related to the idea keywords ($KEYWORD derived from $IDEA)
 grep -rl "$KEYWORD" --include="*.ts" --include="*.js" --include="*.md" . 2>/dev/null | head -10
 ```
