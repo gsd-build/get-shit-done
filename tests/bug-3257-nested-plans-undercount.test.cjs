@@ -237,6 +237,32 @@ describe('buildStateFrontmatter nested plans/ layout (#3257)', () => {
     assert.strictEqual(Number(progress.total_plans), 1, 'PLAN-OUTLINE.md must not count as a plan');
   });
 
+  test('pre-bounce files are excluded from nested plan count (bare PLAN- prefix)', () => {
+    // CR finding: PLAN_PRE_BOUNCE_RE was /-PLAN.*\.pre-bounce\.md$/i which missed
+    // bare-prefix files like PLAN-01-foo.pre-bounce.md. Fixed to /\.pre-bounce\.md$/i.
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-init');
+    const plansDir = path.join(phaseDir, 'plans');
+    fs.mkdirSync(plansDir, { recursive: true });
+
+    fs.writeFileSync(path.join(plansDir, '1-PLAN-01-work.md'), '# Real Plan\n');
+    // Pre-bounce files — should NOT count as plans
+    fs.writeFileSync(path.join(plansDir, 'PLAN-01-work.pre-bounce.md'), '# Pre-bounce\n');
+    fs.writeFileSync(path.join(plansDir, '1-PLAN-01-work.pre-bounce.md'), '# Pre-bounce\n');
+
+    writeRoadmap(tmpDir, [1]);
+    writeStateFile(tmpDir, { phase: '01' });
+
+    const result = runGsdTools('state update "Last Activity" "2026-05-08"', tmpDir);
+    assert.ok(result.success, `state update failed: ${result.error}`);
+
+    const jsonResult = runGsdTools('state json', tmpDir);
+    assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
+
+    const progress = JSON.parse(jsonResult.output).progress;
+    // Only the real plan should count; pre-bounce files excluded.
+    assert.strictEqual(Number(progress.total_plans), 1, 'pre-bounce files must not count as plans');
+  });
+
   test('reporter scenario: 2 phases × multiple plans, all complete', () => {
     // Mirrors the reporter's observation: after a state mutation the progress
     // block should reflect the TRUE on-disk count, not an under-count.

@@ -817,7 +817,7 @@ function buildStateFrontmatter(bodyContent, cwd) {
 
           // Regex constants mirror roadmap.cjs:countPhasePlansAndSummaries (#3257).
           const PLAN_OUTLINE_RE = /-PLAN-OUTLINE\.md$/i;
-          const PLAN_PRE_BOUNCE_RE = /-PLAN.*\.pre-bounce\.md$/i;
+          const PLAN_PRE_BOUNCE_RE = /\.pre-bounce\.md$/i;
           for (const dir of phaseDirs) {
             const phaseDir = path.join(phasesDir, dir);
             const topFiles = fs.readdirSync(phaseDir);
