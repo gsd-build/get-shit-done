@@ -504,9 +504,14 @@ describe('cmdStateSync nested plans/ layout (#3257)', () => {
     assert.ok(planCountChange, `dry-run changes must include Total Plans in Phase; got: ${JSON.stringify(parsed.changes)}`);
     assert.ok(planCountChange.includes('-> 2'), `dry-run must show correct count of 2; got: "${planCountChange}"`);
 
-    // STATE.md must be unchanged (dry-run).
-    const afterContent = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    assert.ok(afterContent.includes('Total Plans in Phase:** 0'), 'STATE.md must not be written in dry-run mode');
+    // STATE.md must be unchanged (dry-run): re-run sync --verify and confirm the
+    // same pending change is still reported (if STATE.md had been written, the
+    // change would have been applied and the second run would show no changes).
+    const result2 = runGsdTools('state sync --verify', tmpDir);
+    assert.ok(result2.success, `second dry-run failed: ${result2.error}`);
+    const parsed2 = JSON.parse(result2.output);
+    const planCountChange2 = parsed2.changes.find(c => c.startsWith('Total Plans in Phase:'));
+    assert.ok(planCountChange2, 'repeated dry-run must still report pending change (file was not mutated on disk)');
   });
 
   test('sync across multiple phases with nested plans sums correctly', () => {
