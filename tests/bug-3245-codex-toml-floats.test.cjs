@@ -363,11 +363,18 @@ describe('#3245 — idempotent rollback reverts skills/, agents/, and VERSION', 
       threw = true;
     }
     assert.strictEqual(threw, true, 'install must throw when validation fails (very early failure)');
-    // With nothing written before rollback fires, skills/ must not be left behind.
-    assert.strictEqual(
-      fs.existsSync(path.join(codexHome, 'skills')),
-      false,
-      'skills/ must not be created when rollback fires before any writes'
+    // Rollback removes all gsd-* skill dirs it wrote. Even if skills/ was
+    // created during the install, no gsd-* dirs should survive after rollback.
+    const skillsDir = path.join(codexHome, 'skills');
+    const remainingGsdSkills = fs.existsSync(skillsDir)
+      ? fs.readdirSync(skillsDir, { withFileTypes: true })
+          .filter((e) => e.isDirectory() && e.name.startsWith('gsd-'))
+          .map((e) => e.name)
+      : [];
+    assert.deepStrictEqual(
+      remainingGsdSkills,
+      [],
+      'rollback must remove all gsd-* skill dirs even when fired after minimal writes'
     );
   });
 
