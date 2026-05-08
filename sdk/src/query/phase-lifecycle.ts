@@ -276,24 +276,22 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
       if (num > maxPhase) maxPhase = num;
     }
 
-    // Belt-and-suspenders: if ROADMAP scan found nothing, fall back to scanning
-    // .planning/phases/ directory names as the canonical source of truth
-    if (maxPhase === 0) {
-      const phasesDir = planningPaths(projectDir, workstream).phases;
-      try {
-        const entries = await readdir(phasesDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const dirMatch = /^(?:[A-Z][A-Z0-9]*-)?(\d+)[A-Z]?(?:\.\d+)*-/i.exec(entry.name);
-          if (dirMatch) {
-            const num = parseInt(dirMatch[1], 10);
-            if (num >= 999) continue;
-            if (num > maxPhase) maxPhase = num;
-          }
-        }
-      } catch {
-        // phases dir may not exist yet — leave maxPhase as 0
+    // Also scan on-disk phase directories (union semantics) — ROADMAP and disk
+    // may diverge temporarily (e.g. a previous run created the dir but didn't
+    // update ROADMAP). Taking the max of both sources prevents collisions.
+    const phasesDir = planningPaths(projectDir, workstream).phases;
+    try {
+      const entries = await readdir(phasesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const dirMatch = /^(?:[A-Z][A-Z0-9]*-)?(\d+)[A-Z]?(?:\.\d+)*-/i.exec(entry.name);
+        if (!dirMatch) continue;
+        const num = parseInt(dirMatch[1], 10);
+        if (num >= 999) continue;
+        if (num > maxPhase) maxPhase = num;
       }
+    } catch {
+      // phases dir may not exist yet — leave maxPhase as 0
     }
 
     newPhaseId = maxPhase + 1;
