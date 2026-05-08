@@ -140,7 +140,8 @@ export function renderGlobalSkillsBaseDisplayPath(runtime: Runtime): string | nu
   const base = resolveGlobalSkillsBase(runtime);
   if (!base) return null;
   const home = homedir();
-  return base.startsWith(home) ? `~${base.slice(home.length)}` : base;
+  const homeWithSep = home.endsWith(pathSep) ? home : `${home}${pathSep}`;
+  return (base === home || base.startsWith(homeWithSep)) ? `~${base.slice(home.length)}` : base;
 }
 
 /** Resolve one runtime-global skill directory, or `null` when unsupported. */
@@ -165,7 +166,8 @@ export function renderGlobalSkillDisplayPath(runtime: Runtime, skillName: string
   const dir = resolveGlobalSkillDir(runtime, skillName);
   if (!dir) return `(${runtime} does not use a skills directory)`;
   const home = homedir();
-  return dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
+  const homeWithSep = home.endsWith(pathSep) ? home : `${home}${pathSep}`;
+  return (dir === home || dir.startsWith(homeWithSep)) ? `~${dir.slice(home.length)}` : dir;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
