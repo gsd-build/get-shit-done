@@ -169,9 +169,12 @@ describe('#3245 — parseTomlToObject accepts TOML floats', () => {
       'x = 07:32:00',
       '',
     ].join('\n');
+    // With leading-zero rejection (CR4 fix) the parser stops at `0`, and
+    // `7:32:00` is "trailing bytes". Either error form is acceptable — the
+    // key invariant is that time literals are never silently accepted.
     assert.throws(
       () => parseTomlToObject(content),
-      /unsupported TOML value/,
+      /unsupported TOML value|trailing bytes/,
       'time literals must remain unsupported'
     );
   });
@@ -268,6 +271,69 @@ describe('#3245 — install succeeds with TOML float in pre-existing config', { 
     assert.strictEqual(parsed.tool_timeout_sec, 20,
       'tool_timeout_sec must round-trip as numeric 20 (=== 20.0 in JS)');
   });
+});
+
+// ---------------------------------------------------------------------------
+// CR round-4 finding — TOML 1.0 disallows leading zeros in integer part
+// ---------------------------------------------------------------------------
+//
+// TOML 1.0 §2: integer literals follow decimal-integer rules, which disallow
+// leading zeros except the value `0` itself. `01`, `01.5`, `00e2`, `+01.0`
+// are therefore invalid. The `parseTomlValue` integer-part regex is tightened
+// from `\d(?:_?\d)*` to `(0|[1-9](?:_?\d)*)`.
+
+describe('#3245 CR4 — parseTomlValue rejects leading zeros in float integer part', () => {
+  function parseValue(raw) {
+    // Wrap in a minimal TOML assignment so parseTomlToObject drives the test.
+    return parseTomlToObject(`x = ${raw}`).x;
+  }
+
+  function assertRejects(raw, label) {
+    let threw = false;
+    try { parseValue(raw); } catch (_) { threw = true; }
+    assert.strictEqual(threw, true, `expected rejection for ${label}: ${raw}`);
+  }
+
+  function assertAccepts(raw, expected, label) {
+    let val;
+    let threw = false;
+    try { val = parseValue(raw); } catch (e) { threw = true; }
+    assert.strictEqual(threw, false, `expected acceptance for ${label}: ${raw}`);
+    if (expected !== undefined) {
+      assert.ok(Math.abs(val - expected) < 1e-12, `${label}: expected ${expected}, got ${val}`);
+    }
+  }
+
+  // --- rejection cases: leading zeros in the integer part ---
+
+  test('rejects 01 (leading zero on bare integer)', () => assertRejects('01', '01'));
+  test('rejects 00 (double-zero bare integer)', () => assertRejects('00', '00'));
+  test('rejects 01.5 (leading zero before decimal point)', () => assertRejects('01.5', '01.5'));
+  test('rejects 00.5 (double-zero before decimal)', () => assertRejects('00.5', '00.5'));
+  test('rejects +01 (leading zero with sign)', () => assertRejects('+01', '+01'));
+  test('rejects -01 (negative leading zero)', () => assertRejects('-01', '-01'));
+  test('rejects 00e2 (leading zero with exponent)', () => assertRejects('00e2', '00e2'));
+  test('rejects +01.0 (leading zero in positive float)', () => assertRejects('+01.0', '+01.0'));
+  test('rejects -01.0 (leading zero in negative float)', () => assertRejects('-01.0', '-01.0'));
+  test('rejects 01.5e10 (leading zero, decimal, and exponent)', () => assertRejects('01.5e10', '01.5e10'));
+
+  // --- acceptance cases: valid TOML 1.0 numeric forms ---
+
+  test('accepts 0 (single zero)', () => assertAccepts('0', 0, 'single zero'));
+  test('accepts 0.5 (zero before decimal)', () => assertAccepts('0.5', 0.5, 'zero.decimal'));
+  test('accepts 0.0 (zero.zero)', () => assertAccepts('0.0', 0.0, 'zero.zero'));
+  test('accepts 0e1 (zero with exponent)', () => assertAccepts('0e1', 0, '0e1'));
+  test('accepts +0.5 (positive zero-decimal)', () => assertAccepts('+0.5', 0.5, '+0.5'));
+  test('accepts -0.5 (negative zero-decimal)', () => assertAccepts('-0.5', -0.5, '-0.5'));
+  test('accepts 1 (single non-zero digit)', () => assertAccepts('1', 1, '1'));
+  test('accepts 12 (two digits)', () => assertAccepts('12', 12, '12'));
+  test('accepts 1.5 (simple float)', () => assertAccepts('1.5', 1.5, '1.5'));
+  test('accepts 1_000 (underscored integer)', () => assertAccepts('1_000', 1000, '1_000'));
+  test('accepts 1_000.5 (underscored float)', () => assertAccepts('1_000.5', 1000.5, '1_000.5'));
+  test('accepts +1.5 (positive float)', () => assertAccepts('+1.5', 1.5, '+1.5'));
+  test('accepts -2.0 (negative float)', () => assertAccepts('-2.0', -2.0, '-2.0'));
+  test('accepts 1.5e-3 (float with negative exponent)', () => assertAccepts('1.5e-3', 1.5e-3, '1.5e-3'));
+  test('accepts 1.05e10 (fractional part may start with zero)', () => assertAccepts('1.05e10', 1.05e10, '1.05e10'));
 });
 
 // ---------------------------------------------------------------------------

@@ -3696,12 +3696,18 @@ function parseTomlValue(text, i) {
   //
   // Still rejected: date/time literals (`-`, `:`, `T`, `Z` after integer prefix)
   // and hex/oct/bin literals (`0x`, `0o`, `0b` — `x`, `o`, `b` fall through to
-  // the unsupported-value throw below because `\d[\d_]*` won't match `x`).
+  // the unsupported-value throw below because the integer-part pattern won't match `x`).
   // TOML 1.0 §2: underscores in numeric literals are only allowed BETWEEN
   // digits (each underscore must have a digit on both sides). The pre-check
   // regex uses (?:_?\d)* rather than [\d_]* so `1__0`, `1_.0`, and `1._0`
   // are rejected before normalization silently hides them.
-  const numMatch = text.slice(i).match(/^[+-]?\d(?:_?\d)*/);
+  //
+  // TOML 1.0 §2 (integer part): the integer part of a number must follow
+  // decimal-integer rules — no leading zeros except the value 0 itself.
+  // `01`, `00`, `01.5`, `00e2`, `+01`, `-01` are therefore all invalid.
+  // The pre-check and float regexes use (0|[1-9](?:_?\d)*) for the integer
+  // part so that `01` and `00` are rejected (k021 sibling rule).
+  const numMatch = text.slice(i).match(/^[+-]?(0|[1-9](?:_?\d)*)/);
   if (numMatch) {
     const afterInt = text[i + numMatch[0].length];
     // Reject date/time separators that cannot be part of a float.
@@ -3712,8 +3718,9 @@ function parseTomlValue(text, i) {
     }
     // Accept float: optional decimal part, optional exponent part.
     // Each segment uses (?:_?\d)* so underscores are only between digits.
+    // Integer part uses (0|[1-9](?:_?\d)*) to reject leading zeros per TOML 1.0.
     const floatMatch = text.slice(i).match(
-      /^[+-]?\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?/
+      /^[+-]?(0|[1-9](?:_?\d)*)(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?/
     );
     const raw = floatMatch ? floatMatch[0] : numMatch[0];
     const normalized = raw.replace(/_/g, '');
