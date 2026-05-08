@@ -7534,6 +7534,102 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
+  // #3245 CR finding 2 — Rollback coverage extends to ALL post-snapshot operations,
+  // not just the Codex config/hook error paths. Any throw between snapshot capture and
+  // the Codex config block (skills copy, agents copy, VERSION write, manifest write, etc.)
+  // must also trigger rollback so the caller is never left in a partially-installed state.
+  //
+  // _codexPreConfigRollback covers the four surfaces that can be mutated before
+  // config.toml is touched: skills/, agents/, get-shit-done/VERSION, and orphaned
+  // atomic-write temp files. It is safe to call before any writes have happened.
+  // The full restoreCodexSnapshot() (defined inside the config block) additionally
+  // handles config.toml, which is not yet touched at this point in the pipeline.
+  const _codexPreConfigRollback = !isCodex || isMinimalMode(installMode) ? null : () => {
+    // skills/gsd-* — pass 1: restore snapshot entries (may be absent if deleted mid-install).
+    const _earlySkillsDir = path.join(targetDir, 'skills');
+    for (const skillName of codexPreInstallSkillNames) {
+      const skillDirPath = path.join(_earlySkillsDir, skillName);
+      const fileMap = codexPreInstallSkillContents.get(skillName);
+      try {
+        fs.rmSync(skillDirPath, { recursive: true, force: true });
+        fs.mkdirSync(skillDirPath, { recursive: true });
+        if (fileMap) {
+          for (const [relPath, buf] of fileMap) {
+            const destFile = path.join(skillDirPath, relPath);
+            try {
+              fs.mkdirSync(path.dirname(destFile), { recursive: true });
+              fs.writeFileSync(destFile, buf);
+            } catch (_) { /* best-effort */ }
+          }
+        }
+      } catch (_) { /* best-effort */ }
+    }
+    // skills/gsd-* — pass 2: remove any newly-created dirs not in the snapshot.
+    if (fs.existsSync(_earlySkillsDir)) {
+      try {
+        for (const entry of fs.readdirSync(_earlySkillsDir, { withFileTypes: true })) {
+          if (entry.isDirectory() && entry.name.startsWith('gsd-') && !codexPreInstallSkillNames.has(entry.name)) {
+            try { fs.rmSync(path.join(_earlySkillsDir, entry.name), { recursive: true, force: true }); }
+            catch (_) { /* best-effort */ }
+          }
+        }
+      } catch (_) { /* best-effort */ }
+    }
+    // agents/gsd-* — pass 1: restore snapshot entries.
+    const _earlyAgentsDir = path.join(targetDir, 'agents');
+    for (const file of codexPreInstallAgentFiles) {
+      const buf = codexPreInstallAgentContents.get(file);
+      if (buf !== undefined) {
+        try {
+          fs.mkdirSync(_earlyAgentsDir, { recursive: true });
+          fs.writeFileSync(path.join(_earlyAgentsDir, file), buf);
+        } catch (_) { /* best-effort */ }
+      }
+    }
+    // agents/gsd-* — pass 2: remove any newly-created files not in the snapshot.
+    if (fs.existsSync(_earlyAgentsDir)) {
+      try {
+        for (const file of fs.readdirSync(_earlyAgentsDir)) {
+          if (file.startsWith('gsd-') && (file.endsWith('.md') || file.endsWith('.toml')) && !codexPreInstallAgentFiles.has(file)) {
+            try { fs.unlinkSync(path.join(_earlyAgentsDir, file)); } catch (_) { /* best-effort */ }
+          }
+        }
+      } catch (_) { /* best-effort */ }
+    }
+    // get-shit-done/VERSION
+    const _earlyVersionPath = path.join(targetDir, 'get-shit-done', 'VERSION');
+    if (codexPreInstallVersionBytes !== null) {
+      try { fs.writeFileSync(_earlyVersionPath, codexPreInstallVersionBytes); } catch (_) { /* best-effort */ }
+    } else if (fs.existsSync(_earlyVersionPath)) {
+      try { fs.unlinkSync(_earlyVersionPath); } catch (_) { /* best-effort */ }
+    }
+    // Orphaned atomic-write temp files.
+    const _earlyTmpPattern = /\.tmp-\d+-\d+$/;
+    function _earlyCleanTmpFiles(dir) {
+      if (!fs.existsSync(dir)) return;
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          _earlyCleanTmpFiles(full);
+        } else if (_earlyTmpPattern.test(entry.name) && __atomicWrittenTmps.has(full)) {
+          try { fs.unlinkSync(full); } catch (_) { /* best-effort */ }
+        }
+      }
+    }
+    _earlyCleanTmpFiles(targetDir);
+  };
+
+  // #3245 CR finding 2 — wrap the pre-config install operations in a try/catch so
+  // that ANY throw between snapshot capture and the Codex config block triggers rollback.
+  // Non-Codex paths are unaffected (_codexPreConfigRollback is null for them).
+  //
+  // agentsSrc is declared here (let, not const) because installCodexConfig() inside the
+  // Codex config block below also references it, and that block is outside the try scope.
+  let agentsSrc = path.join(src, 'agents');
+  try {
+
   // OpenCode/Kilo use command/ (flat), Codex uses skills/, Claude/Gemini use commands/gsd/
   if (isOpencode || isKilo) {
     // OpenCode/Kilo: flat structure in command/ directory
@@ -7852,7 +7948,9 @@ function install(isGlobal, runtime = 'claude') {
   // Skipped under --minimal: gsd-* subagent descriptions are eagerly loaded
   // into the runtime's Agent tool schema, costing ~6k tokens per turn even
   // when no GSD workflow is active. See gsd-build/get-shit-done#2762.
-  const agentsSrc = path.join(src, 'agents');
+  // Note: agentsSrc is declared as let before the enclosing try block so it
+  // is accessible by installCodexConfig() in the Codex config section below.
+  agentsSrc = path.join(src, 'agents');
   const agentsDest = path.join(targetDir, 'agents');
 
   // Always remove stale gsd-* agents first so re-installing with
@@ -8126,6 +8224,16 @@ function install(isGlobal, runtime = 'claude') {
     }
   }
 
+  } catch (_earlyInstallErr) {
+    // #3245 CR finding 2 — any throw in the pre-config install operations (skills copy,
+    // agents copy, VERSION write, manifest write, etc.) triggers the Codex pre-config
+    // rollback so the caller is never left in a partially-installed state.
+    if (_codexPreConfigRollback) {
+      _codexPreConfigRollback();
+    }
+    throw _earlyInstallErr;
+  }
+
   if (isCodex && !isMinimalMode(installMode)) {
     // Capture pre-install snapshot of config.toml before ANY GSD mutation
     // (#2760 fix 3). On post-write schema-validation failure OR any throw
@@ -8162,34 +8270,38 @@ function install(isGlobal, runtime = 'claude') {
 
       // 2. skills/gsd-*
       //   • Dirs that pre-existed: wipe current contents, restore snapshotted files.
+      //     The restore iterates the SNAPSHOT manifest (codexPreInstallSkillNames) rather
+      //     than just the current filesystem so that dirs deleted during the install
+      //     (copyCommandsAsCodexSkills removes pre-existing gsd-* dirs before re-writing)
+      //     are restored even when they are absent from disk at rollback time (#3245 CR).
       //   • Dirs that did not pre-exist: remove entirely.
       const _rollbackSkillsDir = path.join(targetDir, 'skills');
+      // Pass 1 — restore snapshot entries (may be absent from disk if deleted mid-install).
+      for (const skillName of codexPreInstallSkillNames) {
+        const skillDirPath = path.join(_rollbackSkillsDir, skillName);
+        const fileMap = codexPreInstallSkillContents.get(skillName);
+        try {
+          fs.rmSync(skillDirPath, { recursive: true, force: true });
+          fs.mkdirSync(skillDirPath, { recursive: true });
+          if (fileMap) {
+            for (const [relPath, buf] of fileMap) {
+              const destFile = path.join(skillDirPath, relPath);
+              try {
+                fs.mkdirSync(path.dirname(destFile), { recursive: true });
+                fs.writeFileSync(destFile, buf);
+              } catch (_) { /* best-effort file restore */ }
+            }
+          }
+        } catch (_) { /* best-effort dir restore */ }
+      }
+      // Pass 2 — remove any newly-created gsd-* dirs (not in the pre-install snapshot).
       if (fs.existsSync(_rollbackSkillsDir)) {
         try {
           for (const entry of fs.readdirSync(_rollbackSkillsDir, { withFileTypes: true })) {
             if (!entry.isDirectory() || !entry.name.startsWith('gsd-')) continue;
-            const skillDirPath = path.join(_rollbackSkillsDir, entry.name);
-            if (codexPreInstallSkillNames.has(entry.name)) {
-              // Pre-existing: restore from content snapshot.
-              const fileMap = codexPreInstallSkillContents.get(entry.name);
-              try {
-                // Remove current (possibly upgraded) contents first.
-                fs.rmSync(skillDirPath, { recursive: true, force: true });
-                // Re-create directory and restore snapshotted files.
-                fs.mkdirSync(skillDirPath, { recursive: true });
-                if (fileMap) {
-                  for (const [relPath, buf] of fileMap) {
-                    const destFile = path.join(skillDirPath, relPath);
-                    try {
-                      fs.mkdirSync(path.dirname(destFile), { recursive: true });
-                      fs.writeFileSync(destFile, buf);
-                    } catch (_) { /* best-effort file restore */ }
-                  }
-                }
-              } catch (_) { /* best-effort dir restore */ }
-            } else {
+            if (!codexPreInstallSkillNames.has(entry.name)) {
               // New dir written this session: remove entirely.
-              try { fs.rmSync(skillDirPath, { recursive: true, force: true }); }
+              try { fs.rmSync(path.join(_rollbackSkillsDir, entry.name), { recursive: true, force: true }); }
               catch (_) { /* best-effort */ }
             }
           }
@@ -8198,22 +8310,29 @@ function install(isGlobal, runtime = 'claude') {
 
       // 3. agents/gsd-*.{md,toml}
       //   • Files that pre-existed: restore bytes from content snapshot.
+      //     Iterates the SNAPSHOT manifest (codexPreInstallAgentFiles) so that files
+      //     deleted by the pre-copy stale-removal pass (lines 7862-7870) are restored
+      //     even when absent from disk at rollback time (#3245 CR).
       //   • Files that did not pre-exist: remove.
       const _rollbackAgentsDir = path.join(targetDir, 'agents');
+      // Pass 1 — restore snapshot entries (may be absent from disk if deleted mid-install).
+      for (const file of codexPreInstallAgentFiles) {
+        const buf = codexPreInstallAgentContents.get(file);
+        if (buf !== undefined) {
+          try {
+            fs.mkdirSync(_rollbackAgentsDir, { recursive: true });
+            fs.writeFileSync(path.join(_rollbackAgentsDir, file), buf);
+          } catch (_) { /* best-effort */ }
+        }
+      }
+      // Pass 2 — remove any newly-created gsd-* agent files (not in the pre-install snapshot).
       if (fs.existsSync(_rollbackAgentsDir)) {
         try {
           for (const file of fs.readdirSync(_rollbackAgentsDir)) {
             if (!file.startsWith('gsd-') || (!file.endsWith('.md') && !file.endsWith('.toml'))) continue;
-            const filePath = path.join(_rollbackAgentsDir, file);
-            if (codexPreInstallAgentFiles.has(file)) {
-              // Pre-existing: restore from content snapshot.
-              const buf = codexPreInstallAgentContents.get(file);
-              if (buf !== undefined) {
-                try { fs.writeFileSync(filePath, buf); } catch (_) { /* best-effort */ }
-              }
-            } else {
+            if (!codexPreInstallAgentFiles.has(file)) {
               // New file written this session: remove.
-              try { fs.unlinkSync(filePath); } catch (_) { /* best-effort */ }
+              try { fs.unlinkSync(path.join(_rollbackAgentsDir, file)); } catch (_) { /* best-effort */ }
             }
           }
         } catch (_) { /* best-effort */ }
