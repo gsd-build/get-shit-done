@@ -46,7 +46,7 @@ Full roster at `agents/gsd-*.md`. The "Primary doc" column flags whether [`docs/
 | gsd-eval-planner | Designs structured evaluation strategy for an AI phase (AI-SPEC.md §5–§7). | `/gsd-ai-integration-phase` | advanced stub |
 | gsd-eval-auditor | Retroactive audit of an AI phase's evaluation coverage; produces EVAL-REVIEW.md (COVERED/PARTIAL/MISSING). | `/gsd-eval-review` | advanced stub |
 | gsd-framework-selector | ≤6-question interactive decision matrix that scores and recommends an AI/LLM framework. | `/gsd-ai-integration-phase`, `/gsd-select-framework` | advanced stub |
-| gsd-intel-updater | Writes structured intel files (`.planning/intel/*.json`) used as a queryable codebase knowledge base. | `/gsd-intel` | advanced stub |
+| gsd-intel-updater | Writes structured intel files (`.planning/intel/*.json`) used as a queryable codebase knowledge base. | `/gsd-map-codebase --query` | advanced stub |
 | gsd-doc-classifier | Classifies a single planning document as ADR, PRD, SPEC, DOC, or UNKNOWN; spawned in parallel to process the doc corpus. | `/gsd-ingest-docs` | advanced stub |
 | gsd-doc-synthesizer | Synthesizes classified planning docs into a single consolidated context with precedence rules, cycle detection, and three-bucket conflicts report. | `/gsd-ingest-docs` | advanced stub |
 
@@ -382,7 +382,7 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `init-command-router.cjs` | Thin CJS subcommand router adapter for `gsd-tools init` |
 | `init.cjs` | Compound context loading for each workflow type |
 | `install-profiles.cjs` | Install profile allowlist + skill staging for `--minimal` install (#2762); single source of truth for which `gsd-*` skills/agents land in runtime config dirs |
-| `intel.cjs` | Codebase intel store backing `/gsd-intel` and `gsd-intel-updater` |
+| `intel.cjs` | Codebase intel store backing `/gsd-map-codebase --query` and `gsd-intel-updater` |
 | `learnings.cjs` | Cross-phase learnings extraction for `/gsd-extract-learnings` |
 | `milestone.cjs` | Milestone archival, requirements marking |
 | `model-profiles.cjs` | Model profile resolution table (authoritative profile data) |

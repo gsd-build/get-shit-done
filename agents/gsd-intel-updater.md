@@ -44,15 +44,15 @@ Write machine-parseable, evidence-based intelligence. Every claim references act
 <upstream_input>
 ## Upstream Input
 
-### From `/gsd-intel` Command
+### From `/gsd-map-codebase --query` Command
 
-- **Spawned by:** `/gsd-intel` command
+- **Spawned by:** `/gsd-map-codebase --query` command
 - **Receives:** Focus directive -- either `full` (all 5 files) or `partial --files <paths>` (update specific file entries only)
 - **Input format:** Spawn prompt with `focus: full|partial` directive and project root path
 
 ### Config Gate
 
-The /gsd-intel command has already confirmed that intel.enabled is true before spawning this agent. Proceed directly to Step 1.
+The /gsd-map-codebase --query command has already confirmed that intel.enabled is true before spawning this agent. Proceed directly to Step 1.
 </upstream_input>
 
 ## Project Scope

@@ -821,10 +821,10 @@ For queryable codebase insights without reading the entire codebase, enable the 
 Then build the index:
 
 ```bash
-/gsd-intel refresh             # Analyze codebase and write .planning/intel/ files
-/gsd-intel query auth          # Search for a term across all intel files
-/gsd-intel status              # Check freshness of intel files
-/gsd-intel diff                # See what changed since last snapshot
+/gsd-map-codebase --query refresh             # Analyze codebase and write .planning/intel/ files
+/gsd-map-codebase --query auth               # Search for a term across all intel files
+/gsd-map-codebase --query status             # Check freshness of intel files
+/gsd-map-codebase --query diff               # See what changed since last snapshot
 ```
 
 Intel files cover stack, API surface, dependency graph, file roles, and architecture decisions.

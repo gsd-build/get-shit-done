@@ -2064,7 +2064,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 90. Queryable Codebase Intelligence
 
-**Command:** `/gsd-intel [query <term>|status|diff|refresh]`
+**Command:** `/gsd-map-codebase --query [<term>|status|diff|refresh]`
 **Config:** `intel.enabled`
 
 **Purpose:** Maintain a queryable JSON index of codebase structure, API surface, dependency graph, file roles, and architecture decisions in `.planning/intel/`. Enables targeted lookups without reading the entire codebase.
@@ -2614,7 +2614,7 @@ Users who run a memory / knowledge-base MCP server (for example, ExoCortex-style
 
 ### 121. Knowledge Graph Integration
 
-**Purpose:** Build, query, and inspect a lightweight knowledge graph of the project in `.planning/graphs/`. Opt-in per project. Exposed as the `/gsd-graphify` user-facing command and the `gsd-tools.cjs graphify …` programmatic verb family. Complements `/gsd-intel` (snapshot-oriented) with a graph-oriented view of nodes and edges across commands, agents, workflows, and phases.
+**Purpose:** Build, query, and inspect a lightweight knowledge graph of the project in `.planning/graphs/`. Opt-in per project. Exposed as the `/gsd-graphify` user-facing command and the `gsd-tools.cjs graphify …` programmatic verb family. Complements `/gsd-map-codebase --query` (snapshot-oriented) with a graph-oriented view of nodes and edges across commands, agents, workflows, and phases.
 
 **Requirements:**
 - REQ-GRAPH-01: Opt-in via `graphify.enabled: true` in `.planning/config.json`. When disabled, `/gsd-graphify` prints an activation hint and stops without writing.
