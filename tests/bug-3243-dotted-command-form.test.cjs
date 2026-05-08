@@ -72,33 +72,38 @@ describe('bug #3243: CJS dispatcher accepts dotted canonical command form', () =
     // Before the fix: success=false, error contains "Unknown command: validate.plan"
     // After the fix: success=false is still possible (validate needs a PLAN.md),
     // but the error must NOT mention "Unknown command".
+    const errText = dotted.error || '';
     assert.ok(
-      !dotted.error.includes('Unknown command: validate.plan'),
+      !errText.includes('Unknown command: validate.plan'),
       [
         'dotted form must not produce "Unknown command: validate.plan".',
-        'Got error:', dotted.error,
+        'Got error:', errText,
       ].join('\n')
     );
   });
 
   test('roadmap.analyze (dotted) routes into roadmap handler, not "Unknown command"', () => {
     const dotted = runGsdTools(['roadmap.analyze'], tmpDir);
+    // success=true means it reached the handler (even if handler reports no ROADMAP.md).
+    // success=false means dispatcher rejected it — assert the error is NOT "Unknown command".
+    const errText = dotted.error || '';
     assert.ok(
-      !dotted.error.includes('Unknown command: roadmap.analyze'),
+      !errText.includes('Unknown command: roadmap.analyze'),
       [
         'dotted form must not produce "Unknown command: roadmap.analyze".',
-        'Got error:', dotted.error,
+        'Got error:', errText,
       ].join('\n')
     );
   });
 
   test('phases.list (dotted) routes into phases handler, not "Unknown command"', () => {
     const dotted = runGsdTools(['phases.list'], tmpDir);
+    const errText = dotted.error || '';
     assert.ok(
-      !dotted.error.includes('Unknown command: phases.list'),
+      !errText.includes('Unknown command: phases.list'),
       [
         'dotted form must not produce "Unknown command: phases.list".',
-        'Got error:', dotted.error,
+        'Got error:', errText,
       ].join('\n')
     );
   });
@@ -110,11 +115,12 @@ describe('bug #3243: CJS dispatcher accepts dotted canonical command form', () =
     // "check" is not a known top-level command currently, so this will still
     // fail — but the error must NOT say "Unknown command: check.decision-coverage-plan"
     // (the dotted form); it should say something about "check" (the split result).
+    const errText = dotted.error || '';
     assert.ok(
-      !dotted.error.includes('Unknown command: check.decision-coverage-plan'),
+      !errText.includes('Unknown command: check.decision-coverage-plan'),
       [
         'multi-dot dotted form must not be passed verbatim to "Unknown command".',
-        'Got error:', dotted.error,
+        'Got error:', errText,
       ].join('\n')
     );
   });
