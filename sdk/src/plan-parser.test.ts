@@ -217,6 +217,57 @@ describe('extractFrontmatter', () => {
     const result = extractFrontmatter('');
     expect(result).toEqual({});
   });
+
+  it('returns the LEADING block when body contains markdown horizontal rules', () => {
+    // Regression: LAST-block semantics picked up body separators as frontmatter (#3240)
+    const content = [
+      '---',
+      'wave: 3',
+      'autonomous: false',
+      'phase: 05-hardening',
+      '---',
+      '',
+      '## Section One',
+      '',
+      '---',
+      '',
+      '## Section Two',
+      '',
+      '---',
+      '',
+      'body text',
+    ].join('\n');
+    const result = extractFrontmatter(content);
+    expect(result.wave).toBe(3);
+    expect(result.autonomous).toBe(false);
+    expect(result.phase).toBe('05-hardening');
+  });
+
+  it('returns the LEADING block when body contains embedded YAML in fenced code block', () => {
+    // Regression: LAST-block semantics matched YAML inside ```yaml fences (#3240)
+    const content = [
+      '---',
+      'wave: 2',
+      'autonomous: true',
+      'phase: 04-polish',
+      '---',
+      '',
+      '## Example',
+      '',
+      '```yaml',
+      '---',
+      'name: example',
+      'value: 99',
+      '---',
+      '```',
+      '',
+      'More body text.',
+    ].join('\n');
+    const result = extractFrontmatter(content);
+    expect(result.wave).toBe(2);
+    expect(result.autonomous).toBe(true);
+    expect(result.phase).toBe('04-polish');
+  });
 });
 
 describe('parsePlan — frontmatter', () => {
