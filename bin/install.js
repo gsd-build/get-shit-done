@@ -9485,7 +9485,8 @@ function installSdkIfNeeded(opts) {
   // means a non-transient dir has the shim, which is sufficient.
   const userShellPath = getUserShellPath();
   if (onPath && userShellPath !== null) {
-    const userSees = isGsdSdkOnPath(userShellPath);
+    const persistentUserShellPath = filterNpxFromPath(userShellPath);
+    const userSees = isGsdSdkOnPath(persistentUserShellPath);
     if (!userSees) {
       onPath = false;
     }
