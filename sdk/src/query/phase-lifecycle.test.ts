@@ -550,6 +550,47 @@ describe('phaseAdd', () => {
     // Must detect Phase 5 from ### heading → next = 6, not 1
     expect(data.phase_number).toBe(6);
   });
+
+  // ── Concurrent phase.add: no duplicate IDs (CR finding) ────────────────
+  it('concurrent phase.add calls produce distinct sequential phase numbers', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+    await setupTestProject(tmpDir, {
+      phases: ['09-foundation', '10-read-only-queries'],
+    });
+
+    // Fire two phase.add calls simultaneously. If computation happens outside
+    // the lock both will observe maxPhase=10 and claim newPhaseId=11 — collision.
+    const [r1, r2] = await Promise.all([
+      phaseAdd(['Concurrent Alpha'], tmpDir),
+      phaseAdd(['Concurrent Beta'], tmpDir),
+    ]);
+
+    const n1 = (r1.data as Record<string, unknown>).phase_number as number;
+    const n2 = (r2.data as Record<string, unknown>).phase_number as number;
+
+    // Both must succeed and produce DIFFERENT numbers
+    expect(n1).not.toBe(n2);
+
+    // The pair must be {11, 12} — no gaps, no duplicates
+    const sorted = [n1, n2].sort((a, b) => a - b);
+    expect(sorted).toEqual([11, 12]);
+
+    // ROADMAP.md must contain exactly one entry for each phase
+    const roadmap = await readFile(join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    const phase11Count = (roadmap.match(/### Phase 11:/g) || []).length;
+    const phase12Count = (roadmap.match(/### Phase 12:/g) || []).length;
+    expect(phase11Count).toBe(1);
+    expect(phase12Count).toBe(1);
+
+    // Both phase directories must exist on disk
+    const phasesDir = join(tmpDir, '.planning', 'phases');
+    const entries = await readdir(phasesDir, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+    const has11 = dirs.some(d => d.startsWith('11-'));
+    const has12 = dirs.some(d => d.startsWith('12-'));
+    expect(has11).toBe(true);
+    expect(has12).toBe(true);
+  });
 });
 
 // ─── phaseAddBatch ─────────────────────────────────────────────────────
