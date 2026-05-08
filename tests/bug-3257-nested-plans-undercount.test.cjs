@@ -302,3 +302,259 @@ describe('buildStateFrontmatter nested plans/ layout (#3257)', () => {
     assert.strictEqual(Number(progress.percent), 100, 'reporter scenario: 100% when all plans have summaries');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// cmdStateValidate nested plans/ layout (#3257 — CR finding)
+//
+// Prior to this fix, cmdStateValidate did a flat readdirSync on the phase dir
+// and returned diskPlans=0 for nested layouts, causing false drift warnings
+// when STATE.md correctly said "Total Plans in Phase: 3".
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdStateValidate nested plans/ layout (#3257)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('no false drift warning when STATE.md plan count matches nested disk count', () => {
+    // Phase 01-init: 3 nested plans, 0 summaries (still executing).
+    // STATE.md says "Total Plans in Phase: 3" — after the fix, validate sees
+    // diskPlans=3 and emits no plan_count drift warning.
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-init');
+    const plansDir = path.join(phaseDir, 'plans');
+    fs.mkdirSync(plansDir, { recursive: true });
+
+    for (let p = 1; p <= 3; p++) {
+      const pad = String(p).padStart(2, '0');
+      fs.writeFileSync(path.join(plansDir, `1-PLAN-${pad}-step${p}.md`), '# Plan\n');
+    }
+
+    // Write STATE.md with correct plan count so validate can check for drift.
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 01',
+      '**Status:** executing',
+      '**Total Plans in Phase:** 3',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent, 'utf-8');
+
+    const result = runGsdTools('state validate', tmpDir);
+    assert.ok(result.success, `state validate failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(parsed.valid, `state validate should be valid; warnings: ${JSON.stringify(parsed.warnings)}`);
+    assert.deepStrictEqual(parsed.warnings, [], 'no drift warnings for nested-layout phase with correct plan count');
+    assert.ok(!parsed.drift.plan_count, 'no plan_count drift when nested scan matches STATE.md');
+  });
+
+  test('emits drift warning when STATE.md plan count does not match nested disk count', () => {
+    // STATE.md says 5 but only 2 plans exist on disk — validate should catch it.
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-init');
+    const plansDir = path.join(phaseDir, 'plans');
+    fs.mkdirSync(plansDir, { recursive: true });
+
+    for (let p = 1; p <= 2; p++) {
+      const pad = String(p).padStart(2, '0');
+      fs.writeFileSync(path.join(plansDir, `1-PLAN-${pad}-step${p}.md`), '# Plan\n');
+    }
+
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 01',
+      '**Status:** executing',
+      '**Total Plans in Phase:** 5',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent, 'utf-8');
+
+    const result = runGsdTools('state validate', tmpDir);
+    assert.ok(result.success, `state validate failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(!parsed.valid, 'state validate should report invalid when plan counts differ');
+    assert.ok(parsed.warnings.length > 0, 'at least one drift warning expected');
+    assert.ok(parsed.drift.plan_count, 'plan_count drift object must be present');
+    assert.strictEqual(parsed.drift.plan_count.disk, 2, 'disk count must reflect nested scan (2 nested plans)');
+    assert.strictEqual(parsed.drift.plan_count.state, 5, 'state count from STATE.md must be 5');
+  });
+
+  test('PLAN-OUTLINE.md excluded from nested count in validate', () => {
+    // Outline files must not inflate diskPlans and cause false "too few" drift.
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-init');
+    const plansDir = path.join(phaseDir, 'plans');
+    fs.mkdirSync(plansDir, { recursive: true });
+
+    fs.writeFileSync(path.join(plansDir, '1-PLAN-01-work.md'), '# Plan\n');
+    fs.writeFileSync(path.join(plansDir, '1-PLAN-OUTLINE.md'), '# Outline\n'); // must not count
+
+    // STATE.md claims 1 plan — correct after exclusion.
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 01',
+      '**Status:** executing',
+      '**Total Plans in Phase:** 1',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent, 'utf-8');
+
+    const result = runGsdTools('state validate', tmpDir);
+    assert.ok(result.success, `state validate failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(parsed.valid, `should be valid (outline excluded); warnings: ${JSON.stringify(parsed.warnings)}`);
+    assert.ok(!parsed.drift.plan_count, 'no plan_count drift when outline excluded from nested count');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// cmdStateSync nested plans/ layout (#3257 — CR finding)
+//
+// Prior to this fix, cmdStateSync did a flat readdirSync on each phase dir,
+// returning plans=0 for nested layouts. It would set "Total Plans in Phase"
+// to 0 even when plans existed inside plans/ — an under-count that corrupts
+// the STATE.md progress block.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cmdStateSync nested plans/ layout (#3257)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates Total Plans in Phase from 0 to correct nested count on sync', () => {
+    // Disk: phase 01-init with 3 nested plans, no summaries.
+    // STATE.md says "Total Plans in Phase: 0" (stale / pre-fix value).
+    // After sync, the field must be updated to 3.
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-init');
+    const plansDir = path.join(phaseDir, 'plans');
+    fs.mkdirSync(plansDir, { recursive: true });
+
+    for (let p = 1; p <= 3; p++) {
+      const pad = String(p).padStart(2, '0');
+      fs.writeFileSync(path.join(plansDir, `1-PLAN-${pad}-step${p}.md`), '# Plan\n');
+    }
+
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 01',
+      '**Status:** executing',
+      '**Total Plans in Phase:** 0',
+      '**Progress:** [░░░░░░░░░░] 0%',
+      '**Last Activity:** 2026-01-01',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent, 'utf-8');
+
+    const result = runGsdTools('state sync', tmpDir);
+    assert.ok(result.success, `state sync failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(parsed.synced, 'sync must report synced: true');
+    // The "Total Plans in Phase" change must appear in the changes list.
+    const planCountChange = parsed.changes.find(c => c.startsWith('Total Plans in Phase:'));
+    assert.ok(planCountChange, `changes must include Total Plans in Phase update; got: ${JSON.stringify(parsed.changes)}`);
+    assert.ok(planCountChange.includes('-> 3'), `Total Plans in Phase must update to 3; got: "${planCountChange}"`);
+  });
+
+  test('sync dry-run reports correct nested plan count without writing', () => {
+    // --verify flag: sync must report what WOULD change but not write STATE.md.
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-init');
+    const plansDir = path.join(phaseDir, 'plans');
+    fs.mkdirSync(plansDir, { recursive: true });
+
+    for (let p = 1; p <= 2; p++) {
+      const pad = String(p).padStart(2, '0');
+      fs.writeFileSync(path.join(plansDir, `PLAN-${pad}-task${p}.md`), '# Plan\n');
+    }
+
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 01',
+      '**Status:** executing',
+      '**Total Plans in Phase:** 0',
+      '**Progress:** [░░░░░░░░░░] 0%',
+      '**Last Activity:** 2026-01-01',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent, 'utf-8');
+
+    const result = runGsdTools('state sync --verify', tmpDir);
+    assert.ok(result.success, `state sync --verify failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(parsed.dry_run, 'dry_run must be true with --verify flag');
+    const planCountChange = parsed.changes.find(c => c.startsWith('Total Plans in Phase:'));
+    assert.ok(planCountChange, `dry-run changes must include Total Plans in Phase; got: ${JSON.stringify(parsed.changes)}`);
+    assert.ok(planCountChange.includes('-> 2'), `dry-run must show correct count of 2; got: "${planCountChange}"`);
+
+    // STATE.md must be unchanged (dry-run).
+    const afterContent = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(afterContent.includes('Total Plans in Phase:** 0'), 'STATE.md must not be written in dry-run mode');
+  });
+
+  test('sync across multiple phases with nested plans sums correctly', () => {
+    // Phase 01: 2 nested plans, 2 summaries (complete).
+    // Phase 02: 3 nested plans, 1 summary (in progress).
+    // Expected "Total Plans in Phase" = 3 (current/incomplete phase).
+    const phases = [
+      { dir: '01-alpha', plans: 2, summaries: 2 },
+      { dir: '02-beta', plans: 3, summaries: 1 },
+    ];
+    for (const { dir, plans, summaries } of phases) {
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', dir);
+      const plansDir = path.join(phaseDir, 'plans');
+      fs.mkdirSync(plansDir, { recursive: true });
+      for (let p = 1; p <= plans; p++) {
+        const pad = String(p).padStart(2, '0');
+        fs.writeFileSync(path.join(plansDir, `1-PLAN-${pad}-t.md`), '# Plan\n');
+      }
+      for (let s = 1; s <= summaries; s++) {
+        const pad = String(s).padStart(2, '0');
+        fs.writeFileSync(path.join(plansDir, `1-SUMMARY-${pad}-t.md`), '# Summary\n');
+      }
+    }
+
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 02',
+      '**Status:** executing',
+      '**Total Plans in Phase:** 0',
+      '**Progress:** [░░░░░░░░░░] 0%',
+      '**Last Activity:** 2026-01-01',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent, 'utf-8');
+
+    const result = runGsdTools('state sync', tmpDir);
+    assert.ok(result.success, `state sync failed: ${result.error}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.ok(parsed.synced, 'sync must succeed');
+    // "Total Plans in Phase" reflects the current (incomplete) phase: 02-beta has 3 plans.
+    const planCountChange = parsed.changes.find(c => c.startsWith('Total Plans in Phase:'));
+    assert.ok(planCountChange, `Total Plans in Phase change expected; got: ${JSON.stringify(parsed.changes)}`);
+    assert.ok(planCountChange.includes('-> 3'), `current phase plan count must be 3; got: "${planCountChange}"`);
+    // Progress: 3 total summaries / 5 total plans = 60%.
+    const progressChange = parsed.changes.find(c => c.startsWith('Progress:'));
+    assert.ok(progressChange, `Progress change expected; got: ${JSON.stringify(parsed.changes)}`);
+    assert.ok(progressChange.includes('60%'), `progress must reflect nested counts (3/5=60%); got: "${progressChange}"`);
+  });
+});
