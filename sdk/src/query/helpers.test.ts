@@ -464,6 +464,17 @@ describe('runtime-global skills directory helpers', () => {
     expect(renderGlobalSkillsBaseDisplayPath('claude')).toBe('~/.claude/skills');
     expect(renderGlobalSkillDisplayPath('claude', 'demo')).toBe(join('~/.claude/skills', 'demo'));
   });
+
+  it('rejects path-traversal segments — resolveGlobalSkillDir returns null for ../../foo', () => {
+    process.env.CODEX_HOME = '/codex';
+    expect(resolveGlobalSkillDir('codex', '../../foo')).toBeNull();
+    expect(resolveGlobalSkillDir('codex', '../escape')).toBeNull();
+    expect(resolveGlobalSkillDir('codex', '')).toBeNull();
+    // Absolute path as skillName is also rejected
+    expect(resolveGlobalSkillDir('codex', '/abs/path')).toBeNull();
+    // Legitimate name still works
+    expect(resolveGlobalSkillDir('codex', 'demo')).toBe(join('/codex', 'skills', 'demo'));
+  });
 });
 
 describe('findProjectRoot (multi-repo .planning resolution)', () => {
