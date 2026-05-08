@@ -709,18 +709,21 @@ describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namesp
   });
 });
 
-describe('#2760 CR4 finding 3 — parseTomlToObject rejects malformed input that previously slipped through', () => {
-  test('rejects float values (timeout = 0.5)', () => {
+describe('#2760 CR4 finding 3 / #3245 — parseTomlToObject handles edge-case value types (floats accepted; dates/trailing-garbage rejected)', () => {
+  // #3245 inverts the float-rejection requirement: Codex CLI's serde schema
+  // requires f64 for tool_timeout_sec/startup_timeout_sec, so GSD's parser
+  // must now ACCEPT floats. The original guard (from #2760 CR4 finding 3) was
+  // "don't silently truncate 0.5 to integer 0" — that goal is still met
+  // because we parse the full float as a JS Number (not truncate to prefix).
+  test('accepts TOML floats (timeout = 0.5) — #3245 fix', () => {
     const content = [
       '[server]',
       'timeout = 0.5',
       '',
     ].join('\n');
-    assert.throws(
-      () => parseTomlToObject(content),
-      /unsupported TOML value|trailing bytes/,
-      'float values must be rejected, not silently truncated to int prefix'
-    );
+    const parsed = parseTomlToObject(content);
+    assert.strictEqual(parsed.server.timeout, 0.5,
+      'float values must be accepted as JS Number (not truncated to 0) — #3245');
   });
 
   test('rejects date values (created = 1979-05-27)', () => {
