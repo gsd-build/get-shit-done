@@ -49,7 +49,7 @@ Parse current values (default to `true` if not present):
 - `workflow.code_review_depth` — default depth for /gsd-code-review: `quick`, `standard`, or `deep` (default: `"standard"` if absent; only relevant when `code_review` is on)
 - `workflow.ui_review` — run visual quality audit (/gsd-ui-review) in autonomous mode (default: true if absent)
 - `commit_docs` — whether `.planning/` files are committed to git (default: true if absent)
-- `intel.enabled` — enable queryable codebase intelligence (/gsd-intel) (default: false if absent)
+- `intel.enabled` — enable queryable codebase intelligence (/gsd-map-codebase --query) (default: false if absent)
 - `graphify.enabled` — enable project knowledge graph (/gsd-graphify) (default: false if absent)
 - `model_profile` — which model each agent uses (default: `balanced`)
 - `git.branching_strategy` — branching approach (default: `"none"`)
@@ -292,12 +292,12 @@ AskUserQuestion([
     ]
   },
   {
-    question: "Enable Intel? (queryable codebase intelligence via /gsd-intel — builds a JSON index in .planning/intel/)",
+    question: "Enable Intel? (queryable codebase intelligence via /gsd-map-codebase --query — builds a JSON index in .planning/intel/)",
     header: "Intel",
     multiSelect: false,
     options: [
       { label: "No (Recommended)", description: "Skip intel indexing. Use when codebase is small or intel queries are not needed." },
-      { label: "Yes", description: "Enable /gsd-intel commands. Builds and queries a JSON index of the codebase." }
+      { label: "Yes", description: "Enable /gsd-map-codebase --query commands. Builds and queries a JSON index of the codebase." }
     ]
   },
   {
