@@ -557,9 +557,12 @@ describe('cmdStateSync nested plans/ layout (#3257)', () => {
     const planCountChange = parsed.changes.find(c => c.startsWith('Total Plans in Phase:'));
     assert.ok(planCountChange, `Total Plans in Phase change expected; got: ${JSON.stringify(parsed.changes)}`);
     assert.ok(planCountChange.includes('-> 3'), `current phase plan count must be 3; got: "${planCountChange}"`);
-    // Progress: 3 total summaries / 5 total plans = 60%.
+    // Progress: computeProgressPercent uses min(plan_fraction, phase_fraction).
+    // plan_fraction = 3 summaries / 5 plans = 60%.
+    // phase_fraction = 1 completed phase / 2 total phases = 50%.
+    // min(60%, 50%) = 50% — the phase cap applies (#3242).
     const progressChange = parsed.changes.find(c => c.startsWith('Progress:'));
     assert.ok(progressChange, `Progress change expected; got: ${JSON.stringify(parsed.changes)}`);
-    assert.ok(progressChange.includes('60%'), `progress must reflect nested counts (3/5=60%); got: "${progressChange}"`);
+    assert.ok(progressChange.includes('50%'), `progress must reflect nested counts (min(3/5, 1/2)=50%); got: "${progressChange}"`);
   });
 });
