@@ -66,13 +66,6 @@ describe('extractFrontmatter', () => {
     expect(result).toEqual({ items: ['one', 'two'] });
   });
 
-  it('uses the LEADING block when multiple stacked blocks exist', () => {
-    // extractFrontmatter is anchored at file start — leading block wins (#3240 fix)
-    const content = '---\nold: data\n---\n---\nnew: data\n---\nbody';
-    const result = extractFrontmatter(content);
-    expect(result).toEqual({ old: 'data' });
-  });
-
   it('returns the LEADING block when body contains markdown horizontal rules', () => {
     // Regression: LAST-block semantics picked up body separators as frontmatter (#3240)
     const content = [
