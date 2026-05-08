@@ -159,4 +159,25 @@ describe('bug #3243: CJS dispatcher accepts dotted canonical command form', () =
       ].join('\n')
     );
   });
+
+  test('multi-dot unknown command suggestion uses first-dot split only (a.b.c → "a b.c")', () => {
+    // The shim splits only on the FIRST dot, so the suggestion must mirror that:
+    // "a.b.c" → head="a", rest="b.c" → suggest "a b.c", NOT "a b c".
+    const result = runGsdTools(['a.b.c'], tmpDir);
+    assert.strictEqual(result.success, false, '"a.b.c" must fail');
+    assert.ok(
+      result.error.includes('a b.c'),
+      [
+        'suggestion for multi-dot unknown command must use first-dot split: "a b.c".',
+        'Got:', result.error,
+      ].join('\n')
+    );
+    assert.ok(
+      !result.error.includes('a b c'),
+      [
+        'suggestion must NOT replace all dots ("a b c" is wrong — only first dot splits).',
+        'Got:', result.error,
+      ].join('\n')
+    );
+  });
 });

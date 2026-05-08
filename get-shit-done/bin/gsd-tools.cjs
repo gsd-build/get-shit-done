@@ -1196,9 +1196,13 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         typeof originalCommand === 'string' &&
         originalCommand !== command &&
         originalCommand.includes('.');
-      const suggestion = wasDotted
-        ? ` — did you mean: "${originalCommand.split('.').join(' ')}"?`
-        : '';
+      let suggestion = '';
+      if (wasDotted) {
+        const dotIdx = originalCommand.indexOf('.');
+        const head = originalCommand.slice(0, dotIdx);
+        const rest = originalCommand.slice(dotIdx + 1);
+        suggestion = ` — did you mean: "${head} ${rest}"?`;
+      }
       error(`Unknown command: ${command}${suggestion}`);
     }
   }
