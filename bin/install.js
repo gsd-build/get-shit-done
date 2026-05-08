@@ -4186,14 +4186,24 @@ function rewriteTomlKeyLines(content, matches, key) {
  * write leaves the temp file (which we clean up) but never truncates the
  * original target. Used for any mutation of Codex config.toml so we cannot
  * leave the user with a half-written file (#2760 fix 4).
+ *
+ * Every temp path written is recorded in __atomicWrittenTmps so that
+ * _cleanTmpFiles() can scope cleanup to files this installer process actually
+ * created, avoiding accidental deletion of unrelated tools' temp files.
  */
 let __atomicWriteCounter = 0;
+// Set<string> — absolute paths of .tmp-<pid>-<n> files this process created.
+const __atomicWrittenTmps = new Set();
 function atomicWriteFileSync(target, data, options) {
   __atomicWriteCounter += 1;
   const tmp = `${target}.tmp-${process.pid}-${__atomicWriteCounter}`;
+  __atomicWrittenTmps.add(tmp);
   try {
     fs.writeFileSync(tmp, data, options);
     fs.renameSync(tmp, target);
+    // Successful rename: the tmp path no longer exists, but leave it in the
+    // Set so _cleanTmpFiles can recognise it as installer-owned if it somehow
+    // lingers (e.g. a rename succeeded but left a stale entry on some FS).
   } catch (e) {
     // Best-effort cleanup of the partial temp file; never mask the real error.
     try { fs.rmSync(tmp, { force: true }); } catch (_) { /* ignore */ }
@@ -8220,6 +8230,12 @@ function install(isGlobal, runtime = 'claude') {
 
       // 5. Orphaned atomic-write temp files (<file>.tmp-<pid>-<n>) in targetDir.
       // These can accumulate if an atomic write fails mid-rename. Best-effort scan.
+      //
+      // Only delete temp files whose absolute path is in __atomicWrittenTmps —
+      // the Set populated by atomicWriteFileSync for every temp this installer
+      // process actually created. This scopes cleanup to installer-owned writes
+      // and avoids clobbering unrelated tools' temp files that happen to match
+      // the same *.tmp-<pid>-<n> suffix pattern.
       const _tmpPattern = /\.tmp-\d+-\d+$/;
       function _cleanTmpFiles(dir) {
         if (!fs.existsSync(dir)) return;
@@ -8229,7 +8245,7 @@ function install(isGlobal, runtime = 'claude') {
           const full = path.join(dir, entry.name);
           if (entry.isDirectory()) {
             _cleanTmpFiles(full);
-          } else if (_tmpPattern.test(entry.name)) {
+          } else if (_tmpPattern.test(entry.name) && __atomicWrittenTmps.has(full)) {
             try { fs.unlinkSync(full); } catch (_) { /* best-effort */ }
           }
         }
