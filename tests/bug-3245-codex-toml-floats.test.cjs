@@ -252,7 +252,7 @@ describe('#3245 — install succeeds with TOML float in pre-existing config', { 
       'startup_timeout_sec must be preserved as a number after install');
   });
 
-  test('post-install config retains float literal form (20.0 not truncated to 20)', () => {
+  test('post-install config round-trips tool_timeout_sec as numeric 20', () => {
     const preInstall = [
       'tool_timeout_sec = 20.0',
       '',
