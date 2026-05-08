@@ -239,84 +239,103 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
   assertSafeProjectCode(projectCode);
   const prefix = projectCode ? `${projectCode}-` : '';
 
+  // ── Helper: compute newPhaseId / dirName / computedPhaseEntry from raw ROADMAP content ──
+  // Extracted as a local async function so it can be called both inside the
+  // roadmap lock (non-dry-run) and outside (dry-run, where no write occurs and
+  // there is no race condition to guard against).
+  const computePhaseFields = async (rawRoadmapContent: string) => {
+    const milestoneContent = await extractCurrentMilestone(rawRoadmapContent, projectDir);
+
+    let resolvedPhaseId: number | string = '';
+    let resolvedDirName = '';
+
+    if (customId || config.phase_naming === 'custom') {
+      // Custom phase naming
+      resolvedPhaseId = customId || slug.toUpperCase().replace(/-/g, '_');
+      if (!resolvedPhaseId) {
+        throw new GSDError('--id required when phase_naming is "custom"', ErrorClassification.Validation);
+      }
+      assertSafePhaseDirName(String(resolvedPhaseId), 'custom phase id');
+      resolvedDirName = `${prefix}${resolvedPhaseId}-${slug}`;
+    } else {
+      // Sequential mode: find highest integer phase number (in current milestone only)
+      // Skip 999.x backlog phases — they live outside the active sequence
+      // Matches heading (## Phase N:), bullet checklist (- [x] Phase N:), and bold (**Phase N:**)
+      const phasePattern = /(?:^|\n)\s*(?:[-*]\s*(?:\[[x ]\]\s*)?|#{2,4}\s*|\*{1,2}\s*)Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
+      let maxPhase = 0;
+      let m: RegExpExecArray | null;
+      while ((m = phasePattern.exec(milestoneContent)) !== null) {
+        const num = parseInt(m[1], 10);
+        if (num >= 999) continue; // backlog phases use 999.x numbering
+        if (num > maxPhase) maxPhase = num;
+      }
+
+      // Also scan on-disk phase directories (union semantics) — ROADMAP and disk
+      // may diverge temporarily (e.g. a previous run created the dir but didn't
+      // update ROADMAP). Taking the max of both sources prevents collisions.
+      const phasesDir = planningPaths(projectDir, workstream).phases;
+      try {
+        const entries = await readdir(phasesDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const dirMatch = /^(?:[A-Z][A-Z0-9]*-)?(\d+)[A-Z]?(?:\.\d+)*-/i.exec(entry.name);
+          if (!dirMatch) continue;
+          const num = parseInt(dirMatch[1], 10);
+          if (num >= 999) continue;
+          if (num > maxPhase) maxPhase = num;
+        }
+      } catch {
+        // phases dir may not exist yet — leave maxPhase as 0
+      }
+
+      resolvedPhaseId = maxPhase + 1;
+      const paddedNum = String(resolvedPhaseId).padStart(2, '0');
+      resolvedDirName = `${prefix}${paddedNum}-${slug}`;
+    }
+
+    assertSafePhaseDirName(resolvedDirName);
+
+    if (!resolvedDirName) {
+      throw new GSDError('Phase directory name was not computed', ErrorClassification.Execution);
+    }
+    if (resolvedPhaseId === '') {
+      throw new GSDError('Phase ID was not computed', ErrorClassification.Execution);
+    }
+
+    const dependsOn = config.phase_naming === 'custom'
+      ? ''
+      : `\n**Depends on:** Phase ${typeof resolvedPhaseId === 'number' ? resolvedPhaseId - 1 : 'TBD'}`;
+    const resolvedEntry = `\n### Phase ${resolvedPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${resolvedPhaseId} to break down)\n`;
+
+    return { resolvedPhaseId, resolvedDirName, resolvedEntry };
+  };
+
   let newPhaseId: number | string = '';
   let dirName = '';
   let computedPhaseEntry = '';
 
-  // ── Compute the new phase id and directory name ─────────────────────────
-  // We always read the ROADMAP to compute the next number. In dry-run mode we
-  // skip the mkdir/writeFile/roadmap-write steps.
-  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
-
-  let rawRoadmapContent = '';
-  try {
-    rawRoadmapContent = await readFile(roadmapPath, 'utf-8');
-  } catch { /* ROADMAP.md may not exist yet */ }
-
-  const milestoneContent = await extractCurrentMilestone(rawRoadmapContent, projectDir);
-
-  if (customId || config.phase_naming === 'custom') {
-    // Custom phase naming
-    newPhaseId = customId || slug.toUpperCase().replace(/-/g, '_');
-    if (!newPhaseId) {
-      throw new GSDError('--id required when phase_naming is "custom"', ErrorClassification.Validation);
-    }
-    assertSafePhaseDirName(String(newPhaseId), 'custom phase id');
-    dirName = `${prefix}${newPhaseId}-${slug}`;
-  } else {
-    // Sequential mode: find highest integer phase number (in current milestone only)
-    // Skip 999.x backlog phases — they live outside the active sequence
-    // Matches heading (## Phase N:), bullet checklist (- [x] Phase N:), and bold (**Phase N:**)
-    const phasePattern = /(?:^|\n)\s*(?:[-*]\s*(?:\[[x ]\]\s*)?|#{2,4}\s*|\*{1,2}\s*)Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
-    let maxPhase = 0;
-    let m: RegExpExecArray | null;
-    while ((m = phasePattern.exec(milestoneContent)) !== null) {
-      const num = parseInt(m[1], 10);
-      if (num >= 999) continue; // backlog phases use 999.x numbering
-      if (num > maxPhase) maxPhase = num;
-    }
-
-    // Also scan on-disk phase directories (union semantics) — ROADMAP and disk
-    // may diverge temporarily (e.g. a previous run created the dir but didn't
-    // update ROADMAP). Taking the max of both sources prevents collisions.
-    const phasesDir = planningPaths(projectDir, workstream).phases;
+  if (dryRun) {
+    // Dry-run: no write, no race condition — compute outside the lock.
+    const roadmapPath = planningPaths(projectDir, workstream).roadmap;
+    let rawRoadmapContent = '';
     try {
-      const entries = await readdir(phasesDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const dirMatch = /^(?:[A-Z][A-Z0-9]*-)?(\d+)[A-Z]?(?:\.\d+)*-/i.exec(entry.name);
-        if (!dirMatch) continue;
-        const num = parseInt(dirMatch[1], 10);
-        if (num >= 999) continue;
-        if (num > maxPhase) maxPhase = num;
-      }
-    } catch {
-      // phases dir may not exist yet — leave maxPhase as 0
-    }
+      rawRoadmapContent = await readFile(roadmapPath, 'utf-8');
+    } catch { /* ROADMAP.md may not exist yet */ }
 
-    newPhaseId = maxPhase + 1;
-    const paddedNum = String(newPhaseId).padStart(2, '0');
-    dirName = `${prefix}${paddedNum}-${slug}`;
-  }
-
-  assertSafePhaseDirName(dirName);
-
-  if (!dirName) {
-    throw new GSDError('Phase directory name was not computed', ErrorClassification.Execution);
-  }
-  if (newPhaseId === '') {
-    throw new GSDError('Phase ID was not computed', ErrorClassification.Execution);
-  }
-
-  // Build phase entry (needed for both dry-run and real write)
-  const dependsOn = config.phase_naming === 'custom'
-    ? ''
-    : `\n**Depends on:** Phase ${typeof newPhaseId === 'number' ? newPhaseId - 1 : 'TBD'}`;
-  computedPhaseEntry = `\n### Phase ${newPhaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${newPhaseId} to break down)\n`;
-
-  if (!dryRun) {
-    // Real write path: create directory and update ROADMAP atomically
+    const { resolvedPhaseId, resolvedDirName, resolvedEntry } = await computePhaseFields(rawRoadmapContent);
+    newPhaseId = resolvedPhaseId;
+    dirName = resolvedDirName;
+    computedPhaseEntry = resolvedEntry;
+  } else {
+    // Real write path: hold the roadmap lock across the entire read → compute → write
+    // cycle so that two concurrent phase.add calls cannot both observe the same
+    // maxPhase and produce duplicate phase IDs.
     await readModifyWriteRoadmapMd(projectDir, async (roadmapRaw) => {
+      const { resolvedPhaseId, resolvedDirName, resolvedEntry } = await computePhaseFields(roadmapRaw);
+      newPhaseId = resolvedPhaseId;
+      dirName = resolvedDirName;
+      computedPhaseEntry = resolvedEntry;
+
       const dirPath = join(planningPaths(projectDir, workstream).phases, dirName);
 
       // Create directory with .gitkeep so git tracks empty folders
