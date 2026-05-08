@@ -148,7 +148,10 @@ export function renderGlobalSkillsBaseDisplayPath(runtime: Runtime): string | nu
 export function resolveGlobalSkillDir(runtime: Runtime, skillName: string): string | null {
   const base = resolveGlobalSkillsBase(runtime);
   if (base === null) return null;
-  return join(base, skillName);
+  const candidate = resolve(base, skillName);
+  const rel = relative(base, candidate);
+  if (!skillName || rel.startsWith('..') || isAbsolute(rel)) return null;
+  return candidate;
 }
 
 /** Resolve the canonical SKILL.md path for one runtime-global skill. */
