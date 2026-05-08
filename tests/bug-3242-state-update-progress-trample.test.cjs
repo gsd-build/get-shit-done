@@ -208,11 +208,16 @@ describe('#3242 Bug A: body-only state.update preserves curated progress frontma
     );
     assert.ok(updateResult.success, `state update failed: ${updateResult.error}`);
 
-    const content = fs.readFileSync(statePath, 'utf-8');
-    // Confirm the body field was indeed updated (functional check)
-    assert.ok(
-      content.includes('2026-05-07'),
-      'state.update should have written the new date to the body',
+    // Confirm the body field was indeed updated via state json (structured output).
+    // state json reads last_activity from the body — if the field wasn't updated
+    // this will return the original '2026-01-01' value.
+    const jsonResult = runGsdTools('state json', tmpDir);
+    assert.ok(jsonResult.success, `state json failed: ${jsonResult.error}`);
+    const fm = JSON.parse(jsonResult.output);
+    assert.strictEqual(
+      fm.last_activity,
+      '2026-05-07',
+      `state.update should have written '2026-05-07' to the Last Activity body field`,
     );
   });
 });
