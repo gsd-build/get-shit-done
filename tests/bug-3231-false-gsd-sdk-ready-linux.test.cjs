@@ -313,17 +313,18 @@ describe('bug #3231: stale legacy symlink to deprecated gsd-tools.cjs', () => {
     const sdkReady = /GSD SDK ready/.test(combined);
     if (sdkReady) {
       // Only acceptable if the symlink was replaced with the modern shim.
-      const newContent = (() => {
-        try { return fs.readFileSync(legacyShimPath, 'utf8'); } catch { return ''; }
-      })();
       assert.ok(
-        !newContent.includes('@deprecated') && !newContent.includes('gsd-tools.cjs'),
-        'if "GSD SDK ready" is printed, the legacy shim must have been replaced. Content:\n' + newContent,
+        !isLegacyGsdSdkShim(legacyShimPath),
+        'if "GSD SDK ready" is printed, the legacy shim must have been replaced',
+      );
+    } else {
+      // If readiness was not reported, the installer must have emitted a
+      // warning or error — it must not silently swallow the failure.
+      assert.ok(
+        stderr.length > 0,
+        'when readiness is not reported, installer should emit a warning/error path',
       );
     }
-    // The installer must not print "GSD SDK ready" while the legacy binary is
-    // still in place (if self-link succeeds it replaces it; if not it warns).
-    // Either way, it must not lie.
   });
 });
 
