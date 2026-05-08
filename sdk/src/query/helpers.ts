@@ -135,10 +135,11 @@ export function resolveGlobalSkillsBase(runtime: Runtime): string | null {
 /**
  * Render a human-readable runtime-global skills base path.
  * Uses `~` when the path lives under the current home dir.
+ * Returns a displayable string for unsupported runtimes (never null).
  */
-export function renderGlobalSkillsBaseDisplayPath(runtime: Runtime): string | null {
+export function renderGlobalSkillsBaseDisplayPath(runtime: Runtime): string {
   const base = resolveGlobalSkillsBase(runtime);
-  if (!base) return null;
+  if (!base) return `(${runtime} does not use a skills directory)`;
   const home = homedir();
   const homeWithSep = home.endsWith(pathSep) ? home : `${home}${pathSep}`;
   return (base === home || base.startsWith(homeWithSep)) ? `~${base.slice(home.length)}` : base;

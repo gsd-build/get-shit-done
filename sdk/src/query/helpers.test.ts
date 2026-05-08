@@ -454,7 +454,7 @@ describe('runtime-global skills directory helpers', () => {
 
   it('returns null for cline and renders unsupported display path', () => {
     expect(resolveGlobalSkillsBase('cline')).toBeNull();
-    expect(renderGlobalSkillsBaseDisplayPath('cline')).toBeNull();
+    expect(renderGlobalSkillsBaseDisplayPath('cline')).toBe('(cline does not use a skills directory)');
     expect(resolveGlobalSkillDir('cline', 'demo')).toBeNull();
     expect(resolveGlobalSkillMarkdownPath('cline', 'demo')).toBeNull();
     expect(renderGlobalSkillDisplayPath('cline', 'demo')).toBe('(cline does not use a skills directory)');
@@ -474,6 +474,11 @@ describe('runtime-global skills directory helpers', () => {
     expect(resolveGlobalSkillDir('codex', '/abs/path')).toBeNull();
     // Legitimate name still works
     expect(resolveGlobalSkillDir('codex', 'demo')).toBe(join('/codex', 'skills', 'demo'));
+    // resolveGlobalSkillMarkdownPath must also propagate the null for unsafe inputs
+    expect(resolveGlobalSkillMarkdownPath('codex', '../../foo')).toBeNull();
+    expect(resolveGlobalSkillMarkdownPath('codex', '../escape')).toBeNull();
+    expect(resolveGlobalSkillMarkdownPath('codex', '')).toBeNull();
+    expect(resolveGlobalSkillMarkdownPath('codex', '/abs/path')).toBeNull();
   });
 });
 
