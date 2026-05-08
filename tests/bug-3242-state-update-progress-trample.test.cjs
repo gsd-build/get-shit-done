@@ -170,10 +170,16 @@ describe('#3242 Bug A: body-only state.update preserves curated progress frontma
     assert.ok(updateResult.success, `state update failed: ${updateResult.error}`);
 
     const content = fs.readFileSync(statePath, 'utf-8');
-    // Confirm the body field was indeed updated (functional check)
-    assert.ok(
-      content.includes('2026-05-07'),
-      'state.update should have written the new date to the body',
+    // Confirm the body field was indeed updated — parse the body line by line
+    // to find "Last Activity: <value>" rather than raw-text matching.
+    const lines = content.split(/\r?\n/);
+    const lastActivityLine = lines.find((l) => l.startsWith('Last Activity:'));
+    assert.ok(lastActivityLine, 'STATE.md must contain a "Last Activity:" line');
+    const lastActivityValue = lastActivityLine.replace(/^Last Activity:\s*/, '').trim();
+    assert.strictEqual(
+      lastActivityValue,
+      '2026-05-07',
+      'state.update should have written the new date to the Last Activity body field',
     );
   });
 });
