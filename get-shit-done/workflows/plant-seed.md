@@ -19,12 +19,29 @@ later. The file is never gated behind questions.
 <step name="parse-idea">
 Parse `$ARGUMENTS` for the idea summary.
 
-If empty, ask:
-```text
-What's the idea? (one sentence)
+First, check for an enrich flag:
+
+```bash
+if echo "$ARGUMENTS" | grep -qE '\-\-enrich[[:space:]]+SEED-[0-9]+'; then
+  ENRICH_TARGET=$(echo "$ARGUMENTS" | grep -oE 'SEED-[0-9]+')
+  SEED_FILE=$(ls .planning/seeds/${ENRICH_TARGET}-*.md 2>/dev/null | head -1)
+  # Skip to enrich-seed step — do not prompt for $IDEA
+else
+  if [ -n "$ARGUMENTS" ]; then
+    IDEA="$ARGUMENTS"
+  else
+    # Ask only when no arguments at all
+    # What's the idea? (one sentence)
+    IDEA="<user response>"
+  fi
+fi
 ```
 
-Store as `$IDEA`.
+If `$ENRICH_TARGET` is set, skip straight to the `enrich-seed` step. Do not set `$IDEA` and do not run `create-seed-dir`, `generate-seed-id`, `write-seed`, `collect-breadcrumbs`, `commit-seed`, or `confirm`.
+
+If `$ARGUMENTS` is non-empty and contains no `--enrich` flag, treat the full value as `$IDEA` (no prompt).
+
+Only prompt for the idea when `$ARGUMENTS` is empty and no enrich target is present. Store the response as `$IDEA`.
 </step>
 
 <step name="create-seed-dir">
@@ -130,7 +147,7 @@ This seed will surface automatically when you run /gsd-new-milestone.
 **Optional enrichment — only run this step when `--enrich` flag is present.**
 
 If `--enrich` flag is in `$ARGUMENTS`:
-- Find the seed file by ID (e.g. `--enrich SEED-001`) or use the most-recently created seed.
+- `$ENRICH_TARGET` and `$SEED_FILE` are already set by `parse-idea`. Derive `$SEED_ID` from `$ENRICH_TARGET` (e.g. `SEED_ID="$ENRICH_TARGET"`). If `$SEED_FILE` is empty, fall back to the most-recently modified file in `.planning/seeds/` and set `$SEED_ID` from its filename.
 - Ask focused questions to build a complete seed:
 
 
@@ -179,12 +196,12 @@ Update the seed file's frontmatter and sections with the gathered values:
 
 Commit the update:
 ```bash
-gsd-sdk query commit "docs: enrich seed SEED-{PADDED} — trigger + why + scope" --files .planning/seeds/SEED-{PADDED}-{slug}.md
+gsd-sdk query commit "docs: enrich seed ${SEED_ID} — trigger + why + scope" --files "$SEED_FILE"
 ```
 
 Confirm:
 ```text
-✅ Seed enriched: SEED-{PADDED}
+✅ Seed enriched: ${SEED_ID}
 Trigger: {$TRIGGER}
 Scope: {$SCOPE}
 ```
