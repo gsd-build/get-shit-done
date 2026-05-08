@@ -354,10 +354,21 @@ describe('#3245 — idempotent rollback reverts skills/, agents/, and VERSION', 
       reason: 'very early simulated failure',
     });
 
-    // Even if codexHome is empty the rollback must not throw.
-    assert.doesNotThrow(() => {
-      try { runCodexInstall(codexHome); } catch (_) { /* expected */ }
-    }, 'rollback must not throw even when no prior content exists');
+    // The install must throw (validation failure), but the rollback that runs
+    // internally must not throw — it must be idempotent when nothing was written.
+    let threw = false;
+    try {
+      runCodexInstall(codexHome);
+    } catch (_) {
+      threw = true;
+    }
+    assert.strictEqual(threw, true, 'install must throw when validation fails (very early failure)');
+    // With nothing written before rollback fires, skills/ must not be left behind.
+    assert.strictEqual(
+      fs.existsSync(path.join(codexHome, 'skills')),
+      false,
+      'skills/ must not be created when rollback fires before any writes'
+    );
   });
 
   test('rollback does not remove pre-existing user skills that GSD did not write', () => {
