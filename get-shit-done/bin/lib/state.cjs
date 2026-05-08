@@ -13,6 +13,32 @@ const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cj
 // hasn't changed within the same gsd-tools invocation.
 const _diskScanCache = new Map();
 
+/**
+ * Compute the canonical progress percent for STATE.md frontmatter and body.
+ *
+ * Uses min(plan_fraction, phase_fraction) when both denominators are > 0.
+ * This prevents a false "100%" when ROADMAP declares future phases that have no
+ * disk dirs yet — all plans summarised only means 100% of *realized* work done,
+ * not 100% of the declared milestone (#3242 Bug B).
+ *
+ * @param {number|null} completedPlans
+ * @param {number|null} totalPlans
+ * @param {number|null} completedPhases
+ * @param {number|null} totalPhases  - ROADMAP-declared count (>= realised dirs)
+ * @returns {number|null}  0–100, or null when there is no data
+ */
+function computeProgressPercent(completedPlans, totalPlans, completedPhases, totalPhases) {
+  const hasPlanData = totalPlans !== null && totalPlans > 0 && completedPlans !== null;
+  const hasPhaseData = totalPhases !== null && totalPhases > 0 && completedPhases !== null;
+
+  if (!hasPlanData && !hasPhaseData) return null;
+
+  const planFraction = hasPlanData ? completedPlans / totalPlans : 1;
+  const phaseFraction = hasPhaseData ? completedPhases / totalPhases : 1;
+
+  return Math.min(100, Math.round(Math.min(planFraction, phaseFraction) * 100));
+}
+
 /** Shorthand — every state command needs this path */
 function getStatePath(cwd) {
   return planningPaths(cwd).state;
@@ -202,6 +228,9 @@ function cmdStateUpdate(cwd, field, value) {
   const statePath = planningPaths(cwd).state;
   try {
     let updated = false;
+    // resync: false — cmdStateUpdate only replaces a body text line.
+    // Triggering syncStateFrontmatter would rebuild progress.* from disk, trampling
+    // manually-curated cross-milestone counters stored in the frontmatter (#3242 Bug A).
     readModifyWriteStateMd(statePath, (content) => {
       const fieldEscaped = escapeRegex(field);
       // Try **Field:** bold format first, then plain Field: format
@@ -215,7 +244,7 @@ function cmdStateUpdate(cwd, field, value) {
         return content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
       }
       return content;
-    }, cwd);
+    }, cwd, { resync: false });
     if (updated) {
       output({ updated: true });
     } else {
@@ -813,13 +842,12 @@ function buildStateFrontmatter(bodyContent, cwd) {
   }
 
   // Derive percent from disk counts when available (ground truth).
-  // Only falls back to the body Progress: field when no plan files exist on disk
-  // (phases directory empty or absent), which means disk has no authoritative data.
-  // This prevents a stale body "0%" from overriding the real 100% completion state.
-  let progressPercent = null;
-  if (totalPlans !== null && totalPlans > 0 && completedPlans !== null) {
-    progressPercent = Math.min(100, Math.round(completedPlans / totalPlans * 100));
-  } else if (progressRaw) {
+  // Uses min(plan_fraction, phase_fraction) via computeProgressPercent so that
+  // ROADMAP-declared-but-unrealized future phases cap the reported completion
+  // instead of a false 100% from plan-only coverage (#3242 Bug B).
+  // Falls back to the body Progress: field only when no plan files exist on disk.
+  let progressPercent = computeProgressPercent(completedPlans, totalPlans, completedPhases, totalPhases);
+  if (progressPercent === null && progressRaw) {
     const pctMatch = progressRaw.match(/(\d+)%/);
     if (pctMatch) progressPercent = parseInt(pctMatch[1], 10);
   }
@@ -971,13 +999,43 @@ function writeStateMd(statePath, content, cwd) {
  * Holds the lock across the entire read -> transform -> write cycle,
  * preventing the lost-update problem where two agents read the same
  * content and the second write clobbers the first.
+ *
+ * @param {string} statePath
+ * @param {function} transformFn - (content: string) => string
+ * @param {string} cwd
+ * @param {{ resync?: boolean }} [options]
+ *   resync: when true (default) rebuilds the entire frontmatter from disk after
+ *   the transform. Pass { resync: false } for body-only updates (e.g. state.update
+ *   on a single field) that must not trample manually-curated cross-milestone
+ *   progress.* counters in the frontmatter (#3242 Bug A).
+ *   When resync is false, syncStateFrontmatter still runs to maintain/create the
+ *   frontmatter block, but any existing progress.* sub-keys are preserved from
+ *   the pre-transform file rather than being rebuilt from disk.
  */
-function readModifyWriteStateMd(statePath, transformFn, cwd) {
+function readModifyWriteStateMd(statePath, transformFn, cwd, options) {
+  const resync = !options || options.resync !== false;
   const lockPath = acquireStateLock(statePath);
   try {
     const content = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf-8') : '';
+    // Snapshot the existing progress block BEFORE the transform so we can
+    // restore it when resync is false.
+    const preFm = resync ? null : extractFrontmatter(content);
     const modified = transformFn(content);
-    const synced = syncStateFrontmatter(modified, cwd);
+    let synced = syncStateFrontmatter(modified, cwd);
+
+    if (!resync && preFm && preFm.progress) {
+      // Re-apply the curated progress block that syncStateFrontmatter just
+      // overwrote with disk-derived values.  Only restore keys that were present
+      // in the snapshot — this preserves any new non-progress frontmatter fields
+      // (e.g., status, current_phase) that syncStateFrontmatter legitimately
+      // derived from the updated body.
+      const postFm = extractFrontmatter(synced);
+      postFm.progress = preFm.progress;
+      const yamlStr = reconstructFrontmatter(postFm);
+      const body = stripFrontmatter(synced);
+      synced = `---\n${yamlStr}\n---\n\n${body}`;
+    }
+
     atomicWriteFileSync(statePath, normalizeMd(synced), 'utf-8');
   } finally {
     releaseStateLock(lockPath);
@@ -1449,6 +1507,7 @@ function cmdStateSync(cwd, options, raw) {
 
   let totalDiskPlans = 0;
   let totalDiskSummaries = 0;
+  let diskCompletedPhases = 0;
   let highestIncompletePhase = null;
   let highestIncompletePhaseNum = null;
   let highestIncompletePhaseplanCount = 0;
@@ -1461,6 +1520,7 @@ function cmdStateSync(cwd, options, raw) {
     const summaries = files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
     totalDiskPlans += plans;
     totalDiskSummaries += summaries;
+    if (plans > 0 && summaries >= plans) diskCompletedPhases++;
 
     // Track the highest phase with incomplete plans (or any plans)
     const phaseMatch = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
@@ -1481,6 +1541,18 @@ function cmdStateSync(cwd, options, raw) {
     }
   }
 
+  // Determine total phases from ROADMAP (may be larger than realized disk dirs).
+  // Mirrors the logic in buildStateFrontmatter so both report consistent percents (#3242 Bug B).
+  let syncTotalPhases = null;
+  try {
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
+    if (isDirInMilestone.phaseCount > 0) {
+      syncTotalPhases = Math.max(entries.length, isDirInMilestone.phaseCount);
+    } else {
+      syncTotalPhases = entries.length;
+    }
+  } catch { /* intentionally empty */ }
+
   // Sync Total Plans in Phase
   if (highestIncompletePhase) {
     const currentPlansField = stateExtractField(modified, 'Total Plans in Phase');
@@ -1491,8 +1563,13 @@ function cmdStateSync(cwd, options, raw) {
     }
   }
 
-  // Sync Progress
-  const percent = totalDiskPlans > 0 ? Math.min(100, Math.round(totalDiskSummaries / totalDiskPlans * 100)) : 0;
+  // Sync Progress — use shared helper so formula stays in one place (#3242 Bug B).
+  // computeProgressPercent applies min(plan_fraction, phase_fraction) so unrealised
+  // ROADMAP phases cap the reported percent rather than allowing a false 100%.
+  const percent = (() => {
+    const p = computeProgressPercent(totalDiskSummaries, totalDiskPlans, diskCompletedPhases, syncTotalPhases);
+    return p !== null ? p : 0;
+  })();
   const currentProgress = stateExtractField(modified, 'Progress');
   if (currentProgress) {
     const currentPercent = parseInt(currentProgress.replace(/[^\d]/g, ''), 10);
