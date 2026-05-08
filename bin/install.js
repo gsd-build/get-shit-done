@@ -3697,7 +3697,11 @@ function parseTomlValue(text, i) {
   // Still rejected: date/time literals (`-`, `:`, `T`, `Z` after integer prefix)
   // and hex/oct/bin literals (`0x`, `0o`, `0b` — `x`, `o`, `b` fall through to
   // the unsupported-value throw below because `\d[\d_]*` won't match `x`).
-  const numMatch = text.slice(i).match(/^[+-]?\d[\d_]*/);
+  // TOML 1.0 §2: underscores in numeric literals are only allowed BETWEEN
+  // digits (each underscore must have a digit on both sides). The pre-check
+  // regex uses (?:_?\d)* rather than [\d_]* so `1__0`, `1_.0`, and `1._0`
+  // are rejected before normalization silently hides them.
+  const numMatch = text.slice(i).match(/^[+-]?\d(?:_?\d)*/);
   if (numMatch) {
     const afterInt = text[i + numMatch[0].length];
     // Reject date/time separators that cannot be part of a float.
@@ -3707,9 +3711,10 @@ function parseTomlValue(text, i) {
       );
     }
     // Accept float: optional decimal part, optional exponent part.
-    // Regex matches the FULL float literal including underscore separators.
-    // Pattern: integer-prefix (already matched) + optional(. digits) + optional(eE sign digits)
-    const floatMatch = text.slice(i).match(/^[+-]?\d[\d_]*(?:\.[\d_]+)?(?:[eE][+-]?\d[\d_]*)?/);
+    // Each segment uses (?:_?\d)* so underscores are only between digits.
+    const floatMatch = text.slice(i).match(
+      /^[+-]?\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?/
+    );
     const raw = floatMatch ? floatMatch[0] : numMatch[0];
     const normalized = raw.replace(/_/g, '');
     const n = Number(normalized);
