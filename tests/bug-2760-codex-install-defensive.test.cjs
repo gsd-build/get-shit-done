@@ -709,7 +709,7 @@ describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namesp
   });
 });
 
-describe('#2760 CR4 finding 3 — parseTomlToObject rejects malformed input that previously slipped through', () => {
+describe('#2760 CR4 finding 3 / #3245 — parseTomlToObject handles edge-case value types (floats accepted; dates/trailing-garbage rejected)', () => {
   // #3245 inverts the float-rejection requirement: Codex CLI's serde schema
   // requires f64 for tool_timeout_sec/startup_timeout_sec, so GSD's parser
   // must now ACCEPT floats. The original guard (from #2760 CR4 finding 3) was
