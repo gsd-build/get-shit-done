@@ -9437,8 +9437,14 @@ function installSdkIfNeeded(opts) {
   // strictly weaker invariant than the one workflows depend on
   // (`command -v gsd-sdk` resolving), and led to a false ✓ in npx-cache
   // installs (issue #2775).
+  //
+  // #3231: strip transient npx-injected PATH segments before checking. The
+  // installer subprocess PATH includes `~/.npm/_npx/<hash>/node_modules/.bin`
+  // which is ephemeral — it is NOT reachable from the user's interactive
+  // shell. A gsd-sdk found there must NOT count as "on PATH".
   const shimSrc = path.resolve(__dirname, 'gsd-sdk.js');
-  let onPath = isGsdSdkOnPath();
+  const persistentPath = filterNpxFromPath(process.env.PATH || '');
+  let onPath = isGsdSdkOnPath(persistentPath);
 
   // Track WHERE we wrote the shim so the diagnostic can be specific even
   // when isGsdSdkOnPath() returns false because the write target isn't on
@@ -9455,7 +9461,7 @@ function installSdkIfNeeded(opts) {
     const linked = trySelfLinkGsdSdk(shimSrc);
     if (linked) {
       shimDir = path.dirname(linked);
-      onPath = isGsdSdkOnPath();
+      onPath = isGsdSdkOnPath(persistentPath);
       if (onPath) {
         console.log(`  ${dim}↪ linked gsd-sdk → ${linked}${reset}`);
       }
@@ -9470,6 +9476,13 @@ function installSdkIfNeeded(opts) {
   // require the shim to be reachable there too before claiming ✓.
   // POSIX-only probe; on Windows getUserShellPath() returns null and
   // we trust the existing check (Windows-specific fix is separate).
+  //
+  // #3231: when getUserShellPath() returns null (e.g. $SHELL unset on
+  // Linux, rc-file timeout), we cannot confirm persistent reachability.
+  // In that case, do NOT preserve a true onPath — require the initial
+  // check (on persistentPath) to have found the shim in a persistent
+  // location. Since we already filtered npx dirs above, onPath=true here
+  // means a non-transient dir has the shim, which is sufficient.
   const userShellPath = getUserShellPath();
   if (onPath && userShellPath !== null) {
     const userSees = isGsdSdkOnPath(userShellPath);
@@ -9477,6 +9490,8 @@ function installSdkIfNeeded(opts) {
       onPath = false;
     }
   }
+  // If userShellPath is null (POSIX probe failed), onPath reflects
+  // the persistent-PATH check — that is the best available invariant.
 
   if (onPath) {
     console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
@@ -9518,6 +9533,74 @@ function installSdkIfNeeded(opts) {
 }
 
 /**
+ * #3231 helper: detect whether a `gsd-sdk` binary is the legacy deprecated
+ * shim pointing at `gsd-tools.cjs`.
+ *
+ * Reads the first 512 bytes of the file and looks for the `@deprecated`
+ * marker alongside a `gsd-tools.cjs` reference — the fingerprint that
+ * distinguishes the old binary from the modern SDK. Treats any I/O error
+ * (missing file, EACCES) as "not legacy" so callers do not need to guard.
+ *
+ * This is intentionally a plain-text sniff of the file header, not a
+ * semantic parse — the marker is a stable, human-authored string that we
+ * own. Returns false conservatively (prefer false positives to false
+ * negatives: a non-legacy binary reported as legacy triggers a harmless
+ * replacement; a legacy binary reported as non-legacy would keep the broken
+ * shim in place).
+ */
+function isLegacyGsdSdkShim(filePath) {
+  const fs = require('fs');
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    let header;
+    try {
+      const buf = Buffer.alloc(512);
+      const bytesRead = fs.readSync(fd, buf, 0, 512, 0);
+      header = buf.slice(0, bytesRead).toString('utf8');
+    } finally {
+      try { fs.closeSync(fd); } catch {}
+    }
+    // The legacy binary contains "@deprecated" AND "gsd-tools.cjs" within
+    // its first 512 bytes.
+    return header.includes('@deprecated') && header.includes('gsd-tools.cjs');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * #3231 helper: strip transient npx-injected PATH segments.
+ *
+ * npm/npx injects `~/.npm/_npx/<hash>/node_modules/.bin` (and equivalents)
+ * into the installer subprocess PATH. Those directories are ephemeral — they
+ * exist only for the duration of the `npx` run — and MUST NOT be treated as
+ * evidence that `gsd-sdk` is durably reachable.
+ *
+ * Strips any segment whose absolute form contains `/_npx/` or `\\_npx\\`
+ * as a proper path-component boundary.  A user-named directory that merely
+ * contains the substring "npx" (e.g. `/home/user/my-npx-scripts/bin`) is
+ * preserved: we require the boundary characters (`/` or `\`) on both sides.
+ *
+ * Returns the filtered PATH string (may be empty if all segments were npx).
+ */
+function filterNpxFromPath(pathString) {
+  const path = require('path');
+  const input = typeof pathString === 'string' ? pathString : (process.env.PATH || '');
+  return input
+    .split(path.delimiter)
+    .filter((seg) => {
+      if (!seg) return false;
+      // Normalize to forward-slash form for the pattern check so both
+      // POSIX and Windows paths match a single expression. The sep-anchored
+      // pattern avoids matching "my-npx-scripts" etc.
+      const norm = seg.replace(/\\/g, '/');
+      // Must have /_npx/ as a real path component, not just a substring.
+      return !norm.includes('/_npx/');
+    })
+    .join(path.delimiter);
+}
+
+/**
  * #2775 helper: check whether a callable `gsd-sdk` exists on a PATH.
  *
  * Pure PATH walk (no spawn) — we look for a regular file or symlink named
@@ -9531,6 +9614,10 @@ function installSdkIfNeeded(opts) {
  * shims). Callers can pass the user-shell PATH from getUserShellPath() to
  * verify the shim is reachable from the runtime shell, not just the
  * install context. Zero-arg form preserves existing behavior.
+ *
+ * #3231: a candidate that passes the file/exec check is further tested via
+ * isLegacyGsdSdkShim — a symlink pointing at the deprecated gsd-tools.cjs
+ * binary must NOT be treated as "on PATH" even if it is executable.
  */
 function isGsdSdkOnPath(pathString) {
   const path = require('path');
@@ -9547,8 +9634,15 @@ function isGsdSdkOnPath(pathString) {
       try {
         const st = fs.statSync(candidate);
         if (st.isFile()) {
-          if (process.platform === 'win32') return true;
-          if ((st.mode & 0o111) !== 0) return true;
+          if (process.platform === 'win32') {
+            if (!isLegacyGsdSdkShim(candidate)) return true;
+          } else if ((st.mode & 0o111) !== 0) {
+            // #3231: resolve symlink before sniffing, so we detect legacy
+            // through any level of indirection.
+            let target = candidate;
+            try { target = fs.realpathSync(candidate); } catch {}
+            if (!isLegacyGsdSdkShim(target)) return true;
+          }
         }
       } catch {
         // missing / EACCES on dir — keep scanning.
@@ -10040,6 +10134,8 @@ if (process.env.GSD_TEST_MODE) {
     trySelfLinkGsdSdkWindows,
     buildWindowsShimTriple,
     formatSdkPathDiagnostic,
+    filterNpxFromPath,
+    isLegacyGsdSdkShim,
     isGsdSdkOnPath,
     getUserShellPath,
     homePathCoveredByRc,
