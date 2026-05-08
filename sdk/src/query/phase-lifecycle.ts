@@ -56,110 +56,17 @@ import {
   generatePhaseSlug,
   parseMultiwordArg,
 } from './phase-lifecycle-policy.js';
+import {
+  archiveDirectories,
+  ensureDirectoryWithGitkeep,
+  listDirectories,
+} from './phase-filesystem-adapter.js';
+import {
+  readModifyWriteRoadmapMd,
+  replaceInCurrentMilestone,
+} from './phase-roadmap-mutation.js';
 
-// ─── replaceInCurrentMilestone ──────────────────────────────────────────
-
-/**
- * Replace a pattern only in the current milestone section of ROADMAP.md.
- *
- * Port of replaceInCurrentMilestone from core.cjs line 1197-1206.
- * If no `</details>` blocks exist, replaces in the entire content.
- * Otherwise, only replaces in content after the last `</details>` close tag.
- *
- * Edge case: when the active milestone is itself wrapped in a `<details>` block
- * (e.g. collapsed before it is fully shipped), the last `</details>` belongs to
- * the active milestone and the `after` slice is empty. In that case the function
- * falls back to searching the full content with all complete `<details>` blocks
- * stripped, so archived milestones are never touched.
- *
- * @param content - Full ROADMAP.md content
- * @param pattern - Regex or string pattern to match
- * @param replacement - Replacement string
- * @returns Modified content
- */
-export function replaceInCurrentMilestone(
-  content: string,
-  pattern: string | RegExp,
-  replacement: string,
-): string {
-  const lastDetailsClose = content.lastIndexOf('</details>');
-  if (lastDetailsClose === -1) {
-    return content.replace(pattern, replacement);
-  }
-  const offset = lastDetailsClose + '</details>'.length;
-  const before = content.slice(0, offset);
-  const after = content.slice(offset);
-
-  // Fast path: the current milestone is not inside a <details> block — the
-  // pattern lives in the plain text after the last </details>.
-  const replacedAfter = after.replace(pattern, replacement);
-  if (replacedAfter !== after) {
-    return before + replacedAfter;
-  }
-
-  // Slow path: the active milestone is inside the last <details> block.
-  // Strip every complete <details>…</details> block except the last one, then
-  // apply the replacement inside that last block while leaving the stripped
-  // (archived) blocks untouched.
-  //
-  // Strategy:
-  //   1. Collect all complete <details>…</details> spans.
-  //   2. Replace only inside the LAST span; leave earlier spans unchanged.
-  const detailsBlockRe = /<details>[\s\S]*?<\/details>/gi;
-  const spans: { start: number; end: number; text: string }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = detailsBlockRe.exec(content)) !== null) {
-    spans.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
-  }
-
-  if (spans.length === 0) {
-    // No complete blocks found — fall back to full-content replace.
-    return content.replace(pattern, replacement);
-  }
-
-  const lastSpan = spans[spans.length - 1];
-  const updatedLastBlock = lastSpan.text.replace(pattern, replacement);
-  return (
-    content.slice(0, lastSpan.start) +
-    updatedLastBlock +
-    content.slice(lastSpan.end)
-  );
-}
-
-// ─── readModifyWriteRoadmapMd ───────────────────────────────────────────
-
-/**
- * Atomic read-modify-write for ROADMAP.md.
- *
- * Holds a lockfile across the entire read -> transform -> write cycle.
- * Uses the same acquireStateLock/releaseStateLock mechanism as STATE.md
- * but with a ROADMAP.md-specific lock path.
- *
- * @param projectDir - Project root directory
- * @param modifier - Function to transform ROADMAP.md content
- * @returns The final written content
- */
-export async function readModifyWriteRoadmapMd(
-  projectDir: string,
-  modifier: (content: string) => string | Promise<string>,
-  workstream?: string,
-): Promise<string> {
-  const roadmapPath = planningPaths(projectDir, workstream).roadmap;
-  const lockPath = await acquireStateLock(roadmapPath);
-  try {
-    let content: string;
-    try {
-      content = await readFile(roadmapPath, 'utf-8');
-    } catch {
-      content = '';
-    }
-    const modified = await modifier(content);
-    await writeFile(roadmapPath, modified, 'utf-8');
-    return modified;
-  } finally {
-    await releaseStateLock(lockPath);
-  }
-}
+export { readModifyWriteRoadmapMd, replaceInCurrentMilestone };
 
 // ─── phaseAdd handler ───────────────────────────────────────────────────
 
@@ -227,13 +134,7 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
   const computePhaseFields = async (rawRoadmapContent: string) => {
     const milestoneContent = await extractCurrentMilestone(rawRoadmapContent, projectDir);
     const phasesDir = planningPaths(projectDir, workstream).phases;
-    let dirNames: string[] = [];
-    try {
-      const entries = await readdir(phasesDir, { withFileTypes: true });
-      dirNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-    } catch {
-      dirNames = [];
-    }
+    const dirNames = await listDirectories(phasesDir);
 
     const nextSequentialPhaseId = computeNextSequentialPhaseId(milestoneContent, dirNames);
     const { phaseId: resolvedPhaseId, dirName: resolvedDirName } = computePhaseDirectory(
@@ -285,8 +186,7 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
       const dirPath = join(planningPaths(projectDir, workstream).phases, dirName);
 
       // Create directory with .gitkeep so git tracks empty folders
-      await mkdir(dirPath, { recursive: true });
-      await writeFile(join(dirPath, '.gitkeep'), '', 'utf-8');
+      await ensureDirectoryWithGitkeep(dirPath);
 
       // Find insertion point: before last "---" or at end
       const lastSeparator = roadmapRaw.lastIndexOf('\n---');
@@ -383,11 +283,7 @@ export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) 
 
     if (config.phase_naming !== 'custom') {
       const phasesOnDisk = planningPaths(projectDir, workstream).phases;
-      let dirNames: string[] = [];
-      if (existsSync(phasesOnDisk)) {
-        const entries = await readdir(phasesOnDisk, { withFileTypes: true });
-        dirNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-      }
+      const dirNames = await listDirectories(phasesOnDisk);
       maxPhase = computeNextSequentialPhaseId(content, dirNames) - 1;
     }
 
@@ -408,8 +304,7 @@ export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) 
 
       assertSafePhaseDirName(dirName);
       const dirPath = join(planningPaths(projectDir, workstream).phases, dirName);
-      await mkdir(dirPath, { recursive: true });
-      await writeFile(join(dirPath, '.gitkeep'), '', 'utf-8');
+      await ensureDirectoryWithGitkeep(dirPath);
 
       const phaseEntry =
         buildPhaseRoadmapEntry(newPhaseId, description, config.phase_naming);
@@ -481,8 +376,7 @@ export const phaseInsert: QueryHandler = async (args, projectDir, workstream) =>
     const decimalSet = new Set<number>();
 
     try {
-      const entries = await readdir(phasesDir, { withFileTypes: true });
-      const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+      const dirs = await listDirectories(phasesDir);
       for (const suffix of collectDecimalSuffixesFromDirNames(normalizedBase, dirs)) {
         decimalSet.add(suffix);
       }
@@ -507,8 +401,7 @@ export const phaseInsert: QueryHandler = async (args, projectDir, workstream) =>
     const dirPath = join(phasesDir, dirName);
 
     // Create directory with .gitkeep
-    await mkdir(dirPath, { recursive: true });
-    await writeFile(join(dirPath, '.gitkeep'), '', 'utf-8');
+    await ensureDirectoryWithGitkeep(dirPath);
 
     // Build phase entry
     const phaseEntry = `\n### Phase ${decimalPhase}: ${description} (INSERTED)\n\n**Goal:** [Urgent work - to be planned]\n**Requirements**: TBD\n**Depends on:** Phase ${afterPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${decimalPhase} to break down)\n`;
@@ -566,25 +459,19 @@ async function findPhaseDir(
 ): Promise<{ dirPath: string; dirName: string; phaseName: string | null } | null> {
   const phasesDir = planningPaths(projectDir, workstream).phases;
   const normalized = normalizePhaseName(phase);
+  const dirs = await listDirectories(phasesDir);
+  const match = dirs.find((d) => phaseTokenMatches(d, normalized));
+  if (!match) return null;
 
-  try {
-    const entries = await readdir(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
-    const match = dirs.find(d => phaseTokenMatches(d, normalized));
-    if (!match) return null;
+  // Extract phase name from directory
+  const dirMatch = match.match(/^(?:[A-Z]{1,6}-)?\d+[A-Z]?(?:\.\d+)*-(.+)/i);
+  const phaseName = dirMatch ? dirMatch[1] : null;
 
-    // Extract phase name from directory
-    const dirMatch = match.match(/^(?:[A-Z]{1,6}-)?\d+[A-Z]?(?:\.\d+)*-(.+)/i);
-    const phaseName = dirMatch ? dirMatch[1] : null;
-
-    return {
-      dirPath: join(phasesDir, match),
-      dirName: match,
-      phaseName,
-    };
-  } catch {
-    return null;
-  }
+  return {
+    dirPath: join(phasesDir, match),
+    dirName: match,
+    phaseName,
+  };
 }
 
 /**
@@ -657,8 +544,7 @@ export const phaseScaffold: QueryHandler = async (args, projectDir, workstream) 
     const phasesParent = planningPaths(projectDir, workstream).phases;
     await mkdir(phasesParent, { recursive: true });
     const dirPath = join(phasesParent, dirNameNew);
-    await mkdir(dirPath, { recursive: true });
-    await writeFile(join(dirPath, '.gitkeep'), '', 'utf-8');
+    await ensureDirectoryWithGitkeep(dirPath);
     return {
       data: {
         created: true,
@@ -1593,13 +1479,10 @@ export const phaseNextDecimal: QueryHandler = async (args, projectDir, workstrea
   const decimalSet = new Set<number>();
   let baseExists = false;
 
-  if (existsSync(phasesDir)) {
-    const entries = await readdir(phasesDir, { withFileTypes: true });
-    const dirNames = entries.filter(e => e.isDirectory()).map(e => e.name);
-    baseExists = dirNames.some(d => phaseTokenMatches(d, normalized));
-    for (const suffix of collectDecimalSuffixesFromDirNames(normalized, dirNames)) {
-      decimalSet.add(suffix);
-    }
+  const dirNames = await listDirectories(phasesDir);
+  baseExists = dirNames.some((d) => phaseTokenMatches(d, normalized));
+  for (const suffix of collectDecimalSuffixesFromDirNames(normalized, dirNames)) {
+    decimalSet.add(suffix);
   }
 
   const roadmapPath = paths.roadmap;
@@ -1636,19 +1519,7 @@ export const phasesArchive: QueryHandler = async (args, projectDir, workstream) 
   const isDirInMilestone = await getMilestonePhaseFilter(projectDir, workstream);
 
   const archiveDir = join(paths.planning, 'milestones', `${version}-phases`);
-  await mkdir(archiveDir, { recursive: true });
-
-  let archivedCount = 0;
-  if (existsSync(phasesDir)) {
-    const entries = await readdir(phasesDir, { withFileTypes: true });
-    const phaseDirNames = entries.filter(e => e.isDirectory()).map(e => e.name);
-
-    for (const dir of phaseDirNames) {
-      if (!isDirInMilestone(dir)) continue;
-      await rename(join(phasesDir, dir), join(archiveDir, dir));
-      archivedCount++;
-    }
-  }
+  const archivedCount = await archiveDirectories(phasesDir, archiveDir, (dirName) => isDirInMilestone(dirName));
 
   return {
     data: {
@@ -1702,8 +1573,7 @@ export const milestoneComplete: QueryHandler = async (args, projectDir, workstre
   const accomplishments: string[] = [];
 
   try {
-    const entries = await readdir(phasesDir, { withFileTypes: true });
-    const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+    const dirs = (await listDirectories(phasesDir)).sort();
 
     for (const dir of dirs) {
       if (!isDirInMilestone(dir)) continue;
@@ -1829,16 +1699,11 @@ export const milestoneComplete: QueryHandler = async (args, projectDir, workstre
   if (archivePhases) {
     try {
       const phaseArchiveDir = join(archiveDir, `${version}-phases`);
-      await mkdir(phaseArchiveDir, { recursive: true });
-
-      const phaseEntries = await readdir(phasesDir, { withFileTypes: true });
-      const phaseDirNames = phaseEntries.filter((e) => e.isDirectory()).map((e) => e.name);
-      let archivedCount = 0;
-      for (const dir of phaseDirNames) {
-        if (!isDirInMilestone(dir)) continue;
-        await rename(join(phasesDir, dir), join(phaseArchiveDir, dir));
-        archivedCount++;
-      }
+      const archivedCount = await archiveDirectories(
+        phasesDir,
+        phaseArchiveDir,
+        (dirName) => isDirInMilestone(dirName),
+      );
       phasesArchived = archivedCount > 0;
     } catch {
       /* intentionally empty */

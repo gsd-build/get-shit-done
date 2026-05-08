@@ -8,7 +8,7 @@
  */
 
 import { findPhase } from './phase.js';
-import { readModifyWriteRoadmapMd, replaceInCurrentMilestone } from './phase-lifecycle.js';
+import { readModifyWriteRoadmapMd, replaceInCurrentMilestone } from './phase-roadmap-mutation.js';
 import { existsSync } from 'node:fs';
 import { escapeRegex, planningPaths } from './helpers.js';
 import { GSDError, ErrorClassification } from '../errors.js';
