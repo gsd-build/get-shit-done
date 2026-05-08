@@ -143,16 +143,27 @@ describe('bug #3231: transient npx PATH + null login-shell PATH', () => {
     // null (SHELL unset), the guard is short-circuited, and the false ✓ is
     // printed. Post-fix: _npx dirs must be excluded from the initial check
     // so the installer attempts self-link and re-probes.
-    captureConsole(() => {
+    const { stdout, stderr } = captureConsole(() => {
       installSdkIfNeeded({ sdkDir });
     });
-    // Behavioral assertion: after filtering out transient _npx dirs, the
-    // persistent PATH must not contain a valid gsd-sdk shim — the installer
-    // must not have falsely marked itself ready.
-    assert.equal(
-      isGsdSdkOnPath(filterNpxFromPath(process.env.PATH)),
-      false,
-      'installer must NOT treat the transient _npx dir gsd-sdk as persistent reachability',
+    const combined = `${stdout}\n${stderr}`;
+
+    // Primary behavioral assertion: the installer must NOT falsely report
+    // "GSD SDK ready" when gsd-sdk is only reachable via a transient npx
+    // cache directory (not a persistent user PATH entry).
+    assert.ok(
+      !/GSD SDK ready/.test(combined),
+      'installer must NOT print "GSD SDK ready" when only the transient _npx dir has gsd-sdk. Got: ' + combined,
+    );
+
+    // Secondary assertion: the installer must emit a warning or fallback
+    // diagnostic rather than silently succeeding. The warning path prints
+    // "GSD SDK files are present but gsd-sdk is not on your PATH" when
+    // self-link fails; a successful self-link into a non-PATH dir prints the
+    // same warning. Either way, some output must be produced.
+    assert.ok(
+      combined.trim().length > 0,
+      'installer must emit a diagnostic (warning or fallback) instead of silent no-op. Got empty output.',
     );
   });
 
@@ -379,9 +390,10 @@ describe('bug #3231: clean install — gsd-sdk self-linked into persistent PATH 
     // PATH contains only the persistent localBin (no npx dirs)
     process.env.PATH = localBin;
 
-    captureConsole(() => {
+    const { stdout, stderr } = captureConsole(() => {
       installSdkIfNeeded({ sdkDir });
     });
+    const combined = `${stdout}\n${stderr}`;
 
     const shimPath = path.join(localBin, 'gsd-sdk');
     // Behavioral assertions: shim exists and is recognized as a modern (non-legacy) shim
@@ -394,6 +406,15 @@ describe('bug #3231: clean install — gsd-sdk self-linked into persistent PATH 
       isGsdSdkOnPath(filterNpxFromPath(localBin)),
       true,
       'installer must make gsd-sdk reachable on the persistent filtered PATH',
+    );
+
+    // Primary behavioral assertion: the installer MUST print "GSD SDK ready"
+    // after successfully self-linking into a persistent PATH dir. This is the
+    // positive counterpart to the bug #3231 fix — we confirm the success path
+    // works correctly, not just that the false-positive path is blocked.
+    assert.ok(
+      /GSD SDK ready/.test(stdout),
+      'installer must print "GSD SDK ready" after a successful self-link into a persistent PATH dir. Got stdout: ' + stdout,
     );
   });
 });
