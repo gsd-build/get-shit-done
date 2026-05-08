@@ -126,6 +126,12 @@ export function loadLegacyCoreConfig(projectDir: string, deps: LegacySdkCompatib
   }
 
   const req = (deps.createRequire ?? createRequire)(import.meta.url);
-  const { loadConfig } = req(resolution.path) as { loadConfig: (cwd: string) => Record<string, unknown> };
-  return loadConfig(projectDir);
+  const mod = req(resolution.path) as Partial<{ loadConfig: (cwd: string) => Record<string, unknown> }>;
+  if (typeof mod.loadConfig !== 'function') {
+    throw new GSDError(
+      `state load: invalid core.cjs at ${resolution.path} (missing loadConfig(cwd)).`,
+      ErrorClassification.Blocked,
+    );
+  }
+  return mod.loadConfig(projectDir);
 }
