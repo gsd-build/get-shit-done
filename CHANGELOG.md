@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...HEAD)
 
+### Fixed
+
+- **`buildStateFrontmatter` now counts nested `plans/<N>-PLAN-<NN>-<slug>.md` files** — repos using the nested layout (post-#3139) no longer get `progress.*` counters silently overwritten downward on every state mutation. Sibling fix to #3115/#3139/#3191. (#3261)
+
 ## [1.41.0](https://github.com/gsd-build/get-shit-done/compare/v1.40.0...v1.41.0) - 2026-05-07
 
 ### Fixed
