@@ -139,6 +139,8 @@ describe('skill-manifest', () => {
     const manifest = JSON.parse(result.output);
     const claudeRoot = manifest.roots.find((root) => root.root === '~/.claude/skills');
     const codexRoot = manifest.roots.find((root) => root.root === '~/.codex/skills');
+    assert.ok(claudeRoot, 'Expected ~/.claude/skills root to be present');
+    assert.ok(codexRoot, 'Expected ~/.codex/skills root to be present');
     assert.strictEqual(claudeRoot.path, path.join(homeDir, 'claude-custom', 'skills'));
     assert.strictEqual(codexRoot.path, path.join(homeDir, 'codex-custom', 'skills'));
   });
