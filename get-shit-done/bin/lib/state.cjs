@@ -815,10 +815,36 @@ function buildStateFrontmatter(bodyContent, cwd) {
           let diskTotalSummaries = 0;
           let diskCompletedPhases = 0;
 
+          // Regex constants mirror roadmap.cjs:countPhasePlansAndSummaries (#3257).
+          const PLAN_OUTLINE_RE = /-PLAN-OUTLINE\.md$/i;
+          const PLAN_PRE_BOUNCE_RE = /-PLAN.*\.pre-bounce\.md$/i;
           for (const dir of phaseDirs) {
-            const files = fs.readdirSync(path.join(phasesDir, dir));
-            const plans = files.filter(f => f.match(/-PLAN\.md$/i)).length;
-            const summaries = files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
+            const phaseDir = path.join(phasesDir, dir);
+            const topFiles = fs.readdirSync(phaseDir);
+            // Canonical flat-layout plan files in phase root.
+            let plans = topFiles.filter(f =>
+              (f.endsWith('-PLAN.md') || f === 'PLAN.md') &&
+              !PLAN_OUTLINE_RE.test(f) && !PLAN_PRE_BOUNCE_RE.test(f)
+            ).length;
+            let summaries = topFiles.filter(f =>
+              f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md'
+            ).length;
+            // Nested layout (post-#3139): phases/<N>/plans/<N>-PLAN-<NN>-<slug>.md
+            // Mirrors roadmap.cjs:countPhasePlansAndSummaries — do NOT extract here
+            // (shared helper is tracked as follow-on for k014).
+            const nestedPlansDir = path.join(phaseDir, 'plans');
+            if (fs.existsSync(nestedPlansDir)) {
+              try {
+                const nested = fs.readdirSync(nestedPlansDir);
+                plans += nested.filter(f =>
+                  (/^PLAN-\d+.*\.md$/i.test(f) || /-PLAN-\d+.*\.md$/i.test(f)) &&
+                  !PLAN_OUTLINE_RE.test(f) && !PLAN_PRE_BOUNCE_RE.test(f)
+                ).length;
+                summaries += nested.filter(f =>
+                  /^SUMMARY-\d+.*\.md$/i.test(f) || /-SUMMARY-\d+.*\.md$/i.test(f)
+                ).length;
+              } catch { /* ignore if plans/ is not a readable directory */ }
+            }
             diskTotalPlans += plans;
             diskTotalSummaries += summaries;
             if (plans > 0 && summaries >= plans) diskCompletedPhases++;
