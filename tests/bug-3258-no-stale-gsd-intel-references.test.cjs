@@ -89,8 +89,7 @@ describe('#3258: no stale /gsd-intel slash-command references in product source 
         try {
           src = fs.readFileSync(file, 'utf8');
         } catch (err) {
-          // File unreadable — skip rather than fail (k003)
-          return;
+          throw new Error(`failed reading ${rel}: ${err.message}`);
         }
 
         const staleLines = staleLinesIn(src);
