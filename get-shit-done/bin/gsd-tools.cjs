@@ -172,7 +172,7 @@
 const fs = require('fs');
 const path = require('path');
 const core = require('./lib/core.cjs');
-const { error, findProjectRoot } = core;
+const { error, findProjectRoot, ERROR_REASON } = core;
 const { getActiveWorkstream } = require('./lib/planning-workspace.cjs');
 const { resolveActiveWorkstream, applyResolvedWorkstreamEnv } = require('./lib/active-workstream-store.cjs');
 const state = require('./lib/state.cjs');
@@ -304,6 +304,8 @@ async function main() {
   if (jsonErrorsIdx !== -1) {
     core.setJsonErrorMode(true);
     args.splice(jsonErrorsIdx, 1);
+  } else if (process.env.GSD_JSON_ERRORS === '1') {
+    core.setJsonErrorMode(true);
   }
 
   // --pick <name>: extract a single field from JSON output (replaces jq dependency).
@@ -313,7 +315,7 @@ async function main() {
   let pickField = null;
   if (pickIdx !== -1) {
     pickField = args[pickIdx + 1];
-    if (!pickField || pickField.startsWith('--')) error('Missing value for --pick');
+    if (!pickField || pickField.startsWith('--')) error('Missing value for --pick', ERROR_REASON.USAGE);
     args.splice(pickIdx, 2);
   }
 
@@ -396,7 +398,7 @@ async function main() {
   const NEVER_VALID_FLAGS = new Set(['--version', '-v']);
   for (const arg of args) {
     if (NEVER_VALID_FLAGS.has(arg)) {
-      error(`Unknown flag: ${arg}\ngsd-tools does not accept version flags. Run "gsd-tools" with no arguments for usage.`);
+      error(`Unknown flag: ${arg}\ngsd-tools does not accept version flags. Run "gsd-tools" with no arguments for usage.`, ERROR_REASON.USAGE);
     }
   }
 
@@ -1011,7 +1013,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         const planningDir = path.join(cwd, '.planning');
         core.output(intel.intelUpdate(planningDir), raw);
       } else {
-        error('Unknown intel subcommand. Available: query, status, update, diff, snapshot, patch-meta, validate, extract-exports');
+        error('Unknown intel subcommand. Available: query, status, update, diff, snapshot, patch-meta, validate, extract-exports', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -1192,7 +1194,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         const rest = originalCommand.slice(dotIdx + 1);
         suggestion = ` — did you mean: "${head} ${rest}"?`;
       }
-      error(`Unknown command: ${command}${suggestion}`);
+      error(`Unknown command: ${command}${suggestion}`, ERROR_REASON.SDK_UNKNOWN_COMMAND);
     }
   }
 }
