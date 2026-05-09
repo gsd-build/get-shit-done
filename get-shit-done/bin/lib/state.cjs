@@ -437,13 +437,10 @@ function cmdStateRecordMetric(cwd, options, raw) {
     return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
-  if (recorded) {
-    const result = { recorded: true, phase, plan, duration };
-    if (created) result.created = true;
-    output(result, raw, 'true');
-  } else {
-    output({ recorded: false, reason: 'Performance Metrics section not found in STATE.md' }, raw, 'false');
-  }
+  // Auto-create fallback guarantees recorded === true; no else branch needed.
+  const result = { recorded: true, phase, plan, duration };
+  if (created) result.created = true;
+  output(result, raw, 'true');
 }
 
 function cmdStateUpdateProgress(cwd, raw) {
@@ -548,13 +545,10 @@ function cmdStateAddDecision(cwd, options, raw) {
     return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
-  if (added) {
-    const result = { added: true, decision: entry };
-    if (created) result.created = true;
-    output(result, raw, 'true');
-  } else {
-    output({ added: false, reason: 'Decisions section not found in STATE.md' }, raw, 'false');
-  }
+  // Auto-create fallback guarantees added === true; no else branch needed.
+  const result = { added: true, decision: entry };
+  if (created) result.created = true;
+  output(result, raw, 'true');
 }
 
 function cmdStateAddBlocker(cwd, text, raw) {
@@ -601,13 +595,10 @@ function cmdStateAddBlocker(cwd, text, raw) {
     return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
-  if (added) {
-    const result = { added: true, blocker: blockerText };
-    if (created) result.created = true;
-    output(result, raw, 'true');
-  } else {
-    output({ added: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
-  }
+  // Auto-create fallback guarantees added === true; no else branch needed.
+  const result = { added: true, blocker: blockerText };
+  if (created) result.created = true;
+  output(result, raw, 'true');
 }
 
 function cmdStateResolveBlocker(cwd, text, raw) {
