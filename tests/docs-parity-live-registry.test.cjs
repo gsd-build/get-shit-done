@@ -174,13 +174,27 @@ function extractCommandTokens(content) {
 }
 
 /**
- * Walk a directory and return all .md files (non-recursive: top-level only).
+ * Walk a directory and return all .md files recursively.
+ * Uses hand-rolled DFS for Node 20 compat (Node 22+ recursive readdirSync is
+ * not available in all CI matrix entries). Surfaces permission-denied errors
+ * as structured warnings (PRED.k302) rather than silently skipping.
  */
 function listMdFiles(dir) {
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir)
-    .filter(f => f.endsWith('.md'))
-    .map(f => path.join(dir, f));
+  const files = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      try {
+        files.push(...listMdFiles(fullPath));
+      } catch (err) {
+        process.stderr.write('[docs-parity] WARNING: skipping unreadable directory ' + fullPath + ': ' + err.message + '\n');
+      }
+    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      files.push(fullPath);
+    }
+  }
+  return files;
 }
 
 /**
