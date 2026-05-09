@@ -5233,15 +5233,7 @@ function convertClaudeToGeminiToml(content) {
   const body = content.substring(endIndex + 3).trim();
 
   // Extract description from frontmatter
-  let description = '';
-  const lines = frontmatter.split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('description:')) {
-      description = trimmed.substring(12).trim();
-      break;
-    }
-  }
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
 
   // Construct TOML
   let toml = '';
