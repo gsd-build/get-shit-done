@@ -10038,16 +10038,20 @@ function getUserShellPath() {
 }
 
 /**
- * #3211: Windows counterpart to getUserShellPath(). Probes the user's
- * persistent 'Path' from the Windows registry via PowerShell:
+ * #3211: Windows counterpart to getUserShellPath(). Probes the effective
+ * persistent Path from the Windows registry via PowerShell by merging
+ * Machine-level + User-level entries:
  *
- *   powershell.exe -NoProfile -Command
- *     "[Environment]::GetEnvironmentVariable('Path', 'User')"
+ *   $m=[Environment]::GetEnvironmentVariable('Path','Machine')
+ *   $u=[Environment]::GetEnvironmentVariable('Path','User')
+ *   ($m + ';' + $u).Trim(';')
  *
  * This is the correct primitive for Windows cross-shell PATH verification —
- * Git Bash, PowerShell, and cmd.exe all inherit the registry-level User Path,
- * while the install-subprocess process.env.PATH is polluted with transient
- * npx entries and may not include directories added by the user post-install.
+ * Git Bash, PowerShell, and cmd.exe all inherit the effective (Machine;User)
+ * registry Path, while the install-subprocess process.env.PATH is polluted
+ * with transient npx entries and may not include directories added by the
+ * user post-install. Reading only User-level Path would produce a false
+ * warning when gsd-sdk is in a machine-level bin dir (e.g. C:\Program Files\nodejs).
  *
  * Returns the filtered persistent Path string (npx segments stripped) or null
  * on any failure (non-Windows, PowerShell not available, spawn timeout, empty
@@ -10064,9 +10068,20 @@ function getUserShellWindowsPersistentPath() {
   // literal args, no user input, no injection vector.
   const execFile = cp.execFileSync.bind(cp);
   try {
+    // Read Machine + User Path and merge them — the effective PATH that
+    // PowerShell, cmd.exe, and Git Bash inherit is Machine;User (machine
+    // entries first). Reading only User-level Path would produce a false
+    // warning when gsd-sdk is installed in a machine-level bin dir
+    // (e.g. C:\Program Files\nodejs).
     const out = execFile(
       'powershell.exe',
-      ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('Path', 'User')"],
+      [
+        '-NoProfile',
+        '-Command',
+        "$u=[Environment]::GetEnvironmentVariable('Path','User');" +
+        "$m=[Environment]::GetEnvironmentVariable('Path','Machine');" +
+        "[Console]::Out.Write(($m + ';' + $u).Trim(';'))",
+      ],
       {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
