@@ -344,25 +344,31 @@ export const stateSnapshot: QueryHandler = async (_args, projectDir, workstream)
   const fm = extractFrontmatter(content);
   const body = stripFrontmatter(content);
 
-  // Helper: return frontmatter string value when present and non-empty,
-  // otherwise fall back to body extractor (covers STATE.md files that have
+  // Helper: return frontmatter scalar value when present and non-empty.
+  // Accepts strings, numbers, and booleans — coercing non-string primitives to
+  // their string representation so callers always receive string | null.
+  // Returns null for missing, null/undefined, or empty-after-trim values so
+  // the caller falls back to body extractor (covers STATE.md files that have
   // no frontmatter at all, or frontmatter that lacks the specific key).
-  const fmStr = (key: string): string | null => {
+  const fmScalar = (key: string): string | null => {
     const v = fm[key];
-    return (typeof v === 'string' && v.trim()) ? v.trim() : null;
+    if (v === null || v === undefined) return null;
+    if (typeof v === 'string') return v.trim() || null;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return null;
   };
 
   // Extract basic fields — frontmatter keys take precedence over body
-  const currentPhase = fmStr('current_phase') ?? stateExtractField(body, 'Current Phase');
-  const currentPhaseName = fmStr('current_phase_name') ?? stateExtractField(body, 'Current Phase Name');
-  const totalPhasesRaw = fmStr('total_phases') ?? stateExtractField(body, 'Total Phases');
-  const currentPlan = fmStr('current_plan') ?? stateExtractField(body, 'Current Plan');
-  const totalPlansRaw = fmStr('total_plans_in_phase') ?? stateExtractField(body, 'Total Plans in Phase');
-  const status = fmStr('status') ?? stateExtractField(body, 'Status');
-  const progressRaw = fmStr('progress') ?? stateExtractField(body, 'Progress');
-  const lastActivity = fmStr('last_activity') ?? stateExtractField(body, 'Last Activity');
-  const lastActivityDesc = fmStr('last_activity_desc') ?? stateExtractField(body, 'Last Activity Description');
-  const pausedAt = fmStr('paused_at') ?? stateExtractField(body, 'Paused At');
+  const currentPhase = fmScalar('current_phase') ?? stateExtractField(body, 'Current Phase');
+  const currentPhaseName = fmScalar('current_phase_name') ?? stateExtractField(body, 'Current Phase Name');
+  const totalPhasesRaw = fmScalar('total_phases') ?? stateExtractField(body, 'Total Phases');
+  const currentPlan = fmScalar('current_plan') ?? stateExtractField(body, 'Current Plan');
+  const totalPlansRaw = fmScalar('total_plans_in_phase') ?? stateExtractField(body, 'Total Plans in Phase');
+  const status = fmScalar('status') ?? stateExtractField(body, 'Status');
+  const progressRaw = fmScalar('progress') ?? stateExtractField(body, 'Progress');
+  const lastActivity = fmScalar('last_activity') ?? stateExtractField(body, 'Last Activity');
+  const lastActivityDesc = fmScalar('last_activity_desc') ?? stateExtractField(body, 'Last Activity Description');
+  const pausedAt = fmScalar('paused_at') ?? stateExtractField(body, 'Paused At');
 
   // Parse numeric fields
   const totalPhases = totalPhasesRaw ? parseInt(totalPhasesRaw, 10) : null;

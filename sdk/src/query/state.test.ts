@@ -499,3 +499,90 @@ Status: planning
     expect(data.status).toBe('planning');
   });
 });
+
+// ─── Regression: #3275 CR — fmScalar handles numeric/boolean YAML scalars ───
+
+describe('stateSnapshot — CR #3275 fmScalar non-string scalar coercion', () => {
+  it('treats numeric current_phase as string "19", not missing', async () => {
+    // A real YAML parser (e.g. js-yaml) would parse `current_phase: 19` as
+    // the number 19, not the string "19".  fmScalar must coerce it so the
+    // frontmatter value wins over the body's bold field.
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'current_phase: 19',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '**Current Phase:** 03',
+      '**Status:** executing',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3275a-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    // Frontmatter wins: current_phase must be "19", not "03" (from body)
+    expect(data.current_phase).toBe('19');
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+
+  it('treats numeric total_phases in frontmatter as string, not missing', async () => {
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'total_phases: 7',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '**Total Phases:** 3',
+      '**Status:** executing',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3275b-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    // total_phases is parsed as int downstream: frontmatter 7 must win over body 3
+    expect(data.total_phases).toBe(7);
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+
+  it('treats numeric total_plans_in_phase in frontmatter as string, not missing', async () => {
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'total_plans_in_phase: 5',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '**Total Plans in Phase:** 2',
+      '**Status:** executing',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3275c-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.total_plans_in_phase).toBe(5);
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+});
