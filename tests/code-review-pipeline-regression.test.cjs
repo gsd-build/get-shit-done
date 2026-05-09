@@ -186,7 +186,7 @@ describe('Bug 1 — compute_file_scope SUMMARY parser', () => {
       'Script must strip parentheticals with replace(/\\s+\\([^)]*\\)\\s*$/, \'\')'
     );
     assert.ok(
-      scriptSection.includes('split(/\\s+'),
+      scriptSection.includes('split(/\\s+—\\s'),
       'Script must split on em-dash to strip narrative'
     );
   });
@@ -247,7 +247,7 @@ describe('Bug 2 — present_results severity-label parser', () => {
   test('code-review.md present_results grep accepts both critical and blocker labels', () => {
     const src = fs.readFileSync(WORKFLOW_PATH, 'utf8');
     assert.ok(
-      src.includes('grep -E "^\\s*(critical|blocker):"'),
+      src.includes('grep -E "^[[:space:]]*(critical|blocker):"'),
       'code-review.md present_results must grep for both critical: and blocker: labels'
     );
   });
