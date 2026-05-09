@@ -209,11 +209,11 @@ describe('bug #3211-C: getUserShellWindowsPersistentPath export', () => {
     const winNpxDir = 'C:\\Users\\user\\AppData\\Local\\npm-cache\\_npx\\abc\\node_modules\\.bin';
     const mockPath = [winPersistentDir, winNpxDir].join(';');
 
-    cp.execSync = (cmd) => {
+    cp.execSync = (cmd, opts) => {
       if (typeof cmd === 'string' && cmd.includes('GetEnvironmentVariable')) {
         return mockPath + '\n';
       }
-      return savedExecSync.call(cp, cmd);
+      return savedExecSync.call(cp, cmd, opts);
     };
 
     let result;
