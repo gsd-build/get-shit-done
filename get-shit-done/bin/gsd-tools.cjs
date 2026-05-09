@@ -174,6 +174,7 @@ const path = require('path');
 const core = require('./lib/core.cjs');
 const { error, findProjectRoot } = core;
 const { getActiveWorkstream } = require('./lib/planning-workspace.cjs');
+const { resolveActiveWorkstream, applyResolvedWorkstreamEnv } = require('./lib/active-workstream-store.cjs');
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
@@ -275,30 +276,18 @@ async function main() {
   }
 
   // Optional workstream override for parallel milestone work.
-  // Priority: --ws flag > GSD_WORKSTREAM env var > session-scoped pointer > shared legacy pointer > null
-  const wsEqArg = args.find(arg => arg.startsWith('--ws='));
-  const wsIdx = args.indexOf('--ws');
+  // Priority: --ws flag > GSD_WORKSTREAM env var > session/shared pointer > null.
   let ws = null;
-  if (wsEqArg) {
-    ws = wsEqArg.slice('--ws='.length).trim();
-    if (!ws) error('Missing value for --ws');
-    args.splice(args.indexOf(wsEqArg), 1);
-  } else if (wsIdx !== -1) {
-    ws = args[wsIdx + 1];
-    if (!ws || ws.startsWith('--')) error('Missing value for --ws');
-    args.splice(wsIdx, 2);
-  } else if (process.env.GSD_WORKSTREAM) {
-    ws = process.env.GSD_WORKSTREAM.trim();
-  } else {
-    ws = getActiveWorkstream(cwd);
-  }
-  // Validate workstream name to prevent path traversal attacks.
-  if (ws && !/^[a-zA-Z0-9_-]+$/.test(ws)) {
-    error('Invalid workstream name: must be alphanumeric, hyphens, and underscores only');
-  }
-  // Set env var so all modules (planningDir, planningPaths) auto-resolve workstream paths
-  if (ws) {
-    process.env.GSD_WORKSTREAM = ws;
+  try {
+    const wsResolution = resolveActiveWorkstream(cwd, args, process.env, {
+      getStored: getActiveWorkstream,
+    });
+    ws = wsResolution.ws;
+    args = wsResolution.args;
+    // Set env var so all modules (planningDir, planningPaths) auto-resolve workstream paths.
+    applyResolvedWorkstreamEnv(wsResolution, process.env);
+  } catch (err) {
+    error(err.message || String(err));
   }
 
   const rawIndex = args.indexOf('--raw');

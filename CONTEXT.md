@@ -218,3 +218,31 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 - Do not keep duplicate/inert exported types; expose one canonical union Interface.
 - Do not emit decision events before guard checks that may reject the path.
 - Do not leave architectural docs with ambiguous seam ownership between CLI and SDK paths.
+
+---
+
+## AI Ops Memory (2026-05-09, machine-oriented)
+
+`RULESET.CONTRIB.GATE.ORDER=issue-first -> approval-label -> code -> PR-link -> changeset/no-changelog`
+`RULESET.CONTRIB.CLASSIFY.fix=requires confirmed/confirmed-bug before implementation`
+`RULESET.CONTRIB.CLASSIFY.enhancement=requires approved-enhancement before implementation`
+`RULESET.CONTRIB.CLASSIFY.feature=requires approved-feature before implementation`
+
+`CI.GATE.issue-link-required=hard-fail if PR body lacks closes/fixes/resolves #<issue>`
+`CI.GATE.changeset-lint=hard-fail for user-facing code diffs unless .changeset/* or PR has no-changelog label`
+`CI.GATE.repair-sequence(PR)=create issue -> apply approval label -> edit PR body w/ closing keyword -> apply no-changelog if appropriate -> re-run checks`
+
+`PR.3267.POSTMORTEM.root-cause=[missing issue link, missing changeset/no-changelog]`
+`PR.3267.POSTMORTEM.recovery=[issue#3270 created, label approved-enhancement applied, PR reopened, body includes "Closes #3270", label no-changelog applied]`
+
+`WORKTREE.SEAM.current=Worktree Safety Policy Module`
+`WORKTREE.SEAM.files=[get-shit-done/bin/lib/worktree-safety.cjs, get-shit-done/bin/lib/core.cjs]`
+`WORKTREE.SEAM.interface=[resolveWorktreeContext, parseWorktreePorcelain, planWorktreePrune, executeWorktreePrunePlan]`
+`WORKTREE.SEAM.default-prune-policy=metadata_prune_only (non-destructive)`
+`WORKTREE.SEAM.decision-1=retain non-destructive default; destructive path only as explicit future opt-in scaffold`
+
+`WORKSTREAM.INVARIANT.migrate-name=must normalize through canonical slug policy`
+`WORKSTREAM.INVARIANT.slug-contract=all .planning/workstreams/<name> must be addressable by set/get/status/complete`
+`WORKSTREAM.REGRESSION.test-anchor=tests/workstream.test.cjs::normalizes --migrate-name to a valid workstream slug`
+
+`ARCH.SKILL.improve-codebase.next-candidates=[Workstream Name Policy Module, Workstream Progress Projection Module, Active Workstream Pointer Store Module]`
