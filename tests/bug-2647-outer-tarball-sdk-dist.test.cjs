@@ -28,6 +28,7 @@ const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 
 const REPO_ROOT = path.join(__dirname, '..');
@@ -88,6 +89,8 @@ describe('bug #2647: outer tarball ships sdk/dist so gsd-sdk query works', () =>
   });
 
   test('npm pack dry-run includes sdk/dist/cli.js after build:sdk', { timeout: 180_000 }, () => {
+    const npmCache = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-npm-cache-'));
+    const npmEnv = { ...process.env, npm_config_cache: npmCache };
     // Ensure the sdk is built so the pack reflects what publish would ship.
     // The outer prepublishOnly chains through build:sdk, which does `npm ci && npm run build`
     // inside sdk/. We emulate that here without full ci to keep the test fast:
@@ -98,24 +101,28 @@ describe('bug #2647: outer tarball ships sdk/dist so gsd-sdk query works', () =>
       // Build requires node_modules; install if missing, then build.
       const sdkNodeModules = path.join(sdkDir, 'node_modules');
       if (!fs.existsSync(sdkNodeModules)) {
-        execFileSync('npm', ['ci', '--silent'], { cwd: sdkDir, stdio: 'pipe' });
+        execFileSync('npm', ['ci', '--silent'], { cwd: sdkDir, stdio: 'pipe', env: npmEnv });
       }
-      execFileSync('npm', ['run', 'build'], { cwd: sdkDir, stdio: 'pipe' });
+      execFileSync('npm', ['run', 'build'], { cwd: sdkDir, stdio: 'pipe', env: npmEnv });
     }
     assert.ok(fs.existsSync(cliJs), 'sdk build must produce sdk/dist/cli.js');
 
-    const out = execFileSync(
-      'npm',
-      ['pack', '--dry-run', '--json', '--ignore-scripts'],
-      { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
-    ).toString('utf-8');
-    const manifest = JSON.parse(out);
-    const files = manifest[0].files.map((f) => f.path);
-    const cliPresent = files.includes('sdk/dist/cli.js');
-    assert.ok(
-      cliPresent,
-      `npm pack must include sdk/dist/cli.js in the tarball (so "gsd-sdk query" resolves after install). sdk/dist entries found: ${files.filter((p) => p.startsWith('sdk/dist')).length}`,
-    );
+    try {
+      const out = execFileSync(
+        'npm',
+        ['pack', '--dry-run', '--json', '--ignore-scripts'],
+        { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: npmEnv },
+      ).toString('utf-8');
+      const manifest = JSON.parse(out);
+      const files = manifest[0].files.map((f) => f.path);
+      const cliPresent = files.includes('sdk/dist/cli.js');
+      assert.ok(
+        cliPresent,
+        `npm pack must include sdk/dist/cli.js in the tarball (so "gsd-sdk query" resolves after install). sdk/dist entries found: ${files.filter((p) => p.startsWith('sdk/dist')).length}`,
+      );
+    } finally {
+      fs.rmSync(npmCache, { recursive: true, force: true });
+    }
   });
 
   test('built sdk CLI exposes the `query` subcommand', { timeout: 60_000 }, () => {

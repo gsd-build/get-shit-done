@@ -51,6 +51,7 @@ const {
   GSD_CODEX_MARKER,
   CODEX_AGENT_SANDBOX,
   parseTomlToObject,
+  resolveNodeRunner,
 } = require('../bin/install.js');
 
 function runCodexInstall(codexHome, cwd = path.join(__dirname, '..')) {
@@ -1437,10 +1438,10 @@ describe('Codex install hook configuration (e2e)', () => {
     // #3017: handler command now uses the absolute Node binary path so
     // GUI/minimal-PATH runtimes can resolve it. The shape is
     //   "<absolute-node-path>" "<hook-path>"
-    // where <absolute-node-path> is process.execPath (forward-slashed)
-    // and the hook path is also quoted. Same Node process runs the test
-    // and the installer, so process.execPath matches at both ends.
-    const expectedRunner = process.execPath.replace(/\\/g, '/');
+    // where <absolute-node-path> is the normalized runner selected by
+    // resolveNodeRunner() and the hook path is also quoted. Homebrew Cellar
+    // execPath values intentionally normalize to stable Homebrew symlinks.
+    const expectedRunner = JSON.parse(resolveNodeRunner());
     const expectedHookPath = path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
     const expectedCommand = `"${expectedRunner}" "${expectedHookPath}"`;
     assert.strictEqual(

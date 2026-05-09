@@ -244,6 +244,48 @@ describe('stateUpdate', () => {
     expect(data.updated).toBe(false);
   });
 
+  it('preserves curated progress frontmatter during body-only updates', async () => {
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+progress:
+  total_phases: 12
+  completed_phases: 6
+  total_plans: 22
+  completed_plans: 22
+  percent: 50
+---
+
+# Project State
+
+## Current Position
+
+Status: Executing
+Last Activity: 2026-01-01
+Progress: [█████░░░░░] 50%
+`;
+    await setupTestProject(tmpDir, stateContent);
+
+    const { stateUpdate } = await import('./state-mutation.js');
+    const { stateJson } = await import('./state.js');
+
+    const result = await stateUpdate(['Last Activity', '2026-05-07'], tmpDir);
+    expect((result.data as Record<string, unknown>).updated).toBe(true);
+
+    const loaded = await stateJson([], tmpDir);
+    const progress = (loaded.data as Record<string, unknown>).progress as Record<string, unknown>;
+    expect(progress.total_phases).toBe(12);
+    expect(progress.completed_phases).toBe(6);
+    expect(progress.total_plans).toBe(22);
+    expect(progress.completed_plans).toBe(22);
+    expect(progress.percent).toBe(50);
+
+    const after = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(after).toContain('Last Activity: 2026-05-07');
+  });
+
   it('throws on missing args', async () => {
     const { stateUpdate } = await import('./state-mutation.js');
 

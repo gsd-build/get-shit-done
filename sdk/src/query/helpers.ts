@@ -25,6 +25,7 @@ import { GSDError, ErrorClassification } from '../errors.js';
 export { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { workspacePlanningPaths, resolveWorkspaceContext, type PlanningPaths } from './workspace.js';
+export { stateExtractField } from './state-document.js';
 import { relPlanningPath, validateWorkstreamName } from '../workstream-utils.js';
 
 // ─── Runtime-aware agents directory resolution ─────────────────────────────
@@ -315,29 +316,6 @@ export function phaseTokenMatches(dirName: string, normalized: string): boolean 
  */
 export function toPosixPath(p: string): string {
   return p.split('\\').join('/');
-}
-
-// ─── stateExtractField ──────────────────────────────────────────────────────
-
-/**
- * Extract a field value from STATE.md content.
- *
- * Supports both **bold:** and plain: formats, case-insensitive.
- *
- * @param content - STATE.md content string
- * @param fieldName - Field name to extract
- * @returns The field value, or null if not found
- */
-export function stateExtractField(content: string, fieldName: string): string | null {
-  const escaped = escapeRegex(fieldName);
-  // Horizontal whitespace only after ':' so YAML blocks like `progress:\n  total:` do not
-  // match as `Progress:` with a multi-line "value" (parity with STATE.md body fields).
-  const boldPattern = new RegExp(`\\*\\*${escaped}:\\*\\*[ \\t]*(.+)`, 'i');
-  const boldMatch = content.match(boldPattern);
-  if (boldMatch) return boldMatch[1].trim();
-  const plainPattern = new RegExp(`^${escaped}:[ \\t]*(.+)`, 'im');
-  const plainMatch = content.match(plainPattern);
-  return plainMatch ? plainMatch[1].trim() : null;
 }
 
 // ─── normalizeMd ───────────────────────────────────────────────────────────

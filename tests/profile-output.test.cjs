@@ -110,7 +110,7 @@ describe('write-profile command', () => {
     const analysisPath = path.join(tmpDir, 'analysis.json');
     fs.writeFileSync(analysisPath, JSON.stringify(analysis));
 
-    const result = runGsdTools(['write-profile', '--input', analysisPath, '--raw'], tmpDir);
+    const result = runGsdTools(['write-profile', '--input', analysisPath, '--raw'], tmpDir, { HOME: tmpDir });
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.ok(out.profile_path, 'should return profile_path');
@@ -206,7 +206,11 @@ describe('generate-dev-preferences command', () => {
     const analysisPath = path.join(tmpDir, 'analysis.json');
     fs.writeFileSync(analysisPath, JSON.stringify(analysis));
 
-    const result = runGsdTools(['generate-dev-preferences', '--analysis', analysisPath, '--raw'], tmpDir);
+    const result = runGsdTools(
+      ['generate-dev-preferences', '--analysis', analysisPath, '--raw'],
+      tmpDir,
+      { HOME: tmpDir }
+    );
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.ok(out.command_path || out.command_name, 'should return command output');

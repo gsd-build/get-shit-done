@@ -118,18 +118,19 @@ describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
       'must return null on missing runner so caller can warn-and-skip instead of writing a broken hook');
   });
 
-  test('integrates with resolveNodeRunner() in the live process — runner equals process.execPath (#3022 CR)', () => {
+  test('integrates with resolveNodeRunner() in the live process — runner equals resolved node runner (#3022 CR)', () => {
     const runner = resolveNodeRunner();
     assert.ok(runner, 'resolveNodeRunner returns a usable value in this test env');
     const block = buildCodexHookBlock('/tmp/x/.codex', { absoluteRunner: runner });
     const parsed = parseCodexHookBlock(block);
     assert.equal(parsed.ok, true);
-    // Strict canonical-runner equality: the parsed runner (after
-    // stripping toml + JSON escape layers) must be exactly process.execPath
-    // (forward-slashed, since resolveNodeRunner normalizes that way).
-    const expected = process.execPath.replace(/\\/g, '/');
+    // Strict canonical-runner equality: the parsed runner (after stripping
+    // toml + JSON escape layers) must be exactly the normalized runner that
+    // resolveNodeRunner selected. Homebrew Cellar execPath values intentionally
+    // normalize to the stable Homebrew symlink (#3181).
+    const expected = JSON.parse(runner);
     assert.equal(unescapeRunner(parsed.runner), expected,
-      `parsed runner must equal process.execPath, got: ${parsed.runner}, want: ${expected}`);
+      `parsed runner must equal resolveNodeRunner(), got: ${parsed.runner}, want: ${expected}`);
   });
 });
 

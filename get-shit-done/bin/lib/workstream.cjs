@@ -10,10 +10,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal, filterPlanFiles, filterSummaryFiles, readSubdirectories } = require('./core.cjs');
-const { planningPaths, planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
-const { stateExtractField } = require('./state.cjs');
+const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal } = require('./core.cjs');
+const { planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
 const { toWorkstreamSlug, hasInvalidPathSegment, isValidActiveWorkstreamName } = require('./workstream-name-policy.cjs');
+const {
+  getOtherActiveWorkstreamInventories,
+  inspectWorkstream,
+  listWorkstreamInventories,
+} = require('./workstream-inventory.cjs');
 
 // ─── Migration ──────────────────────────────────────────────────────────────
 
@@ -179,52 +183,22 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
 }
 
 function cmdWorkstreamList(cwd, raw) {
-  const wsRoot = path.join(planningRoot(cwd), 'workstreams');
-
-  if (!fs.existsSync(wsRoot)) {
-    output({ mode: 'flat', workstreams: [], message: 'No workstreams — operating in flat mode' }, raw);
+  const inventory = listWorkstreamInventories(cwd);
+  if (inventory.mode === 'flat') {
+    output({ mode: 'flat', workstreams: [], message: inventory.message }, raw);
     return;
   }
 
-  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
-  const workstreams = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-
-    const wsDir = path.join(wsRoot, entry.name);
-    const phasesDir = path.join(wsDir, 'phases');
-
-    const phaseDirs = readSubdirectories(phasesDir);
-    const phaseCount = phaseDirs.length;
-    let completedCount = 0;
-    for (const d of phaseDirs) {
-      try {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, d));
-        const plans = filterPlanFiles(phaseFiles);
-        const summaries = filterSummaryFiles(phaseFiles);
-        if (plans.length > 0 && summaries.length >= plans.length) completedCount++;
-      } catch {}
-    }
-
-    let status = 'unknown', currentPhase = null;
-    try {
-      const stateContent = fs.readFileSync(path.join(wsDir, 'STATE.md'), 'utf-8');
-      status = stateExtractField(stateContent, 'Status') || 'unknown';
-      currentPhase = stateExtractField(stateContent, 'Current Phase');
-    } catch {}
-
-    workstreams.push({
-      name: entry.name,
-      path: toPosixPath(path.relative(cwd, wsDir)),
-      has_roadmap: fs.existsSync(path.join(wsDir, 'ROADMAP.md')),
-      has_state: fs.existsSync(path.join(wsDir, 'STATE.md')),
-      status,
-      current_phase: currentPhase,
-      phase_count: phaseCount,
-      completed_phases: completedCount,
-    });
-  }
+  const workstreams = inventory.workstreams.map(ws => ({
+    name: ws.name,
+    path: ws.path,
+    has_roadmap: ws.files.roadmap,
+    has_state: ws.files.state,
+    status: ws.status,
+    current_phase: ws.current_phase,
+    phase_count: ws.phase_count,
+    completed_phases: ws.completed_phases,
+  }));
 
   output({ mode: 'workstream', workstreams, count: workstreams.length }, raw);
 }
@@ -239,50 +213,19 @@ function cmdWorkstreamStatus(cwd, name, raw) {
     return;
   }
 
-  const p = planningPaths(cwd, name);
-  const relPath = toPosixPath(path.relative(cwd, wsDir));
-
-  const files = {
-    roadmap: fs.existsSync(p.roadmap),
-    state: fs.existsSync(p.state),
-    requirements: fs.existsSync(p.requirements),
-  };
-
-  const phases = [];
-  for (const dir of readSubdirectories(p.phases).sort()) {
-    try {
-      const phaseFiles = fs.readdirSync(path.join(p.phases, dir));
-      const plans = filterPlanFiles(phaseFiles);
-      const summaries = filterSummaryFiles(phaseFiles);
-      phases.push({
-        directory: dir,
-        status: summaries.length >= plans.length && plans.length > 0 ? 'complete' :
-                plans.length > 0 ? 'in_progress' : 'pending',
-        plan_count: plans.length,
-        summary_count: summaries.length,
-      });
-    } catch {}
-  }
-
-  let stateInfo = {};
-  try {
-    const stateContent = fs.readFileSync(p.state, 'utf-8');
-    stateInfo = {
-      status: stateExtractField(stateContent, 'Status') || 'unknown',
-      current_phase: stateExtractField(stateContent, 'Current Phase'),
-      last_activity: stateExtractField(stateContent, 'Last Activity'),
-    };
-  } catch {}
+  const inventory = inspectWorkstream(cwd, name);
 
   output({
     found: true,
     workstream: name,
-    path: relPath,
-    files,
-    phases,
-    phase_count: phases.length,
-    completed_phases: phases.filter(ph => ph.status === 'complete').length,
-    ...stateInfo,
+    path: inventory.path,
+    files: inventory.files,
+    phases: inventory.phases,
+    phase_count: inventory.phase_count,
+    completed_phases: inventory.completed_phases,
+    status: inventory.status,
+    current_phase: inventory.current_phase,
+    last_activity: inventory.last_activity,
   }, raw);
 }
 
@@ -381,64 +324,23 @@ function cmdWorkstreamGet(cwd, raw) {
 }
 
 function cmdWorkstreamProgress(cwd, raw) {
-  const root = planningRoot(cwd);
-  const wsRoot = path.join(root, 'workstreams');
-
-  if (!fs.existsSync(wsRoot)) {
-    output({ mode: 'flat', workstreams: [], message: 'No workstreams — operating in flat mode' }, raw);
+  const inventory = listWorkstreamInventories(cwd);
+  if (inventory.mode === 'flat') {
+    output({ mode: 'flat', workstreams: [], message: inventory.message }, raw);
     return;
   }
 
-  const active = getActiveWorkstream(cwd);
-  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
-  const workstreams = [];
+  const workstreams = inventory.workstreams.map(ws => ({
+    name: ws.name,
+    active: ws.active,
+    status: ws.status,
+    current_phase: ws.current_phase,
+    phases: `${ws.completed_phases}/${ws.roadmap_phase_count}`,
+    plans: `${ws.completed_plans}/${ws.total_plans}`,
+    progress_percent: ws.progress_percent,
+  }));
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-
-    const wsDir = path.join(wsRoot, entry.name);
-    const phasesDir = path.join(wsDir, 'phases');
-
-    const phaseDirsProgress = readSubdirectories(phasesDir);
-    const phaseCount = phaseDirsProgress.length;
-    let completedCount = 0, totalPlans = 0, completedPlans = 0;
-    for (const d of phaseDirsProgress) {
-      try {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, d));
-        const plans = filterPlanFiles(phaseFiles);
-        const summaries = filterSummaryFiles(phaseFiles);
-        totalPlans += plans.length;
-        completedPlans += Math.min(summaries.length, plans.length);
-        if (plans.length > 0 && summaries.length >= plans.length) completedCount++;
-      } catch {}
-    }
-
-    let roadmapPhaseCount = phaseCount;
-    try {
-      const roadmapContent = fs.readFileSync(path.join(wsDir, 'ROADMAP.md'), 'utf-8');
-      const phaseMatches = roadmapContent.match(/^###?\s+Phase\s+\d/gm);
-      if (phaseMatches) roadmapPhaseCount = phaseMatches.length;
-    } catch {}
-
-    let status = 'unknown', currentPhase = null;
-    try {
-      const stateContent = fs.readFileSync(path.join(wsDir, 'STATE.md'), 'utf-8');
-      status = stateExtractField(stateContent, 'Status') || 'unknown';
-      currentPhase = stateExtractField(stateContent, 'Current Phase');
-    } catch {}
-
-    workstreams.push({
-      name: entry.name,
-      active: entry.name === active,
-      status,
-      current_phase: currentPhase,
-      phases: `${completedCount}/${roadmapPhaseCount}`,
-      plans: `${completedPlans}/${totalPlans}`,
-      progress_percent: roadmapPhaseCount > 0 ? Math.round((completedCount / roadmapPhaseCount) * 100) : 0,
-    });
-  }
-
-  output({ mode: 'workstream', active, workstreams, count: workstreams.length }, raw);
+  output({ mode: 'workstream', active: inventory.active, workstreams, count: workstreams.length }, raw);
 }
 
 // ─── Collision Detection ────────────────────────────────────────────────────
@@ -449,47 +351,12 @@ function cmdWorkstreamProgress(cwd, raw) {
  * when a workstream finishes its last phase.
  */
 function getOtherActiveWorkstreams(cwd, excludeWs) {
-  const wsRoot = path.join(planningRoot(cwd), 'workstreams');
-  if (!fs.existsSync(wsRoot)) return [];
-
-  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
-  const others = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === excludeWs) continue;
-
-    const wsDir = path.join(wsRoot, entry.name);
-    const statePath = path.join(wsDir, 'STATE.md');
-
-    let status = 'unknown', currentPhase = null;
-    try {
-      const content = fs.readFileSync(statePath, 'utf-8');
-      status = stateExtractField(content, 'Status') || 'unknown';
-      currentPhase = stateExtractField(content, 'Current Phase');
-    } catch {}
-
-    if (status.toLowerCase().includes('milestone complete') ||
-        status.toLowerCase().includes('archived')) {
-      continue;
-    }
-
-    const phasesDir = path.join(wsDir, 'phases');
-    const phaseDirsOther = readSubdirectories(phasesDir);
-    const phaseCount = phaseDirsOther.length;
-    let completedCount = 0;
-    for (const d of phaseDirsOther) {
-      try {
-        const phaseFiles = fs.readdirSync(path.join(phasesDir, d));
-        const plans = filterPlanFiles(phaseFiles);
-        const summaries = filterSummaryFiles(phaseFiles);
-        if (plans.length > 0 && summaries.length >= plans.length) completedCount++;
-      } catch {}
-    }
-
-    others.push({ name: entry.name, status, current_phase: currentPhase, phases: `${completedCount}/${phaseCount}` });
-  }
-
-  return others;
+  return getOtherActiveWorkstreamInventories(cwd, excludeWs).map(ws => ({
+    name: ws.name,
+    status: ws.status,
+    current_phase: ws.current_phase,
+    phases: `${ws.completed_phases}/${ws.phase_count}`,
+  }));
 }
 
 module.exports = {

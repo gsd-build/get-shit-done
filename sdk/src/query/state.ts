@@ -23,7 +23,14 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { extractFrontmatter, stripFrontmatter } from './frontmatter.js';
-import { stateExtractField, planningPaths, escapeRegex } from './helpers.js';
+import { planningPaths, escapeRegex } from './helpers.js';
+import {
+  computeProgressPercent,
+  normalizeProgressNumbers,
+  normalizeStateStatus,
+  shouldPreserveExistingProgress,
+  stateExtractField,
+} from './state-document.js';
 import { getMilestoneInfo, extractCurrentMilestone } from './roadmap.js';
 import type { QueryHandler } from './utils.js';
 
@@ -146,32 +153,14 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
   } catch { /* intentionally empty */ }
 
   // Derive percent from disk counts (ground truth)
-  let progressPercent: number | null = null;
-  if (totalPlans !== null && totalPlans > 0 && completedPlans !== null) {
-    progressPercent = Math.min(100, Math.round(completedPlans / totalPlans * 100));
-  } else if (progressRaw) {
+  let progressPercent = computeProgressPercent(completedPlans, totalPlans, completedPhases, totalPhases);
+  if (progressPercent === null && progressRaw) {
     const pctMatch = progressRaw.match(/(\d+)%/);
     if (pctMatch) progressPercent = parseInt(pctMatch[1], 10);
   }
 
   // Normalize status
-  let normalizedStatus = status || 'unknown';
-  const statusLower = (status || '').toLowerCase();
-  if (statusLower.includes('paused') || statusLower.includes('stopped') || pausedAt) {
-    normalizedStatus = 'paused';
-  } else if (statusLower.includes('executing') || statusLower.includes('in progress')) {
-    normalizedStatus = 'executing';
-  } else if (statusLower.includes('planning') || statusLower.includes('ready to plan')) {
-    normalizedStatus = 'planning';
-  } else if (statusLower.includes('discussing')) {
-    normalizedStatus = 'discussing';
-  } else if (statusLower.includes('verif')) {
-    normalizedStatus = 'verifying';
-  } else if (statusLower.includes('complete') || statusLower.includes('done')) {
-    normalizedStatus = 'completed';
-  } else if (statusLower.includes('ready to execute')) {
-    normalizedStatus = 'executing';
-  }
+  let normalizedStatus = normalizeStateStatus(status, pausedAt);
 
   // Bug #2613: status preservation — if body has no Status field and existing
   // frontmatter has a non-unknown status, prefer existing.
@@ -210,7 +199,7 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
     const derivedCompletedPlans = Number(progress.completed_plans ?? 0);
     const existingTotalPlans = Number(existingProgress.total_plans ?? 0);
     if (derivedTotalPlans === 0 && derivedCompletedPlans === 0 && existingTotalPlans > 0) {
-      fm.progress = existingProgress;
+      fm.progress = normalizeProgressNumbers(existingProgress);
     }
   }
 
@@ -258,6 +247,12 @@ export const stateJson: QueryHandler = async (_args, projectDir, workstream) => 
   // Preserve existing non-unknown status when body-derived is 'unknown'
   if (built.status === 'unknown' && existingFm && existingFm.status && existingFm.status !== 'unknown') {
     built.status = existingFm.status;
+  }
+  // Read-side projection: preserve curated cross-milestone aggregates when the
+  // disk scan sees only a narrower realized subset (#3242 Bug A). Mutation sync
+  // remains disk-authoritative when it sees non-zero counts.
+  if (existingFm && shouldPreserveExistingProgress(existingFm.progress, built.progress)) {
+    built.progress = normalizeProgressNumbers(existingFm.progress);
   }
 
   return { data: built };

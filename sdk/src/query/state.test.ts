@@ -155,8 +155,36 @@ describe('stateJson', () => {
     expect(progress.completed_plans).toBe(4);
     // Phase 09 complete (3/3), phase 10 incomplete (1/3), phase 11 incomplete (0/1)
     expect(progress.completed_phases).toBe(1);
-    // 4/7 = 57%
-    expect(progress.percent).toBe(57);
+    // min(plan fraction 4/7, phase fraction 1/3) = 33%
+    expect(progress.percent).toBe(33);
+  });
+
+  it('preserves wider curated progress when disk scan only sees a realized subset', async () => {
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+progress:
+  total_phases: 12
+  completed_phases: 6
+  total_plans: 22
+  completed_plans: 22
+  percent: 50
+---
+
+${STATE_BODY}`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateJson([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const progress = data.progress as Record<string, unknown>;
+
+    expect(progress.total_phases).toBe(12);
+    expect(progress.completed_phases).toBe(6);
+    expect(progress.total_plans).toBe(22);
+    expect(progress.completed_plans).toBe(22);
+    expect(progress.percent).toBe(50);
   });
 
   it('preserves stopped_at from existing frontmatter', async () => {
@@ -232,8 +260,8 @@ Progress: [░░░░░░░░░░] 0%
     const data = result.data as Record<string, unknown>;
     const progress = data.progress as Record<string, unknown>;
 
-    // Disk should override the body's 0%
-    expect(progress.percent).toBe(57);
+    // Disk should override the body's 0%; phase fraction caps plan-only progress.
+    expect(progress.percent).toBe(33);
   });
 });
 

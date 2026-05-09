@@ -28,14 +28,13 @@ import { extractFrontmatter, stripFrontmatter } from './frontmatter.js';
 import { reconstructFrontmatter, spliceFrontmatter } from './frontmatter-mutation.js';
 import {
   comparePhaseNum,
-  escapeRegex,
   normalizePhaseName,
   phaseTokenMatches,
   planningPaths,
   normalizeMd,
-  stateExtractField,
 } from './helpers.js';
 import { buildStateFrontmatter, getMilestonePhaseFilter } from './state.js';
+import { stateExtractField, stateReplaceField, stateReplaceFieldWithFallback } from './state-document.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Process exit lock cleanup (D2 — match CJS state.cjs:16-23) ─────────
@@ -52,48 +51,7 @@ process.on('exit', () => {
   }
 });
 
-// ─── stateReplaceField ────────────────────────────────────────────────────
-
-/**
- * Replace a field value in STATE.md content.
- *
- * Uses separate regex instances (no g flag) to avoid lastIndex persistence.
- * Supports both **bold:** and plain: formats.
- *
- * @param content - STATE.md content
- * @param fieldName - Field name to replace
- * @param newValue - New value to set
- * @returns Updated content, or null if field not found
- */
-export function stateReplaceField(content: string, fieldName: string, newValue: string): string | null {
-  const escaped = escapeRegex(fieldName);
-  // Try **Field:** bold format first
-  const boldPattern = new RegExp(`(\\*\\*${escaped}:\\*\\*\\s*)(.*)`, 'i');
-  if (boldPattern.test(content)) {
-    return content.replace(new RegExp(`(\\*\\*${escaped}:\\*\\*\\s*)(.*)`, 'i'), (_match, prefix: string) => `${prefix}${newValue}`);
-  }
-  // Try plain Field: format
-  const plainPattern = new RegExp(`(^${escaped}:\\s*)(.*)`, 'im');
-  if (plainPattern.test(content)) {
-    return content.replace(new RegExp(`(^${escaped}:\\s*)(.*)`, 'im'), (_match, prefix: string) => `${prefix}${newValue}`);
-  }
-  return null;
-}
-
-/**
- * Replace a field with fallback field name support.
- *
- * Tries primary first, then fallback. Returns content unchanged if neither matches.
- */
-function stateReplaceFieldWithFallback(content: string, primary: string, fallback: string | null, value: string): string {
-  let result = stateReplaceField(content, primary, value);
-  if (result) return result;
-  if (fallback) {
-    result = stateReplaceField(content, fallback, value);
-    if (result) return result;
-  }
-  return content;
-}
+export { stateReplaceField };
 
 /**
  * Update fields within the ## Current Position section.
@@ -234,10 +192,10 @@ export async function releaseStateLock(lockPath: string): Promise<void> {
  * Strips existing frontmatter, rebuilds from body + disk, and splices back.
  * Preserves existing status when body-derived status is 'unknown'.
  */
-async function syncStateFrontmatter(content: string, projectDir: string): Promise<string> {
+async function syncStateFrontmatter(content: string, projectDir: string, workstream?: string): Promise<string> {
   const existingFm = extractFrontmatter(content);
   const body = stripFrontmatter(content);
-  const derivedFm = await buildStateFrontmatter(body, projectDir);
+  const derivedFm = await buildStateFrontmatter(body, projectDir, workstream);
 
   // Preserve existing status when body-derived is 'unknown'
   if (derivedFm.status === 'unknown' && existingFm.status && existingFm.status !== 'unknown') {
@@ -261,8 +219,10 @@ async function readModifyWriteStateMd(
   projectDir: string,
   modifier: (content: string) => string | Promise<string>,
   workstream?: string,
+  options: { resync?: boolean } = {},
 ): Promise<string> {
   const statePath = planningPaths(projectDir, workstream).state;
+  const resync = options.resync !== false;
   const lockPath = await acquireStateLock(statePath);
   try {
     let content: string;
@@ -274,9 +234,16 @@ async function readModifyWriteStateMd(
     // Strip frontmatter before passing to modifier so that regex replacements
     // operate on body fields only (not on YAML frontmatter keys like 'status:').
     // syncStateFrontmatter rebuilds frontmatter from the modified body + disk.
+    const preFm = extractFrontmatter(content);
     const body = stripFrontmatter(content);
     const modified = await modifier(body);
-    const synced = await syncStateFrontmatter(modified, projectDir);
+    let synced = await syncStateFrontmatter(modified, projectDir, workstream);
+    if (!resync && preFm && preFm.progress) {
+      const postFm = extractFrontmatter(synced);
+      postFm.progress = preFm.progress;
+      const yamlStr = reconstructFrontmatter(postFm);
+      synced = `---\n${yamlStr}\n---\n\n${stripFrontmatter(synced)}`;
+    }
     const normalized = normalizeMd(synced);
     await writeFile(statePath, normalized, 'utf-8');
     return normalized;
@@ -339,7 +306,7 @@ export const stateUpdate: QueryHandler = async (args, projectDir, workstream) =>
       return result;
     }
     return content;
-  }, workstream);
+  }, workstream, { resync: false });
 
   return { data: { updated } };
 };

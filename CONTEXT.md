@@ -25,6 +25,9 @@ Adapter Module that satisfies native query dispatch at the Dispatch Policy seam,
 ### Query CLI Output Module
 Module owning projection from dispatch results/errors to CLI `{ exitCode, stdoutChunks, stderrLines }` output contract.
 
+### STATE.md Document Module
+Shared CJS/SDK pure transform Module owning STATE.md parse, field extraction, field replacement, status normalization, and frontmatter reconstruction. It does not scan `.planning/phases` and does not own persistence or locking; phase/plan/summary counts arrive from inventory/progress Modules as inputs, and CJS/SDK read-modify-write paths remain Adapters.
+
 ### Query Execution Policy Module
 Module owning query transport routing policy projection (`preferNative`, fallback policy, workstream subprocess forcing) at execution seam.
 
@@ -37,11 +40,20 @@ Canonical command normalization and resolution Interface (`query-command-resolut
 ### Command Topology Module
 Module owning command resolution, policy projection (`mutation`, `output_mode`), unknown-command diagnosis, and handler Adapter binding at one seam for query dispatch.
 
+### CJS Command Router Adapter Module
+Compatibility Adapter Module for `gsd-tools.cjs` command families. Uses generated command metadata plus small argument shapers to route to CJS handlers, rather than calling SDK Command Topology directly. Preserves CJS compatibility startup while reducing hand-written router drift.
+
 ### Query Pre-Project Config Policy Module
 Module policy that defines query-time behavior when `.planning/config.json` is absent: use built-in defaults for parity-sensitive query Interfaces, and emit parity-aligned empty model ids for pre-project model resolution surfaces.
 
 ### Planning Workspace Module
 Module owning `.planning` path resolution, active workstream pointer policy (`session-scoped > shared`), pointer self-heal behavior, and planning lock semantics for workstream-aware execution.
+
+### Workstream Inventory Module
+Shared CJS/SDK Module owning workstream directory discovery, per-workstream state projection, phase/plan/summary counting, roadmap-declared phase count, active marker projection, and active-workstream collision inputs. Command handlers render list/status/progress outputs from this inventory instead of rescanning `.planning/workstreams/*` directly.
+
+### Planning Path Projection Module
+SDK query Module owning projection from project/workstream context to concrete `.planning` paths. Policy precedence is `explicit workstream > env workstream > env project > root`. Invalid workspace context is a validation error at this seam rather than a silent fallback.
 
 ### Worktree Root Resolution Adapter Module
 Adapter Module owning linked-worktree root mapping and metadata-prune policy (`git worktree prune` non-destructive default) for planning/workstream callers.
@@ -306,3 +318,170 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `RELEASE-NOTES.RELEASE-STREAM.dev-branch=canary dist-tag (only); install via @canary`
 `RELEASE-NOTES.RELEASE-STREAM.main-branch=next (RCs) + latest (stable); install via @next or @latest`
 `RELEASE-NOTES.RELEASE-STREAM.rule=streams do not mix; do not document @canary install in RC notes or @next in canary notes`
+
+---
+
+## Repo-Rule Reinforcement (2026-05-09, machine-oriented)
+
+`META.RULE.canonical-source-precedence=CONTRIBUTING.md > docs/adr/* > CONTEXT.md > agent memory`
+`META.RULE.read-contributing-first=read CONTRIBUTING.md sections "Pull Request Guidelines" + "CHANGELOG Entries" before EVERY agent dispatch`
+`META.RULE.brief-must-cite-doc=agent prompts MUST quote the canonical doc line being applied; paraphrasing from predicate memory drifts and produces violations`
+`META.RULE.brief-no-paraphrase=writing "k040 — never leave changelog box unchecked" caused 5 of 8 agents to edit CHANGELOG.md in violation of CONTRIBUTING.md L110`
+
+`PRED.k320.signal=changelog-direct-edit-forbidden`
+`PRED.k320.canonical-source=CONTRIBUTING.md L110-123`
+`PRED.k320.rule=do not edit CHANGELOG.md in feature/fix/enhancement PRs`
+`PRED.k320.cure=drop .changeset/<adj>-<noun>-<noun>.md fragment ONLY`
+`PRED.k320.tool=npm run changeset -- --type <T> --pr <NNN> --body "..."`
+`PRED.k320.types=Added|Changed|Deprecated|Removed|Fixed|Security`
+`PRED.k320.opt-out-label=no-changelog`
+`PRED.k320.ci-enforcement=scripts/changeset/lint.cjs`
+`PRED.k320.ci-paths-monitored=bin/ get-shit-done/ agents/ commands/ hooks/ sdk/src/`
+`PRED.k320.recovery=open Removed-typed cleanup PR deleting only the redundant row`
+`PRED.k320.evidence=PR #3302 merge-conflict against #3308 CHANGELOG.md row 2026-05-09`
+
+`PRED.k321.signal=cr-outside-diff-range-finding`
+`PRED.k321.shape=CR posts "[!CAUTION] outside the diff" findings in review BODY, not in reviewThreads`
+`PRED.k321.poll-shape=parse pulls/<n>/reviews body AND graphql reviewThreads`
+`PRED.k321.resolution=address in code; no GraphQL resolveReviewThread needed for body-only findings`
+`PRED.k321.evidence=PRs #3304/#3305 (2026-05-09): real Minor/Major findings in body, 0 threads`
+
+`PRED.k322.signal=cr-sustained-throttle`
+`PRED.k322.distinct-from=k080`
+`PRED.k322.shape=ack posted, real review never lands within [5s, 410s] cooldown after burst of N PRs <15min`
+`PRED.k322.cure-1=2nd retrigger ~10min after first ack`
+`PRED.k322.cure-2=if silent at 50min, treat as silent-pass with maintainer flag in merge-commit body`
+`PRED.k322.merge-gate-impact=k070 real_coderabbit_review_present unsatisfied; requires maintainer judgment`
+`PRED.k322.evidence=PR #3306 (2026-05-09): 0 reviews after 50min + 2 retriggers`
+
+`PRED.k323.signal=sibling-audit-cross-pr-overlap`
+`PRED.k323.shape=2+ open issues touch same canonical bug site; each fix's sibling-audit produces overlapping diff`
+`PRED.k323.cure-pre-dispatch=brief one agent canonical-owner; brief others to EXCLUDE shared site`
+`PRED.k323.cure-alt=consolidate into single PR when 2+ issues share root cause`
+`PRED.k323.recovery=close smaller PR as "subsumed by #N" or rebase second to drop overlap hunk`
+`PRED.k323.evidence=#3300 (#3297) overlapped #3306 (#3298) on add-backlog.md hunks 2026-05-09`
+
+`PRED.k324.signal=agent-terminates-mid-monitor`
+`PRED.k324.k095-restatement=k095 confirmed shape: agent reports "waiting for monitor" / "tests still running" then terminates`
+`PRED.k324.cure=verify via gh api on every agent-completion notification; never trust narrative`
+`PRED.k324.poll-shape=gh pr view <n> --json mergeStateStatus,statusCheckRollup + pulls/<n>/reviews + graphql reviewThreads + issues/<n>/comments tail`
+`PRED.k324.evidence=2026-05-09 session: 5+ mid-monitor terminations across PRs #3232/#3271/#3251/#3255/#3262`
+
+`PRED.k325.signal=worktree-branch-lock-on-force-push`
+`PRED.k325.shape=git checkout <branch> errors "already used by worktree at <agent-worktree>"`
+`PRED.k325.cure=detached-HEAD: git checkout --detach $(git ls-remote origin <branch>); modify; commit; git push --force-with-lease=<branch>:<remote-sha> origin HEAD:refs/heads/<branch>`
+`PRED.k325.cleanup=git worktree remove --force <path> for aged agent worktrees`
+`PRED.k325.evidence=2026-05-09 CHANGELOG.md strip on PRs #3300/#3302/#3304/#3305 required detached-HEAD`
+
+`PRED.k326.signal=brief-contradicts-canonical-doc`
+`PRED.k326.shape=N parallel agents amplify a single brief-vs-doc contradiction into N violations`
+`PRED.k326.cure=quote canonical doc verbatim in brief; mentally simulate "if all N agents follow this brief literally, do they violate any rule?"`
+`PRED.k326.evidence=2026-05-09 brief "k040 — update CHANGELOG.md" → 5 of 8 agents violated CONTRIBUTING.md L110`
+
+`PRED.k327.signal=cr-ack-vs-real-review`
+`PRED.k327.ack-shape=body "✅ Actions performed - Full review triggered"`
+`PRED.k327.real-review-shape=body starts "Actionable comments posted: N" OR "[!CAUTION] Some comments are outside the diff"`
+`PRED.k327.distinguish-key=len(pulls/<n>/reviews) — ack=0, real=≥1`
+`PRED.k327.cooldown-normal=[5s, 410s]`
+`PRED.k327.cooldown-throttled=k322`
+
+`PRED.k328.signal=pr-template-typed-heading-required`
+`PRED.k328.canonical-source=CONTRIBUTING.md L101`
+`PRED.k328.k100-restatement=heading must match issue class: bug→## Fix PR, enhancement→## Enhancement PR, feature→## Feature PR`
+`PRED.k328.audit-list=[heading-matches-class, closing-keyword-present, changeset-fragment-or-no-changelog-label]`
+
+`PRED.k329.signal=changeset-fragment-canonical-shape`
+`PRED.k329.canonical-source=CONTRIBUTING.md L112-117 + .changeset/README.md`
+`PRED.k329.filename=.changeset/<adj>-<noun>-<noun>.md`
+`PRED.k329.frontmatter=---\\ntype: <Added|Changed|Deprecated|Removed|Fixed|Security>\\npr: <NNN>\\n---`
+`PRED.k329.body=**<Bold user-visible change>** — <symptom-led explanation>. (#<NNN>)`
+`PRED.k329.observed-clean=#3299 sunny-ibex-wave, #3301 sturdy-rams-caper, #3306 3298-phase-dir-prefix-drift-workflows`
+
+`PRED.k330.signal=mempalace-diary-not-callable-by-ai`
+`PRED.k330.shape=mempalace MCP tools require explicit user call; AI cannot trigger`
+`PRED.k330.fallback=append predicate-format findings directly to CONTEXT.md`
+
+`PRED.k331.signal=close-with-no-comment-is-literal`
+`PRED.k331.shape=instruction "close with no comment (rationale)" — parenthetical is rationale, NOT comment body`
+`PRED.k331.k101-restatement=k101 includes close-time --comment flag; rationale belongs in subsuming PR's squash-merge body`
+`PRED.k331.cure=gh pr close <n> with NO --comment flag`
+`PRED.k331.recovery=if violation lands, gh api -X DELETE repos/<o>/<r>/issues/comments/<id>`
+`PRED.k331.evidence=2026-05-09 wave-3: violation on #3300 close, deleted within 30s`
+
+`PROC.AGENT-DISPATCH.preflight=[read-CONTRIBUTING.md-fresh, read-relevant-ADRs, cite-specific-line-in-brief, require-closing-keyword, require-changeset-fragment, forbid-CHANGELOG.md-edit, require-isolation-worktree, forbid-self-PR-comment, mandate-trust-but-verify]`
+`PROC.AGENT-DISPATCH.parallel-overlap-audit=before dispatching N sibling-audit fixers, compute file-set union and assign canonical owners`
+`PROC.AGENT-DISPATCH.completion-verify=run k324.poll-shape on every agent-completion notification`
+
+`PROC.MERGE-WAVE.ordering=[wave1: isolated-files, wave2: CHANGELOG-only-overlap (better: strip per k320), wave3: same-file-overlap with explicit decision]`
+`PROC.MERGE-WAVE.preflight=gh pr view <n> --json files for every PR; identify overlap pairs; surface to maintainer`
+`PROC.MERGE-WAVE.changelog-strip-pattern=detached-HEAD per k325 + git checkout main -- CHANGELOG.md + commit + force-with-lease`
+`PROC.MERGE-WAVE.merge-tool=gh pr merge <n> --squash --delete-branch`
+`PROC.MERGE-WAVE.merge-tool-warning=delete-branch may fail with "used by worktree at" — harmless; remote branch still deleted`
+
+## Triage+Merge Wave Outcome (2026-05-09T15:47Z, machine-oriented)
+
+`WAVE.2026-05-09.scope=trek-e-authored issues, classes=[bug, enhancement, feature]`
+`WAVE.2026-05-09.dispatched=8`
+`WAVE.2026-05-09.merged=7`
+`WAVE.2026-05-09.closed-as-subsumed=1`
+`WAVE.2026-05-09.skipped-mvp-epic=[#2826, #2885, #2882, #2879, #2877, #2875]`
+
+`WAVE.PR.3299.issue=3290`
+`WAVE.PR.3299.class=bug`
+`WAVE.PR.3299.fix=agents/gsd-intel-updater.md layout-detection block gated on framework-repo check`
+`WAVE.PR.3299.cr-state=clean (No actionable comments)`
+`WAVE.PR.3299.merged=2026-05-09T15:39:16Z`
+
+`WAVE.PR.3301.issue=3232`
+`WAVE.PR.3301.class=enhancement`
+`WAVE.PR.3301.fix=docs/contributor-standards.md first-cut + CONTRIBUTING.md cross-link + 1 CR thread resolved (MD040)`
+`WAVE.PR.3301.cr-state=clean post-fix`
+`WAVE.PR.3301.merged=2026-05-09T15:39:24Z`
+
+`WAVE.PR.3308.issue=3262`
+`WAVE.PR.3308.class=enhancement`
+`WAVE.PR.3308.fix=extract get-shit-done/bin/lib/plan-scan.cjs scanPhasePlans; port 4 call sites in init/state/roadmap/phase`
+`WAVE.PR.3308.cr-state=2 reviews real, 1 thread resolved`
+`WAVE.PR.3308.merged=2026-05-09T15:39:32Z`
+`WAVE.PR.3308.violation=carried redundant CHANGELOG.md row in violation of k320; cleanup task spawned`
+
+`WAVE.PR.3302.issue=3271`
+`WAVE.PR.3302.class=enhancement`
+`WAVE.PR.3302.fix=docs/adr/0005 + 0006 + README index + tests/enh-3271-sdk-adr-structure.test.cjs`
+`WAVE.PR.3302.cr-state=1 review, 1 thread resolved (ADR self-ref test)`
+`WAVE.PR.3302.changelog-strip=force-pushed 2026-05-09T15:35Z`
+`WAVE.PR.3302.merged=2026-05-09T15:46:28Z`
+
+`WAVE.PR.3304.issue=3255`
+`WAVE.PR.3304.class=enhancement`
+`WAVE.PR.3304.fix=get-shit-done/bin/gsd-tools.cjs --json-errors flag + GSD_JSON_ERRORS env + docs/json-errors.md taxonomy + usage-string disclosure (CR k321 finding addressed)`
+`WAVE.PR.3304.cr-state=1 review (k321 outside-diff finding fixed in code)`
+`WAVE.PR.3304.changelog-strip=force-pushed 2026-05-09T15:35Z`
+`WAVE.PR.3304.merged=2026-05-09T15:46:35Z`
+
+`WAVE.PR.3305.issue=3251`
+`WAVE.PR.3305.class=enhancement`
+`WAVE.PR.3305.fix=command-aliases.generated.cjs NON_FAMILY entries (40) + sdk gen-command-aliases.ts typed-export preservation (CR k321 Major finding addressed)`
+`WAVE.PR.3305.cr-state=1 review (k321 outside-diff finding fixed in code)`
+`WAVE.PR.3305.changelog-strip=force-pushed 2026-05-09T15:35Z`
+`WAVE.PR.3305.merged=2026-05-09T15:46:41Z`
+
+`WAVE.PR.3306.issue=3298`
+`WAVE.PR.3306.class=bug`
+`WAVE.PR.3306.fix=phase-dir prefix drift fixed in 3 sites (add-backlog.md + import.md + plan-milestone-gaps.md) per k015 sibling-audit`
+`WAVE.PR.3306.cr-state=k322 sustained-throttle silent pass — 0 reviews after 50min + 2 retriggers, CI green`
+`WAVE.PR.3306.subsumes=PR #3300 (#3297 add-backlog dedicated fix)`
+`WAVE.PR.3306.merged=2026-05-09T15:47:16Z`
+
+`WAVE.PR.3300.issue=3297`
+`WAVE.PR.3300.class=bug`
+`WAVE.PR.3300.fix=add-backlog.md project_code prefix (focused #3297 fix)`
+`WAVE.PR.3300.outcome=closed-as-subsumed by #3306; issue #3297 manually closed`
+`WAVE.PR.3300.k323-evidence=overlapped #3306 add-backlog.md hunks with different prefix idiom`
+`WAVE.PR.3300.k331-violation=close-with-comment violation, comment deleted within 30s`
+
+`WAVE.LESSON.changelog-policy-violation-multiplier=brief contradicting CONTRIBUTING.md L110 produced violations on 5 of 8 PRs (#3300, #3302, #3304, #3305, #3308); k326 + k320 capture`
+`WAVE.LESSON.cr-throttle-burst-correlation=8 PRs in <15min triggered k322 sustained-throttle on multiple PRs (#3306 worst case)`
+`WAVE.LESSON.sibling-audit-overlap=k015-family parallel dispatch on #3297 + #3298 produced k323 add-backlog.md cross-PR overlap`
+`WAVE.LESSON.agent-narrative-unreliable=k095/k324 confirmed at scale: 5 of 8 agents terminated mid-monitor with stale claims requiring direct verification`
+`WAVE.LESSON.k101-still-trips=even after CONTEXT.md k101 reinforcement, agent of record posted self-PR comment on close; k331 adds explicit close-time literal-instruction guard`
