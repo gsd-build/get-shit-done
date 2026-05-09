@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-07",
+  "generated": "2026-05-09",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -256,6 +256,7 @@
       "worktree-path-safety.md"
     ],
     "cli_modules": [
+      "active-workstream-store.cjs",
       "artifacts.cjs",
       "audit.cjs",
       "command-aliases.generated.cjs",
@@ -298,7 +299,9 @@
       "validate-command-router.cjs",
       "verify-command-router.cjs",
       "verify.cjs",
-      "workstream.cjs"
+      "workstream-name-policy.cjs",
+      "workstream.cjs",
+      "worktree-safety.cjs"
     ],
     "hooks": [
       "gsd-check-update-worker.js",
