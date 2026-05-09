@@ -104,7 +104,7 @@ function inspectWorkstream(cwd, name, options = {}) {
     roadmap_phase_count: roadmapPhaseCount,
     total_plans: totalPlans,
     completed_plans: completedPlans,
-    progress_percent: roadmapPhaseCount > 0 ? Math.round((completedPhases / roadmapPhaseCount) * 100) : 0,
+    progress_percent: roadmapPhaseCount > 0 ? Math.min(100, Math.round((completedPhases / roadmapPhaseCount) * 100)) : 0,
   };
 }
 

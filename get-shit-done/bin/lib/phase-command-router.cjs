@@ -20,11 +20,21 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
         let customId = null;
         const descArgs = [];
         for (let i = 2; i < args.length; i++) {
-          if (args[i] === '--id' && i + 1 < args.length) {
-            customId = args[i + 1];
+          const token = args[i];
+          if (token === '--raw') {
+            continue;
+          }
+          if (token === '--id') {
+            const id = args[i + 1];
+            if (!id || id.startsWith('--')) {
+              error('--id requires a value');
+            }
+            customId = id;
             i++;
+          } else if (token.startsWith('--')) {
+            error(`phase add does not support ${token}`);
           } else {
-            descArgs.push(args[i]);
+            descArgs.push(token);
           }
         }
         phase.cmdPhaseAdd(cwd, descArgs.join(' '), raw, customId);
@@ -36,6 +46,9 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
           try {
             descriptions = JSON.parse(args[descFlagIdx + 1]);
           } catch {
+            error('--descriptions must be a JSON array');
+          }
+          if (!Array.isArray(descriptions)) {
             error('--descriptions must be a JSON array');
           }
         } else {

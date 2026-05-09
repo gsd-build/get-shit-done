@@ -84,7 +84,12 @@ export async function getMilestonePhaseFilter(projectDir: string, workstream?: s
  * Port of buildStateFrontmatter from state.cjs lines 650-760.
  * HIGH complexity: extracts fields, scans disk, computes progress.
  */
-export async function buildStateFrontmatter(bodyContent: string, projectDir: string, workstream?: string): Promise<Record<string, unknown>> {
+export async function buildStateFrontmatter(
+  bodyContent: string,
+  projectDir: string,
+  workstream?: string,
+  options: { preserveExistingProgress?: boolean } = {},
+): Promise<Record<string, unknown>> {
   const currentPhase = stateExtractField(bodyContent, 'Current Phase');
   const currentPhaseName = stateExtractField(bodyContent, 'Current Phase Name');
   const currentPlan = stateExtractField(bodyContent, 'Current Plan');
@@ -194,7 +199,7 @@ export async function buildStateFrontmatter(bodyContent: string, projectDir: str
   // prefer existing. Legitimate mid-milestone updates see non-zero disk counts
   // and fall through, keeping disk as ground truth.
   const existingProgress = existingFm.progress as Record<string, unknown> | undefined;
-  if (existingProgress && typeof existingProgress === 'object') {
+  if (options.preserveExistingProgress !== false && existingProgress && typeof existingProgress === 'object') {
     const derivedTotalPlans = Number(progress.total_plans ?? 0);
     const derivedCompletedPlans = Number(progress.completed_plans ?? 0);
     const existingTotalPlans = Number(existingProgress.total_plans ?? 0);

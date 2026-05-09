@@ -191,17 +191,22 @@ function cmdStateUpdate(cwd, field, value) {
   const statePath = planningPaths(cwd).state;
   try {
     let updated = false;
-    // resync: false — cmdStateUpdate only replaces a body text line.
-    // Triggering syncStateFrontmatter would rebuild progress.* from disk, trampling
-    // manually-curated cross-milestone counters stored in the frontmatter (#3242 Bug A).
+    const shouldResync = ['Progress', 'Total Plans in Phase', 'Total Phases'].includes(field);
+    // Preserve curated progress for body-only updates, but allow fields that
+    // directly project into progress.* frontmatter to rebuild after mutation.
     readModifyWriteStateMd(statePath, (content) => {
-      const result = stateReplaceField(content, field, value);
+      const body = stripFrontmatter(content);
+      const result = stateReplaceField(body, field, value);
       if (result) {
         updated = true;
+        const existingFm = extractFrontmatter(content);
+        if (Object.keys(existingFm).length > 0) {
+          return `---\n${reconstructFrontmatter(existingFm)}\n---\n\n${result}`;
+        }
         return result;
       }
       return content;
-    }, cwd, { resync: false });
+    }, cwd, { resync: shouldResync });
     if (updated) {
       output({ updated: true });
     } else {

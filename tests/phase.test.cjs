@@ -854,6 +854,35 @@ describe('phase add command', () => {
     assert.ok(roadmap.includes('**Requirements**: TBD'), 'new phase entry should include Requirements TBD');
   });
 
+  test('phase add ignores --raw instead of persisting it in the description', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n\n---\n`
+    );
+
+    const result = runGsdTools(['phase', 'add', '--raw', 'User', 'Dashboard'], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.ok(roadmap.includes('### Phase 2: User Dashboard'), 'description should exclude --raw');
+    assert.ok(!roadmap.includes('--raw'), 'raw flag must not be persisted into ROADMAP.md');
+  });
+
+  test('phase add rejects unsupported flags and dangling --id', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n\n---\n`
+    );
+
+    const unsupported = runGsdTools(['phase', 'add', '--unknown', 'Dashboard'], tmpDir);
+    assert.ok(!unsupported.success, 'unsupported flags should fail');
+    assert.match(unsupported.error, /phase add does not support --unknown/);
+
+    const dangling = runGsdTools(['phase', 'add', 'Dashboard', '--id'], tmpDir);
+    assert.ok(!dangling.success, 'dangling --id should fail');
+    assert.match(dangling.error, /--id requires a value/);
+  });
+
   test('skips 999.x backlog phases when calculating next phase number', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),
@@ -1175,6 +1204,12 @@ describe('phase add-batch command (#2165)', () => {
   test('returns error for empty descriptions array', () => {
     const result = runGsdTools(['phase', 'add-batch', '--descriptions', '[]'], tmpDir);
     assert.ok(!result.success, 'should fail on empty array');
+  });
+
+  test('returns error when --descriptions JSON is not an array', () => {
+    const result = runGsdTools(['phase', 'add-batch', '--descriptions', '{"one":"Alpha"}'], tmpDir);
+    assert.ok(!result.success, 'should fail on non-array JSON');
+    assert.match(result.error, /--descriptions must be a JSON array/);
   });
 });
 
@@ -2855,4 +2890,3 @@ describe('phase complete excludes 999.x backlog from next-phase (#2129)', () => 
 // ─────────────────────────────────────────────────────────────────────────────
 // milestone complete command
 // ─────────────────────────────────────────────────────────────────────────────
-

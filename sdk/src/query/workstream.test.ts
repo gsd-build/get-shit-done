@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { readFile } from 'node:fs/promises';
-import { workstreamList, workstreamCreate, workstreamSet } from './workstream.js';
+import { workstreamList, workstreamCreate, workstreamSet, workstreamProgress } from './workstream.js';
 
 describe('workstreamList', () => {
   let tmpDir: string;
@@ -28,6 +28,34 @@ describe('workstreamList', () => {
     const data = r.data as Record<string, unknown>;
     expect(data.mode).toBe('flat');
     expect(Array.isArray(data.workstreams)).toBe(true);
+  });
+});
+
+describe('workstreamProgress', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-ws-progress-'));
+    const wsDir = join(tmpDir, '.planning', 'workstreams', 'overflow');
+    await mkdir(join(wsDir, 'phases', '01-one'), { recursive: true });
+    await mkdir(join(wsDir, 'phases', '02-two'), { recursive: true });
+    await writeFile(join(wsDir, 'phases', '01-one', 'PLAN.md'), '# Plan\n');
+    await writeFile(join(wsDir, 'phases', '01-one', 'SUMMARY.md'), '# Summary\n');
+    await writeFile(join(wsDir, 'phases', '02-two', 'PLAN.md'), '# Plan\n');
+    await writeFile(join(wsDir, 'phases', '02-two', 'SUMMARY.md'), '# Summary\n');
+    await writeFile(join(wsDir, 'STATE.md'), '# State\nStatus: In progress\n');
+    await writeFile(join(wsDir, 'ROADMAP.md'), '# Roadmap\n### Phase 1: One\n');
+    await writeFile(join(tmpDir, '.planning', 'active-workstream'), 'overflow\n');
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('clamps progress percent when completed phase dirs exceed roadmap count', async () => {
+    const result = await workstreamProgress([], tmpDir);
+    const data = result.data as { workstreams: Array<{ progress_percent: number }> };
+    expect(data.workstreams[0].progress_percent).toBe(100);
   });
 });
 

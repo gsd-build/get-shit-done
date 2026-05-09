@@ -666,6 +666,28 @@ describe('workstream progress', () => {
     assert.strictEqual(data.workstreams[0].progress_percent, 50);
   });
 
+  test('clamps progress percent when completed phase dirs exceed roadmap count', () => {
+    const isolatedDir = createTempProject();
+    try {
+      const wsDir = path.join(isolatedDir, '.planning', 'workstreams', 'overflow');
+      for (const phase of ['01-one', '02-two']) {
+        const phaseDir = path.join(wsDir, 'phases', phase);
+        fs.mkdirSync(phaseDir, { recursive: true });
+        fs.writeFileSync(path.join(phaseDir, 'PLAN.md'), '# Plan\n');
+        fs.writeFileSync(path.join(phaseDir, 'SUMMARY.md'), '# Summary\n');
+      }
+      fs.writeFileSync(path.join(wsDir, 'STATE.md'), '# State\n**Status:** In progress\n');
+      fs.writeFileSync(path.join(wsDir, 'ROADMAP.md'), '# Roadmap\n### Phase 1: One\n');
+
+      const result = runGsdTools(['workstream', 'progress', '--raw'], isolatedDir);
+      assert.ok(result.success, `progress failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.workstreams[0].progress_percent, 100);
+    } finally {
+      cleanup(isolatedDir);
+    }
+  });
+
   test('returns flat mode when no workstreams exist', () => {
     const emptyDir = createTempProject();
     try {

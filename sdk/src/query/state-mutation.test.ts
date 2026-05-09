@@ -286,6 +286,89 @@ Progress: [█████░░░░░] 50%
     expect(after).toContain('Last Activity: 2026-05-07');
   });
 
+  it('resyncs progress frontmatter when updating the Progress body field', async () => {
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+progress:
+  total_phases: 12
+  completed_phases: 6
+  total_plans: 22
+  completed_plans: 22
+  percent: 50
+---
+
+# Project State
+
+## Current Position
+
+Status: Executing
+Progress: [█████░░░░░] 50%
+`;
+    await setupTestProject(tmpDir, stateContent);
+    await rm(join(tmpDir, '.planning', 'ROADMAP.md'), { force: true });
+
+    const { stateUpdate } = await import('./state-mutation.js');
+    await stateUpdate(['Progress', '[████████░░] 80%'], tmpDir);
+
+    const after = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    const progress = fm.progress as Record<string, unknown>;
+    expect(Number(progress.percent)).toBe(80);
+  });
+
+  it('syncs full-file workstream STATE.md frontmatter from the selected workstream', async () => {
+    const planningDir = join(tmpDir, '.planning');
+    const wsDir = join(planningDir, 'workstreams', 'feature');
+    await mkdir(join(wsDir, 'phases'), { recursive: true });
+
+    await writeFile(
+      join(planningDir, 'STATE.md'),
+      [
+        '---',
+        'milestone: v0.1',
+        'milestone_name: Root Milestone',
+        '---',
+        '',
+        '# Root State',
+        '',
+        'Status: Root',
+        '',
+      ].join('\n'),
+      'utf-8',
+    );
+    await writeFile(join(planningDir, 'ROADMAP.md'), '# Roadmap\n\n## v0.1 Root Milestone\n', 'utf-8');
+    await writeFile(
+      join(wsDir, 'STATE.md'),
+      [
+        '---',
+        'milestone: v2.0',
+        'milestone_name: Feature Milestone',
+        '---',
+        '',
+        '# Workstream State',
+        '',
+        'Status: Executing',
+        '',
+      ].join('\n'),
+      'utf-8',
+    );
+    await writeFile(join(wsDir, 'ROADMAP.md'), '# Roadmap\n\n## v2.0 Feature Milestone\n', 'utf-8');
+
+    const { readModifyWriteStateMdFull } = await import('./state-mutation.js');
+    await readModifyWriteStateMdFull(tmpDir, content => content.replace('Status: Executing', 'Status: Complete'), 'feature');
+
+    const after = await readFile(join(wsDir, 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    expect(fm.milestone).toBe('v2.0');
+    expect(fm.milestone_name).toBe('Feature Milestone');
+    expect(fm.status).toBe('completed');
+  });
+
   it('throws on missing args', async () => {
     const { stateUpdate } = await import('./state-mutation.js');
 

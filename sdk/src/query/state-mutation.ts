@@ -192,10 +192,15 @@ export async function releaseStateLock(lockPath: string): Promise<void> {
  * Strips existing frontmatter, rebuilds from body + disk, and splices back.
  * Preserves existing status when body-derived status is 'unknown'.
  */
-async function syncStateFrontmatter(content: string, projectDir: string, workstream?: string): Promise<string> {
+async function syncStateFrontmatter(
+  content: string,
+  projectDir: string,
+  workstream?: string,
+  options: { preserveExistingProgress?: boolean } = {},
+): Promise<string> {
   const existingFm = extractFrontmatter(content);
   const body = stripFrontmatter(content);
-  const derivedFm = await buildStateFrontmatter(body, projectDir, workstream);
+  const derivedFm = await buildStateFrontmatter(body, projectDir, workstream, options);
 
   // Preserve existing status when body-derived is 'unknown'
   if (derivedFm.status === 'unknown' && existingFm.status && existingFm.status !== 'unknown') {
@@ -219,7 +224,7 @@ async function readModifyWriteStateMd(
   projectDir: string,
   modifier: (content: string) => string | Promise<string>,
   workstream?: string,
-  options: { resync?: boolean } = {},
+  options: { resync?: boolean; preserveExistingProgress?: boolean } = {},
 ): Promise<string> {
   const statePath = planningPaths(projectDir, workstream).state;
   const resync = options.resync !== false;
@@ -237,7 +242,9 @@ async function readModifyWriteStateMd(
     const preFm = extractFrontmatter(content);
     const body = stripFrontmatter(content);
     const modified = await modifier(body);
-    let synced = await syncStateFrontmatter(modified, projectDir, workstream);
+    let synced = await syncStateFrontmatter(modified, projectDir, workstream, {
+      preserveExistingProgress: options.preserveExistingProgress,
+    });
     if (!resync && preFm && preFm.progress) {
       const postFm = extractFrontmatter(synced);
       postFm.progress = preFm.progress;
@@ -272,7 +279,7 @@ export async function readModifyWriteStateMdFull(
       /* missing */
     }
     const modified = await modifier(content);
-    const synced = await syncStateFrontmatter(modified, projectDir);
+    const synced = await syncStateFrontmatter(modified, projectDir, workstream);
     await writeFile(statePath, normalizeMd(synced), 'utf-8');
   } finally {
     await releaseStateLock(lockPath);
@@ -299,6 +306,7 @@ export const stateUpdate: QueryHandler = async (args, projectDir, workstream) =>
   }
 
   let updated = false;
+  const shouldResync = ['Progress', 'Total Plans in Phase', 'Total Phases'].includes(field);
   await readModifyWriteStateMd(projectDir, (content) => {
     const result = stateReplaceField(content, field, value);
     if (result) {
@@ -306,7 +314,10 @@ export const stateUpdate: QueryHandler = async (args, projectDir, workstream) =>
       return result;
     }
     return content;
-  }, workstream, { resync: false });
+  }, workstream, {
+    resync: shouldResync,
+    preserveExistingProgress: !shouldResync,
+  });
 
   return { data: { updated } };
 };
