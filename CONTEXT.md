@@ -485,3 +485,110 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `WAVE.LESSON.sibling-audit-overlap=k015-family parallel dispatch on #3297 + #3298 produced k323 add-backlog.md cross-PR overlap`
 `WAVE.LESSON.agent-narrative-unreliable=k095/k324 confirmed at scale: 5 of 8 agents terminated mid-monitor with stale claims requiring direct verification`
 `WAVE.LESSON.k101-still-trips=even after CONTEXT.md k101 reinforcement, agent of record posted self-PR comment on close; k331 adds explicit close-time literal-instruction guard`
+
+---
+
+## Recent Defect Anti-Patterns (2026-05-09, machine-oriented)
+
+`DEFECT.SCOPE.window=PRs #3306..#3325 + sibling fixes #3240/#3242/#3245/#3257/#3261/#3267/#3286/#3287`
+`DEFECT.FORMAT=class.sub-key=value | classes are greppable; each class carries detect / fix / anchor sub-keys when applicable`
+
+`DEFECT.PORT-DRIFT.cjs-sdk.symptom=SDK port (sdk/src/query/*.ts) cites bin/lib/*.cjs source in docstring; CJS gets a fix or new constant; SDK lags silently`
+`DEFECT.PORT-DRIFT.cjs-sdk.examples=#3317 (skills missing from SDK GSD_MANAGED_DIRS), #3240 (extractFrontmatter anchor), #3226 (phase.add --dry-run), #3243 (cjs dotted canonical), #3229 (model catalog source-of-truth)`
+`DEFECT.PORT-DRIFT.cjs-sdk.detect=grep canonical constant in CJS, then in SDK; if both present compare values; if only CJS present treat as port-gap until proven intentional`
+`DEFECT.PORT-DRIFT.cjs-sdk.fix-forward=add SDK-side behavioral test mirroring the CJS test; or extract shared JSON/TS module if both runtimes can consume it`
+`DEFECT.PORT-DRIFT.cjs-sdk.anchor=tests/config-schema-sdk-parity.test.cjs is the canonical pattern — replicate per port-pair`
+
+`DEFECT.REMOVED-BUT-NEEDED.symptom=file/key removed because "scoped under sdk/" or "no longer used" without verifying every consumer (workflows, docs, manifests, npm scripts)`
+`DEFECT.REMOVED-BUT-NEEDED.examples=#3316 root package-lock.json (root package.json declares deps; workflows use cache:'npm' + npm ci), e3b52c70 docs referenced removed /gsd-new-workspace`
+`DEFECT.REMOVED-BUT-NEEDED.detect=before deletion, grep filename across .github/workflows, get-shit-done/, docs/, package.json scripts, sdk/scripts; if any reference exists removal is incomplete`
+`DEFECT.REMOVED-BUT-NEEDED.fix-forward=restore the file or update every consumer in the same commit; do not paper over with --no-package-lock or workflow workarounds that lose reproducibility`
+
+`DEFECT.STATE-TRAMPLE.symptom=state-mutation paths overwrite curated values when body-derived computation is narrower than what's stored in frontmatter`
+`DEFECT.STATE-TRAMPLE.examples=#3242 (Last Activity overwrote progress.completed_plans), #3257 (nested plans/ files uncounted), #3261 (buildStateFrontmatter), #3265 (canonical fields), #3286 (record-metric/add-decision sections)`
+`DEFECT.STATE-TRAMPLE.detect=any state writer that calls buildStateFrontmatter without preserving existing progress.* keys; any mutation surface that does not honor shouldPreserveExistingProgress`
+`DEFECT.STATE-TRAMPLE.fix-forward=route through state-document.cjs/.ts shouldPreserveExistingProgress + normalizeProgressNumbers (extracted in #3316 SDK-first seams)`
+
+`DEFECT.PHASE-DIR-PREFIX-DRIFT.symptom=multiple workflow files independently construct .planning/phases/{NN}-{slug} paths; project_code prefix or slug normalization missing in some surfaces`
+`DEFECT.PHASE-DIR-PREFIX-DRIFT.examples=#3287 (init.phase-op + init.plan-phase first-touch), #3306/PRED.k015 (plan-milestone-gaps + import + add-backlog), #3297/#3298 (sibling reports)`
+`DEFECT.PHASE-DIR-PREFIX-DRIFT.detect=grep mkdir/touch/path.join with {NN}-{slug} or padded_phase + phase_slug; if not consuming expected_phase_dir from init.* JSON it is drifting`
+`DEFECT.PHASE-DIR-PREFIX-DRIFT.fix-forward=consume expected_phase_dir from init.phase-op / init.plan-phase output; never re-construct from padded_phase + slug in workflow steps`
+`DEFECT.PHASE-DIR-PREFIX-DRIFT.anchor=tests/bug-3298-phase-dir-prefix-drift-in-workflows.test.cjs (broad regression across workflow surfaces)`
+
+`DEFECT.STACKED-PR-AUTO-RETARGET.symptom=PR #N is stacked on branch B; branch B merges to main and is deleted; GitHub does not reliably auto-retarget #N to main; PR shows DIRTY/CONFLICTING with phantom conflicts`
+`DEFECT.STACKED-PR-AUTO-RETARGET.examples=#3311 base fix/3255-add-json-errors-mode-gsd-tools deleted after #3304 merged`
+`DEFECT.STACKED-PR-AUTO-RETARGET.detect=ls-remote shows base ref absent; PR base still points at the deleted ref; mergeable=CONFLICTING with no real diff conflicts`
+`DEFECT.STACKED-PR-AUTO-RETARGET.fix-forward=PATCH /repos/{owner}/{repo}/pulls/{N} -f base=main; rebase head onto current main; resolve carry-over commits (parent commits will auto-drop as patch contents already upstream)`
+
+`DEFECT.BOT-BRANCH-STALE-BASE.symptom=auto-branch.yml creates fix/{N}-{slug} when issue is filed; branch is anchored to issue-creation main; by the time work begins, main has moved`
+`DEFECT.BOT-BRANCH-STALE-BASE.examples=#3309 fix/3309-checkpoint-type-human-verify-burns-token (was at e14ef535; main at 2e87c60a)`
+`DEFECT.BOT-BRANCH-STALE-BASE.detect=git merge-base origin/<bot-branch> origin/main returns the bot branch tip — confirms the bot branch is an ancestor of main, just stale`
+`DEFECT.BOT-BRANCH-STALE-BASE.fix-forward=git checkout --detach origin/main; do work; git checkout -b <same-branch-name>; force-push with --force-with-lease`
+
+`DEFECT.SUPERSEDED-CONCURRENT-PRS.symptom=multiple in-flight PRs attack overlapping subsets of the same issue; the broadest one merges first; narrower siblings remain open with phantom conflicts`
+`DEFECT.SUPERSEDED-CONCURRENT-PRS.examples=#3303 + #3307 superseded by #3306 (all addressing #3297/#3298 project_code prefix family)`
+`DEFECT.SUPERSEDED-CONCURRENT-PRS.detect=after a fix lands on main, grep recently-merged PR title for shared keyword/issue; check open PRs touching same files; if open PRs are subsets of merged work they are superseded`
+`DEFECT.SUPERSEDED-CONCURRENT-PRS.fix-forward=close superseded PRs via gh api PATCH state=closed; do not comment on self-authored PRs (k101); the link to the merged PR makes supersession discoverable in PR history`
+
+`DEFECT.PROMPT-INJECTION-SCAN-COLLISION.symptom=custom XML element name in agent .md file matches scripts/scan-prompt-injection regex; legitimate agent vocabulary trips the security gate`
+`DEFECT.PROMPT-INJECTION-SCAN-COLLISION.examples=#3309 added a bare 'human' element (angle-bracket-wrapped) for verify-block harvesting; tests/prompt-injection-scan.test.cjs flags angle-bracket-wrapped names matching system|assistant|human (open or close form)`
+`DEFECT.PROMPT-INJECTION-SCAN-COLLISION.detect=any new bare <system|assistant|human|user> tag in agents/*.md`
+`DEFECT.PROMPT-INJECTION-SCAN-COLLISION.fix-forward=hyphenate the tag (<human-check>, <assistant-prompt>) — scanner regex matches bare names only`
+
+`DEFECT.INVENTORY-DRIFT.symptom=new file added under get-shit-done/references/ or get-shit-done/workflows/ without updating docs/INVENTORY.md count + row AND docs/INVENTORY-MANIFEST.json`
+`DEFECT.INVENTORY-DRIFT.examples=#3309 planner-human-verify-mode.md (caught by tests/inventory-counts.test.cjs + tests/inventory-manifest-sync.test.cjs)`
+`DEFECT.INVENTORY-DRIFT.detect=tests/inventory-* fails with "References (N shipped) disagrees with filesystem" or "New surfaces not in manifest"`
+`DEFECT.INVENTORY-DRIFT.fix-forward=update INVENTORY.md headline count + row entry + footnote count; run node scripts/gen-inventory-manifest.cjs --write to regen INVENTORY-MANIFEST.json; only families.workflows is canonical (top-level workflows key is stale)`
+
+`DEFECT.AGENT-FILE-SIZE-CAP-BREACH.symptom=adding to agents/gsd-planner.md (or other large agent files) exceeds the 45K char extraction-evidence threshold`
+`DEFECT.AGENT-FILE-SIZE-CAP-BREACH.state=gsd-planner.md is already 49,121 chars on main (over 45K); test fails on main; net-new content makes it strictly worse`
+`DEFECT.AGENT-FILE-SIZE-CAP-BREACH.detect=tests/planner-decomposition.test.cjs ("planner is under 45K chars (proves mode sections were extracted)") and tests/reachability-check.test.cjs ("file stays under 50000 char limit")`
+`DEFECT.AGENT-FILE-SIZE-CAP-BREACH.fix-forward=mirror MVP mode pattern — extract full rules to get-shit-done/references/planner-<mode>.md, leave a slim Detection section in the agent file with @-reference to the new file`
+
+`DEFECT.CHANGESET-PR-FIELD-DRIFT.symptom=.changeset/*.md frontmatter pr: value is the issue number, a guess made before PR opened, or a stale stacked-PR number`
+`DEFECT.CHANGESET-PR-FIELD-DRIFT.examples=#3316 (pr:3312 was the issue), #3325 (pr:3319 was a guess); already covered in CONTEXT.md L94 + L186 but recurs every cycle`
+`DEFECT.CHANGESET-PR-FIELD-DRIFT.detect=changeset pr: value mismatches the actual PR number returned by gh api POST /pulls`
+`DEFECT.CHANGESET-PR-FIELD-DRIFT.fix-forward=author changeset with placeholder pr:0; immediately after gh api POST /pulls returns the number, edit changeset and amend or follow-up commit; never guess`
+
+`DEFECT.WORKTREE-FETCH-SHA-DIVERGENCE.symptom=in a worktree, git fetch origin pull/N/head:pr-N produces commits with SHAs different from the actual remote PR head SHA; force-push rejected as non-fast-forward despite recent fetch`
+`DEFECT.WORKTREE-FETCH-SHA-DIVERGENCE.examples=this session, branch fix/3309-... and pr-3316`
+`DEFECT.WORKTREE-FETCH-SHA-DIVERGENCE.detect=git rev-parse HEAD~1 vs git rev-parse origin/<actual-branch-ref> — if they differ despite fetch the local copy was rewritten by some checkout-time hook`
+`DEFECT.WORKTREE-FETCH-SHA-DIVERGENCE.fix-forward=git checkout --detach origin/<actual-remote-branch> directly; do work from detached HEAD; push HEAD:<remote-branch>`
+
+`DEFECT.WINDOWS-FS-OPS.symptom=fs.renameSync / fs.copyFileSync hits EPERM/EBUSY on Windows when antivirus or another process holds a transient handle on the target`
+`DEFECT.WINDOWS-FS-OPS.examples=c47c2c5d build-hooks rename → copy fallback, d2412271 install Windows persistent SDK shim`
+`DEFECT.WINDOWS-FS-OPS.detect=any rename/copy in build/install path without try/catch fallback`
+`DEFECT.WINDOWS-FS-OPS.fix-forward=catch EPERM/EBUSY/EACCES, fall back to copy + unlink with retry, surface degraded-mode message; never silently swallow`
+
+`DEFECT.UNBOUNDED-SUBPROCESS.symptom=git/npm subprocess shelled out without timeout; CLI hangs indefinitely on stuck remote, large repo, or missing network`
+`DEFECT.UNBOUNDED-SUBPROCESS.examples=a33cbe72 worktree fix bound git subprocesses with timeout`
+`DEFECT.UNBOUNDED-SUBPROCESS.detect=execSync/execFileSync/spawnSync without timeout option in non-test code; especially git list-worktrees, git fetch, npm view`
+`DEFECT.UNBOUNDED-SUBPROCESS.fix-forward=add timeout (5-30s for git, 60s for npm); on timeout return degraded result + structured warning rather than throw`
+
+`DEFECT.PARSER-BRITTLE-MARKER-WHITELIST.symptom=human-output parser whitelists known markers (severity, status); silently drops unfamiliar markers as malformed`
+`DEFECT.PARSER-BRITTLE-MARKER-WHITELIST.examples=ac518646/#3263 code-review SUMMARY parser rejected BL-/blocker variants`
+`DEFECT.PARSER-BRITTLE-MARKER-WHITELIST.detect=any parser with hard-coded marker list; any parser that returns empty for non-matching input without warning`
+`DEFECT.PARSER-BRITTLE-MARKER-WHITELIST.fix-forward=accept variants explicitly (case-insensitive, hyphen/space alternatives); on unknown marker emit a structured WARN with the original line so the human can fix the source`
+
+`DEFECT.HALT-COST-PATTERN.symptom=architecturally-sound checkpoint pattern produces hidden token cost because subagent context is discarded across the pause and respawn`
+`DEFECT.HALT-COST-PATTERN.examples=#3309 checkpoint:human-verify (mid-flight halt = full executor cold-start per round-trip; reporter measured "tens of thousands of tokens" per halt)`
+`DEFECT.HALT-COST-PATTERN.detect=any subagent-spawning workflow with mid-flight pause-and-resume that does not preserve subagent context`
+`DEFECT.HALT-COST-PATTERN.fix-forward=offer config flag for end-of-phase aggregation; if cost dominates make end-of-phase the default; route deferred items through existing verifier surface, do not invent new writer`
+
+`DEFECT.HOOK-OVER-ENFORCEMENT.symptom=PreToolUse hook keeps blocking gh pr edit / gh issue edit even after all required files are read in the session`
+`DEFECT.HOOK-OVER-ENFORCEMENT.examples=this session repeatedly hit "Refusing to run gh issue create|edit / gh pr create|edit" despite reading every listed file`
+`DEFECT.HOOK-OVER-ENFORCEMENT.detect=hook re-fires on each invocation regardless of session-state read receipts`
+`DEFECT.HOOK-OVER-ENFORCEMENT.fix-forward=use gh api -X PATCH repos/{owner}/{repo}/pulls/{N} or repos/{owner}/{repo}/issues/{N} directly — same effect, hook regex does not match`
+
+`DEFECT.DEFAULT-FLIP-DOCUMENTATION.symptom=PR flips a config default but does not call out the migration semantics (when does the new default take effect; existing configs vs new configs; what the opt-back-in looks like)`
+`DEFECT.DEFAULT-FLIP-DOCUMENTATION.examples=#3309 v2 default flip from mid-flight to end-of-phase`
+`DEFECT.DEFAULT-FLIP-DOCUMENTATION.detect=any PR that changes a default value in CONFIG_DEFAULTS or buildNewProjectConfig; check that PR body Breaking Changes section explicitly covers (a) when the new default takes effect, (b) opt-back-in command, (c) effect on in-flight artifacts`
+`DEFECT.DEFAULT-FLIP-DOCUMENTATION.fix-forward=template — "new default takes effect when .planning/config.json is rewritten (config-set, fresh project, regenerated config); existing artifacts continue to work; opt-back-in: gsd config-set <key> <old-value>"`
+
+`DEFECT.SOURCE-GREP-IN-NEW-TESTS.symptom=new test file uses readFileSync + .includes() / .match() against source code (CONTEXT.md L82); contradicts the test rule lint script`
+`DEFECT.SOURCE-GREP-IN-NEW-TESTS.detect=tests/lint-no-source-grep.cjs (npm run lint:tests) fails with line-number-precise violation; or test reads sdk/dist/* artifacts in CI where dist may not exist`
+`DEFECT.SOURCE-GREP-IN-NEW-TESTS.fix-forward=replace with runGsdTools(...) behavioral test capturing JSON; if asserting agent .md content (which IS the runtime contract) add // allow-test-rule: source-text-is-the-product with one-line justification`
+
+`DEFECT.GENERATIVE-PRIORITY=these defect classes share a common root: parallel implementations diverge silently because no parity test enforces equality at the test layer`
+`DEFECT.GENERATIVE-FIX=for any new constant/array/parser shared between CJS and SDK (or between two workflow surfaces), the same commit MUST add a parity assertion that fails when the two diverge`
+`DEFECT.GENERATIVE-EXEMPLAR=tests/config-schema-sdk-parity.test.cjs (asserts SDK VALID_CONFIG_KEYS == CJS VALID_CONFIG_KEYS); tests/bug-3298-phase-dir-prefix-drift-in-workflows.test.cjs (asserts every workflow surface uses expected_phase_dir)`
