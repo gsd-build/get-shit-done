@@ -337,17 +337,32 @@ export const stateSnapshot: QueryHandler = async (_args, projectDir, workstream)
     return { data: { error: 'STATE.md not found' } };
   }
 
-  // Extract basic fields
-  const currentPhase = stateExtractField(content, 'Current Phase');
-  const currentPhaseName = stateExtractField(content, 'Current Phase Name');
-  const totalPhasesRaw = stateExtractField(content, 'Total Phases');
-  const currentPlan = stateExtractField(content, 'Current Plan');
-  const totalPlansRaw = stateExtractField(content, 'Total Plans in Phase');
-  const status = stateExtractField(content, 'Status');
-  const progressRaw = stateExtractField(content, 'Progress');
-  const lastActivity = stateExtractField(content, 'Last Activity');
-  const lastActivityDesc = stateExtractField(content, 'Last Activity Description');
-  const pausedAt = stateExtractField(content, 'Paused At');
+  // Bug #3265: prefer YAML frontmatter for canonical scalar fields so that a
+  // body table cell containing **Status:** Y cannot shadow the authoritative
+  // frontmatter value.  Matches the precedent set by buildStateFrontmatter
+  // (see state.ts:92 Bug #2613 comment).
+  const fm = extractFrontmatter(content);
+  const body = stripFrontmatter(content);
+
+  // Helper: return frontmatter string value when present and non-empty,
+  // otherwise fall back to body extractor (covers STATE.md files that have
+  // no frontmatter at all, or frontmatter that lacks the specific key).
+  const fmStr = (key: string): string | null => {
+    const v = fm[key];
+    return (typeof v === 'string' && v.trim()) ? v.trim() : null;
+  };
+
+  // Extract basic fields — frontmatter keys take precedence over body
+  const currentPhase = fmStr('current_phase') ?? stateExtractField(body, 'Current Phase');
+  const currentPhaseName = fmStr('current_phase_name') ?? stateExtractField(body, 'Current Phase Name');
+  const totalPhasesRaw = fmStr('total_phases') ?? stateExtractField(body, 'Total Phases');
+  const currentPlan = fmStr('current_plan') ?? stateExtractField(body, 'Current Plan');
+  const totalPlansRaw = fmStr('total_plans_in_phase') ?? stateExtractField(body, 'Total Plans in Phase');
+  const status = fmStr('status') ?? stateExtractField(body, 'Status');
+  const progressRaw = fmStr('progress') ?? stateExtractField(body, 'Progress');
+  const lastActivity = fmStr('last_activity') ?? stateExtractField(body, 'Last Activity');
+  const lastActivityDesc = fmStr('last_activity_desc') ?? stateExtractField(body, 'Last Activity Description');
+  const pausedAt = fmStr('paused_at') ?? stateExtractField(body, 'Paused At');
 
   // Parse numeric fields
   const totalPhases = totalPhasesRaw ? parseInt(totalPhasesRaw, 10) : null;
@@ -361,7 +376,7 @@ export const stateSnapshot: QueryHandler = async (_args, projectDir, workstream)
 
   // Extract decisions table
   const decisions: Array<{ phase: string; summary: string; rationale: string }> = [];
-  const decisionsMatch = content.match(/##\s*Decisions Made[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n([\s\S]*?)(?=\n##|\n$|$)/i);
+  const decisionsMatch = body.match(/##\s*Decisions Made[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n([\s\S]*?)(?=\n##|\n$|$)/i);
   if (decisionsMatch) {
     const tableBody = decisionsMatch[1];
     const rows = tableBody.trim().split('\n').filter(r => r.includes('|'));
@@ -379,7 +394,7 @@ export const stateSnapshot: QueryHandler = async (_args, projectDir, workstream)
 
   // Extract blockers list
   const blockers: string[] = [];
-  const blockersMatch = content.match(/##\s*Blockers\s*\n([\s\S]*?)(?=\n##|$)/i);
+  const blockersMatch = body.match(/##\s*Blockers\s*\n([\s\S]*?)(?=\n##|$)/i);
   if (blockersMatch) {
     const blockersSection = blockersMatch[1];
     const items = blockersSection.match(/^-\s+(.+)$/gm) || [];
@@ -395,7 +410,7 @@ export const stateSnapshot: QueryHandler = async (_args, projectDir, workstream)
     resume_file: null,
   };
 
-  const sessionMatch = content.match(/##\s*Session\s*\n([\s\S]*?)(?=\n##|$)/i);
+  const sessionMatch = body.match(/##\s*Session\s*\n([\s\S]*?)(?=\n##|$)/i);
   if (sessionMatch) {
     const sessionSection = sessionMatch[1];
     const lastDateMatch = sessionSection.match(/\*\*Last Date:\*\*\s*(.+)/i)

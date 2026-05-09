@@ -346,6 +346,126 @@ describe('stateSnapshot', () => {
   });
 });
 
+// ─── Regression: #3265 — frontmatter wins over bold-body cell ─────────────
+
+describe('stateSnapshot — bug #3265 frontmatter precedence', () => {
+  it('returns frontmatter status, not **Status:** value embedded in a body table cell', async () => {
+    // Reproduce the collision: frontmatter says "executing", but the body
+    // contains a Markdown table cell with "**Status:** to ✅ COMPLETE ..."
+    // which stateExtractField (bold pattern) would match before the YAML line.
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'status: executing',
+      'current_plan: 19.5-05',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '## Recent Quick Tasks',
+      '',
+      '| Date | Task | Notes |',
+      '|------|------|-------|',
+      '| 2026-05-01 | Reopened Plan 19.5-05. **Status:** to ✅ COMPLETE | done |',
+      '',
+      '**Current Phase:** 19',
+      '**Current Plan:** archived-lane',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3265-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    // Frontmatter status must win
+    expect(data.status).toBe('executing');
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+
+  it('returns frontmatter current_plan, not bold body value when both present', async () => {
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'status: executing',
+      'current_plan: 19.5-05',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '**Current Phase:** 19',
+      '**Current Plan:** archived-lane',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3265b-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    // Frontmatter current_plan must win over body bold value
+    expect(data.current_plan).toBe('19.5-05');
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+
+  it('falls back to body extraction when no frontmatter block is present', async () => {
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 07',
+      '**Status:** paused',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3265c-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    // No frontmatter — body extraction must still work
+    expect(data.status).toBe('paused');
+    expect(data.current_phase).toBe('07');
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+
+  it('falls back to body extractor for a field absent from frontmatter', async () => {
+    // Frontmatter has status but no current_plan — snapshot must body-extract current_plan
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'status: planning',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '**Current Plan:** 05-03',
+      '',
+    ].join('\n');
+
+    const localDir = await mkdtemp(join(tmpdir(), 'gsd-3265d-'));
+    await mkdir(join(localDir, '.planning'), { recursive: true });
+    await writeFile(join(localDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = await stateSnapshot([], localDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.status).toBe('planning');
+    // current_plan absent from frontmatter — must come from body
+    expect(data.current_plan).toBe('05-03');
+
+    await rm(localDir, { recursive: true, force: true });
+  });
+});
+
 // ─── Regression: --ws propagation (#2618 gap 1) ────────────────────────────
 
 describe('stateJson with --ws workstream', () => {

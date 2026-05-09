@@ -191,6 +191,98 @@ describe('state-snapshot command', () => {
   });
 });
 
+// ─── Regression: #3265 — frontmatter wins over bold-body cell ─────────────
+
+describe('state-snapshot — bug #3265 frontmatter precedence', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns frontmatter status, not **Status:** value embedded in a body table cell', () => {
+    // Reproduce the collision: frontmatter says "executing", but the body
+    // contains a Markdown table cell with "**Status:** to ✅ COMPLETE ..."
+    // which stateExtractField (bold pattern) would match before the YAML line.
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'status: executing',
+      'current_plan: 19.5-05',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '## Recent Quick Tasks',
+      '',
+      '| Date | Task | Notes |',
+      '|------|------|-------|',
+      '| 2026-05-01 | Reopened Plan 19.5-05. **Status:** to ✅ COMPLETE | done |',
+      '',
+      '**Current Phase:** 19',
+      '**Current Plan:** archived-lane',
+      '',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = runGsdTools('state-snapshot', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Frontmatter status must win over the table cell's **Status:** match
+    assert.strictEqual(output.status, 'executing', 'frontmatter status beats body table cell');
+  });
+
+  test('returns frontmatter current_plan, not bold body value when both present', () => {
+    const stateContent = [
+      '---',
+      'gsd_state_version: 1.0',
+      'status: executing',
+      'current_plan: 19.5-05',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '**Current Phase:** 19',
+      '**Current Plan:** archived-lane',
+      '',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = runGsdTools('state-snapshot', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.current_plan, '19.5-05', 'frontmatter current_plan beats body bold value');
+  });
+
+  test('falls back to body extraction when no frontmatter block is present', () => {
+    const stateContent = [
+      '# Project State',
+      '',
+      '**Current Phase:** 07',
+      '**Status:** paused',
+      '',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateContent);
+
+    const result = runGsdTools('state-snapshot', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // No frontmatter — body extraction must still work
+    assert.strictEqual(output.status, 'paused', 'body extraction works without frontmatter');
+    assert.strictEqual(output.current_phase, '07', 'body extraction works without frontmatter');
+  });
+});
+
 describe('state mutation commands', () => {
   let tmpDir;
 
