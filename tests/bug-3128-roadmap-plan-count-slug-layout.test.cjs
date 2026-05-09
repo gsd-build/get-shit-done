@@ -24,6 +24,7 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 // Require the module under test directly
 const roadmapLib = path.join(ROOT, 'get-shit-done', 'bin', 'lib', 'roadmap.cjs');
+const planScanLib = path.join(ROOT, 'get-shit-done', 'bin', 'lib', 'plan-scan.cjs');
 
 // We test countPhasePlansAndSummaries indirectly via getManagerInfo since
 // it is not exported. We build a real phaseDir on disk and call the full
@@ -76,16 +77,22 @@ describe('bug #3128: roadmap.cjs plan-count for {N}-PLAN-{NN}-{slug}.md layout',
   });
 
   test('roadmap.cjs source uses the extended isPlanFile filter', () => {
-    const src = fs.readFileSync(roadmapLib, 'utf8');
-    // Verify the fix is in place: the old simple filter is gone
+    const roadmapSrc = fs.readFileSync(roadmapLib, 'utf8');
+    // Verify the fix is in place: the old simple inline filter is gone from roadmap.cjs
     assert.ok(
-      !src.includes("phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md')"),
-      'Old simple plan filter still present — fix not applied',
+      !roadmapSrc.includes("phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md')"),
+      'Old simple plan filter still present in roadmap.cjs — fix not applied',
     );
-    // The fix introduces isPlanFile with PLAN regex
+    // roadmap.cjs now delegates to plan-scan.cjs via require('./plan-scan.cjs')
     assert.ok(
-      src.includes('isPlanFile') && src.includes('/PLAN/i'),
-      'isPlanFile with /PLAN/i not found in roadmap.cjs — fix not applied',
+      roadmapSrc.includes('plan-scan.cjs'),
+      'roadmap.cjs does not require plan-scan.cjs — delegation not applied',
+    );
+    // plan-scan.cjs is where the extended plan-file detection logic lives (isRootPlanFile)
+    const planScanSrc = fs.readFileSync(planScanLib, 'utf8');
+    assert.ok(
+      planScanSrc.includes('isRootPlanFile') && planScanSrc.includes('/PLAN/i'),
+      'isRootPlanFile with /PLAN/i not found in plan-scan.cjs — canonical helper missing extended filter',
     );
   });
 });
