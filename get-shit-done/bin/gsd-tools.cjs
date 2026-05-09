@@ -244,24 +244,42 @@ function parseMultiwordArg(args, flag) {
 async function main() {
   let args = process.argv.slice(2);
 
+  // --json-errors / GSD_JSON_ERRORS=1: when active, error() emits structured
+  // JSON ({ ok: false, reason: <ERROR_REASON code>, message }) to stderr
+  // instead of "Error: <text>". Lets test suites assert on typed reason codes
+  // per CONTRIBUTING.md "Prohibited: Raw Text Matching" (#2974).
+  //
+  // Detect early — before any flag parsing that can fire error() — so even
+  // --cwd and workstream-resolution failures emit structured stderr (#3310).
+  // The argv splice must happen here too, otherwise the dispatcher below sees
+  // "--json-errors" as an unknown command. Default off — human operators keep
+  // their plain-text diagnostic.
+  const jsonErrorsIdx = args.indexOf('--json-errors');
+  if (jsonErrorsIdx !== -1) {
+    core.setJsonErrorMode(true);
+    args.splice(jsonErrorsIdx, 1);
+  } else if (process.env.GSD_JSON_ERRORS === '1') {
+    core.setJsonErrorMode(true);
+  }
+
   // Optional cwd override for sandboxed subagents running outside project root.
   let cwd = process.cwd();
   const cwdEqArg = args.find(arg => arg.startsWith('--cwd='));
   const cwdIdx = args.indexOf('--cwd');
   if (cwdEqArg) {
     const value = cwdEqArg.slice('--cwd='.length).trim();
-    if (!value) error('Missing value for --cwd');
+    if (!value) error('Missing value for --cwd', ERROR_REASON.USAGE);
     args.splice(args.indexOf(cwdEqArg), 1);
     cwd = path.resolve(value);
   } else if (cwdIdx !== -1) {
     const value = args[cwdIdx + 1];
-    if (!value || value.startsWith('--')) error('Missing value for --cwd');
+    if (!value || value.startsWith('--')) error('Missing value for --cwd', ERROR_REASON.USAGE);
     args.splice(cwdIdx, 2);
     cwd = path.resolve(value);
   }
 
   if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
-    error(`Invalid --cwd: ${cwd}`);
+    error(`Invalid --cwd: ${cwd}`, ERROR_REASON.USAGE);
   }
 
   // Resolve worktree root: in a linked worktree, .planning/ lives in the main worktree.
@@ -293,20 +311,6 @@ async function main() {
   const rawIndex = args.indexOf('--raw');
   const raw = rawIndex !== -1;
   if (rawIndex !== -1) args.splice(rawIndex, 1);
-
-  // --json-errors: when present, error() emits structured JSON to stderr
-  // ({ ok: false, reason: <ERROR_REASON code>, message }) instead of plain
-  // "Error: <text>". Lets test suites assert on typed reason codes per the
-  // CONTRIBUTING.md "Prohibited: Raw Text Matching on Test Outputs" rule
-  // (#2974). Default off — human operators see the original plain-text
-  // diagnostic.
-  const jsonErrorsIdx = args.indexOf('--json-errors');
-  if (jsonErrorsIdx !== -1) {
-    core.setJsonErrorMode(true);
-    args.splice(jsonErrorsIdx, 1);
-  } else if (process.env.GSD_JSON_ERRORS === '1') {
-    core.setJsonErrorMode(true);
-  }
 
   // --pick <name>: extract a single field from JSON output (replaces jq dependency).
   // Supports dot-notation (e.g., --pick workflow.research) and bracket notation
@@ -579,7 +583,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
           wave: wave || '1',
         }, raw);
       } else {
-        error('Unknown template subcommand. Available: select, fill');
+        error('Unknown template subcommand. Available: select, fill', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -597,7 +601,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       } else if (subcommand === 'validate') {
         frontmatter.cmdFrontmatterValidate(cwd, file, parseNamedArgs(args, ['schema']).schema, raw);
       } else {
-        error('Unknown frontmatter subcommand. Available: get, set, merge, validate');
+        error('Unknown frontmatter subcommand. Available: get, set, merge, validate', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -706,7 +710,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       if (subcommand === 'mark-complete') {
         milestone.cmdRequirementsMarkComplete(cwd, args.slice(2), raw);
       } else {
-        error('Unknown requirements subcommand. Available: mark-complete');
+        error('Unknown requirements subcommand. Available: mark-complete', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -736,7 +740,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         const archivePhases = args.includes('--archive-phases');
         milestone.cmdMilestoneComplete(cwd, args[2], { name: milestoneName, archivePhases }, raw);
       } else {
-        error('Unknown milestone subcommand. Available: complete');
+        error('Unknown milestone subcommand. Available: complete', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -788,7 +792,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         const options = parseNamedArgs(args, ['file']);
         uat.cmdRenderCheckpoint(cwd, options, raw);
       } else {
-        error('Unknown uat subcommand. Available: render-checkpoint');
+        error('Unknown uat subcommand. Available: render-checkpoint', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -806,7 +810,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       } else if (subcommand === 'match-phase') {
         commands.cmdTodoMatchPhase(cwd, args[2], raw);
       } else {
-        error('Unknown todo subcommand. Available: complete, match-phase');
+        error('Unknown todo subcommand. Available: complete, match-phase', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -882,7 +886,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       const sessionsPath = pathIdx !== -1 ? args[pathIdx + 1] : null;
       const projectArg = args[1];
       if (!projectArg || projectArg.startsWith('--')) {
-        error('Usage: gsd-tools extract-messages <project> [--session <id>] [--limit N] [--path <dir>]\nRun scan-sessions first to see available projects.');
+        error('Usage: gsd-tools extract-messages <project> [--session <id>] [--limit N] [--path <dir>]\nRun scan-sessions first to see available projects.', ERROR_REASON.USAGE);
       }
       await profilePipeline.cmdExtractMessages(projectArg, { sessionId, limit }, raw, sessionsPath);
       break;
@@ -906,7 +910,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     case 'write-profile': {
       const inputIdx = args.indexOf('--input');
       const inputPath = inputIdx !== -1 ? args[inputIdx + 1] : null;
-      if (!inputPath) error('--input <analysis-json-path> is required');
+      if (!inputPath) error('--input <analysis-json-path> is required', ERROR_REASON.USAGE);
       const outputIdx = args.indexOf('--output');
       const outputPath = outputIdx !== -1 ? args[outputIdx + 1] : null;
       profileOutput.cmdWriteProfile(cwd, { input: inputPath, output: outputPath }, raw);
@@ -972,7 +976,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       } else if (subcommand === 'progress') {
         workstream.cmdWorkstreamProgress(cwd, raw);
       } else {
-        error('Unknown workstream subcommand. Available: create, list, status, complete, set, get, progress');
+        error('Unknown workstream subcommand. Available: create, list, status, complete, set, get, progress', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -984,7 +988,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       const subcommand = args[1];
       if (subcommand === 'query') {
         const term = args[2];
-        if (!term) error('Usage: gsd-tools intel query <term>');
+        if (!term) error('Usage: gsd-tools intel query <term>', ERROR_REASON.USAGE);
         const planningDir = path.join(cwd, '.planning');
         core.output(intel.intelQuery(term, planningDir), raw);
       } else if (subcommand === 'status') {
@@ -1006,14 +1010,14 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         core.output(intel.intelSnapshot(planningDir), raw);
       } else if (subcommand === 'patch-meta') {
         const filePath = args[2];
-        if (!filePath) error('Usage: gsd-tools intel patch-meta <file-path>');
+        if (!filePath) error('Usage: gsd-tools intel patch-meta <file-path>', ERROR_REASON.USAGE);
         core.output(intel.intelPatchMeta(path.resolve(cwd, filePath)), raw);
       } else if (subcommand === 'validate') {
         const planningDir = path.join(cwd, '.planning');
         core.output(intel.intelValidate(planningDir), raw);
       } else if (subcommand === 'extract-exports') {
         const filePath = args[2];
-        if (!filePath) error('Usage: gsd-tools intel extract-exports <file-path>');
+        if (!filePath) error('Usage: gsd-tools intel extract-exports <file-path>', ERROR_REASON.USAGE);
         core.output(intel.intelExtractExports(path.resolve(cwd, filePath)), raw);
       } else if (subcommand === 'update') {
         const planningDir = path.join(cwd, '.planning');
@@ -1031,7 +1035,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       const subcommand = args[1];
       if (subcommand === 'query') {
         const term = args[2];
-        if (!term) error('Usage: gsd-tools graphify query <term>');
+        if (!term) error('Usage: gsd-tools graphify query <term>', ERROR_REASON.USAGE);
         const budgetIdx = args.indexOf('--budget');
         const budget = budgetIdx !== -1 ? parseInt(args[budgetIdx + 1], 10) : null;
         core.output(graphify.graphifyQuery(cwd, term, { budget }), raw);
@@ -1046,7 +1050,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
           core.output(graphify.graphifyBuild(cwd), raw);
         }
       } else {
-        error('Unknown graphify subcommand. Available: build, query, status, diff');
+        error('Unknown graphify subcommand. Available: build, query, status, diff', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -1067,21 +1071,21 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       } else if (subcommand === 'query') {
         const tagIdx = args.indexOf('--tag');
         const tag = tagIdx !== -1 ? args[tagIdx + 1] : null;
-        if (!tag) error('Usage: gsd-tools learnings query --tag <tag>');
+        if (!tag) error('Usage: gsd-tools learnings query --tag <tag>', ERROR_REASON.USAGE);
         learnings.cmdLearningsQuery(tag, raw);
       } else if (subcommand === 'copy') {
         learnings.cmdLearningsCopy(cwd, raw);
       } else if (subcommand === 'prune') {
         const olderIdx = args.indexOf('--older-than');
         const olderThan = olderIdx !== -1 ? args[olderIdx + 1] : null;
-        if (!olderThan) error('Usage: gsd-tools learnings prune --older-than <duration>');
+        if (!olderThan) error('Usage: gsd-tools learnings prune --older-than <duration>', ERROR_REASON.USAGE);
         learnings.cmdLearningsPrune(olderThan, raw);
       } else if (subcommand === 'delete') {
         const id = args[2];
-        if (!id) error('Usage: gsd-tools learnings delete <id>');
+        if (!id) error('Usage: gsd-tools learnings delete <id>', ERROR_REASON.USAGE);
         learnings.cmdLearningsDelete(id, raw);
       } else {
-        error('Unknown learnings subcommand. Available: list, query, copy, prune, delete');
+        error('Unknown learnings subcommand. Available: list, query, copy, prune, delete', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
@@ -1101,11 +1105,11 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       const configDirIdx = args.indexOf('--config-dir');
       const configDir = configDirIdx !== -1 ? args[configDirIdx + 1] : null;
       if (!configDir) {
-        error('Usage: gsd-tools detect-custom-files --config-dir <path>');
+        error('Usage: gsd-tools detect-custom-files --config-dir <path>', ERROR_REASON.USAGE);
       }
       const resolvedConfigDir = path.resolve(configDir);
       if (!fs.existsSync(resolvedConfigDir)) {
-        error(`Config directory not found: ${resolvedConfigDir}`);
+        error(`Config directory not found: ${resolvedConfigDir}`, ERROR_REASON.USAGE);
       }
 
       const manifestPath = path.join(resolvedConfigDir, 'gsd-file-manifest.json');
