@@ -77,24 +77,57 @@ async function main(): Promise<void> {
       mutation: entry.mutation,
     }));
 
+  // Serialise a FamilyCommandAlias entry as a single-line TS literal.
+  function serializeFamily(e: { canonical: string; aliases: string[]; subcommand: string; mutation: boolean }): string {
+    const aliases = `[${e.aliases.map((a) => `'${a}'`).join(', ')}]`;
+    return `{ canonical: '${e.canonical}', aliases: ${aliases}, subcommand: '${e.subcommand}', mutation: ${e.mutation} }`;
+  }
+
+  // Serialise a NonFamilyCommandAlias entry as a single-line TS literal.
+  function serializeNonFamily(e: { canonical: string; aliases: string[]; mutation: boolean }): string {
+    const aliases = `[${e.aliases.map((a) => `'${a}'`).join(', ')}]`;
+    return `{ canonical: '${e.canonical}', aliases: ${aliases}, mutation: ${e.mutation} }`;
+  }
+
+  function renderFamilyArray(entries: { canonical: string; aliases: string[]; subcommand: string; mutation: boolean }[]): string {
+    return `[\n${entries.map((e) => `  ${serializeFamily(e)},`).join('\n')}\n]`;
+  }
+
+  function renderNonFamilyArray(entries: { canonical: string; aliases: string[]; mutation: boolean }[]): string {
+    return `[\n${entries.map((e) => `  ${serializeNonFamily(e)},`).join('\n')}\n]`;
+  }
+
   const tsOutPath = fileURLToPath(new URL('../src/query/command-aliases.generated.ts', import.meta.url));
   const tsHeader = `/**\n * GENERATED FILE — command alias expansion for state.*, verify.*, init.*, phase.*, phases.*, validate.*, roadmap.*, and non-family commands.\n * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap,non-family}.ts\n */\n\n`;
   const tsBody = [
-    `export const STATE_COMMAND_ALIASES = ${JSON.stringify(stateEntries, null, 2)} as const;`,
+    'export interface FamilyCommandAlias {',
+    '  canonical: string;',
+    '  aliases: string[];',
+    '  subcommand: string;',
+    '  mutation: boolean;',
+    '}',
     '',
-    `export const VERIFY_COMMAND_ALIASES = ${JSON.stringify(verifyEntries, null, 2)} as const;`,
+    `export const STATE_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(stateEntries)} as const;`,
     '',
-    `export const INIT_COMMAND_ALIASES = ${JSON.stringify(initEntries, null, 2)} as const;`,
+    `export const VERIFY_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(verifyEntries)} as const;`,
     '',
-    `export const PHASE_COMMAND_ALIASES = ${JSON.stringify(phaseEntries, null, 2)} as const;`,
+    `export const INIT_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(initEntries)} as const;`,
     '',
-    `export const PHASES_COMMAND_ALIASES = ${JSON.stringify(phasesEntries, null, 2)} as const;`,
+    `export const PHASE_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(phaseEntries)} as const;`,
     '',
-    `export const VALIDATE_COMMAND_ALIASES = ${JSON.stringify(validateEntries, null, 2)} as const;`,
+    `export const PHASES_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(phasesEntries)} as const;`,
     '',
-    `export const ROADMAP_COMMAND_ALIASES = ${JSON.stringify(roadmapEntries, null, 2)} as const;`,
+    `export const VALIDATE_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(validateEntries)} as const;`,
     '',
-    `export const NON_FAMILY_COMMAND_ALIASES = ${JSON.stringify(nonFamilyEntries, null, 2)} as const;`,
+    `export const ROADMAP_COMMAND_ALIASES: readonly FamilyCommandAlias[] = ${renderFamilyArray(roadmapEntries)} as const;`,
+    '',
+    'export interface NonFamilyCommandAlias {',
+    '  canonical: string;',
+    '  aliases: string[];',
+    '  mutation: boolean;',
+    '}',
+    '',
+    `export const NON_FAMILY_COMMAND_ALIASES: readonly NonFamilyCommandAlias[] = ${renderNonFamilyArray(nonFamilyEntries)} as const;`,
     '',
     'export const STATE_SUBCOMMANDS = new Set<string>(STATE_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     'export const VERIFY_SUBCOMMANDS = new Set<string>(VERIFY_COMMAND_ALIASES.map((entry) => entry.subcommand));',
@@ -108,6 +141,7 @@ async function main(): Promise<void> {
   await writeFile(tsOutPath, tsHeader + tsBody, 'utf-8');
 
   // Also generate the CJS mirror used by get-shit-done/bin/lib/ seams.
+  // CJS is plain JavaScript — no type annotations.
   const cjsOutPath = fileURLToPath(new URL('../../get-shit-done/bin/lib/command-aliases.generated.cjs', import.meta.url));
   const cjsHeader = `'use strict';\n\n/**\n * GENERATED FILE — state.*, verify.*, init.*, phase.*, phases.*, validate.*, roadmap.*, and non-family alias/subcommand metadata for CJS routing.\n * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap,non-family}.ts\n */\n\n`;
   const cjsBody = [
