@@ -81,6 +81,8 @@ Read worktree config:
 
 ```bash
 USE_WORKTREES=$(gsd-sdk query config-get workflow.use_worktrees 2>/dev/null || echo "true")
+EXECUTOR_STALL_INTERVAL_MINUTES=$(gsd-sdk query config-get executor.stall_detect_interval_minutes 2>/dev/null || echo "5")
+EXECUTOR_STALL_THRESHOLD_MINUTES=$(gsd-sdk query config-get executor.stall_threshold_minutes 2>/dev/null || echo "10")
 ```
 
 If the project uses git submodules, worktree isolation is unsafe **only when a plan touches a submodule path** — the executor commit protocol cannot correctly handle submodule commits inside isolated worktrees. The previous behavior unconditionally disabled worktree isolation whenever `.gitmodules` existed, which penalised every plan in a submodule project even when the plan was nowhere near a submodule. Compute submodule paths once and intersect them per-plan with the plan's declared `files_modified` frontmatter.
@@ -145,6 +147,31 @@ if [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG=
 MVP_MODE=$(gsd-sdk query phase.mvp-mode "${PHASE_NUMBER}" $MVP_FLAG_ARG --pick active)
 TDD_MODE=$(gsd-sdk query config-get workflow.tdd_mode 2>/dev/null || echo "false")
 ```
+
+<step name="safe_resume_gate">
+Before trusting `STATE.md` or dispatching any executor, check whether the current
+plan already has production commits but was not closed out. Derive
+`CURRENT_PLAN_ID` from the active incomplete plan in `INIT` (phase number plus
+plan number), then search recent history:
+
+```bash
+CURRENT_PLAN_ID="{phase_number}-{plan_padded}"
+SUMMARY_PATH="{phase_dir}/{plan_padded}-SUMMARY.md"
+PLAN_COMMITS=$(git log --oneline --grep="${CURRENT_PLAN_ID}" -30)
+```
+
+If production commits exist and `SUMMARY.md is missing`, stop before spawning a
+new executor. This is a partial-plan half-state: continuing would risk duplicate
+implementation work and stale `STATE.md`/ROADMAP progress.
+
+Offer exactly these recovery options:
+- `close out manually` — inspect the commits, write the missing SUMMARY.md, then
+  let the orchestrator update STATE/ROADMAP.
+- `re-execute from scratch` — revert or supersede the partial commits first, then
+  dispatch a fresh executor.
+- `mark-and-skip` — record the anomaly as intentionally skipped and move on only
+  when the user explicitly confirms.
+</step>
 
 **MVP+TDD gate.** Task-scoped enforcement runs inside plan execution (immediately before each implementation step), where `TASK_FILE`, `PLAN_ID`, and `TASK_ID` are defined. Keep the same predicate and RED-commit contract:
 ```bash
@@ -494,6 +521,8 @@ increases monotonically across waves. `{status}` is `complete` (success),
    Before spawning, capture the current HEAD:
    ```bash
    EXPECTED_BASE=$(git rev-parse HEAD)
+   DISPATCH_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+   EXPECTED_BRANCH=$(git rev-parse --abbrev-ref HEAD)
    ```
 
    **Sequential dispatch for parallel execution (waves with 2+ agents):**
@@ -666,6 +695,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
    # For each plan in this wave, check if the executor finished:
    SUMMARY_EXISTS=$(test -f "{phase_dir}/{plan_number}-{plan_padded}-SUMMARY.md" && echo "true" || echo "false")
    COMMITS_FOUND=$(git log --oneline --all --grep="{phase_number}-{plan_padded}" --since="1 hour ago" | head -1)
+   COMMITS_SINCE_DISPATCH=$(git log "${EXPECTED_BRANCH}" --since="${DISPATCH_TS}" --oneline | head -1)
    ```
 
    **If SUMMARY.md exists AND commits are found:** The agent completed successfully —
@@ -675,6 +705,14 @@ increases monotonically across waves. `{status}` is `complete` (success),
    running or may have failed silently. Check `git log --oneline -5` for recent
    activity. If commits are still appearing, wait longer. If no activity, report
    the plan as failed and route to the failure handler in step 6.
+
+   **Configurable stall surveillance (#3212):** Every
+   `${EXECUTOR_STALL_INTERVAL_MINUTES}` minutes while waiting, compare the current
+   time to `DISPATCH_TS` and inspect `git log "${EXPECTED_BRANCH}" --since="${DISPATCH_TS}"`
+   for new executor activity. When no completion signal, no SUMMARY.md, and no
+   expected-branch commits have appeared for `${EXECUTOR_STALL_THRESHOLD_MINUTES}`
+   minutes, pause and ask the user to choose one recovery path: `continue waiting`,
+   `kill and retry`, or `kill and switch to inline execution`.
 
    **This fallback applies automatically to all runtimes.** Claude Code's Agent() normally
    returns synchronously, but the fallback ensures resilience if it doesn't.

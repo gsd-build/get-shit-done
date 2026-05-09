@@ -384,6 +384,8 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
  */
 const SCHEMA_DEFAULTS = {
   'context_window': 200000,
+  'executor.stall_detect_interval_minutes': 5,
+  'executor.stall_threshold_minutes': 10,
 };
 
 function cmdConfigGet(cwd, keyPath, raw, defaultValue) {

@@ -9,6 +9,16 @@ Read config.json for planning behavior settings.
 @~/.claude/get-shit-done/references/git-integration.md
 </required_reading>
 
+<atomic_close_out_invariant>
+For each executed plan, the only complete close-out order is:
+`production-code commit(s) -> SUMMARY commit -> STATE/ROADMAP update`.
+
+The only legal half-state is mid-production-commits while the executor is still
+actively working. Once production commits for a plan exist, returning without a
+committed SUMMARY.md is an illegal partial-plan state. The next execute-phase
+resume must detect that condition before dispatching another executor.
+</atomic_close_out_invariant>
+
 <available_agent_types>
 Valid GSD subagent types (use exact names — do not fall back to 'general-purpose'):
 - gsd-executor — Executes plan tasks, commits, creates SUMMARY.md

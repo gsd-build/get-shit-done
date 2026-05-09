@@ -47,6 +47,8 @@ const VALID_CONFIG_KEYS = new Set([
   'review.ollama_host', 'review.lm_studio_host', 'review.llama_cpp_host',
   'workflow.cross_ai_execution', 'workflow.cross_ai_command', 'workflow.cross_ai_timeout',
   'workflow.subagent_timeout',
+  'executor.stall_detect_interval_minutes',
+  'executor.stall_threshold_minutes',
   'workflow.inline_plan_threshold',
   'hooks.context_warnings',
   'hooks.workflow_guard',
