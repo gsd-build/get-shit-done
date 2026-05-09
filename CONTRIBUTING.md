@@ -88,12 +88,15 @@ The following files are maintainer-owned coding standards and must be treated as
 - `CONTEXT.md` — domain language and module naming standards
 - `docs/adr/` — Architecture Decision Records (ADRs) for accepted architectural decisions
 
-Contributor requirements:
+Full contributor requirements — including CONTEXT.md format, ADR governance, and AI-agent-assisted work standards — are in **[`docs/contributor-standards.md`](docs/contributor-standards.md)**.
+
+Contributor requirements (summary):
 - Read `CONTEXT.md` before naming or refactoring modules/interfaces/seams.
 - Use `CONTEXT.md` vocabulary consistently in code comments, tests, issue/PR text, and docs for the touched area.
 - Check relevant ADRs in `docs/adr/` before proposing or implementing architectural changes.
 - If a change intentionally revisits an ADR decision, call it out explicitly in the linked issue and PR rationale.
 - Do not rewrite maintainer intent in `CONTEXT.md`/ADRs as part of drive-by cleanup; propose focused updates tied to approved scope.
+- If using an AI assistant, prompt it to read `CONTEXT.md` and the relevant ADRs before writing any code or docs, and verify it used the correct vocabulary before opening the PR.
 
 **Every PR must link to an approved issue.** PRs without a linked issue are closed without review, no exceptions.
 
