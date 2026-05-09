@@ -105,6 +105,11 @@ const hasMinimal = args.includes('--minimal') || args.includes('--core-only');
 const installMode = hasMinimal ? 'minimal' : 'full';
 const hasSdk = args.includes('--sdk');
 const hasNoSdk = args.includes('--no-sdk');
+const commandDescriptionLocaleArg = readFlagValue(args, [
+  '--command-description-locale',
+  '--locale',
+  '--lang',
+]);
 
 if (hasSdk && hasNoSdk) {
   console.error(`  ${yellow}Cannot specify both --sdk and --no-sdk${reset}`);
@@ -486,7 +491,7 @@ if (hasUninstall) {
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--hermes${reset}                  Install for Hermes Agent only\n    ${cyan}--cline${reset}                   Install for Cline only\n    ${cyan}--codebuddy${reset}              Install for CodeBuddy only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n    ${cyan}--portable-hooks${reset}          Emit \$HOME-relative hook paths in settings.json\n                              (for WSL/Docker bind-mount setups; also GSD_PORTABLE_HOOKS=1)\n    ${cyan}--minimal${reset}                 Install only the main-loop skills (new-project,\n                              discuss-phase, plan-phase, execute-phase, help, update)\n                              and zero gsd-* subagents. Cuts cold-start system-prompt\n                              overhead from ~12k tokens to ~700 — useful for local LLMs\n                              with 32K–128K context. Re-run \`gsd update\` (without --minimal)\n                              to expand to the full surface. Alias: --core-only.\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Hermes Agent globally${reset}\n    npx get-shit-done-cc --hermes --global\n\n    ${dim}# Install for Hermes Agent locally${reset}\n    npx get-shit-done-cc --hermes --local\n\n    ${dim}# Install for Cline locally${reset}\n    npx get-shit-done-cc --cline --local\n\n    ${dim}# Install for CodeBuddy globally${reset}\n    npx get-shit-done-cc --codebuddy --global\n\n    ${dim}# Install for CodeBuddy locally${reset}\n    npx get-shit-done-cc --codebuddy --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR / HERMES_HOME / CLINE_CONFIG_DIR / CODEBUDDY_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--hermes${reset}                  Install for Hermes Agent only\n    ${cyan}--cline${reset}                   Install for Cline only\n    ${cyan}--codebuddy${reset}              Install for CodeBuddy only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}--locale pt-BR${reset}            Install command descriptions in Brazilian Portuguese\n                              (also GSD_COMMAND_DESCRIPTION_LOCALE=pt-BR)\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n    ${cyan}--portable-hooks${reset}          Emit \$HOME-relative hook paths in settings.json\n                              (for WSL/Docker bind-mount setups; also GSD_PORTABLE_HOOKS=1)\n    ${cyan}--minimal${reset}                 Install only the main-loop skills (new-project,\n                              discuss-phase, plan-phase, execute-phase, help, update)\n                              and zero gsd-* subagents. Cuts cold-start system-prompt\n                              overhead from ~12k tokens to ~700 — useful for local LLMs\n                              with 32K–128K context. Re-run \`gsd update\` (without --minimal)\n                              to expand to the full surface. Alias: --core-only.\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Hermes Agent globally${reset}\n    npx get-shit-done-cc --hermes --global\n\n    ${dim}# Install for Hermes Agent locally${reset}\n    npx get-shit-done-cc --hermes --local\n\n    ${dim}# Install for Cline locally${reset}\n    npx get-shit-done-cc --cline --local\n\n    ${dim}# Install for CodeBuddy globally${reset}\n    npx get-shit-done-cc --codebuddy --global\n\n    ${dim}# Install for CodeBuddy locally${reset}\n    npx get-shit-done-cc --codebuddy --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install command descriptions in Brazilian Portuguese${reset}\n    npx get-shit-done-cc --claude --global --locale pt-BR\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR / HERMES_HOME / CLINE_CONFIG_DIR / CODEBUDDY_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -1624,6 +1629,70 @@ function extractFrontmatterField(frontmatter, fieldName) {
   return match[1].trim().replace(/^['"]|['"]$/g, '');
 }
 
+function readFlagValue(argv, names) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    for (const name of names) {
+      if (arg === name) {
+        const value = argv[i + 1];
+        return value && !value.startsWith('--') ? value : null;
+      }
+      if (arg.startsWith(`${name}=`)) {
+        return arg.slice(name.length + 1);
+      }
+    }
+  }
+  return null;
+}
+
+let _commandDescriptionLocales = null;
+
+function normalizeCommandDescriptionLocale(value) {
+  if (!value) return null;
+  const normalized = String(value).trim().replace('_', '-').toLowerCase();
+  if (normalized === 'pt' || normalized === 'pt-br') return 'pt-BR';
+  return null;
+}
+
+function getCommandDescriptionLocale() {
+  return normalizeCommandDescriptionLocale(
+    commandDescriptionLocaleArg ||
+    process.env.GSD_COMMAND_DESCRIPTION_LOCALE ||
+    process.env.GSD_LOCALE
+  );
+}
+
+function loadCommandDescriptionLocales() {
+  if (_commandDescriptionLocales) return _commandDescriptionLocales;
+  _commandDescriptionLocales = {};
+  const localePath = path.join(__dirname, '..', 'commands', 'i18n', 'pt-BR-command-descriptions.json');
+  try {
+    _commandDescriptionLocales['pt-BR'] = JSON.parse(fs.readFileSync(localePath, 'utf8'));
+  } catch {
+    _commandDescriptionLocales['pt-BR'] = {};
+  }
+  return _commandDescriptionLocales;
+}
+
+function replaceFrontmatterDescription(content, description) {
+  const { frontmatter, body } = extractFrontmatterAndBody(content);
+  if (!frontmatter) return content;
+  const lines = frontmatter.split('\n');
+  const index = lines.findIndex((line) => line.trim().startsWith('description:'));
+  if (index === -1) return content;
+  const indentation = lines[index].match(/^\s*/)[0];
+  lines[index] = `${indentation}description: ${yamlQuote(description)}`;
+  return `---\n${lines.join('\n')}\n---${body}`;
+}
+
+function localizeCommandDescription(content, commandName) {
+  const locale = getCommandDescriptionLocale();
+  if (!locale) return content;
+  const descriptions = loadCommandDescriptionLocales()[locale] || {};
+  const description = descriptions[commandName];
+  return description ? replaceFrontmatterDescription(content, description) : content;
+}
+
 // Tool name mapping from Claude Code to Cursor CLI
 const claudeToCursorTools = {
   Bash: 'Shell',
@@ -2022,6 +2091,7 @@ function copyCommandsAsAugmentSkills(srcDir, skillsDir, prefix, pathPrefix, runt
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5227,6 +5297,7 @@ function copyFlattenedCommands(srcDir, destDir, prefix, pathPrefix, runtime) {
       const destPath = path.join(destDir, destName);
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5292,6 +5363,7 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5345,6 +5417,7 @@ function copyCommandsAsCursorSkills(srcDir, skillsDir, prefix, pathPrefix, runti
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5402,6 +5475,7 @@ function copyCommandsAsWindsurfSkills(srcDir, skillsDir, prefix, pathPrefix, run
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5454,6 +5528,7 @@ function copyCommandsAsTraeSkills(srcDir, skillsDir, prefix, pathPrefix, runtime
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5517,6 +5592,7 @@ function copyCommandsAsCodebuddySkills(srcDir, skillsDir, prefix, pathPrefix, ru
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       const globalClaudeRegex = /~\/\.claude\//g;
       const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
       const localClaudeRegex = /\.\/\.claude\//g;
@@ -5581,6 +5657,7 @@ function copyCommandsAsCopilotSkills(srcDir, skillsDir, prefix, isGlobal = false
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       content = convertClaudeCommandToCopilotSkill(content, skillName, isGlobal);
       content = processAttribution(content, getCommitAttribution('copilot'));
 
@@ -5678,6 +5755,7 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       content = content.replace(/~\/\.claude\//g, pathPrefix);
       content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
       content = content.replace(/\.\/\.claude\//g, `./${getDirName(runtime)}/`);
@@ -5780,6 +5858,7 @@ function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = f
       fs.mkdirSync(skillDir, { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf8');
+      content = localizeCommandDescription(content, baseName);
       content = convertClaudeCommandToAntigravitySkill(content, skillName, isGlobal);
       content = processAttribution(content, getCommitAttribution('antigravity'));
 
@@ -5915,6 +5994,10 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       // Replace ~/.claude/ and $HOME/.claude/ and ./.claude/ with runtime-appropriate paths
       // Skip generic replacement for Copilot — convertClaudeToCopilotContent handles all paths
       let content = fs.readFileSync(srcPath, 'utf8');
+      if (isCommand) {
+        const commandName = entry.name.replace(/\.md$/, '');
+        content = localizeCommandDescription(content, commandName);
+      }
       if (!isCopilot && !isAntigravity) {
         const globalClaudeRegex = /~\/\.claude\//g;
         const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
@@ -10495,6 +10578,8 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeCommandToCopilotSkill,
     convertClaudeAgentToCopilotAgent,
     copyCommandsAsCopilotSkills,
+    getCommandDescriptionLocale,
+    localizeCommandDescription,
     GSD_COPILOT_INSTRUCTIONS_MARKER,
     GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER,
     mergeCopilotInstructions,
