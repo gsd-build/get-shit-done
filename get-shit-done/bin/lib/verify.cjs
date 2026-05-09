@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { safeReadFile, loadConfig, normalizePhaseName, escapeRegex, execGit, findPhaseInternal, getMilestoneInfo, stripShippedMilestones, extractCurrentMilestone, output, error, checkAgentsInstalled, CONFIG_DEFAULTS } = require('./core.cjs');
+const { safeReadFile, loadConfig, normalizePhaseName, escapeRegex, execGit, findPhaseInternal, getMilestoneInfo, stripShippedMilestones, extractCurrentMilestone, output, error, checkAgentsInstalled, CONFIG_DEFAULTS, inspectWorktreeHealth } = require('./core.cjs');
 const { planningDir } = require('./planning-workspace.cjs');
 const { extractFrontmatter, parseMustHavesBlock } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
@@ -908,33 +908,24 @@ function cmdValidateHealth(cwd, options, raw) {
 
   // ─── Check 11: Stale / orphan git worktrees (#2167) ────────────────────────
   try {
-    const worktreeResult = execGit(cwd, ['worktree', 'list', '--porcelain']);
-    if (worktreeResult.exitCode === 0 && worktreeResult.stdout) {
-      const blocks = worktreeResult.stdout.split('\n\n').filter(Boolean);
-      // Skip the first block — it is always the main worktree
-      for (let i = 1; i < blocks.length; i++) {
-        const lines = blocks[i].split('\n');
-        const wtLine = lines.find(l => l.startsWith('worktree '));
-        if (!wtLine) continue;
-        const wtPath = wtLine.slice('worktree '.length);
-
-        if (!fs.existsSync(wtPath)) {
-          // Orphan: path no longer exists on disk
+    const worktreeHealth = inspectWorktreeHealth(
+      cwd,
+      { staleAfterMs: 60 * 60 * 1000 },
+      { execGit, existsSync: fs.existsSync, statSync: fs.statSync }
+    );
+    if (worktreeHealth.ok) {
+      for (const finding of worktreeHealth.findings) {
+        if (finding.kind === 'orphan') {
           addIssue('warning', 'W017',
-            `Orphan git worktree: ${wtPath} (path no longer exists on disk)`,
+            `Orphan git worktree: ${finding.path} (path no longer exists on disk)`,
             'Run: git worktree prune');
-        } else {
-          // Check if stale (older than 1 hour)
-          try {
-            const stat = fs.statSync(wtPath);
-            const ageMs = Date.now() - stat.mtimeMs;
-            const ONE_HOUR = 60 * 60 * 1000;
-            if (ageMs > ONE_HOUR) {
-              addIssue('warning', 'W017',
-                `Stale git worktree: ${wtPath} (last modified ${Math.round(ageMs / 60000)} minutes ago)`,
-                `Run: git worktree remove ${wtPath} --force`);
-            }
-          } catch { /* stat failed — skip */ }
+          continue;
+        }
+
+        if (finding.kind === 'stale') {
+          addIssue('warning', 'W017',
+            `Stale git worktree: ${finding.path} (last modified ${finding.ageMinutes} minutes ago)`,
+            `Run: git worktree remove ${finding.path} --force`);
         }
       }
     }

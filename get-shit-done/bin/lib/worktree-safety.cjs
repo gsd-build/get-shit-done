@@ -38,6 +38,18 @@ function parseWorktreePorcelain(porcelain) {
   return entries;
 }
 
+function parseWorktreeListPaths(porcelain) {
+  const paths = [];
+  const blocks = String(porcelain || '').split('\n\n').filter(Boolean);
+  for (const block of blocks) {
+    const line = block.split('\n').find(l => l.startsWith('worktree '));
+    if (!line) continue;
+    const worktreePath = line.slice('worktree '.length).trim();
+    if (worktreePath) paths.push(worktreePath);
+  }
+  return paths;
+}
+
 function resolveWorktreeContext(cwd, deps = {}) {
   const execGit = deps.execGit || execGitDefault;
   const existsSync = deps.existsSync || fs.existsSync;
@@ -138,10 +150,78 @@ function executeWorktreePrunePlan(plan, deps = {}) {
   };
 }
 
+function listLinkedWorktreePaths(repoRoot, deps = {}) {
+  const execGit = deps.execGit || execGitDefault;
+  const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
+  if (listResult.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: 'git_list_failed',
+      paths: [],
+    };
+  }
+
+  const allPaths = parseWorktreeListPaths(listResult.stdout);
+  // git worktree list always includes the current/main worktree first.
+  return {
+    ok: true,
+    reason: 'ok',
+    paths: allPaths.slice(1),
+  };
+}
+
+function inspectWorktreeHealth(repoRoot, options = {}, deps = {}) {
+  const existsSync = deps.existsSync || fs.existsSync;
+  const statSync = deps.statSync || fs.statSync;
+  const staleAfterMs = options.staleAfterMs ?? (60 * 60 * 1000);
+  const nowMs = options.nowMs ?? Date.now();
+
+  const listed = listLinkedWorktreePaths(repoRoot, { execGit: deps.execGit || execGitDefault });
+  if (!listed.ok) {
+    return {
+      ok: false,
+      reason: listed.reason,
+      findings: [],
+    };
+  }
+
+  const findings = [];
+  for (const worktreePath of listed.paths) {
+    if (!existsSync(worktreePath)) {
+      findings.push({
+        kind: 'orphan',
+        path: worktreePath,
+      });
+      continue;
+    }
+
+    try {
+      const stat = statSync(worktreePath);
+      const ageMs = nowMs - stat.mtimeMs;
+      if (ageMs > staleAfterMs) {
+        findings.push({
+          kind: 'stale',
+          path: worktreePath,
+          ageMinutes: Math.round(ageMs / 60000),
+        });
+      }
+    } catch {
+      // Keep historical behavior: stat failures are ignored.
+    }
+  }
+
+  return {
+    ok: true,
+    reason: 'ok',
+    findings,
+  };
+}
+
 module.exports = {
   resolveWorktreeContext,
   parseWorktreePorcelain,
   planWorktreePrune,
   executeWorktreePrunePlan,
+  listLinkedWorktreePaths,
+  inspectWorktreeHealth,
 };
-

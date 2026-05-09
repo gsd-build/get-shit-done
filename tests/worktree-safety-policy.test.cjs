@@ -8,6 +8,8 @@ const {
   parseWorktreePorcelain,
   planWorktreePrune,
   executeWorktreePrunePlan,
+  listLinkedWorktreePaths,
+  inspectWorktreeHealth,
 } = require('../get-shit-done/bin/lib/worktree-safety.cjs');
 
 describe('worktree-safety policy module', () => {
@@ -170,5 +172,65 @@ describe('worktree-safety policy module', () => {
     assert.strictEqual(result.ok, false);
     assert.strictEqual(result.action, 'remove_missing_paths');
     assert.strictEqual(result.reason, 'unsupported_action');
+  });
+
+  test('listLinkedWorktreePaths parses porcelain and skips first/main path', () => {
+    const listed = listLinkedWorktreePaths('/repo/main', {
+      execGit: () => ({
+        exitCode: 0,
+        stdout: [
+          'worktree /repo/main',
+          'HEAD aaa',
+          'branch refs/heads/main',
+          '',
+          'worktree /repo/wt-a',
+          'HEAD bbb',
+          'branch refs/heads/feat-a',
+          '',
+          'worktree /repo/wt-b',
+          'HEAD ccc',
+          'detached',
+          '',
+        ].join('\n'),
+        stderr: '',
+      }),
+    });
+    assert.strictEqual(listed.ok, true);
+    assert.deepStrictEqual(listed.paths, ['/repo/wt-a', '/repo/wt-b']);
+  });
+
+  test('inspectWorktreeHealth reports orphan and stale findings', () => {
+    const health = inspectWorktreeHealth(
+      '/repo/main',
+      { staleAfterMs: 60 * 60 * 1000, nowMs: 2 * 60 * 60 * 1000 },
+      {
+        execGit: () => ({
+          exitCode: 0,
+          stdout: [
+            'worktree /repo/main',
+            'HEAD aaa',
+            'branch refs/heads/main',
+            '',
+            'worktree /repo/wt-orphan',
+            'HEAD bbb',
+            'branch refs/heads/feat-a',
+            '',
+            'worktree /repo/wt-stale',
+            'HEAD ccc',
+            'branch refs/heads/feat-b',
+            '',
+          ].join('\n'),
+          stderr: '',
+        }),
+        existsSync: p => p !== '/repo/wt-orphan',
+        statSync: () => ({ mtimeMs: 0 }),
+      }
+    );
+
+    assert.strictEqual(health.ok, true);
+    assert.deepStrictEqual(health.findings, [
+      { kind: 'orphan', path: '/repo/wt-orphan' },
+      { kind: 'stale', path: '/repo/wt-stale', ageMinutes: 120 },
+    ]);
   });
 });

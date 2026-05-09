@@ -13,6 +13,7 @@ const {
   parseWorktreePorcelain: parseWorktreePorcelainPolicy,
   planWorktreePrune,
   executeWorktreePrunePlan,
+  inspectWorktreeHealth,
 } = require('./worktree-safety.cjs');
 // Compatibility shim: new imports should use planning-workspace.cjs directly.
 const {
@@ -2004,4 +2005,5 @@ module.exports = {
   atomicWriteFileSync,
   timeAgo,
   pruneOrphanedWorktrees,
+  inspectWorktreeHealth,
 };
