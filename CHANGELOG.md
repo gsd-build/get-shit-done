@@ -6,9 +6,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...HEAD)
 
-### Added
+### Enhancement
 
-- **`gsd-tools --json-errors` structured error mode** — all error paths in `gsd-tools` now emit `{ ok: false, reason: "<code>", message: "..." }` JSON to stderr when the CLI is invoked with `--json-errors` or `GSD_JSON_ERRORS=1`. Tests can assert on stable typed reason codes (`sdk_unknown_command`, `config_key_not_found`, `usage`, etc.) instead of grepping free-form text. Full taxonomy in `docs/json-errors.md`. (#3255)
+- **Shared `scanPhasePlans()` helper extracted to `bin/lib/plan-scan.cjs` (k014)** — four divergent copies of the plan-scan algorithm in `state.cjs`, `roadmap.cjs`, `init.cjs`, and `phase.cjs` are now replaced by a single canonical implementation. Each copy had subtle differences (regex shapes, flat vs nested coverage, pre-bounce exclusion patterns) that caused plan-count drift between the four callers. The helper covers both the flat layout (`*-PLAN.md`, `PLAN.md`) and the nested layout (`plans/PLAN-NN-slug.md`) introduced in #3139, and returns `{ planCount, summaryCount, completed, hasNestedPlans, planFiles, summaryFiles }`. (#3262)
 
 ### Fixed
 
