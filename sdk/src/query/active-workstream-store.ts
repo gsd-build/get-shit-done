@@ -41,6 +41,10 @@ export function writeActiveWorkstream(projectDir: string, name: string | null): 
   if (!validateWorkstreamName(name)) {
     throw new Error('Invalid workstream name: must be alphanumeric, hyphens, underscores, or dots');
   }
+  const wsDir = workstreamDir(projectDir, name);
+  if (!existsSync(wsDir)) {
+    throw new Error(`Workstream directory does not exist: ${name}`);
+  }
   writeFileSync(filePath, name + '\n', 'utf-8');
 }
 
