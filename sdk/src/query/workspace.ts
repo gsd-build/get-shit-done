@@ -93,7 +93,7 @@ export function resolveWorkspaceContext(): WorkspaceContext {
  * Return PlanningPaths scoped to the active workspace or project.
  *
  * When context has a workstream set: base = .planning/workstreams/<ws>/
- * When context has a project set: base = .planning/projects/<project>/
+ * When context has a project set: base = .planning/<project>/
  * When context is null or empty: base = .planning/ (default)
  *
  * Workspace and project names are validated before path construction.
@@ -114,7 +114,9 @@ export function workspacePlanningPaths(
     base = join(projectDir, '.planning', 'workstreams', context.workstream);
   } else if (context?.project != null) {
     validateWorkspaceName(context.project, 'project');
-    base = join(projectDir, '.planning', 'projects', context.project);
+    // Match CJS planningDir() policy: project scopes under `.planning/<project>/`
+    // (not `.planning/projects/<project>/`).
+    base = join(projectDir, '.planning', context.project);
   } else {
     base = join(projectDir, '.planning');
   }

@@ -69,10 +69,11 @@ describe('workspacePlanningPaths', () => {
     expect(paths.phases).toContain('workstreams/backend/phases');
   });
 
-  it('scopes to .planning/projects/<project> when project set', () => {
+  it('scopes to .planning/<project> when project set (CJS parity)', () => {
     const paths = workspacePlanningPaths(projectDir, { workstream: null, project: 'api-server' });
-    expect(paths.planning).toContain('projects/api-server');
-    expect(paths.state).toContain('projects/api-server/STATE.md');
+    expect(paths.planning).toContain('.planning/api-server');
+    expect(paths.planning).not.toContain('projects/');
+    expect(paths.state).toContain('.planning/api-server/STATE.md');
   });
 
   it('workstream takes precedence over project when both set', () => {
