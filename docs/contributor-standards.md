@@ -155,7 +155,7 @@ If you are dispatching an AI agent, include these reads in the agent's prompt ex
 Agent-written code must use an isolated worktree to prevent branch pollution. The standard pattern:
 
 ```bash
-git worktree add ../my-feature-worktree fix/3232-contributor-standards-vision
+git worktree add ../my-feature-worktree fix/NNNN-short-description
 ```
 
 Never commit agent output directly to `main` or to an already-open feature branch without review.
