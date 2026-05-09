@@ -3336,10 +3336,13 @@ function migrateCodexHooksMapFormat(content) {
   // Use section.segments (parsed key count) rather than section.path.startsWith() so that
   // nested handler tables like [hooks.SessionStart.hooks] (3 segments) are not mistakenly
   // included and re-emitted as an event named "SessionStart.hooks".
+  // Exclude hooks.state and hooks.state.* — these are Codex's persistent hook-trust
+  // namespace (Codex CLI 0.130.0+) and use regular-table shape, never AoT.
   const legacyMapSections = sections.filter(
     (section) => !section.array && (
       section.path === 'hooks' ||
-      (section.path.startsWith('hooks.') && section.segments.length === 2)
+      (section.path.startsWith('hooks.') && section.segments.length === 2 &&
+        section.path !== 'hooks.state' && !section.path.startsWith('hooks.state.'))
     )
   );
 
@@ -3979,9 +3982,16 @@ function validateCodexConfigSchema(content) {
 
     // hooks.state.* is Codex's persistent hook-trust namespace (added in
     // Codex CLI 0.130.0). It uses regular-table shape, NOT array-of-tables.
-    // Any section whose path is exactly `hooks.state` or starts with
-    // `hooks.state.` must be allowed as a bare table. All other hooks.*
-    // paths (event handlers like hooks.SessionStart) still require AoT.
+    // [[hooks.state]] or [[hooks.state.<key>]] (AoT) is invalid; reject it.
+    if (section.array && (section.path === 'hooks.state' || section.path.startsWith('hooks.state.'))) {
+      return {
+        ok: false,
+        reason: `[[${section.path}]] is invalid; hooks.state namespace must use regular tables`,
+      };
+    }
+
+    // All other hooks.* paths (event handlers like hooks.SessionStart) require
+    // AoT shape — bare [hooks.<Event>] (single-bracket) is invalid.
     if (!section.array && section.path.startsWith('hooks.') &&
         section.path !== 'hooks.state' && !section.path.startsWith('hooks.state.')) {
       return {
@@ -4004,8 +4014,23 @@ function validateCodexConfigSchema(content) {
     if (typeof parsed.hooks === 'object' && parsed.hooks !== null) {
       for (const [event, value] of Object.entries(parsed.hooks)) {
         // hooks.state is Codex's persistent hook-trust namespace — a regular
-        // object, not an array of event-handler tables. Skip it entirely.
-        if (event === 'state') continue;
+        // object (table), not an array of event-handler tables.
+        // Reject AoT shape (Array) and scalar forms; only plain objects are valid.
+        if (event === 'state') {
+          if (Array.isArray(value)) {
+            return {
+              ok: false,
+              reason: `hooks.state must be a regular table/object, got array-of-tables`,
+            };
+          }
+          if (typeof value !== 'object' || value === null) {
+            return {
+              ok: false,
+              reason: `hooks.state must be a regular table/object, got ${typeof value}`,
+            };
+          }
+          continue;
+        }
         // Skip the nested .hooks sub-array — it lives under hooks.<Event>[n].hooks
         // and is validated separately below.
         if (!Array.isArray(value)) {
