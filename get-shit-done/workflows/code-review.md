@@ -435,7 +435,7 @@ FRONTMATTER=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
 # Parse fields from frontmatter only (not full file)
 STATUS=$(echo "$FRONTMATTER" | grep "^status:" | cut -d: -f2 | xargs)
 FILES_REVIEWED=$(echo "$FRONTMATTER" | grep "^files_reviewed:" | cut -d: -f2 | xargs)
-CRITICAL=$(echo "$FRONTMATTER" | grep -E "^\s*(critical|blocker):" | head -1 | cut -d: -f2 | xargs)
+CRITICAL=$(echo "$FRONTMATTER" | grep -E "^[[:space:]]*(critical|blocker):" | head -1 | cut -d: -f2 | xargs)
 WARNING=$(echo "$FRONTMATTER" | grep "warning:" | head -1 | cut -d: -f2 | xargs)
 INFO=$(echo "$FRONTMATTER" | grep "info:" | head -1 | cut -d: -f2 | xargs)
 TOTAL=$(echo "$FRONTMATTER" | grep "total:" | head -1 | cut -d: -f2 | xargs)
