@@ -400,14 +400,16 @@ function cmdStateRecordMetric(cwd, options, raw) {
   }
 
   let recorded = false;
+  let created = false;
   readModifyWriteStateMd(statePath, (content) => {
     // Find Performance Metrics section and its table
     const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
     const metricsMatch = content.match(metricsPattern);
 
+    const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
+
     if (metricsMatch) {
       let tableBody = metricsMatch[2].trimEnd();
-      const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
 
       if (tableBody.trim() === '' || tableBody.includes('None yet')) {
         tableBody = newRow;
@@ -418,11 +420,27 @@ function cmdStateRecordMetric(cwd, options, raw) {
       recorded = true;
       return content.replace(metricsPattern, (_match, header) => `${header}${tableBody}\n`);
     }
-    return content;
+
+    // Section absent — DWIM: auto-create canonical ## Performance Metrics scaffold,
+    // then append the row. Matches state begin-phase / advance-plan DWIM behavior.
+    const scaffold = [
+      '',
+      '## Performance Metrics',
+      '',
+      '| Phase | Plan | Duration | Notes |',
+      '|-------|------|----------|-------|',
+      newRow,
+      '',
+    ].join('\n');
+    recorded = true;
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
   if (recorded) {
-    output({ recorded: true, phase, plan, duration }, raw, 'true');
+    const result = { recorded: true, phase, plan, duration };
+    if (created) result.created = true;
+    output(result, raw, 'true');
   } else {
     output({ recorded: false, reason: 'Performance Metrics section not found in STATE.md' }, raw, 'false');
   }
@@ -500,6 +518,7 @@ function cmdStateAddDecision(cwd, options, raw) {
 
   const entry = `- [Phase ${phase || '?'}]: ${summaryText}${rationaleText ? ` — ${rationaleText}` : ''}`;
   let added = false;
+  let created = false;
 
   readModifyWriteStateMd(statePath, (content) => {
     // Find Decisions section (various heading patterns)
@@ -514,11 +533,25 @@ function cmdStateAddDecision(cwd, options, raw) {
       added = true;
       return content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
     }
-    return content;
+
+    // Section absent — DWIM: auto-create canonical ## Decisions scaffold,
+    // then append the entry. Matches state begin-phase / advance-plan DWIM behavior.
+    const scaffold = [
+      '',
+      '## Decisions',
+      '',
+      entry,
+      '',
+    ].join('\n');
+    added = true;
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
   if (added) {
-    output({ added: true, decision: entry }, raw, 'true');
+    const result = { added: true, decision: entry };
+    if (created) result.created = true;
+    output(result, raw, 'true');
   } else {
     output({ added: false, reason: 'Decisions section not found in STATE.md' }, raw, 'false');
   }
