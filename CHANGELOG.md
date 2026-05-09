@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...HEAD)
 
+### Enhancement
+
+- **`docs/adr/` index and structural test** — added `docs/adr/README.md` as an indexed entry point linking all seven ADRs. ADR 0005 (SDK architecture seam-map) enumerates SDK seam ownership (Dispatch Policy, Model Catalog, Planning Workspace, SDK Package Seam, Planning Path Projection). ADR 0006 (planning-path projection) documents how SDK query handlers project planning paths. A structural test gates on ADR completeness: required headings, Status/Date metadata, and README linkage for every ADR file. (#3271)
+
 ### Fixed
 
 - **`/gsd-discuss-phase` and `/gsd-plan-phase` first-touch creation now apply `project_code` prefix consistently with `phase.add`/`phase.insert`** — projects with `project_code` set in `.planning/config.json` no longer accumulate a two-headed naming convention (`01-foundation/` mixed with `XR-02.1-spike/`). `init.phase-op` and `init.plan-phase` now expose `expected_phase_dir` (with prefix) in their JSON bundle; workflow fallback mkdir calls use this value instead of constructing the path from `padded_phase`+`phase_slug`. `phase.scaffold phase-dir` (CJS and SDK) also fixed. (#3287)
