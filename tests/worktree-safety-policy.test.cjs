@@ -44,6 +44,20 @@ describe('worktree-safety policy module', () => {
     assert.strictEqual(context.reason, 'not_git_repo');
   });
 
+  test('resolveWorktreeContext keeps cwd for main worktree checkout', () => {
+    const context = resolveWorktreeContext('/repo/main', {
+      existsSync: () => false,
+      execGit: (_, args) => {
+        if (args[1] === '--git-dir') return { exitCode: 0, stdout: '.git', stderr: '' };
+        if (args[1] === '--git-common-dir') return { exitCode: 0, stdout: '.git', stderr: '' };
+        return { exitCode: 1, stdout: '', stderr: '' };
+      },
+    });
+    assert.strictEqual(context.effectiveRoot, '/repo/main');
+    assert.strictEqual(context.reason, 'main_worktree');
+    assert.strictEqual(context.mode, 'current_directory');
+  });
+
   test('parseWorktreePorcelain skips detached HEAD entries', () => {
     const porcelain = [
       'worktree /repo/main',
@@ -94,6 +108,17 @@ describe('worktree-safety policy module', () => {
     assert.strictEqual(plan.reason, 'git_list_failed');
   });
 
+  test('planWorktreePrune still metadata-prunes when porcelain parser throws', () => {
+    const plan = planWorktreePrune('/repo/main', {}, {
+      execGit: () => ({ exitCode: 0, stdout: 'not-porcelain', stderr: '' }),
+      parseWorktreePorcelain: () => {
+        throw new Error('parse failed');
+      },
+    });
+    assert.strictEqual(plan.action, 'metadata_prune_only');
+    assert.strictEqual(plan.reason, 'no_worktrees');
+  });
+
   test('executeWorktreePrunePlan runs git worktree prune for metadata plan', () => {
     const calls = [];
     const result = executeWorktreePrunePlan(
@@ -107,5 +132,43 @@ describe('worktree-safety policy module', () => {
     );
     assert.strictEqual(result.ok, true);
     assert.deepStrictEqual(calls, [{ cwd: '/repo/main', args: ['worktree', 'prune'] }]);
+  });
+
+  test('executeWorktreePrunePlan returns skip for missing plan', () => {
+    const result = executeWorktreePrunePlan(null, {
+      execGit: () => ({ exitCode: 0, stdout: '', stderr: '' }),
+    });
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.action, 'skip');
+    assert.strictEqual(result.reason, 'missing_plan');
+  });
+
+  test('executeWorktreePrunePlan returns skip plan unchanged without git call', () => {
+    let called = false;
+    const result = executeWorktreePrunePlan(
+      { repoRoot: '/repo/main', action: 'skip', reason: 'git_list_failed' },
+      {
+        execGit: () => {
+          called = true;
+          return { exitCode: 0, stdout: '', stderr: '' };
+        },
+      }
+    );
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.action, 'skip');
+    assert.strictEqual(result.reason, 'git_list_failed');
+    assert.strictEqual(called, false);
+  });
+
+  test('executeWorktreePrunePlan rejects unsupported actions', () => {
+    const result = executeWorktreePrunePlan(
+      { repoRoot: '/repo/main', action: 'remove_missing_paths', reason: 'explicit' },
+      {
+        execGit: () => ({ exitCode: 0, stdout: '', stderr: '' }),
+      }
+    );
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.action, 'remove_missing_paths');
+    assert.strictEqual(result.reason, 'unsupported_action');
   });
 });
