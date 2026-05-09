@@ -57,12 +57,20 @@ The /gsd-map-codebase --query command has already confirmed that intel.enabled i
 
 ## Project Scope
 
-**Runtime layout detection (do this first):** Check which runtime root exists by running:
+<!-- Layout detection: only meaningful when analysing the GSD framework's own repo (#3290). -->
+
+**Runtime layout detection (GSD framework repo only):** If `package.json` `"name"` equals `"get-shit-done-cc"`, this project IS the GSD framework. In that case, detect the runtime root to choose canonical paths:
+
 ```bash
-ls -d .kilo 2>/dev/null && echo "kilo" || (ls -d .claude/get-shit-done 2>/dev/null && echo "claude") || echo "unknown"
+# Only run layout detection when analysing the GSD framework repo itself.
+if [[ "$(jq -r '.name // ""' package.json 2>/dev/null)" == "get-shit-done-cc" ]]; then
+  ls -d .kilo 2>/dev/null && echo "kilo" || (ls -d .claude/get-shit-done 2>/dev/null && echo "claude") || echo "unknown"
+fi
 ```
 
-Use the detected root to resolve all canonical paths below:
+For all other projects, skip this step and proceed directly to Step 1.
+
+Use the detected root (when applicable) to resolve all canonical paths below:
 
 | Source type | Standard `.claude` layout | `.kilo` layout |
 |-------------|--------------------------|----------------|
