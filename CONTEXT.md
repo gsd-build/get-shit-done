@@ -97,6 +97,12 @@ Five-axis story decomposition discipline (**S**pike, **P**aths, **I**nterfaces, 
 ### Shell guards — absolute-path containment must use `root/` prefix, not glob
 - `[[ "$PATH" != "$ROOT"* ]]` matches sibling prefixes (`/repo-extra` passes when `ROOT=/repo`). Use `[[ "$P" != "$ROOT" && "$P" != "$ROOT/"* ]]`. Also: check `[ -z "$ROOT" ]` and exit 1 before the containment test. Warn → fail-closed for security-relevant path checks.
 
+### Workstream migration names — enforce one canonical slug contract
+- **Invariant**: every directory under `.planning/workstreams/*` must be addressable by `workstream status/set/complete`, so creation and migration must share the same name contract.
+- **Failure class**: accepting raw `--migrate-name` values created directories that later commands reject (e.g. `Bad Name` directory exists but CLI rejects it as invalid).
+- **Rule**: normalize `--migrate-name` through the same slug transform as `workstream create` (`[a-z0-9-]`), and fail fast if normalization yields empty.
+- **TDD sentinel**: keep regression asserting `workstream create ... --migrate-name 'Bad Name'` migrates to `bad-name` and does not leave `Bad Name` on disk.
+
 ### Docs — keep internal reference counts consistent
 - When a heading says `(N shipped)` and a footnote says `N-1 top-level references`, update the footnote. CodeRabbit catches this every time.
 
