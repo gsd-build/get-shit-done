@@ -125,6 +125,18 @@ const INTERNAL_COMPONENT_SLUGS = new Set([
   // as an external community project URL. The regex captures "/gsd-opencode" from
   // the URL path. Not a user-typable slash command in this product.
   'opencode',
+
+  // Smoke-test directory path — locale docs reference "/tmp/gsd-smoke-$(date +%s)"
+  // as a temporary directory path in bash code-block examples. The regex captures
+  // "/gsd-smoke-" from the filesystem path. Not a slash command.
+  'smoke-',
+
+  // Template placeholders — zh-CN/references/ui-brand.md used "/gsd-alternative-1"
+  // and "/gsd-alternative-2" as unfilled placeholders in a UI template example.
+  // These were never registered commands. Fixed in the source doc; kept here as
+  // a belt-and-suspenders guard against the pattern returning in other locale docs.
+  'alternative-1',
+  'alternative-2',
 ]);
 
 /**
@@ -321,15 +333,28 @@ describe('getLiveCommandTokens() — fixture contract', () => {
 
 // ─── English docs parity check ───────────────────────────────────────────────
 
+// Precomputed locale directory prefixes for efficient exclusion in the English scan.
+const LOCALE_DIRS = LOCALES.map(l => path.join(DOCS_DIR, l) + path.sep);
+
+/**
+ * List all .md files under dir, excluding files under any of the known locale
+ * subdirectories (which are covered by the per-locale describe blocks below).
+ */
+function listEnglishMdFiles(dir) {
+  return listMdFiles(dir).filter(
+    f => !LOCALE_DIRS.some(ld => f.startsWith(ld))
+  );
+}
+
 describe('docs parity — English docs/*.md ⊆ liveRegistry', () => {
   test('docs/ directory exists and contains markdown files', () => {
-    const files = listMdFiles(DOCS_DIR);
+    const files = listEnglishMdFiles(DOCS_DIR);
     assert.ok(files.length > 0, `expected markdown files under ${DOCS_DIR}`);
   });
 
   test('every slash-command token in docs/*.md resolves to a live command', () => {
     const liveTokens = getLiveCommandTokens();
-    const docFiles = listMdFiles(DOCS_DIR);
+    const docFiles = listEnglishMdFiles(DOCS_DIR);
     const allOffenders = [];
 
     for (const filePath of docFiles) {
