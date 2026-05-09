@@ -8,6 +8,12 @@ const path = require('path');
 const { execSync, execFileSync, spawnSync } = require('child_process');
 const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES, AGENT_DEFAULT_TIERS, VALID_AGENT_TIERS, nextTier } = require('./model-profiles.cjs');
 const { MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT } = require('./model-catalog.cjs');
+const {
+  resolveWorktreeContext,
+  parseWorktreePorcelain: parseWorktreePorcelainPolicy,
+  planWorktreePrune,
+  executeWorktreePrunePlan,
+} = require('./worktree-safety.cjs');
 // Compatibility shim: new imports should use planning-workspace.cjs directly.
 const {
   planningDir,
@@ -740,30 +746,11 @@ function execGit(cwd, args) {
  * Returns the main worktree path, or cwd if not in a worktree.
  */
 function resolveWorktreeRoot(cwd) {
-  // If the current directory already has its own .planning/, respect it.
-  // This handles linked worktrees with independent planning state (e.g., Conductor workspaces).
-  if (fs.existsSync(path.join(cwd, '.planning'))) {
-    return cwd;
-  }
-
-  // Check if we're in a linked worktree
-  const gitDir = execGit(cwd, ['rev-parse', '--git-dir']);
-  const commonDir = execGit(cwd, ['rev-parse', '--git-common-dir']);
-
-  if (gitDir.exitCode !== 0 || commonDir.exitCode !== 0) return cwd;
-
-  // In a linked worktree, .git is a file pointing to .git/worktrees/<name>
-  // and git-common-dir points to the main repo's .git directory
-  const gitDirResolved = path.resolve(cwd, gitDir.stdout);
-  const commonDirResolved = path.resolve(cwd, commonDir.stdout);
-
-  if (gitDirResolved !== commonDirResolved) {
-    // We're in a linked worktree — resolve main worktree root
-    // The common dir is the main repo's .git, so its parent is the main worktree root
-    return path.dirname(commonDirResolved);
-  }
-
-  return cwd;
+  const context = resolveWorktreeContext(cwd, {
+    execGit,
+    existsSync: fs.existsSync,
+  });
+  return context.effectiveRoot;
 }
 
 /**
@@ -775,21 +762,7 @@ function resolveWorktreeRoot(cwd) {
  * @returns {{ path: string, branch: string }[]}
  */
 function parseWorktreePorcelain(porcelain) {
-  const entries = [];
-  let current = null;
-  for (const line of porcelain.split('\n')) {
-    if (line.startsWith('worktree ')) {
-      current = { path: line.slice('worktree '.length).trim(), branch: null };
-    } else if (line.startsWith('branch refs/heads/') && current) {
-      current.branch = line.slice('branch refs/heads/'.length).trim();
-    } else if (line === '' && current) {
-      if (current.branch) entries.push(current);
-      current = null;
-    }
-  }
-  // flush last entry if file doesn't end with blank line
-  if (current && current.branch) entries.push(current);
-  return entries;
+  return parseWorktreePorcelainPolicy(porcelain);
 }
 
 /**
@@ -802,31 +775,15 @@ function parseWorktreePorcelain(porcelain) {
  * @returns {string[]} list of worktree paths that were removed (always empty)
  */
 function pruneOrphanedWorktrees(repoRoot) {
-  const pruned = [];
-  const cwd = process.cwd();
-
   try {
-    // 1. Get all worktrees in porcelain format
-    const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
-    if (listResult.exitCode !== 0) return pruned;
-
-    const worktrees = parseWorktreePorcelain(listResult.stdout);
-    if (worktrees.length === 0) {
-      execGit(repoRoot, ['worktree', 'prune']);
-      return pruned;
-    }
-
-    // Destructive removal of linked worktrees is intentionally disabled.
-    // Keep metadata cleanup only (git worktree prune), which clears stale refs
-    // for manually-deleted directories without removing active sibling worktrees.
-    void cwd;
-    void worktrees;
+    const plan = planWorktreePrune(
+      repoRoot,
+      { allowDestructive: false },
+      { execGit, parseWorktreePorcelain }
+    );
+    executeWorktreePrunePlan(plan, { execGit });
   } catch { /* never crash the caller */ }
-
-  // Always run prune to clear stale references (e.g. manually-deleted dirs)
-  execGit(repoRoot, ['worktree', 'prune']);
-
-  return pruned;
+  return [];
 }
 
 // ─── Planning workspace (pathing + active workstream + lock) moved to planning-workspace.cjs ───
