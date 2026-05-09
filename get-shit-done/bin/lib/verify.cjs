@@ -917,7 +917,7 @@ function cmdValidateHealth(cwd, options, raw) {
       // AC2 / AC3: surface degraded-git state as a structured warning instead
       // of silently suppressing it (PRED.k302 — error-swallowing-empty-sentinel).
       if (worktreeHealth.reason === 'git_timed_out') {
-        addIssue('warning', 'W018',
+        addIssue('warning', 'W020',
           'Worktree health check degraded: git worktree list timed out after 10s — orphan/stale worktrees could not be inspected',
           'Run: git worktree list --porcelain to diagnose; check for .git/index.lock or a hung git process');
       }
