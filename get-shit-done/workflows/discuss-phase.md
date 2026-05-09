@@ -373,10 +373,12 @@ DISCUSSION-LOG.md is for human reference only (audits, retrospectives) and is NO
 
 **Find or create phase directory:**
 
-Use values from init: `phase_dir`, `phase_slug`, `padded_phase`. If `phase_dir` is null:
+Use values from init: `phase_dir`, `expected_phase_dir`, `phase_slug`, `padded_phase`. If `phase_dir` is null:
 ```bash
-mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
+mkdir -p "${expected_phase_dir}"
 ```
+
+Set `phase_dir="${expected_phase_dir}"` after creation.
 
 **File location:** `${phase_dir}/${padded_phase}-CONTEXT.md`
 
