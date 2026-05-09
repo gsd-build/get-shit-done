@@ -14,6 +14,10 @@ const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal, filt
 const { planningPaths, planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
 const { stateExtractField } = require('./state.cjs');
 
+function toWorkstreamSlug(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 // ─── Migration ──────────────────────────────────────────────────────────────
 
 /**
@@ -72,7 +76,7 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
     error('workstream name required. Usage: workstream create <name>');
   }
 
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slug = toWorkstreamSlug(name);
   if (!slug) {
     error('Invalid workstream name — must contain at least one alphanumeric character');
   }
@@ -101,7 +105,15 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
       const migrateName = options.migrateName || null;
       let existingWsName;
       if (migrateName) {
-        existingWsName = migrateName;
+        existingWsName = toWorkstreamSlug(migrateName);
+        if (!existingWsName) {
+          output({
+            created: false,
+            error: 'migration_failed',
+            message: 'Invalid migrate-name — must contain at least one alphanumeric character',
+          }, raw);
+          return;
+        }
       } else {
         try {
           const milestone = getMilestoneInfo(cwd);

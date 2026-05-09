@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
+const { migrateToWorkstreams, getOtherActiveWorkstreams } = require('../get-shit-done/bin/lib/workstream.cjs');
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
@@ -386,6 +387,56 @@ describe('workstream create with migration', () => {
     // Shared files stay
     assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'PROJECT.md')));
   });
+
+  test('normalizes --migrate-name to a valid workstream slug', () => {
+    const isolatedDir = createTempProject();
+    try {
+      fs.writeFileSync(path.join(isolatedDir, '.planning', 'PROJECT.md'), '# Project\n');
+      fs.writeFileSync(path.join(isolatedDir, '.planning', 'ROADMAP.md'), '## Roadmap v1.0: Existing\n### Phase 1: A\n');
+      fs.writeFileSync(path.join(isolatedDir, '.planning', 'STATE.md'), '# State\n**Status:** In progress\n');
+
+      const result = runGsdTools(
+        ['workstream', 'create', 'new-feature', '--migrate-name', 'Bad Name', '--raw'],
+        isolatedDir
+      );
+      assert.ok(result.success, `create with migrate-name normalization failed: ${result.error}`);
+
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.created, true);
+      assert.strictEqual(data.migration.workstream, 'bad-name');
+      assert.ok(fs.existsSync(path.join(isolatedDir, '.planning', 'workstreams', 'bad-name', 'ROADMAP.md')));
+      assert.ok(!fs.existsSync(path.join(isolatedDir, '.planning', 'workstreams', 'Bad Name')));
+    } finally {
+      cleanup(isolatedDir);
+    }
+  });
+});
+
+describe('migrateToWorkstreams', () => {
+  test('rejects invalid workstream names for migration', () => {
+    const tmpDir = createTempProject();
+    try {
+      assert.throws(
+        () => migrateToWorkstreams(tmpDir, 'bad/name'),
+        /Invalid workstream name for migration/
+      );
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('fails when already in workstream mode', () => {
+    const tmpDir = createTempProject();
+    try {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'workstreams', 'existing'), { recursive: true });
+      assert.throws(
+        () => migrateToWorkstreams(tmpDir, 'new-stream'),
+        /Already in workstream mode/
+      );
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
 });
 
 describe('workstream list', () => {
@@ -570,6 +621,22 @@ describe('getOtherActiveWorkstreams', () => {
       !w.status.toLowerCase().includes('milestone complete'));
     assert.strictEqual(activeWs.length, 2); // alpha and beta active
   });
+
+  test('returns only non-complete siblings with phase progress metadata', () => {
+    const alphaPlan = path.join(tmpDir, '.planning', 'workstreams', 'alpha', 'phases', '01-alpha', 'PLAN.md');
+    const betaPlan = path.join(tmpDir, '.planning', 'workstreams', 'beta', 'phases', '01-beta', 'PLAN.md');
+    const betaSummary = path.join(tmpDir, '.planning', 'workstreams', 'beta', 'phases', '01-beta', 'SUMMARY.md');
+    fs.mkdirSync(path.dirname(alphaPlan), { recursive: true });
+    fs.mkdirSync(path.dirname(betaPlan), { recursive: true });
+    fs.writeFileSync(alphaPlan, '# Plan\n');
+    fs.writeFileSync(betaPlan, '# Plan\n');
+    fs.writeFileSync(betaSummary, '# Summary\n');
+
+    const others = getOtherActiveWorkstreams(tmpDir, 'alpha');
+    assert.strictEqual(others.length, 1);
+    assert.strictEqual(others[0].name, 'beta');
+    assert.strictEqual(others[0].phases, '1/1');
+  });
 });
 
 describe('workstream progress', () => {
@@ -597,6 +664,18 @@ describe('workstream progress', () => {
     assert.strictEqual(data.workstreams[0].name, 'feature');
     assert.strictEqual(data.workstreams[0].active, true);
     assert.strictEqual(data.workstreams[0].progress_percent, 50);
+  });
+
+  test('returns flat mode when no workstreams exist', () => {
+    const emptyDir = createTempProject();
+    try {
+      const result = runGsdTools(['workstream', 'progress', '--raw'], emptyDir);
+      assert.ok(result.success, `progress in flat mode failed: ${result.error}`);
+      const data = JSON.parse(result.output);
+      assert.strictEqual(data.mode, 'flat');
+    } finally {
+      cleanup(emptyDir);
+    }
   });
 });
 
