@@ -95,7 +95,7 @@ An ADR is optional (a comment in the relevant issue or PR is sufficient) when:
 
 Every ADR must open with:
 
-```
+```md
 # <Title>
 
 - **Status:** Accepted | Proposed | Deprecated
@@ -108,7 +108,7 @@ Amendments are appended as `## Amendment (YYYY-MM-DD): <topic>` sections — the
 
 ### Status block format
 
-```
+```md
 - **Status:** Accepted
 - **Date:** 2026-05-09
 ```
