@@ -25,6 +25,7 @@ import { GSDError, ErrorClassification } from '../errors.js';
 export { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { workspacePlanningPaths, resolveWorkspaceContext, type PlanningPaths } from './workspace.js';
+import { relPlanningPath } from '../workstream-utils.js';
 
 // ─── Runtime-aware agents directory resolution ─────────────────────────────
 
@@ -459,11 +460,22 @@ export function normalizeMd(content: string): string {
  */
 export function planningPaths(projectDir: string, workstream?: string): PlanningPaths {
   const envCtx = resolveWorkspaceContext();
-  return workspacePlanningPaths(projectDir, {
-    // Planning Workspace policy parity: explicit ws > env ws > env project > root
-    workstream: workstream ?? envCtx.workstream,
-    project: workstream ? null : envCtx.project,
-  });
+  const effectiveWorkstream = workstream ?? envCtx.workstream;
+  // Use relPlanningPath(workstream) to scope the base path per workstream policy.
+  const base = join(projectDir, relPlanningPath(effectiveWorkstream ?? undefined));
+  // For env-sourced project scoping (no explicit workstream), delegate to workspace.
+  if (!effectiveWorkstream && envCtx.project) {
+    return workspacePlanningPaths(projectDir, { workstream: null, project: envCtx.project });
+  }
+  return {
+    planning: toPosixPath(base),
+    state: toPosixPath(join(base, 'STATE.md')),
+    roadmap: toPosixPath(join(base, 'ROADMAP.md')),
+    project: toPosixPath(join(base, 'PROJECT.md')),
+    config: toPosixPath(join(base, 'config.json')),
+    phases: toPosixPath(join(base, 'phases')),
+    requirements: toPosixPath(join(base, 'REQUIREMENTS.md')),
+  };
 }
 
 // ─── findProjectRoot (multi-repo .planning resolution) ─────────────────────

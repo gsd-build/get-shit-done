@@ -312,7 +312,7 @@ export const workstreamComplete: QueryHandler = async (args, projectDir) => {
       try { renameSync(join(archivePath, fname), join(wsDir, fname)); } catch { /* rollback */ }
     }
     try { rmdirSync(archivePath); } catch { /* cleanup */ }
-    if (active === name) setActiveWorkstream(projectDir, name);
+    if (active === name) writeActiveWorkstream(projectDir, name);
     return { data: { completed: false, error: 'archive_failed', message: String(err), workstream: name } };
   }
 
@@ -353,7 +353,7 @@ export const workstreamProgress: QueryHandler = async (_args, projectDir) => {
     };
   }
 
-  const active = getActiveWorkstream(projectDir);
+  const active = readActiveWorkstream(projectDir);
   const entries = readdirSync(wsRoot, { withFileTypes: true });
   const workstreams: Array<{
     name: string;
