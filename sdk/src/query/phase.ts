@@ -364,6 +364,9 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   // Deps that reference plans outside this phase are silently ignored (treated
   // as already-satisfied external deps — the plan becomes a source node).
   const planMap = new Map<string, RawPlan>(rawPlans.map(p => [p.id, p]));
+  // Secondary index: canonical prefix → full plan ID, so depends_on: ['03-01'] resolves
+  // to '03-01-auth-hardening-PLAN.md'-derived ID '03-01-auth-hardening' (k015).
+  const canonicalToId = new Map<string, string>(rawPlans.map(p => [extractCanonicalPlanId(p.id), p.id]));
 
   // Kahn's algorithm — compute in-degree and adjacency for plans in this phase only.
   const level = new Map<string, number>();
@@ -374,9 +377,11 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
     if (!inDeg.has(p.id)) inDeg.set(p.id, 0);
     if (!adj.has(p.id)) adj.set(p.id, []);
     for (const dep of p.dependsOn) {
-      if (!planMap.has(dep)) continue; // external dep — ignore
-      if (!adj.has(dep)) adj.set(dep, []);
-      adj.get(dep)!.push(p.id);
+      // Accept both full-stem ('03-01-auth-hardening') and canonical-prefix ('03-01') forms.
+      const resolvedDep = planMap.has(dep) ? dep : canonicalToId.get(dep);
+      if (!resolvedDep) continue; // external dep — ignore
+      if (!adj.has(resolvedDep)) adj.set(resolvedDep, []);
+      adj.get(resolvedDep)!.push(p.id);
       inDeg.set(p.id, (inDeg.get(p.id) ?? 0) + 1);
     }
   }

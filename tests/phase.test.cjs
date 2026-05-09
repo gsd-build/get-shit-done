@@ -487,6 +487,42 @@ files-modified: [prisma/schema.prisma, src/lib/db.ts]
     assert.deepStrictEqual(output.incomplete, [], 'plan should not be marked incomplete');
   });
 
+  // #3266 CR — depends_on canonical-id mismatch: a plan named
+  // '03-01-auth-hardening-PLAN.md' is stored with id '03-01-auth-hardening',
+  // but a dependency declared as '03-01' was never resolving to it, silently
+  // putting the dependent plan in the same wave as its prerequisite.
+  test('depends_on short canonical prefix resolves against descriptive plan filename (#3266)', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // Plan 01: descriptive filename — id becomes '03-01-auth-hardening'
+    fs.writeFileSync(
+      path.join(phaseDir, '03-01-auth-hardening-PLAN.md'),
+      `---\nwave: 1\n---\n## Task 1\n`,
+    );
+    // Plan 02: depends on the canonical prefix '03-01' (not the full stem)
+    fs.writeFileSync(
+      path.join(phaseDir, '03-02-followup-PLAN.md'),
+      `---\ndepends_on:\n  - '03-01'\n---\n## Task 1\n`,
+    );
+
+    const result = runGsdTools('phase-plan-index 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const waves = output.waves;
+
+    // Plan 01 must be in an earlier wave than plan 02
+    const wave01 = Object.keys(waves).find(w => waves[w].some(id => id.startsWith('03-01')));
+    const wave02 = Object.keys(waves).find(w => waves[w].some(id => id.startsWith('03-02')));
+    assert.ok(wave01 !== undefined, 'plan 03-01-auth-hardening should appear in waves');
+    assert.ok(wave02 !== undefined, 'plan 03-02-followup should appear in waves');
+    assert.ok(
+      Number(wave01) < Number(wave02),
+      `03-02 must be in a later wave than 03-01 (got wave01=${wave01}, wave02=${wave02})`,
+    );
+  });
+
   test('detects checkpoints (autonomous: false)', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
