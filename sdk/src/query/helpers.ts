@@ -22,9 +22,9 @@ import { realpath } from 'node:fs/promises';
 import { existsSync, statSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { GSDError, ErrorClassification } from '../errors.js';
-import { relPlanningPath } from '../workstream-utils.js';
 export { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
+import { workspacePlanningPaths, resolveWorkspaceContext, type PlanningPaths } from './workspace.js';
 
 // ─── Runtime-aware agents directory resolution ─────────────────────────────
 
@@ -173,15 +173,7 @@ export function renderGlobalSkillDisplayPath(runtime: Runtime, skillName: string
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Paths to common .planning files. */
-export interface PlanningPaths {
-  planning: string;
-  state: string;
-  roadmap: string;
-  project: string;
-  config: string;
-  phases: string;
-  requirements: string;
-}
+export type { PlanningPaths } from './workspace.js';
 
 // ─── escapeRegex ────────────────────────────────────────────────────────────
 
@@ -462,20 +454,16 @@ export function normalizeMd(content: string): string {
  * All paths returned in POSIX format.
  *
  * @param projectDir - Root project directory
- * @param workstream - Optional workstream name (see relPlanningPath)
+ * @param workstream - Optional workstream name
  * @returns Object with paths to common .planning files
  */
 export function planningPaths(projectDir: string, workstream?: string): PlanningPaths {
-  const base = join(projectDir, relPlanningPath(workstream));
-  return {
-    planning: toPosixPath(base),
-    state: toPosixPath(join(base, 'STATE.md')),
-    roadmap: toPosixPath(join(base, 'ROADMAP.md')),
-    project: toPosixPath(join(base, 'PROJECT.md')),
-    config: toPosixPath(join(base, 'config.json')),
-    phases: toPosixPath(join(base, 'phases')),
-    requirements: toPosixPath(join(base, 'REQUIREMENTS.md')),
-  };
+  const envCtx = resolveWorkspaceContext();
+  return workspacePlanningPaths(projectDir, {
+    // Planning Workspace policy parity: explicit ws > env ws > env project > root
+    workstream: workstream ?? envCtx.workstream,
+    project: workstream ? null : envCtx.project,
+  });
 }
 
 // ─── findProjectRoot (multi-repo .planning resolution) ─────────────────────

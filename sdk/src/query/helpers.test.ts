@@ -193,6 +193,11 @@ describe('stateExtractField', () => {
 // ─── planningPaths ──────────────────────────────────────────────────────────
 
 describe('planningPaths', () => {
+  afterEach(() => {
+    delete process.env['GSD_WORKSTREAM'];
+    delete process.env['GSD_PROJECT'];
+  });
+
   it('returns all expected keys', () => {
     const paths = planningPaths('/proj');
     expect(paths).toHaveProperty('planning');
@@ -208,6 +213,19 @@ describe('planningPaths', () => {
     const paths = planningPaths('/proj');
     expect(paths.state).toContain('.planning/STATE.md');
     expect(paths.config).toContain('.planning/config.json');
+  });
+
+  it('uses GSD_PROJECT env when no explicit workstream is provided', () => {
+    process.env['GSD_PROJECT'] = 'proj-scope';
+    const paths = planningPaths('/proj');
+    expect(paths.planning).toContain('/proj/.planning/proj-scope');
+  });
+
+  it('explicit workstream overrides GSD_PROJECT env', () => {
+    process.env['GSD_PROJECT'] = 'proj-scope';
+    const paths = planningPaths('/proj', 'ws-a');
+    expect(paths.planning).toContain('/proj/.planning/workstreams/ws-a');
+    expect(paths.planning).not.toContain('proj-scope');
   });
 });
 

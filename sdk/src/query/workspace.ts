@@ -21,8 +21,20 @@
 
 import { join } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
-import { toPosixPath } from './helpers.js';
-import type { PlanningPaths } from './helpers.js';
+
+export interface PlanningPaths {
+  planning: string;
+  state: string;
+  roadmap: string;
+  project: string;
+  config: string;
+  phases: string;
+  requirements: string;
+}
+
+function toPosixPath(p: string): string {
+  return p.split('\\').join('/');
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
