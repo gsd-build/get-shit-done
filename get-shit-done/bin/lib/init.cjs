@@ -272,6 +272,23 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     : null;
   const phase_req_ids = (reqExtracted && reqExtracted !== 'TBD') ? reqExtracted : null;
 
+  // #3287: compute the canonical directory name with project_code prefix so
+  // the first-touch mkdir in /gsd-plan-phase stays consistent with phase.add.
+  const phaseDirPlan = phaseInfo?.directory || null;
+  const phaseNumberPlan = phaseInfo?.phase_number || null;
+  const phaseNamePlan = phaseInfo?.phase_name || null;
+  const rawProjectCodePlan = config.project_code || '';
+  let expectedPhaseDirPlan = null;
+  if (!phaseDirPlan && phaseNumberPlan && phaseNamePlan) {
+    const paddedNum = normalizePhaseName(phaseNumberPlan);
+    const slug = generateSlugInternal(phaseNamePlan).substring(0, 60);
+    if (slug) {
+      const prefix = rawProjectCodePlan ? `${rawProjectCodePlan}-` : '';
+      const dirName = `${prefix}${paddedNum}-${slug}`;
+      expectedPhaseDirPlan = toPosixPath(path.relative(cwd, path.join(planningPaths(cwd).phases, dirName)));
+    }
+  }
+
   const result = {
     // Models
     researcher_model: resolveModelInternal(cwd, 'gsd-phase-researcher'),
@@ -294,11 +311,12 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
 
     // Phase info
     phase_found: !!phaseInfo,
-    phase_dir: phaseInfo?.directory || null,
-    phase_number: phaseInfo?.phase_number || null,
-    phase_name: phaseInfo?.phase_name || null,
+    phase_dir: phaseDirPlan,
+    expected_phase_dir: expectedPhaseDirPlan,
+    phase_number: phaseNumberPlan,
+    phase_name: phaseNamePlan,
     phase_slug: phaseInfo?.phase_slug || null,
-    padded_phase: phaseInfo?.phase_number ? normalizePhaseName(phaseInfo.phase_number) : null,
+    padded_phase: phaseNumberPlan ? normalizePhaseName(phaseNumberPlan) : null,
     phase_req_ids,
 
     // Existing artifacts
@@ -747,6 +765,23 @@ function cmdInitPhaseOp(cwd, phase, raw) {
     }
   }
 
+  // #3287: compute the canonical directory name with project_code prefix so
+  // the first-touch mkdir in /gsd-discuss-phase stays consistent with phase.add.
+  const phaseDir = phaseInfo?.directory || null;
+  const phaseNumber = phaseInfo?.phase_number || null;
+  const phaseName = phaseInfo?.phase_name || null;
+  const rawProjectCode = config.project_code || '';
+  let expectedPhaseDir = null;
+  if (!phaseDir && phaseNumber && phaseName) {
+    const paddedNum = normalizePhaseName(phaseNumber);
+    const slug = generateSlugInternal(phaseName).substring(0, 60);
+    if (slug) {
+      const prefix = rawProjectCode ? `${rawProjectCode}-` : '';
+      const dirName = `${prefix}${paddedNum}-${slug}`;
+      expectedPhaseDir = toPosixPath(path.relative(cwd, path.join(planningPaths(cwd).phases, dirName)));
+    }
+  }
+
   const result = {
     // Config
     commit_docs: config.commit_docs,
@@ -760,11 +795,12 @@ function cmdInitPhaseOp(cwd, phase, raw) {
 
     // Phase info
     phase_found: !!phaseInfo,
-    phase_dir: phaseInfo?.directory || null,
-    phase_number: phaseInfo?.phase_number || null,
-    phase_name: phaseInfo?.phase_name || null,
+    phase_dir: phaseDir,
+    expected_phase_dir: expectedPhaseDir,
+    phase_number: phaseNumber,
+    phase_name: phaseName,
     phase_slug: phaseInfo?.phase_slug || null,
-    padded_phase: phaseInfo?.phase_number ? normalizePhaseName(phaseInfo.phase_number) : null,
+    padded_phase: phaseNumber ? normalizePhaseName(phaseNumber) : null,
 
     // Existing artifacts
     has_research: phaseInfo?.has_research || false,

@@ -400,14 +400,16 @@ function cmdStateRecordMetric(cwd, options, raw) {
   }
 
   let recorded = false;
+  let created = false;
   readModifyWriteStateMd(statePath, (content) => {
     // Find Performance Metrics section and its table
     const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
     const metricsMatch = content.match(metricsPattern);
 
+    const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
+
     if (metricsMatch) {
       let tableBody = metricsMatch[2].trimEnd();
-      const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks || '-'} tasks | ${files || '-'} files |`;
 
       if (tableBody.trim() === '' || tableBody.includes('None yet')) {
         tableBody = newRow;
@@ -418,14 +420,27 @@ function cmdStateRecordMetric(cwd, options, raw) {
       recorded = true;
       return content.replace(metricsPattern, (_match, header) => `${header}${tableBody}\n`);
     }
-    return content;
+
+    // Section absent — DWIM: auto-create canonical ## Performance Metrics scaffold,
+    // then append the row. Matches state begin-phase / advance-plan DWIM behavior.
+    const scaffold = [
+      '',
+      '## Performance Metrics',
+      '',
+      '| Phase | Plan | Duration | Notes |',
+      '|-------|------|----------|-------|',
+      newRow,
+      '',
+    ].join('\n');
+    recorded = true;
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
-  if (recorded) {
-    output({ recorded: true, phase, plan, duration }, raw, 'true');
-  } else {
-    output({ recorded: false, reason: 'Performance Metrics section not found in STATE.md' }, raw, 'false');
-  }
+  // Auto-create fallback guarantees recorded === true; no else branch needed.
+  const result = { recorded: true, phase, plan, duration };
+  if (created) result.created = true;
+  output(result, raw, 'true');
 }
 
 function cmdStateUpdateProgress(cwd, raw) {
@@ -500,6 +515,7 @@ function cmdStateAddDecision(cwd, options, raw) {
 
   const entry = `- [Phase ${phase || '?'}]: ${summaryText}${rationaleText ? ` — ${rationaleText}` : ''}`;
   let added = false;
+  let created = false;
 
   readModifyWriteStateMd(statePath, (content) => {
     // Find Decisions section (various heading patterns)
@@ -514,14 +530,25 @@ function cmdStateAddDecision(cwd, options, raw) {
       added = true;
       return content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
     }
-    return content;
+
+    // Section absent — DWIM: auto-create canonical ## Decisions scaffold,
+    // then append the entry. Matches state begin-phase / advance-plan DWIM behavior.
+    const scaffold = [
+      '',
+      '## Decisions',
+      '',
+      entry,
+      '',
+    ].join('\n');
+    added = true;
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
-  if (added) {
-    output({ added: true, decision: entry }, raw, 'true');
-  } else {
-    output({ added: false, reason: 'Decisions section not found in STATE.md' }, raw, 'false');
-  }
+  // Auto-create fallback guarantees added === true; no else branch needed.
+  const result = { added: true, decision: entry };
+  if (created) result.created = true;
+  output(result, raw, 'true');
 }
 
 function cmdStateAddBlocker(cwd, text, raw) {
@@ -541,6 +568,7 @@ function cmdStateAddBlocker(cwd, text, raw) {
 
   const entry = `- ${blockerText}`;
   let added = false;
+  let created = false;
 
   readModifyWriteStateMd(statePath, (content) => {
     const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -553,14 +581,24 @@ function cmdStateAddBlocker(cwd, text, raw) {
       added = true;
       return content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
     }
-    return content;
+
+    // Section absent — DWIM: auto-create canonical ### Blockers scaffold.
+    const scaffold = [
+      '',
+      '### Blockers',
+      '',
+      entry,
+      '',
+    ].join('\n');
+    added = true;
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
-  if (added) {
-    output({ added: true, blocker: blockerText }, raw, 'true');
-  } else {
-    output({ added: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
-  }
+  // Auto-create fallback guarantees added === true; no else branch needed.
+  const result = { added: true, blocker: blockerText };
+  if (created) result.created = true;
+  output(result, raw, 'true');
 }
 
 function cmdStateResolveBlocker(cwd, text, raw) {
