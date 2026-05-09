@@ -9803,24 +9803,32 @@ function installSdkIfNeeded(opts) {
   // mismatch, POSIX ~/.local/bin missing from login shell, or node-
   // version-manager PATH shims. Probe the user's login shell PATH and
   // require the shim to be reachable there too before claiming ✓.
-  // POSIX-only probe; on Windows getUserShellPath() returns null and
-  // we trust the existing check (Windows-specific fix is separate).
   //
-  // #3231: when getUserShellPath() returns null (e.g. $SHELL unset on
-  // Linux, rc-file timeout), we cannot confirm persistent reachability.
-  // In that case, do NOT preserve a true onPath — require the initial
-  // check (on persistentPath) to have found the shim in a persistent
-  // location. Since we already filtered npx dirs above, onPath=true here
-  // means a non-transient dir has the shim, which is sufficient.
-  const userShellPath = getUserShellPath();
+  // #3211 (Windows): getUserShellWindowsPersistentPath() reads the user-level
+  // 'Path' registry key via PowerShell — the correct cross-shell source on
+  // Windows (Git Bash, PowerShell, and cmd.exe all inherit it). Returns null
+  // when PowerShell is unavailable or the probe times out.
+  //
+  // #3231: when getUserShellPath() / getUserShellWindowsPersistentPath()
+  // returns null (probe failed or unavailable), we cannot confirm persistent
+  // reachability. Since we already filtered npx dirs from persistentPath above,
+  // onPath=true means a non-transient dir has the shim — that is the best
+  // available invariant and is sufficient to claim ✓.
+  const userShellPath = process.platform === 'win32'
+    ? getUserShellWindowsPersistentPath()
+    : getUserShellPath();
   if (onPath && userShellPath !== null) {
-    const persistentUserShellPath = filterNpxFromPath(userShellPath);
+    // filterNpxFromPath is applied inside getUserShellWindowsPersistentPath
+    // (Windows) and here for the POSIX case.
+    const persistentUserShellPath = process.platform === 'win32'
+      ? userShellPath  // already filtered by getUserShellWindowsPersistentPath
+      : filterNpxFromPath(userShellPath);
     const userSees = isGsdSdkOnPath(persistentUserShellPath);
     if (!userSees) {
       onPath = false;
     }
   }
-  // If userShellPath is null (POSIX probe failed), onPath reflects
+  // If userShellPath is null (probe failed or unavailable), onPath reflects
   // the persistent-PATH check — that is the best available invariant.
 
   if (onPath) {
@@ -9995,9 +10003,8 @@ function isGsdSdkOnPath(pathString) {
  * login shell.
  *
  * Uses `$SHELL -lc 'printf %s "$PATH"'` on POSIX. Returns null on Windows
- * (cross-shell PATH probing requires a different strategy — Git Bash
- * vs PowerShell vs cmd.exe each read PATH from different sources, and
- * a future revision can build a Windows-aware probe). Returns null
+ * (the Windows counterpart is getUserShellWindowsPersistentPath, which reads
+ * the user-level 'Path' registry key via PowerShell). Returns null
  * when $SHELL is unset, when the spawn fails, or when the result is
  * empty — callers must fall back to process.env.PATH in those cases.
  *
@@ -10025,6 +10032,57 @@ function getUserShellPath() {
     const lines = String(out || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
     const candidate = lines.length > 0 ? lines[lines.length - 1] : '';
     return candidate.length > 0 ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * #3211: Windows counterpart to getUserShellPath(). Probes the user's
+ * persistent 'Path' from the Windows registry via PowerShell:
+ *
+ *   powershell.exe -NoProfile -Command
+ *     "[Environment]::GetEnvironmentVariable('Path', 'User')"
+ *
+ * This is the correct primitive for Windows cross-shell PATH verification —
+ * Git Bash, PowerShell, and cmd.exe all inherit the registry-level User Path,
+ * while the install-subprocess process.env.PATH is polluted with transient
+ * npx entries and may not include directories added by the user post-install.
+ *
+ * Returns the filtered persistent Path string (npx segments stripped) or null
+ * on any failure (non-Windows, PowerShell not available, spawn timeout, empty
+ * result). Callers must treat null as "check unavailable — trust install-time
+ * filtered PATH".
+ *
+ * Synchronous, 2-second timeout, best-effort — safe to call from
+ * installSdkIfNeeded without restructuring to async.
+ */
+function getUserShellWindowsPersistentPath() {
+  if (process.platform !== 'win32') return null;
+  const cp = require('child_process');
+  // Use the same execFileSync form as getUserShellPath() above — static
+  // literal args, no user input, no injection vector.
+  const execFile = cp.execFileSync.bind(cp);
+  try {
+    const out = execFile(
+      'powershell.exe',
+      ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('Path', 'User')"],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        // 2-second cap — a locked registry or slow profile can't hang the install.
+        timeout: 2000,
+      },
+    );
+    // Take the last non-empty line so any motd/banner noise before the output
+    // doesn't corrupt the result — same defensive pattern as getUserShellPath.
+    const lines = String(out || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    const candidate = lines.length > 0 ? lines[lines.length - 1] : '';
+    if (!candidate) return null;
+    // Strip transient npx dirs from the persistent Path before returning —
+    // the registry can accumulate stale _npx entries from prior runs.
+    const filtered = filterNpxFromPath(candidate);
+    return filtered.length > 0 ? filtered : null;
   } catch {
     return null;
   }
@@ -10468,6 +10526,7 @@ if (process.env.GSD_TEST_MODE) {
     isLegacyGsdSdkShim,
     isGsdSdkOnPath,
     getUserShellPath,
+    getUserShellWindowsPersistentPath,
     homePathCoveredByRc,
     maybeSuggestPathExport,
     runtimeMap,
