@@ -459,9 +459,9 @@ function cmdStateUpdateProgress(cwd, raw) {
       .filter(e => e.isDirectory()).map(e => e.name)
       .filter(isDirInMilestone);
     for (const dir of phaseDirs) {
-      const files = fs.readdirSync(path.join(phasesDir, dir));
-      totalPlans += files.filter(f => f.match(/-PLAN\.md$/i)).length;
-      totalSummaries += files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
+      const { planCount, summaryCount } = scanPhasePlans(path.join(phasesDir, dir));
+      totalPlans += planCount;
+      totalSummaries += summaryCount;
     }
   }
 

@@ -197,8 +197,7 @@ function cmdInitExecutePhase(cwd, phase, raw, options = {}) {
         const warnings = [];
         const phasesPath = planningPaths(cwd).phases;
         if (phaseInfo && phaseInfo.directory && fs.existsSync(path.join(cwd, phaseInfo.directory))) {
-          const files = fs.readdirSync(path.join(cwd, phaseInfo.directory));
-          const diskPlans = files.filter(f => f.match(/-PLAN\.md$/i)).length;
+          const diskPlans = listPhasePlanFiles(path.join(cwd, phaseInfo.directory)).length;
           const totalPlansRaw = stateExtractField(stateContent, 'Total Plans in Phase');
           const totalPlansInPhase = totalPlansRaw ? parseInt(totalPlansRaw, 10) : null;
           if (totalPlansInPhase !== null && diskPlans !== totalPlansInPhase) {
