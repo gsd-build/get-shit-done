@@ -25,7 +25,7 @@ import { GSDError, ErrorClassification } from '../errors.js';
 export { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { SUPPORTED_RUNTIMES, type Runtime } from '../model-catalog.js';
 import { workspacePlanningPaths, resolveWorkspaceContext, type PlanningPaths } from './workspace.js';
-import { relPlanningPath } from '../workstream-utils.js';
+import { relPlanningPath, validateWorkstreamName } from '../workstream-utils.js';
 
 // ─── Runtime-aware agents directory resolution ─────────────────────────────
 
@@ -460,7 +460,12 @@ export function normalizeMd(content: string): string {
  */
 export function planningPaths(projectDir: string, workstream?: string): PlanningPaths {
   const envCtx = resolveWorkspaceContext();
-  const effectiveWorkstream = workstream ?? envCtx.workstream;
+  // Validate env workstream before use: invalid GSD_WORKSTREAM falls back to
+  // root .planning/ (bug-2791 contract — invalid env must not crash or route
+  // to a bad path; silent fallback to root preserves pre-#3269 behaviour).
+  const validEnvWorkstream =
+    envCtx.workstream && validateWorkstreamName(envCtx.workstream) ? envCtx.workstream : null;
+  const effectiveWorkstream = workstream ?? validEnvWorkstream;
   // Use relPlanningPath(workstream) to scope the base path per workstream policy.
   const base = join(projectDir, relPlanningPath(effectiveWorkstream ?? undefined));
   // For env-sourced project scoping (no explicit workstream), delegate to workspace.
