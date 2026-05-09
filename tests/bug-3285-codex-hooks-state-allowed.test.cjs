@@ -149,6 +149,38 @@ describe('#3285 — validateCodexConfigSchema: hooks.state is a regular table (n
     assert.strictEqual(result.ok, true,
       'multiple hooks.state sub-keys must all pass: ' + result.reason);
   });
+
+  test('[[hooks.state]] AoT form is rejected', () => {
+    // hooks.state must be a regular table — array-of-tables shape is invalid.
+    const content = [
+      '[[hooks.state]]',
+      'enabled = true',
+      '',
+    ].join('\n');
+    const result = validateCodexConfigSchema(content);
+    assert.strictEqual(result.ok, false,
+      '[[hooks.state]] (AoT) must be rejected');
+    assert.ok(
+      result.reason.includes('hooks.state'),
+      'rejection reason must mention hooks.state, got: ' + result.reason
+    );
+  });
+
+  test('[[hooks.state.foo]] AoT sub-key form is rejected', () => {
+    // hooks.state.* sub-keys must be regular tables — AoT sub-key shape is invalid.
+    const content = [
+      '[[hooks.state.foo]]',
+      'enabled = true',
+      '',
+    ].join('\n');
+    const result = validateCodexConfigSchema(content);
+    assert.strictEqual(result.ok, false,
+      '[[hooks.state.foo]] (AoT sub-key) must be rejected');
+    assert.ok(
+      result.reason.includes('hooks.state'),
+      'rejection reason must mention hooks.state, got: ' + result.reason
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -229,6 +261,22 @@ describe('#3285 — install succeeds when config.toml contains hooks.state entri
     assert.ok(
       parsed.hooks && typeof parsed.hooks.state === 'object' && parsed.hooks.state !== null,
       'post-install config.toml must have hooks.state as an object'
+    );
+    // Verify the actual trust entry survives — not just that hooks.state is an object.
+    const trustKey = "/home/user/.codex/hooks.json:pre_tool_use:0:0";
+    assert.ok(
+      parsed.hooks.state[trustKey] != null,
+      `post-install must preserve the original trust entry for key: ${trustKey}`
+    );
+    assert.strictEqual(
+      parsed.hooks.state[trustKey].enabled,
+      true,
+      'preserved trust entry must have enabled = true'
+    );
+    assert.strictEqual(
+      parsed.hooks.state[trustKey].trusted_hash,
+      'sha256:abc123def456',
+      'preserved trust entry must have the original trusted_hash'
     );
   });
 });
