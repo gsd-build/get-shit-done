@@ -361,7 +361,7 @@ async function main() {
   // supported by the dispatcher so `--help` is actually useful for
   // discovery; previously it was a partial subset that didn't include
   // phase / roadmap / milestone / progress / etc.
-  const TOP_LEVEL_USAGE = 'Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>]\n' +
+  const TOP_LEVEL_USAGE = 'Usage: gsd-tools <command> [args] [--raw] [--pick <field>] [--cwd <path>] [--ws <name>] [--json-errors]\n' +
     'Commands: agent-skills, audit-open, audit-uat, check-commit, commit, commit-to-subrepo, ' +
     'config-ensure-section, config-get, config-new-project, config-path, config-set, ' +
     'current-timestamp, detect-custom-files, docs-init, extract-messages, find-phase, ' +
@@ -370,6 +370,12 @@ async function main() {
     'learnings, list-todos, milestone, phase, phase-plan-index, phases, profile-questionnaire, ' +
     'profile-sample, progress, requirements, resolve-model, roadmap, scaffold, state, ' +
     'template, validate, verify, verify-path-exists, verify-summary, workstream\n\n' +
+    'Global flags:\n' +
+    '  --raw              Emit raw output without post-processing\n' +
+    '  --pick <field>     Extract a single field from JSON output (dot/bracket notation)\n' +
+    '  --cwd <path>       Override working directory for project-root resolution\n' +
+    '  --ws <name>        Override active workstream (or set GSD_WORKSTREAM)\n' +
+    '  --json-errors      Emit structured JSON error objects on stderr (or set GSD_JSON_ERRORS=1)\n\n' +
     'For command-specific argument requirements, invoke the command without args ' +
     '(e.g. `gsd-tools phase add`) — the resulting error lists what is required.';
 
