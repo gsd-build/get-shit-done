@@ -6,6 +6,10 @@
  * (b) as a row in docs/INVENTORY.md's Commands table. At least one of
  * these must be true so every shipped command is reachable from docs.
  *
+ * The slug is derived from the `name:` frontmatter field (e.g. `gsd-workflow`)
+ * rather than the filename (e.g. `ns-workflow.md`), so the test stays aligned
+ * with the actual deployed command token even when the file has a legacy name.
+ *
  * Related: docs readiness refresh, lane-12 recommendation.
  */
 
@@ -21,6 +25,28 @@ const INVENTORY_MD = fs.readFileSync(path.join(ROOT, 'docs', 'INVENTORY.md'), 'u
 
 const commandFiles = fs.readdirSync(COMMANDS_DIR).filter((f) => f.endsWith('.md'));
 
+/**
+ * Extract the slug from the `name:` frontmatter field.
+ * Accepts both `gsd:slug` and `gsd-slug` forms.
+ * Returns the slug portion only (e.g. `workflow`, `plan-phase`).
+ * Throws if frontmatter is missing or malformed.
+ */
+function parseSlugFromFrontmatter(content, filePath) {
+  if (!content.startsWith('---')) {
+    throw new Error('commands-doc-parity: missing YAML frontmatter in ' + filePath);
+  }
+  const closingIdx = content.indexOf('\n---', 3);
+  if (closingIdx < 0) {
+    throw new Error('commands-doc-parity: unclosed YAML frontmatter in ' + filePath);
+  }
+  const frontmatter = content.slice(0, closingIdx);
+  const nameMatch = frontmatter.match(/^name:\s*"?(gsd[:-])([a-z0-9][a-z0-9-]*)"?\s*$/m);
+  if (!nameMatch) {
+    throw new Error('commands-doc-parity: could not extract slug from name: field in ' + filePath);
+  }
+  return nameMatch[2];
+}
+
 function mentionedInCommandsDoc(slug) {
   // Match a heading like: ### /gsd-<slug>  or  ## /gsd-<slug>
   const headingRe = new RegExp(`^#{2,4}\\s+\\\`?/gsd-${slug}\\\`?(?:[\\s(]|$)`, 'm');
@@ -35,13 +61,15 @@ function mentionedInInventory(slug) {
 
 describe('every shipped command is documented somewhere', () => {
   for (const file of commandFiles) {
-    const slug = file.replace(/\.md$/, '');
+    const filePath = path.join(COMMANDS_DIR, file);
+    const content = fs.readFileSync(filePath, 'utf8');
+    const slug = parseSlugFromFrontmatter(content, filePath);
     test(`/gsd-${slug}`, () => {
       const inCommandsDoc = mentionedInCommandsDoc(slug);
       const inInventory = mentionedInInventory(slug);
       assert.ok(
         inCommandsDoc || inInventory,
-        `commands/gsd/${file} is not mentioned in docs/COMMANDS.md (as a heading) or docs/INVENTORY.md (as a Commands row) — add a one-line entry to at least one`,
+        `commands/gsd/${file} (name: gsd-${slug}) is not mentioned in docs/COMMANDS.md (as a heading) or docs/INVENTORY.md (as a Commands row) — add a one-line entry to at least one`,
       );
     });
   }
