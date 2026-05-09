@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 3305
+---
+**`command-aliases.generated.cjs` now exports `NON_FAMILY_COMMAND_ALIASES` with all 14 previously-missing commands** — the CJS manifest used by the SDK query registry only exposed the 7 "family" command arrays (state, verify, init, phase, phases, validate, roadmap). Commands registered in static catalogs (foundation + domain) had no manifest entry, so tooling that queries the manifest could not discover them. `command-manifest.non-family.ts` is extended with 10 new entries (`check.decision-coverage-plan`, `check.decision-coverage-verify`, `frontmatter.get`, `phase.mvp-mode`, `progress.bar`, `stats.json`, `task.is-behavior-adding`, `todo.match-phase`, `uat.render-checkpoint`, `workstream.list`); the other 4 were already in the source but not exported. Both the TS generated file and CJS manifest now include a `NON_FAMILY_COMMAND_ALIASES` array (40 entries, sorted by canonical). The generator and freshness check are extended to cover the non-family section. (#3305)
