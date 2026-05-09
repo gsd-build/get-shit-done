@@ -11,7 +11,7 @@
  */
 export function validateWorkstreamName(name: string): boolean {
   if (!name || name.length === 0) return false;
-  if (name === '..' || name.startsWith('../')) return false;
+  if (name.includes('..')) return false;
   return /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name);
 }
 

@@ -5,7 +5,7 @@
  * active-pointer callers.
  */
 
-const ACTIVE_WORKSTREAM_RE = /^[a-zA-Z0-9_-]+$/;
+const ACTIVE_WORKSTREAM_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
 function toWorkstreamSlug(name) {
   return String(name || '')
@@ -20,7 +20,9 @@ function hasInvalidPathSegment(name) {
 }
 
 function isValidActiveWorkstreamName(name) {
-  return ACTIVE_WORKSTREAM_RE.test(String(name || ''));
+  const value = String(name || '');
+  if (value === '..' || value.startsWith('../') || value.includes('..')) return false;
+  return ACTIVE_WORKSTREAM_RE.test(value);
 }
 
 module.exports = {

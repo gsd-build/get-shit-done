@@ -334,7 +334,7 @@ function createPlanningWorkspace(cwd, opts = {}) {
           return;
         }
         if (!validateWorkstreamName(name)) {
-          throw new Error('Invalid workstream name: must be alphanumeric, hyphens, and underscores only');
+          throw new Error('Invalid workstream name: must be alphanumeric, hyphens, underscores, or dots');
         }
 
         const wsDir = path.join(planningRoot(cwd), 'workstreams', name);

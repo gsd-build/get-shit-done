@@ -13,7 +13,7 @@ const path = require('path');
 const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal, filterPlanFiles, filterSummaryFiles, readSubdirectories } = require('./core.cjs');
 const { planningPaths, planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
 const { stateExtractField } = require('./state.cjs');
-const { toWorkstreamSlug, hasInvalidPathSegment } = require('./workstream-name-policy.cjs');
+const { toWorkstreamSlug, hasInvalidPathSegment, isValidActiveWorkstreamName } = require('./workstream-name-policy.cjs');
 
 // ─── Migration ──────────────────────────────────────────────────────────────
 
@@ -359,8 +359,8 @@ function cmdWorkstreamSet(cwd, name, raw) {
     return;
   }
 
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-    output({ active: null, error: 'invalid_name', message: 'Workstream name must be alphanumeric, hyphens, and underscores only' }, raw);
+  if (!isValidActiveWorkstreamName(name)) {
+    output({ active: null, error: 'invalid_name', message: 'Workstream name must be alphanumeric, hyphens, underscores, or dots' }, raw);
     return;
   }
 
