@@ -52,6 +52,7 @@ function resolveModel(options?: SessionOptions, config?: GSDConfig): string | un
 
   if (config?.model_profile) {
     const profile = String(config.model_profile).toLowerCase();
+    if (profile === 'inherit') return undefined;
     const tier = profile === 'quality' ? 'opus'
       : (profile === 'budget' || profile === 'speed') ? 'haiku'
       : (profile === 'balanced' || profile === 'adaptive') ? 'sonnet'
