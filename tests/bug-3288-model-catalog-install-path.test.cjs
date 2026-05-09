@@ -88,7 +88,10 @@ describe('bug #3288: model-catalog.cjs install-layout resolution', () => {
     tmpRoot = makeTmpDir('gsd-3288-');
     savedHome = process.env.HOME;
     // Stash and clear explicitConfigDir via env so install() picks up our tmp dir.
+    // Must delete (not just save) so any CI-set value doesn't leak into install()
+    // and target a different directory than tmpRoot (CR finding, PR #3293).
     savedExplicitConfigDir = process.env.GSD_EXPLICIT_CONFIG_DIR;
+    delete process.env.GSD_EXPLICIT_CONFIG_DIR;
   });
 
   afterEach(() => {

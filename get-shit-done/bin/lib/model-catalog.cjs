@@ -31,6 +31,13 @@ for (const _p of _catalogCandidates) {
     catalog = require(_p);
     break;
   } catch (e) {
+    // Only treat missing-file errors as recoverable — rethrow parse errors,
+    // permission errors, and any other real failures so they surface clearly
+    // instead of being silently swallowed (CR finding, PR #3293).
+    const isMissingCandidate =
+      (e && e.code === 'MODULE_NOT_FOUND' && String(e.message || '').includes(_p)) ||
+      (e && e.code === 'ENOENT');
+    if (!isMissingCandidate) throw e;
     _catalogLastErr = e;
   }
 }
