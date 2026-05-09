@@ -129,7 +129,7 @@ describe('execute-phase docs: user-facing wave flag', () => {
 });
 
 describe('phase-plan-index: wave grouping behavior', () => {
-  test('phase-plan-index groups plans by wave frontmatter field', () => {
+  test('phase-plan-index groups plans by wave (DAG-bucketing: P002 depends on P001)', () => {
     // allow-test-rule: behavioral — calls gsd-tools and asserts structured output
     const fs = require('fs');
     const path = require('path');
@@ -138,12 +138,13 @@ describe('phase-plan-index: wave grouping behavior', () => {
       const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-alpha');
       fs.mkdirSync(phaseDir, { recursive: true });
 
-      // Wave 1 plan
+      // Wave 1 plan — no dependencies
       fs.writeFileSync(path.join(phaseDir, 'P001-PLAN.md'), [
         '---',
         'wave: 1',
         'objective: First wave task',
         'autonomous: true',
+        'depends_on: []',
         '---',
         '',
         '# Plan 001',
@@ -153,12 +154,14 @@ describe('phase-plan-index: wave grouping behavior', () => {
         '<task>Do the thing</task>',
       ].join('\n'));
 
-      // Wave 2 plan
+      // Wave 2 plan — depends on P001 so DAG places it in level 1 → wave 2
       fs.writeFileSync(path.join(phaseDir, 'P002-PLAN.md'), [
         '---',
         'wave: 2',
         'objective: Second wave task',
         'autonomous: true',
+        'depends_on:',
+        '  - P001',
         '---',
         '',
         '# Plan 002',
@@ -185,6 +188,8 @@ describe('phase-plan-index: wave grouping behavior', () => {
       assert.ok(p002, 'P002 should be in plans array');
       assert.equal(p001.wave, 1, 'P001 should have wave=1');
       assert.equal(p002.wave, 2, 'P002 should have wave=2');
+      // No mismatch warning: declared wave 2 matches topo level 2
+      assert.strictEqual(data.warnings, undefined, 'no warnings when declared wave matches DAG');
     } finally {
       cleanup(tmpDir);
     }

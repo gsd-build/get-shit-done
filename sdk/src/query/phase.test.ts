@@ -67,6 +67,8 @@ phase: 09-foundation
 plan: 03
 wave: 2
 autonomous: true
+depends_on:
+  - 09-01
 ---
 
 <objective>
@@ -303,5 +305,204 @@ describe('phasePlanIndex', () => {
 
     expect(data.error).toBe('Phase not found');
     expect(data.plans).toEqual([]);
+  });
+
+  // ── #3266 regression tests ─────────────────────────────────────────────
+
+  it('#3266: wave 0 round-trip — plan with wave: 0 lands in waves["0"] with PlanInfo.wave === 0', async () => {
+    const phase11 = join(tmpDir, '.planning', 'phases', '11-wave-zero');
+    await mkdir(phase11, { recursive: true });
+    await writeFile(join(phase11, '11-01-PLAN.md'), [
+      '---',
+      'phase: 11',
+      'plan: 01',
+      'wave: 0',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>',
+      'Bootstrap step.',
+      '</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['11'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const plans = data.plans as Array<Record<string, unknown>>;
+    const waves = data.waves as Record<string, string[]>;
+
+    const plan = plans.find(p => p.id === '11-01');
+    expect(plan).toBeDefined();
+    // wave must be 0, not coerced to 1
+    expect(plan!.wave).toBe(0);
+    // bucketed under "0"
+    expect(waves['0']).toContain('11-01');
+    expect(waves['1']).toBeUndefined();
+  });
+
+  it('#3266: DAG topological grouping — B depends_on A → B lands in a later bucket', async () => {
+    const phase12 = join(tmpDir, '.planning', 'phases', '12-dag');
+    await mkdir(phase12, { recursive: true });
+    await writeFile(join(phase12, '12-01-PLAN.md'), [
+      '---',
+      'phase: 12',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>',
+      'Plan A — no deps.',
+      '</objective>',
+    ].join('\n'));
+    await writeFile(join(phase12, '12-02-PLAN.md'), [
+      '---',
+      'phase: 12',
+      'plan: 02',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on:',
+      '  - 12-01',
+      '---',
+      '<objective>',
+      'Plan B — depends on A.',
+      '</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['12'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const plans = data.plans as Array<Record<string, unknown>>;
+    const waves = data.waves as Record<string, string[]>;
+
+    const planA = plans.find(p => p.id === '12-01');
+    const planB = plans.find(p => p.id === '12-02');
+    expect(planA).toBeDefined();
+    expect(planB).toBeDefined();
+
+    // A must be in an earlier bucket than B
+    expect(planA!.wave).toBeLessThan(planB!.wave as number);
+
+    // Structurally: A in wave 1, B in wave 2 (1-indexed, no wave:0 declared)
+    expect(waves['1']).toContain('12-01');
+    expect(waves['2']).toContain('12-02');
+
+    // depends_on field populated on PlanInfo
+    expect(planB!.depends_on).toEqual(['12-01']);
+    expect(planA!.depends_on).toEqual([]);
+  });
+
+  it('#3266: declared-vs-computed mismatch surfaces a warning in the result', async () => {
+    const phase13 = join(tmpDir, '.planning', 'phases', '13-mismatch');
+    await mkdir(phase13, { recursive: true });
+    await writeFile(join(phase13, '13-01-PLAN.md'), [
+      '---',
+      'phase: 13',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A.</objective>',
+    ].join('\n'));
+    // B claims wave: 1 but depends on A → topo says wave 2
+    await writeFile(join(phase13, '13-02-PLAN.md'), [
+      '---',
+      'phase: 13',
+      'plan: 02',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on:',
+      '  - 13-01',
+      '---',
+      '<objective>Plan B — wrong wave declaration.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['13'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const warnings = data.warnings as string[] | undefined;
+
+    expect(warnings).toBeDefined();
+    expect(Array.isArray(warnings)).toBe(true);
+    expect(warnings!.length).toBeGreaterThan(0);
+    // Warning must name the plan ID and both wave numbers
+    const w = warnings![0];
+    expect(w).toContain('13-02');
+    expect(w).toContain('1');  // declared
+    expect(w).toContain('2');  // computed
+  });
+
+  it('#3266: cycle detection throws GSDError naming the cycle nodes', async () => {
+    const phase14 = join(tmpDir, '.planning', 'phases', '14-cycle');
+    await mkdir(phase14, { recursive: true });
+    // A → B → A (cycle)
+    await writeFile(join(phase14, '14-01-PLAN.md'), [
+      '---',
+      'phase: 14',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on:',
+      '  - 14-02',
+      '---',
+      '<objective>Plan A depends on B.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase14, '14-02-PLAN.md'), [
+      '---',
+      'phase: 14',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on:',
+      '  - 14-01',
+      '---',
+      '<objective>Plan B depends on A.</objective>',
+    ].join('\n'));
+
+    let thrownError: unknown;
+    try {
+      await phasePlanIndex(['14'], tmpDir);
+    } catch (err) {
+      thrownError = err;
+    }
+    expect(thrownError).toBeInstanceOf(GSDError);
+    const msg = (thrownError as GSDError).message;
+    // Message must mention cycle and name the nodes
+    expect(msg).toContain('cycle');
+    expect(msg).toMatch(/14-0[12]/);
+  });
+
+  it('#3266: PlanInfo.depends_on is populated from frontmatter', async () => {
+    const phase15 = join(tmpDir, '.planning', 'phases', '15-deps-field');
+    await mkdir(phase15, { recursive: true });
+    await writeFile(join(phase15, '15-01-PLAN.md'), [
+      '---',
+      'phase: 15',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase15, '15-02-PLAN.md'), [
+      '---',
+      'phase: 15',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on:',
+      '  - 15-01',
+      '---',
+      '<objective>Plan B.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['15'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const plans = data.plans as Array<Record<string, unknown>>;
+
+    const planA = plans.find(p => p.id === '15-01');
+    const planB = plans.find(p => p.id === '15-02');
+
+    expect(planA!.depends_on).toEqual([]);
+    expect(planB!.depends_on).toEqual(['15-01']);
   });
 });

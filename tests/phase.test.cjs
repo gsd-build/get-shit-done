@@ -393,44 +393,52 @@ files-modified: [prisma/schema.prisma, src/lib/db.ts]
     assert.strictEqual(output.plans[0].has_summary, false, 'no summary yet');
   });
 
-  test('groups multiple plans by wave', () => {
+  test('groups multiple plans by wave (DAG-bucketing: 03-03 depends on 03-01 and 03-02)', () => {
     const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
     fs.mkdirSync(phaseDir, { recursive: true });
 
     fs.writeFileSync(
       path.join(phaseDir, '03-01-PLAN.md'),
-      `---
-wave: 1
-autonomous: true
-objective: Database setup
----
-
-## Task 1: Schema
-`
+      [
+        '---',
+        'wave: 1',
+        'autonomous: true',
+        'objective: Database setup',
+        'depends_on: []',
+        '---',
+        '',
+        '## Task 1: Schema',
+      ].join('\n')
     );
 
     fs.writeFileSync(
       path.join(phaseDir, '03-02-PLAN.md'),
-      `---
-wave: 1
-autonomous: true
-objective: Auth setup
----
-
-## Task 1: JWT
-`
+      [
+        '---',
+        'wave: 1',
+        'autonomous: true',
+        'objective: Auth setup',
+        'depends_on: []',
+        '---',
+        '',
+        '## Task 1: JWT',
+      ].join('\n')
     );
 
     fs.writeFileSync(
       path.join(phaseDir, '03-03-PLAN.md'),
-      `---
-wave: 2
-autonomous: false
-objective: API routes
----
-
-## Task 1: Routes
-`
+      [
+        '---',
+        'wave: 2',
+        'autonomous: false',
+        'objective: API routes',
+        'depends_on:',
+        '  - 03-01',
+        '  - 03-02',
+        '---',
+        '',
+        '## Task 1: Routes',
+      ].join('\n')
     );
 
     const result = runGsdTools('phase-plan-index 03', tmpDir);
@@ -440,6 +448,8 @@ objective: API routes
     assert.strictEqual(output.plans.length, 3, 'should have 3 plans');
     assert.deepStrictEqual(output.waves['1'], ['03-01', '03-02'], 'wave 1 has 2 plans');
     assert.deepStrictEqual(output.waves['2'], ['03-03'], 'wave 2 has 1 plan');
+    // No mismatch warning: declared wave 2 matches topo level 2
+    assert.strictEqual(output.warnings, undefined, 'no warnings when declared wave matches DAG');
   });
 
   test('detects incomplete plans (no matching summary)', () => {

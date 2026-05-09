@@ -322,10 +322,9 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     })
   );
 
-  const plans = [];
-  const waves = {};
-  const incomplete = [];
-  let hasCheckpoints = false;
+  // ── Pass 1: parse each plan file ─────────────────────────────────────────
+
+  const rawPlans = [];
 
   for (const planFile of planFiles) {
     const planId = planFile.replace('-PLAN.md', '').replace('PLAN.md', '');
@@ -338,17 +337,25 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     const mdTasks = content.match(/##\s*Task\s*\d+/gi) || [];
     const taskCount = xmlTasks.length || mdTasks.length;
 
-    // Parse wave as integer
-    const wave = parseInt(fm.wave, 10) || 1;
+    // Parse wave as integer — use nullish handling so wave: 0 is preserved.
+    // parseInt returns NaN for missing/non-numeric values; fall back to null
+    // (meaning "no declared wave") so downstream can apply the topo default.
+    const parsedWave = parseInt(fm.wave, 10);
+    const declaredWave = Number.isNaN(parsedWave) ? null : parsedWave;
+
+    // Parse depends_on — normalise to string[]
+    let dependsOn = [];
+    const fmDeps = fm['depends_on'];
+    if (Array.isArray(fmDeps)) {
+      dependsOn = fmDeps.map(String);
+    } else if (typeof fmDeps === 'string' && fmDeps.trim() !== '') {
+      dependsOn = [fmDeps];
+    }
 
     // Parse autonomous (default true if not specified)
     let autonomous = true;
     if (fm.autonomous !== undefined) {
       autonomous = fm.autonomous === 'true' || fm.autonomous === true;
-    }
-
-    if (!autonomous) {
-      hasCheckpoints = true;
     }
 
     // Parse files_modified (underscore is canonical; also accept hyphenated for compat)
@@ -359,28 +366,124 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     }
 
     const hasSummary = completedPlanIds.has(planId) || completedPlanIds.has(extractCanonicalPlanId(planFile));
-    if (!hasSummary) {
-      incomplete.push(planId);
+
+    rawPlans.push({
+      id: planId,
+      declaredWave,
+      dependsOn,
+      autonomous,
+      objective: extractObjective(content) || fm.objective || null,
+      filesModified,
+      taskCount,
+      hasSummary,
+    });
+  }
+
+  // ── Pass 2: topological level assignment via depends_on DAG ──────────────
+
+  // Build a map from plan ID → raw plan for fast lookup.
+  // Deps that reference plans outside this phase are treated as external and ignored.
+  const planMap = new Map(rawPlans.map(p => [p.id, p]));
+
+  // Kahn's algorithm — compute in-degree and adjacency for in-phase deps only.
+  const level = new Map();
+  const inDeg = new Map();
+  const adj = new Map();
+
+  for (const p of rawPlans) {
+    if (!inDeg.has(p.id)) inDeg.set(p.id, 0);
+    if (!adj.has(p.id)) adj.set(p.id, []);
+    for (const dep of p.dependsOn) {
+      if (!planMap.has(dep)) continue; // external dep — ignore
+      if (!adj.has(dep)) adj.set(dep, []);
+      adj.get(dep).push(p.id);
+      inDeg.set(p.id, (inDeg.get(p.id) ?? 0) + 1);
+    }
+  }
+
+  // Start with nodes that have no in-phase dependencies.
+  const queue = [];
+  for (const p of rawPlans) {
+    if ((inDeg.get(p.id) ?? 0) === 0) {
+      queue.push(p.id);
+      level.set(p.id, 0);
+    }
+  }
+
+  let visited = 0;
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    visited++;
+    const curLevel = level.get(cur);
+    for (const dep of (adj.get(cur) ?? [])) {
+      const newLevel = curLevel + 1;
+      if (newLevel > (level.get(dep) ?? -1)) {
+        level.set(dep, newLevel);
+      }
+      inDeg.set(dep, inDeg.get(dep) - 1);
+      if (inDeg.get(dep) === 0) {
+        queue.push(dep);
+      }
+    }
+  }
+
+  // Cycle detection — any node not visited has a cycle.
+  if (visited < rawPlans.length) {
+    const cycleNodes = rawPlans.filter(p => !level.has(p.id)).map(p => p.id);
+    error(`depends_on cycle detected in phase ${normalized} — cycle involves: ${cycleNodes.join(', ')}`);
+    return;
+  }
+
+  // ── Pass 3: determine lowest bucket key and build output ─────────────────
+
+  // If any plan has declared wave: 0, the lowest level maps to "0"; otherwise "1".
+  const anyWaveZero = rawPlans.some(p => p.declaredWave === 0);
+  const levelOffset = anyWaveZero ? 0 : 1;
+
+  const plans = [];
+  const waves = {};
+  const incomplete = [];
+  let hasCheckpoints = false;
+  const warnings = [];
+
+  for (const raw of rawPlans) {
+    if (!raw.autonomous) {
+      hasCheckpoints = true;
+    }
+    if (!raw.hasSummary) {
+      incomplete.push(raw.id);
+    }
+
+    // Computed wave = topological level + offset (so lowest level → 0 or 1).
+    const computedWave = (level.get(raw.id) ?? 0) + levelOffset;
+
+    // The effective wave used for bucketing is always the computed topo level.
+    // If the plan declared a wave that disagrees, emit a non-fatal warning.
+    const effectiveWave = computedWave;
+    if (raw.declaredWave !== null && raw.declaredWave !== computedWave) {
+      warnings.push(
+        `Plan ${raw.id}: declared wave: ${raw.declaredWave} but depends_on DAG places it in wave ${computedWave}`,
+      );
     }
 
     const plan = {
-      id: planId,
-      wave,
-      autonomous,
-      objective: extractObjective(content) || fm.objective || null,
-      files_modified: filesModified,
-      task_count: taskCount,
-      has_summary: hasSummary,
+      id: raw.id,
+      wave: effectiveWave,
+      depends_on: raw.dependsOn,
+      autonomous: raw.autonomous,
+      objective: raw.objective,
+      files_modified: raw.filesModified,
+      task_count: raw.taskCount,
+      has_summary: raw.hasSummary,
     };
 
     plans.push(plan);
 
-    // Group by wave
-    const waveKey = String(wave);
+    const waveKey = String(effectiveWave);
     if (!waves[waveKey]) {
       waves[waveKey] = [];
     }
-    waves[waveKey].push(planId);
+    waves[waveKey].push(raw.id);
   }
 
   const result = {
@@ -391,6 +494,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     has_checkpoints: hasCheckpoints,
   };
   if (planNamingWarning) result.warning = planNamingWarning;
+  if (warnings.length > 0) result.warnings = warnings;
 
   output(result, raw);
 }
