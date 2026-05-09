@@ -45,7 +45,11 @@ function parseGeminiCommandToml(toml) {
     if (!line) continue;
     const match = line.match(/^([a-z_]+)\s*=\s*(.*)$/);
     if (!match) throw new Error(`Unparseable TOML line: ${rawLine}`);
-    result[match[1]] = JSON.parse(match[2]);
+    const value = match[2].trim();
+    if (!value.startsWith('"')) {
+      throw new Error(`Expected JSON-quoted TOML value: ${rawLine}`);
+    }
+    result[match[1]] = JSON.parse(value);
   }
   return result;
 }
@@ -113,7 +117,11 @@ describe('command description localization', () => {
       const installed = fs.readFileSync(path.join(tmp, 'gsd-execute-phase', 'SKILL.md'), 'utf8');
       assert.match(installed, new RegExp(`^description: "${PT_BR_DESCRIPTION}"$`, 'm'));
     } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
+      try {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      } catch {
+        // best-effort cleanup
+      }
     }
   });
 });
