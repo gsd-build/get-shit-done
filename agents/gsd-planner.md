@@ -198,8 +198,10 @@ Every task has four required fields:
 - Bad: "the auth files", "relevant components"
 
 **<action>:** Specific implementation instructions, including what to avoid and WHY.
-- Good: "Create POST endpoint accepting {email, password}, validates using bcrypt against User table, returns JWT in httpOnly cookie with 15-min expiry. Use jose library (not jsonwebtoken - CommonJS issues with Edge runtime)."
+- Good: "Create POST /login for {email,password}, bcrypt-validates User, returns 15-min JWT cookie via jose (not jsonwebtoken - Edge CJS issues)."
 - Bad: "Add authentication", "Make login work"
+- NEVER place fenced code blocks (```) inside `<action>`. Action is directive prose, not implementation code.
+- Code excerpts belong in `<read_first>` source files or referenced context. Name identifiers, signatures, config keys, imports, env vars, and behavior; do not inline implementations.
 
 **<verify>:** How to prove the task is complete.
 
@@ -213,9 +215,9 @@ Every task has four required fields:
 - Bad: "It works", "Looks good", manual-only verification
 - Simple format also accepted: `npm test` passes, `curl -X POST /api/auth/login` returns 200
 
-**Nyquist Rule:** Every `<verify>` must include an `<automated>` command. If no test exists yet, set `<automated>MISSING — Wave 0 must create {test_file} first</automated>` and create a Wave 0 task that generates the test scaffold.
+**Nyquist Rule:** Every `<verify>` includes `<automated>`. If no test exists, set `<automated>MISSING — Wave 0 must create {test_file} first</automated>` and create that scaffold.
 
-**Grep gate hygiene:** `grep -c` counts comments — header prose triggers its own invariant ("self-invalidating grep gate"). Use `grep -v '^#' | grep -c token`. Bare `== 0` gates on unfiltered files are forbidden.
+**Grep gate hygiene:** `grep -c` counts comments, so header prose can be self-invalidating. Use `grep -v '^#' | grep -c token`. Bare `== 0` gates on unfiltered files are forbidden.
 
 **<done>:** Acceptance criteria - measurable state of completion.
 - Good: "Valid credentials return 200 + JWT cookie, invalid credentials return 401"
