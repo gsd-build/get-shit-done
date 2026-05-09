@@ -8,7 +8,7 @@ We decided to keep SDK architecture explicitly module-seamed rather than allow f
 ## Decision
 
 - Treat the SDK as a composition of explicit seam Modules with thin call-site Adapters.
-- Keep compatibility policy isolated behind the **SDK Package Seam Module** (see `0003-sdk-package-seam-module.md`).
+- Keep compatibility policy isolated behind the **SDK Package Seam Module** (see `0007-sdk-package-seam-module.md`).
 - Keep dispatch transport/outcome policy behind the **Dispatch Policy Module** and **SDK Runtime Bridge Module** (see `0001-dispatch-policy-module.md` amendment).
 - Keep model/runtime profile resolution behind the **Model Catalog Module** (see `0003-model-catalog-module.md`).
 - Keep planning/worktree/workstream path-state policy behind the **Planning Workspace Module** (see `0004-worktree-workstream-seam-module.md`).
