@@ -574,6 +574,7 @@ function cmdStateAddBlocker(cwd, text, raw) {
 
   const entry = `- ${blockerText}`;
   let added = false;
+  let created = false;
 
   readModifyWriteStateMd(statePath, (content) => {
     const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -586,11 +587,24 @@ function cmdStateAddBlocker(cwd, text, raw) {
       added = true;
       return content.replace(sectionPattern, (_match, header) => `${header}${sectionBody}`);
     }
-    return content;
+
+    // Section absent — DWIM: auto-create canonical ### Blockers scaffold.
+    const scaffold = [
+      '',
+      '### Blockers',
+      '',
+      entry,
+      '',
+    ].join('\n');
+    added = true;
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, cwd);
 
   if (added) {
-    output({ added: true, blocker: blockerText }, raw, 'true');
+    const result = { added: true, blocker: blockerText };
+    if (created) result.created = true;
+    output(result, raw, 'true');
   } else {
     output({ added: false, reason: 'Blockers section not found in STATE.md' }, raw, 'false');
   }
