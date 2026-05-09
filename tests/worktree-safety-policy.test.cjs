@@ -10,6 +10,7 @@ const {
   executeWorktreePrunePlan,
   listLinkedWorktreePaths,
   inspectWorktreeHealth,
+  snapshotWorktreeInventory,
 } = require('../get-shit-done/bin/lib/worktree-safety.cjs');
 
 describe('worktree-safety policy module', () => {
@@ -231,6 +232,41 @@ describe('worktree-safety policy module', () => {
     assert.deepStrictEqual(health.findings, [
       { kind: 'orphan', path: '/repo/wt-orphan' },
       { kind: 'stale', path: '/repo/wt-stale', ageMinutes: 120 },
+    ]);
+  });
+
+  test('snapshotWorktreeInventory returns typed linked-worktree entries', () => {
+    const inventory = snapshotWorktreeInventory(
+      '/repo/main',
+      { staleAfterMs: 60 * 60 * 1000, nowMs: 2 * 60 * 60 * 1000 },
+      {
+        execGit: () => ({
+          exitCode: 0,
+          stdout: [
+            'worktree /repo/main',
+            'HEAD aaa',
+            'branch refs/heads/main',
+            '',
+            'worktree /repo/wt-a',
+            'HEAD bbb',
+            'branch refs/heads/feat-a',
+            '',
+            'worktree /repo/wt-b',
+            'HEAD ccc',
+            'branch refs/heads/feat-b',
+            '',
+          ].join('\n'),
+          stderr: '',
+        }),
+        existsSync: p => p !== '/repo/wt-b',
+        statSync: () => ({ mtimeMs: 0 }),
+      }
+    );
+
+    assert.strictEqual(inventory.ok, true);
+    assert.deepStrictEqual(inventory.entries, [
+      { path: '/repo/wt-a', exists: true, isStale: true, ageMinutes: 120 },
+      { path: '/repo/wt-b', exists: false, isStale: false, ageMinutes: null },
     ]);
   });
 });

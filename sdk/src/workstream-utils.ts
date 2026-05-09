@@ -6,19 +6,7 @@
  */
 
 import { posix } from 'node:path';
-
-/**
- * Validate a workstream name.
- * Allowed: alphanumeric, hyphens, underscores, dots.
- * Disallowed: empty, spaces, slashes, special chars, path traversal.
- */
-export function validateWorkstreamName(name: string): boolean {
-  if (!name || name.length === 0) return false;
-  // Only allow alphanumeric, hyphens, underscores, dots
-  // Must not be ".." or start with ".." (path traversal)
-  if (name === '..' || name.startsWith('../')) return false;
-  return /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name);
-}
+export { validateWorkstreamName, toWorkstreamSlug } from './workstream-name-policy.js';
 
 /**
  * Return the relative planning directory path.

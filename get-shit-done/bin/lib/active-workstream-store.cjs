@@ -6,11 +6,10 @@
  */
 
 const { getActiveWorkstream } = require('./planning-workspace.cjs');
-
-const WORKSTREAM_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+const { isValidActiveWorkstreamName } = require('./workstream-name-policy.cjs');
 
 function validateWorkstreamName(name) {
-  return WORKSTREAM_NAME_RE.test(String(name || ''));
+  return isValidActiveWorkstreamName(name);
 }
 
 function parseCliWorkstream(args) {
@@ -84,4 +83,3 @@ module.exports = {
   resolveActiveWorkstream,
   applyResolvedWorkstreamEnv,
 };
-

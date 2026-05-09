@@ -22,32 +22,50 @@ function execGitDefault(cwd, args) {
 }
 
 function parseWorktreePorcelain(porcelain) {
+  return parseWorktreeEntries(porcelain).filter((entry) => entry.branch).map((entry) => ({
+    path: entry.path,
+    branch: entry.branch,
+  }));
+}
+
+function parseWorktreeEntries(porcelain) {
   const entries = [];
-  let current = null;
-  for (const line of String(porcelain || '').split('\n')) {
-    if (line.startsWith('worktree ')) {
-      current = { path: line.slice('worktree '.length).trim(), branch: null };
-    } else if (line.startsWith('branch refs/heads/') && current) {
-      current.branch = line.slice('branch refs/heads/'.length).trim();
-    } else if (line === '' && current) {
-      if (current.branch) entries.push(current);
-      current = null;
-    }
+  const blocks = String(porcelain || '').split('\n\n').filter(Boolean);
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    const worktreeLine = lines.find((l) => l.startsWith('worktree '));
+    if (!worktreeLine) continue;
+    const worktreePath = worktreeLine.slice('worktree '.length).trim();
+    if (!worktreePath) continue;
+    const branchLine = lines.find((l) => l.startsWith('branch refs/heads/'));
+    const branch = branchLine ? branchLine.slice('branch refs/heads/'.length).trim() : null;
+    entries.push({ path: worktreePath, branch });
   }
-  if (current && current.branch) entries.push(current);
   return entries;
 }
 
 function parseWorktreeListPaths(porcelain) {
-  const paths = [];
-  const blocks = String(porcelain || '').split('\n\n').filter(Boolean);
-  for (const block of blocks) {
-    const line = block.split('\n').find(l => l.startsWith('worktree '));
-    if (!line) continue;
-    const worktreePath = line.slice('worktree '.length).trim();
-    if (worktreePath) paths.push(worktreePath);
+  return parseWorktreeEntries(porcelain).map((entry) => entry.path);
+}
+
+function readWorktreeList(repoRoot, deps = {}) {
+  const execGit = deps.execGit || execGitDefault;
+  const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
+  if (listResult.exitCode !== 0) {
+    return {
+      ok: false,
+      reason: 'git_list_failed',
+      porcelain: '',
+      entries: [],
+    };
   }
-  return paths;
+
+  return {
+    ok: true,
+    reason: 'ok',
+    porcelain: listResult.stdout,
+    entries: parseWorktreeEntries(listResult.stdout),
+  };
 }
 
 function resolveWorktreeContext(cwd, deps = {}) {
@@ -91,23 +109,21 @@ function resolveWorktreeContext(cwd, deps = {}) {
 }
 
 function planWorktreePrune(repoRoot, options = {}, deps = {}) {
-  const execGit = deps.execGit || execGitDefault;
   const parsePorcelain = deps.parseWorktreePorcelain || parseWorktreePorcelain;
   const destructiveModeRequested = Boolean(options.allowDestructive);
-
-  const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
-  if (listResult.exitCode !== 0) {
+  const listed = readWorktreeList(repoRoot, deps);
+  if (!listed.ok) {
     return {
       repoRoot,
       action: 'skip',
-      reason: 'git_list_failed',
+      reason: listed.reason,
       destructiveModeRequested,
     };
   }
 
   let worktrees = [];
   try {
-    worktrees = parsePorcelain(listResult.stdout);
+    worktrees = parsePorcelain(listed.porcelain);
   } catch {
     // Keep historical behavior: still run metadata prune when parsing fails.
     worktrees = [];
@@ -151,17 +167,16 @@ function executeWorktreePrunePlan(plan, deps = {}) {
 }
 
 function listLinkedWorktreePaths(repoRoot, deps = {}) {
-  const execGit = deps.execGit || execGitDefault;
-  const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
-  if (listResult.exitCode !== 0) {
+  const listed = readWorktreeList(repoRoot, deps);
+  if (!listed.ok) {
     return {
       ok: false,
-      reason: 'git_list_failed',
+      reason: listed.reason,
       paths: [],
     };
   }
 
-  const allPaths = parseWorktreeListPaths(listResult.stdout);
+  const allPaths = listed.entries.map((entry) => entry.path);
   // git worktree list always includes the current/main worktree first.
   return {
     ok: true,
@@ -171,42 +186,30 @@ function listLinkedWorktreePaths(repoRoot, deps = {}) {
 }
 
 function inspectWorktreeHealth(repoRoot, options = {}, deps = {}) {
-  const existsSync = deps.existsSync || fs.existsSync;
-  const statSync = deps.statSync || fs.statSync;
-  const staleAfterMs = options.staleAfterMs ?? (60 * 60 * 1000);
-  const nowMs = options.nowMs ?? Date.now();
-
-  const listed = listLinkedWorktreePaths(repoRoot, { execGit: deps.execGit || execGitDefault });
-  if (!listed.ok) {
+  const inventory = snapshotWorktreeInventory(repoRoot, options, deps);
+  if (!inventory.ok) {
     return {
       ok: false,
-      reason: listed.reason,
+      reason: inventory.reason,
       findings: [],
     };
   }
 
   const findings = [];
-  for (const worktreePath of listed.paths) {
-    if (!existsSync(worktreePath)) {
+  for (const entry of inventory.entries) {
+    if (!entry.exists) {
       findings.push({
         kind: 'orphan',
-        path: worktreePath,
+        path: entry.path,
       });
       continue;
     }
-
-    try {
-      const stat = statSync(worktreePath);
-      const ageMs = nowMs - stat.mtimeMs;
-      if (ageMs > staleAfterMs) {
-        findings.push({
-          kind: 'stale',
-          path: worktreePath,
-          ageMinutes: Math.round(ageMs / 60000),
-        });
-      }
-    } catch {
-      // Keep historical behavior: stat failures are ignored.
+    if (entry.isStale) {
+      findings.push({
+        kind: 'stale',
+        path: entry.path,
+        ageMinutes: entry.ageMinutes,
+      });
     }
   }
 
@@ -217,6 +220,62 @@ function inspectWorktreeHealth(repoRoot, options = {}, deps = {}) {
   };
 }
 
+function snapshotWorktreeInventory(repoRoot, options = {}, deps = {}) {
+  const existsSync = deps.existsSync || fs.existsSync;
+  const statSync = deps.statSync || fs.statSync;
+  const staleAfterMs = options.staleAfterMs ?? (60 * 60 * 1000);
+  const nowMs = options.nowMs ?? Date.now();
+  const listed = listLinkedWorktreePaths(repoRoot, { execGit: deps.execGit || execGitDefault });
+  if (!listed.ok) {
+    return {
+      ok: false,
+      reason: listed.reason,
+      entries: [],
+    };
+  }
+
+  const entries = [];
+  for (const worktreePath of listed.paths) {
+    let exists = false;
+    let isStale = false;
+    let ageMinutes = null;
+
+    if (!existsSync(worktreePath)) {
+      entries.push({
+        path: worktreePath,
+        exists,
+        isStale,
+        ageMinutes,
+      });
+      continue;
+    }
+
+    exists = true;
+    try {
+      const stat = statSync(worktreePath);
+      const ageMs = nowMs - stat.mtimeMs;
+      ageMinutes = Math.round(ageMs / 60000);
+      if (ageMs > staleAfterMs) {
+        isStale = true;
+      }
+    } catch {
+      // Keep historical behavior: stat failures are ignored.
+    }
+    entries.push({
+      path: worktreePath,
+      exists,
+      isStale,
+      ageMinutes,
+    });
+  }
+
+  return {
+    ok: true,
+    reason: 'ok',
+    entries,
+  };
+}
+
 module.exports = {
   resolveWorktreeContext,
   parseWorktreePorcelain,
@@ -224,4 +283,5 @@ module.exports = {
   executeWorktreePrunePlan,
   listLinkedWorktreePaths,
   inspectWorktreeHealth,
+  snapshotWorktreeInventory,
 };

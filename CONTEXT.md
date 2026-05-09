@@ -254,6 +254,10 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `WORKTREE.SEAM.inventory-interface=[listLinkedWorktreePaths, inspectWorktreeHealth]`
 `WORKTREE.SEAM.caller-rule=verify.cjs must consume inspectWorktreeHealth for W017 classification; no ad-hoc porcelain parsing in callers`
 `WORKTREE.SEAM.test-anchor-w017=tests/orphan-worktree-detection.test.cjs + tests/worktree-safety-policy.test.cjs`
+`WORKTREE.SEAM.inventory-snapshot=snapshotWorktreeInventory(repoRoot,{staleAfterMs,nowMs}) is canonical linked-worktree health snapshot for callers`
 `PLANNING.PATH.PARITY.sdk-project-scope=.planning/<project> (never .planning/projects/<project>); mirror planning-workspace.cjs planningDir()`
 `PLANNING.PATH.SEAM.sdk=helpers.planningPaths delegates to workspacePlanningPaths + resolveWorkspaceContext; precedence explicit-ws > env-ws > env-project > root`
 `PLANNING.PATH.SEAM.init-handlers=[initExecutePhase, initPlanPhase, initPhaseOp, initMilestoneOp] consume helpers.planningPaths().planning (no direct relPlanningPath join)`
+`WORKSTREAM.NAME.POLICY.cjs-module=get-shit-done/bin/lib/workstream-name-policy.cjs owns toWorkstreamSlug + active-name/path-segment validation`
+`WORKSTREAM.POINTER.SEAM.sdk-module=sdk/src/query/active-workstream-store.ts owns read/write self-heal for .planning/active-workstream`
+`CONFIG.SEAM.loadConfig-context=loadConfig(cwd,{workstream}) replaces env-mutation fallback; no temporary process.env GSD_WORKSTREAM rewrites`

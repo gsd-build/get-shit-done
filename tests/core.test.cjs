@@ -289,6 +289,17 @@ describe('loadConfig workstream config inheritance (#2714)', () => {
     assert.strictEqual(config.model_profile, 'quality');
     assert.deepStrictEqual(config.model_overrides, { 'gsd-executor': 'opus' });
   });
+
+  test('loadConfig does not mutate GSD_WORKSTREAM when workstream config is missing', () => {
+    writeRootConfig({ model_profile: 'quality' });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'workstreams', 'feature-f'), { recursive: true });
+    process.env.GSD_WORKSTREAM = 'feature-f';
+
+    const config = loadConfig(tmpDir);
+
+    assert.strictEqual(config.model_profile, 'quality');
+    assert.strictEqual(process.env.GSD_WORKSTREAM, 'feature-f');
+  });
 });
 
 // ─── loadConfig commit_docs gitignore auto-detection (#1250) ──────────────────

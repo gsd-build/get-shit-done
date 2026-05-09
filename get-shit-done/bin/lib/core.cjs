@@ -339,11 +339,14 @@ function _deepMergeConfig(base, overlay) {
   return result;
 }
 
-function loadConfig(cwd) {
+function loadConfig(cwd, options = {}) {
+  const activeWorkstream = Object.prototype.hasOwnProperty.call(options, 'workstream')
+    ? options.workstream
+    : (process.env.GSD_WORKSTREAM || null);
   // When GSD_WORKSTREAM is set, load root config first so workstream config
   // can inherit from it. This prevents users from duplicating model_overrides,
   // workflow.*, etc. across every workstream config (#2714).
-  const ws = process.env.GSD_WORKSTREAM || null;
+  const ws = activeWorkstream;
   let rootParsed = null;
   if (ws) {
     const rootConfigPath = path.join(planningRoot(cwd), 'config.json');
@@ -355,7 +358,7 @@ function loadConfig(cwd) {
     }
   }
 
-  const configPath = path.join(planningDir(cwd), 'config.json');
+  const configPath = path.join(planningDir(cwd, ws), 'config.json');
   const defaults = CONFIG_DEFAULTS;
 
   try {
@@ -542,18 +545,11 @@ function loadConfig(cwd) {
     // If .planning/ exists, the project is initialized — just missing config.json.
     // When GSD_WORKSTREAM is set and root config was loaded, the workstream config
     // doesn't exist — treat root config as the effective config for this workstream.
-    if (fs.existsSync(planningDir(cwd))) {
+    if (fs.existsSync(planningDir(cwd, ws))) {
       if (rootParsed) {
         // Workstream has no config.json: re-parse using root config as the sole source.
-        // Temporarily clear GSD_WORKSTREAM so planningDir() returns root .planning/,
-        // then reload. This is safe: rootParsed is already the root config object.
-        const savedWs = process.env.GSD_WORKSTREAM;
-        delete process.env.GSD_WORKSTREAM;
-        try {
-          return loadConfig(cwd);
-        } finally {
-          process.env.GSD_WORKSTREAM = savedWs;
-        }
+        // Keep env immutable by explicitly reloading with workstream context cleared.
+        return loadConfig(cwd, { workstream: null });
       }
       return defaults;
     }

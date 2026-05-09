@@ -13,10 +13,7 @@ const path = require('path');
 const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal, filterPlanFiles, filterSummaryFiles, readSubdirectories } = require('./core.cjs');
 const { planningPaths, planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
 const { stateExtractField } = require('./state.cjs');
-
-function toWorkstreamSlug(name) {
-  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
+const { toWorkstreamSlug, hasInvalidPathSegment } = require('./workstream-name-policy.cjs');
 
 // ─── Migration ──────────────────────────────────────────────────────────────
 
@@ -27,7 +24,7 @@ function toWorkstreamSlug(name) {
  * milestones/, research/, codebase/, todos/) stay in place.
  */
 function migrateToWorkstreams(cwd, workstreamName) {
-  if (!workstreamName || /[/\\]/.test(workstreamName) || workstreamName === '.' || workstreamName === '..') {
+  if (!workstreamName || hasInvalidPathSegment(workstreamName)) {
     throw new Error('Invalid workstream name for migration');
   }
 
@@ -234,7 +231,7 @@ function cmdWorkstreamList(cwd, raw) {
 
 function cmdWorkstreamStatus(cwd, name, raw) {
   if (!name) error('workstream name required. Usage: workstream status <name>');
-  if (/[/\\]/.test(name) || name === '.' || name === '..') error('Invalid workstream name');
+  if (hasInvalidPathSegment(name)) error('Invalid workstream name');
 
   const wsDir = path.join(planningRoot(cwd), 'workstreams', name);
   if (!fs.existsSync(wsDir)) {
@@ -291,7 +288,7 @@ function cmdWorkstreamStatus(cwd, name, raw) {
 
 function cmdWorkstreamComplete(cwd, name, options, raw) {
   if (!name) error('workstream name required. Usage: workstream complete <name>');
-  if (/[/\\]/.test(name) || name === '.' || name === '..') error('Invalid workstream name');
+  if (hasInvalidPathSegment(name)) error('Invalid workstream name');
 
   const root = planningRoot(cwd);
   const wsRoot = path.join(root, 'workstreams');
