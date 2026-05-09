@@ -9,6 +9,7 @@ const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInte
 const { planningPaths, planningDir, planningRoot } = require('./planning-workspace.cjs');
 const { maskIfSecret } = require('./secrets.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
+const { stateExtractField } = require('./state-document.cjs');
 
 // Accept all bold/colon variants of the Requirements header (#2769):
 // **Requirements:** / **Requirements**: / **Requirements** : render the
@@ -185,12 +186,9 @@ function cmdInitExecutePhase(cwd, phase, raw, options = {}) {
   // Optional --validate: run state validation and include warnings (#1627)
   if (options.validate) {
     try {
-      const { cmdStateValidate } = require('./state.cjs');
-      // Capture validate output by temporarily redirecting
       const statePath = path.join(planningDir(cwd), 'STATE.md');
       if (fs.existsSync(statePath)) {
         const stateContent = fs.readFileSync(statePath, 'utf-8');
-        const { stateExtractField } = require('./state.cjs');
         const status = stateExtractField(stateContent, 'Status') || '';
         result.state_validation_ran = true;
         // Simple inline validation — check for obvious drift
@@ -360,7 +358,6 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     try {
       const statePath = path.join(planningDir(cwd), 'STATE.md');
       if (fs.existsSync(statePath)) {
-        const { stateExtractField } = require('./state.cjs');
         const stateContent = fs.readFileSync(statePath, 'utf-8');
         const warnings = [];
         result.state_validation_ran = true;
