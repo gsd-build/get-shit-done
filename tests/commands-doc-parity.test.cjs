@@ -1,3 +1,4 @@
+// allow-test-rule: source-text-is-the-product
 'use strict';
 
 /**
