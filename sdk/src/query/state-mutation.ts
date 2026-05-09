@@ -37,6 +37,8 @@ import { buildStateFrontmatter, getMilestonePhaseFilter } from './state.js';
 import { stateExtractField, stateReplaceField, stateReplaceFieldWithFallback } from './state-document.js';
 import type { QueryHandler } from './utils.js';
 
+const PROGRESS_FRONTMATTER_FIELDS = new Set(['Progress', 'Total Plans in Phase', 'Total Phases']);
+
 // ─── Process exit lock cleanup (D2 — match CJS state.cjs:16-23) ─────────
 
 /**
@@ -306,7 +308,7 @@ export const stateUpdate: QueryHandler = async (args, projectDir, workstream) =>
   }
 
   let updated = false;
-  const shouldResync = ['Progress', 'Total Plans in Phase', 'Total Phases'].includes(field);
+  const shouldResync = PROGRESS_FRONTMATTER_FIELDS.has(field);
   await readModifyWriteStateMd(projectDir, (content) => {
     const result = stateReplaceField(content, field, value);
     if (result) {
@@ -355,6 +357,7 @@ export const statePatch: QueryHandler = async (args, projectDir, workstream) => 
 
   const updated: string[] = [];
   const failed: string[] = [];
+  const shouldResync = Object.keys(patches).some(field => PROGRESS_FRONTMATTER_FIELDS.has(field));
   await readModifyWriteStateMd(projectDir, (content) => {
     for (const [field, value] of Object.entries(patches)) {
       const result = stateReplaceField(content, field, String(value));
@@ -366,7 +369,10 @@ export const statePatch: QueryHandler = async (args, projectDir, workstream) => 
       }
     }
     return content;
-  }, workstream);
+  }, workstream, {
+    resync: shouldResync,
+    preserveExistingProgress: !shouldResync,
+  });
 
   return { data: { updated, failed } };
 };

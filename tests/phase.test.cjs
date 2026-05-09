@@ -1211,6 +1211,16 @@ describe('phase add-batch command (#2165)', () => {
     assert.ok(!result.success, 'should fail on non-array JSON');
     assert.match(result.error, /--descriptions must be a JSON array/);
   });
+
+  test('returns error when --descriptions is missing its JSON value', () => {
+    const missing = runGsdTools(['phase', 'add-batch', '--descriptions'], tmpDir);
+    assert.ok(!missing.success, 'should fail on dangling --descriptions');
+    assert.match(missing.error, /--descriptions must be a JSON array/);
+
+    const flagValue = runGsdTools(['phase', 'add-batch', '--descriptions', '--raw'], tmpDir);
+    assert.ok(!flagValue.success, 'should fail when --descriptions value is another flag');
+    assert.match(flagValue.error, /--descriptions must be a JSON array/);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

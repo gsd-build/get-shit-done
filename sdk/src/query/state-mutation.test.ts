@@ -276,11 +276,11 @@ Progress: [█████░░░░░] 50%
 
     const loaded = await stateJson([], tmpDir);
     const progress = (loaded.data as Record<string, unknown>).progress as Record<string, unknown>;
-    expect(progress.total_phases).toBe(12);
-    expect(progress.completed_phases).toBe(6);
-    expect(progress.total_plans).toBe(22);
-    expect(progress.completed_plans).toBe(22);
-    expect(progress.percent).toBe(50);
+    expect(Number(progress.total_phases)).toBe(12);
+    expect(Number(progress.completed_phases)).toBe(6);
+    expect(Number(progress.total_plans)).toBe(22);
+    expect(Number(progress.completed_plans)).toBe(22);
+    expect(Number(progress.percent)).toBe(50);
 
     const after = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     expect(after).toContain('Last Activity: 2026-05-07');
@@ -401,6 +401,45 @@ describe('statePatch', () => {
     // Verify file was updated
     const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     expect(content).toContain('done');
+  });
+
+  it('preserves curated progress frontmatter when patching body-only fields', async () => {
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v3.0
+milestone_name: SDK-First Migration
+status: executing
+progress:
+  total_phases: 12
+  completed_phases: 6
+  total_plans: 22
+  completed_plans: 22
+  percent: 50
+---
+
+# Project State
+
+## Current Position
+
+Status: Executing
+Last Activity: 2026-01-01
+Progress: [█████░░░░░] 50%
+`;
+    await setupTestProject(tmpDir, stateContent);
+
+    const { statePatch } = await import('./state-mutation.js');
+    await statePatch([JSON.stringify({ 'Last Activity': '2026-05-07' })], tmpDir);
+
+    const after = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const { extractFrontmatter } = await import('./frontmatter.js');
+    const fm = extractFrontmatter(after);
+    const progress = fm.progress as Record<string, unknown>;
+    expect(Number(progress.total_phases)).toBe(12);
+    expect(Number(progress.completed_phases)).toBe(6);
+    expect(Number(progress.total_plans)).toBe(22);
+    expect(Number(progress.completed_plans)).toBe(22);
+    expect(Number(progress.percent)).toBe(50);
+    expect(after).toContain('Last Activity: 2026-05-07');
   });
 });
 

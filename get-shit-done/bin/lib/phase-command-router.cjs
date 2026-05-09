@@ -42,9 +42,13 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
       'add-batch': () => {
         const descFlagIdx = args.indexOf('--descriptions');
         let descriptions;
-        if (descFlagIdx !== -1 && args[descFlagIdx + 1]) {
+        if (descFlagIdx !== -1) {
+          const rawDescriptions = args[descFlagIdx + 1];
+          if (!rawDescriptions || rawDescriptions.startsWith('--')) {
+            error('--descriptions must be a JSON array');
+          }
           try {
-            descriptions = JSON.parse(args[descFlagIdx + 1]);
+            descriptions = JSON.parse(rawDescriptions);
           } catch {
             error('--descriptions must be a JSON array');
           }
