@@ -123,6 +123,7 @@ describe('ADR 0005 — SDK architecture seam-map', () => {
     while ((m = linkRe.exec(raw)) !== null) { refs.add(path.basename(m[1])); }
     const codeRe = /`(\d{4}-[^`]*\.md)`/g;
     while ((m = codeRe.exec(raw)) !== null) { refs.add(path.basename(m[1])); }
+    refs.delete('0005-sdk-architecture-seam-map.md');
     assert.ok(
       refs.size >= 2,
       `Seam-map ADR must cross-reference at least 2 other ADR files. Found: ${[...refs].join(', ')}`
