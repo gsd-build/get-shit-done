@@ -149,28 +149,19 @@ TDD_MODE=$(gsd-sdk query config-get workflow.tdd_mode 2>/dev/null || echo "false
 ```
 
 <step name="safe_resume_gate">
-Before trusting `STATE.md` or dispatching any executor, check whether the current
-plan already has production commits but was not closed out. Derive
-`CURRENT_PLAN_ID` from the active incomplete plan in `INIT` (phase number plus
-plan number), then search recent history:
-
+Before trusting `STATE.md` or dispatching any executor, derive `CURRENT_PLAN_ID`
+from the active incomplete plan in `INIT`, then search recent history:
 ```bash
 CURRENT_PLAN_ID="{phase_number}-{plan_padded}"
 SUMMARY_PATH="{phase_dir}/{plan_padded}-SUMMARY.md"
 PLAN_COMMITS=$(git log --oneline --grep="${CURRENT_PLAN_ID}" -30)
 ```
-
 If production commits exist and `SUMMARY.md is missing`, stop before spawning a
-new executor. This is a partial-plan half-state: continuing would risk duplicate
-implementation work and stale `STATE.md`/ROADMAP progress.
-
-Offer exactly these recovery options:
-- `close out manually` — inspect the commits, write the missing SUMMARY.md, then
-  let the orchestrator update STATE/ROADMAP.
-- `re-execute from scratch` — revert or supersede the partial commits first, then
-  dispatch a fresh executor.
-- `mark-and-skip` — record the anomaly as intentionally skipped and move on only
-  when the user explicitly confirms.
+new executor; continuing risks duplicate work and stale `STATE.md`/ROADMAP progress.
+Offer these recovery options:
+- `close out manually` — inspect commits, write SUMMARY.md, then update STATE/ROADMAP.
+- `re-execute from scratch` — revert or supersede partial commits before dispatch.
+- `mark-and-skip` — record the anomaly and move on only with explicit confirmation.
 </step>
 
 **MVP+TDD gate.** Task-scoped enforcement runs inside plan execution (immediately before each implementation step), where `TASK_FILE`, `PLAN_ID`, and `TASK_ID` are defined. Keep the same predicate and RED-commit contract:
@@ -706,13 +697,12 @@ increases monotonically across waves. `{status}` is `complete` (success),
    activity. If commits are still appearing, wait longer. If no activity, report
    the plan as failed and route to the failure handler in step 6.
 
-   **Configurable stall surveillance (#3212):** Every
-   `${EXECUTOR_STALL_INTERVAL_MINUTES}` minutes while waiting, compare the current
-   time to `DISPATCH_TS` and inspect `git log "${EXPECTED_BRANCH}" --since="${DISPATCH_TS}"`
-   for new executor activity. When no completion signal, no SUMMARY.md, and no
-   expected-branch commits have appeared for `${EXECUTOR_STALL_THRESHOLD_MINUTES}`
-   minutes, pause and ask the user to choose one recovery path: `continue waiting`,
-   `kill and retry`, or `kill and switch to inline execution`.
+   **Configurable stall surveillance (#3212):** Every `${EXECUTOR_STALL_INTERVAL_MINUTES}`
+   minutes while waiting, inspect `git log "${EXPECTED_BRANCH}" --since="${DISPATCH_TS}"`
+   for activity. If no completion signal, no SUMMARY.md, and no expected-branch
+   commits appear for `${EXECUTOR_STALL_THRESHOLD_MINUTES}` minutes, pause and
+   ask for one recovery path: `continue waiting`, `kill and retry`, or
+   `kill and switch to inline execution`.
 
    **This fallback applies automatically to all runtimes.** Claude Code's Agent() normally
    returns synchronously, but the fallback ensures resilience if it doesn't.
