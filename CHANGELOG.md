@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...HEAD)
 
+### Added
+
+- **`gsd-tools --json-errors` structured error mode** — all error paths in `gsd-tools` now emit `{ ok: false, reason: "<code>", message: "..." }` JSON to stderr when the CLI is invoked with `--json-errors` or `GSD_JSON_ERRORS=1`. Tests can assert on stable typed reason codes (`sdk_unknown_command`, `config_key_not_found`, `usage`, etc.) instead of grepping free-form text. Full taxonomy in `docs/json-errors.md`. (#3255)
+
 ### Fixed
 
 - **`/gsd-discuss-phase` and `/gsd-plan-phase` first-touch creation now apply `project_code` prefix consistently with `phase.add`/`phase.insert`** — projects with `project_code` set in `.planning/config.json` no longer accumulate a two-headed naming convention (`01-foundation/` mixed with `XR-02.1-spike/`). `init.phase-op` and `init.plan-phase` now expose `expected_phase_dir` (with prefix) in their JSON bundle; workflow fallback mkdir calls use this value instead of constructing the path from `padded_phase`+`phase_slug`. `phase.scaffold phase-dir` (CJS and SDK) also fixed. (#3287)
