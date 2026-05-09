@@ -223,6 +223,7 @@
       "planner-antipatterns.md",
       "planner-chunked.md",
       "planner-gap-closure.md",
+      "planner-human-verify-mode.md",
       "planner-mvp-mode.md",
       "planner-reviews.md",
       "planner-revision.md",

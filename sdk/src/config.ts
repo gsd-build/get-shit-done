@@ -25,6 +25,15 @@ export interface WorkflowConfig {
   nyquist_validation: boolean;
   /** Mirrors gsd-tools flat `config.tdd_mode` (from `workflow.tdd_mode`). */
   tdd_mode: boolean;
+  /**
+   * Issue #3309. `mid-flight` (default) preserves the current behavior — the
+   * planner emits `<task type="checkpoint:human-verify">` tasks and the
+   * executor halts at each one. `end-of-phase` instructs the planner to
+   * suppress those tasks and instead embed the verification details into
+   * the relevant `auto` task's `<verify><human>` block, which the verifier
+   * harvests at end-of-phase into the existing HUMAN-UAT.md path.
+   */
+  human_verify_mode: string;
   auto_advance: boolean;
   /** Internal auto-chain flag used by workflow routing. */
   _auto_chain_active?: boolean;
@@ -94,6 +103,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     verifier: true,
     nyquist_validation: true,
     tdd_mode: false,
+    human_verify_mode: 'mid-flight',
     auto_advance: false,
     node_repair: true,
     node_repair_budget: 2,

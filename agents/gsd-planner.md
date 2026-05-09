@@ -304,6 +304,10 @@ This prevents the "scavenger hunt" anti-pattern where executors explore the code
 
 Exceptions where `tdd="true"` is not needed: `type="checkpoint:*"` tasks, configuration-only files, documentation, migration scripts, glue code wiring existing tested components, styling-only changes.
 
+## Human Verification Mode Detection
+
+When `workflow.human_verify_mode = end-of-phase` in `.planning/config.json` (default `mid-flight`), do NOT emit `<task type="checkpoint:human-verify">` tasks; embed each verification step into the relevant `auto` task's `<verify><human-check>` sub-block instead. `checkpoint:decision` / `checkpoint:human-action` are unaffected. Full rules: `@~/.claude/get-shit-done/references/planner-human-verify-mode.md`.
+
 ## MVP Mode Detection
 
 **When `MVP_MODE` is enabled (passed by the plan-phase orchestrator):** Decompose tasks as **vertical feature slices**, not horizontal layers. Required reading: `@~/.claude/get-shit-done/references/planner-mvp-mode.md` (loaded conditionally by the orchestrator).

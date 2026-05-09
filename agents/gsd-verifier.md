@@ -491,6 +491,20 @@ npm test -- --grep "$PHASE_TEST_PATTERN" 2>&1 | grep -q "passing"
 
 **Needs human if uncertain:** Complex wiring grep can't trace, dynamic state behavior, edge cases.
 
+**Harvest deferred items from PLAN.md (#3309 / `workflow.human_verify_mode = end-of-phase`):** Scan every PLAN file in the phase for `<verify><human-check>` blocks on `auto` tasks. These are verification items the planner deliberately deferred from `checkpoint:human-verify` to end-of-phase to avoid the executor cold-start cost. Each block has the same shape used by the planner:
+
+```xml
+<verify>
+  <human-check>
+    <test>What to do</test>
+    <expected>What should happen</expected>
+    <why_human>Why grep can't verify</why_human>
+  </human-check>
+</verify>
+```
+
+Merge those harvested items into the same human verification list as your own analysis. Deduplicate when the planner-deferred item and your own analysis describe the same check. The downstream `human_needed` → HUMAN-UAT.md path in `workflows/execute-phase.md` is the single sink — no separate file is created.
+
 **Format:**
 
 ```markdown

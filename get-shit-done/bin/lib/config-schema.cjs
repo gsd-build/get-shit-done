@@ -20,6 +20,7 @@ const VALID_CONFIG_KEYS = new Set([
   'workflow.nyquist_validation', 'workflow.ai_integration_phase', 'workflow.ui_phase', 'workflow.ui_safety_gate',
   'workflow.auto_advance', 'workflow.node_repair', 'workflow.node_repair_budget',
   'workflow.tdd_mode',
+  'workflow.human_verify_mode',
   'workflow.text_mode',
   'workflow.research_before_questions',
   'workflow.discuss_mode',
