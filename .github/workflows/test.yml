@@ -84,9 +84,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+          cache-dependency-path: sdk/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-package-lock
 
       - name: Build SDK dist (required by installer)
         run: npm run build:sdk

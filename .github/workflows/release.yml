@@ -100,7 +100,8 @@ jobs:
           git checkout -b "$BRANCH"
           npm version "$VERSION" --no-git-tag-version
           cd sdk && npm version "$VERSION" --no-git-tag-version && cd ..
-          git add package.json package-lock.json sdk/package.json
+          git add package.json sdk/package.json
+          [ -f sdk/package-lock.json ] && git add sdk/package-lock.json
           git commit -m "chore: bump version to ${VERSION} for release"
           git push origin "$BRANCH"
           echo "## Release branch created" >> "$GITHUB_STEP_SUMMARY"
@@ -143,6 +144,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+          cache-dependency-path: sdk/package-lock.json
 
       - name: Determine pre-release version
         id: prerelease
@@ -179,14 +181,15 @@ jobs:
 
       - name: Install and test
         run: |
-          npm ci
+          npm install --no-package-lock
           npm run test:coverage
 
       - name: Commit pre-release version bump
         env:
           PRE_VERSION: ${{ steps.prerelease.outputs.pre_version }}
         run: |
-          git add package.json package-lock.json sdk/package.json
+          git add package.json sdk/package.json
+          [ -f sdk/package-lock.json ] && git add sdk/package-lock.json
           git commit -m "chore: bump to ${PRE_VERSION}"
 
       - name: Build SDK dist for tarball
@@ -313,6 +316,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+          cache-dependency-path: sdk/package-lock.json
 
       - name: Configure git identity
         run: |
@@ -325,12 +329,13 @@ jobs:
         run: |
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           cd sdk && npm version "$VERSION" --no-git-tag-version --allow-same-version && cd ..
-          git add package.json package-lock.json sdk/package.json
+          git add package.json sdk/package.json
+          [ -f sdk/package-lock.json ] && git add sdk/package-lock.json
           git diff --cached --quiet || git commit -m "chore: finalize v${VERSION}"
 
       - name: Install and test
         run: |
-          npm ci
+          npm install --no-package-lock
           npm run test:coverage
 
       - name: Build SDK dist for tarball

@@ -244,7 +244,7 @@ jobs:
         run: |
           set -euo pipefail
           npm version "$VERSION" --no-git-tag-version
-          git add package.json package-lock.json
+          git add package.json
           # Keep sdk/package.json in lockstep (parity with release-sdk.yml).
           if [ -f sdk/package.json ]; then
             (cd sdk && npm version "$VERSION" --no-git-tag-version)
@@ -295,6 +295,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+          cache-dependency-path: sdk/package-lock.json
 
       - name: Configure git identity
         run: |
@@ -316,7 +317,7 @@ jobs:
 
       - name: Install and test
         run: |
-          npm ci
+          npm install --no-package-lock
           npm run test:coverage
 
       - name: Build SDK dist for tarball
