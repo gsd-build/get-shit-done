@@ -213,6 +213,21 @@ export async function runQueryDispatch(deps: QueryDispatchDeps, queryArgv: strin
     return toDispatchFailure(mapFallbackDispatchError(new Error('No native match in dispatch plan'), normCmd, normArgs));
   }
 
+  // #3259: guard — if the invocation contains --help / -h AND the matched
+  // handler is a mutating command (mutation: true in the command manifest),
+  // short-circuit to a non-mutating stub. Mutating handlers are not help-aware
+  // by default (fail-closed). This prevents e.g. `milestone.complete --help`
+  // from writing milestone artifacts to disk.
+  const helpFlagPresent = matched.args.some((a) => a === '--help' || a === '-h');
+  if (helpFlagPresent && matched.mutation) {
+    return dispatchSuccess(
+      formatSuccess(
+        { help: `Usage: gsd-sdk query ${matched.canonical} [args...]` },
+        undefined,
+      ),
+    );
+  }
+
   const dispatchNative = deps.nativeAdapter
     ? (cmd: string, args: string[]) => deps.nativeAdapter!.dispatch(cmd, args)
     : deps.dispatchNative;

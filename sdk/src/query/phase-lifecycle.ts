@@ -1781,6 +1781,14 @@ export const milestoneComplete: QueryHandler = async (args, projectDir, workstre
   if (!version) {
     throw new GSDError('version required for milestone complete (e.g., v1.0)', ErrorClassification.Validation);
   }
+  // #3259: defense-in-depth — reject --help / -h as a version value before
+  // any disk write, regardless of whether the dispatcher guard intercepted first.
+  if (version === '--help' || version === '-h') {
+    throw new GSDError(
+      `"${version}" is not a valid milestone version; see \`gsd-sdk query --help\` for command list`,
+      ErrorClassification.Validation,
+    );
+  }
   assertNoNullBytes(version, 'version');
 
   const nameOpt = parseMultiwordArg(args, 'name');

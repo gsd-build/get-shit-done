@@ -1505,6 +1505,68 @@ describe('phasesArchive', () => {
   });
 });
 
+// ─── milestoneComplete help-flag defense (#3259) ────────────────────────────
+
+describe('milestoneComplete help-flag defense', () => {
+  it('rejects --help as a version value with GSDError before any disk write', async () => {
+    const { milestoneComplete } = await import('./phase-lifecycle.js');
+    const { GSDError, ErrorClassification } = await import('../errors.js');
+    await setupTestProject(tmpDir);
+
+    // Capture pre-invocation filesystem state
+    const planningDir = join(tmpDir, '.planning');
+    const milestonesPath = join(planningDir, 'MILESTONES.md');
+    const statePath = join(planningDir, 'STATE.md');
+    const preStateStat = await import('node:fs').then((m) => m.statSync(statePath));
+    const milestonesExistedBefore = existsSync(milestonesPath);
+
+    let thrown: unknown;
+    try {
+      await milestoneComplete(['--help'], tmpDir);
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(GSDError);
+    const err = thrown as InstanceType<typeof GSDError>;
+    expect(err.classification).toBe(ErrorClassification.Validation);
+    expect(err.message).toContain('--help');
+
+    // Assert no files were written
+    const postStateStat = await import('node:fs').then((m) => m.statSync(statePath));
+    expect(postStateStat.mtimeMs).toBe(preStateStat.mtimeMs);
+    expect(existsSync(milestonesPath)).toBe(milestonesExistedBefore);
+  });
+
+  it('rejects -h as a version value with GSDError before any disk write', async () => {
+    const { milestoneComplete } = await import('./phase-lifecycle.js');
+    const { GSDError, ErrorClassification } = await import('../errors.js');
+    await setupTestProject(tmpDir);
+
+    const statePath = join(tmpDir, '.planning', 'STATE.md');
+    const preStateStat = await import('node:fs').then((m) => m.statSync(statePath));
+    const milestonesPath = join(tmpDir, '.planning', 'MILESTONES.md');
+    const milestonesExistedBefore = existsSync(milestonesPath);
+
+    let thrown: unknown;
+    try {
+      await milestoneComplete(['-h'], tmpDir);
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(GSDError);
+    const err = thrown as InstanceType<typeof GSDError>;
+    expect(err.classification).toBe(ErrorClassification.Validation);
+    expect(err.message).toContain('-h');
+
+    // Assert no files were written
+    const postStateStat = await import('node:fs').then((m) => m.statSync(statePath));
+    expect(postStateStat.mtimeMs).toBe(preStateStat.mtimeMs);
+    expect(existsSync(milestonesPath)).toBe(milestonesExistedBefore);
+  });
+});
+
 // ─── Registry integration ──────────────────────────────────────────────────
 
 describe('lifecycle handlers in registry', () => {
