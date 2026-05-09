@@ -11,6 +11,7 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { COMMAND_DEFINITIONS_BY_FAMILY } from '../src/query/command-definition.js';
+import { NON_FAMILY_COMMAND_MANIFEST } from '../src/query/command-manifest.non-family.js';
 
 function toSubcommand(canonical: string, family: 'state' | 'verify' | 'init' | 'phase' | 'phases' | 'validate' | 'roadmap'): string {
   const prefix = `${family}.`;
@@ -67,9 +68,18 @@ async function main(): Promise<void> {
     mutation: entry.mutation,
   }));
 
-  const outPath = fileURLToPath(new URL('../src/query/command-aliases.generated.ts', import.meta.url));
-  const header = `/**\n * GENERATED FILE — command alias expansion for state.*, verify.*, init.*, phase.*, phases.*, validate.*, and roadmap.* pilots.\n * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap}.ts\n */\n\n`;
-  const body = [
+  // Non-family entries — sorted by canonical for deterministic output.
+  const nonFamilyEntries = [...NON_FAMILY_COMMAND_MANIFEST]
+    .sort((a, b) => a.canonical.localeCompare(b.canonical))
+    .map((entry) => ({
+      canonical: entry.canonical,
+      aliases: [...entry.aliases],
+      mutation: entry.mutation,
+    }));
+
+  const tsOutPath = fileURLToPath(new URL('../src/query/command-aliases.generated.ts', import.meta.url));
+  const tsHeader = `/**\n * GENERATED FILE — command alias expansion for state.*, verify.*, init.*, phase.*, phases.*, validate.*, roadmap.*, and non-family commands.\n * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap,non-family}.ts\n */\n\n`;
+  const tsBody = [
     `export const STATE_COMMAND_ALIASES = ${JSON.stringify(stateEntries, null, 2)} as const;`,
     '',
     `export const VERIFY_COMMAND_ALIASES = ${JSON.stringify(verifyEntries, null, 2)} as const;`,
@@ -84,6 +94,8 @@ async function main(): Promise<void> {
     '',
     `export const ROADMAP_COMMAND_ALIASES = ${JSON.stringify(roadmapEntries, null, 2)} as const;`,
     '',
+    `export const NON_FAMILY_COMMAND_ALIASES = ${JSON.stringify(nonFamilyEntries, null, 2)} as const;`,
+    '',
     'export const STATE_SUBCOMMANDS = new Set<string>(STATE_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     'export const VERIFY_SUBCOMMANDS = new Set<string>(VERIFY_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     'export const INIT_SUBCOMMANDS = new Set<string>(INIT_COMMAND_ALIASES.map((entry) => entry.subcommand));',
@@ -92,9 +104,56 @@ async function main(): Promise<void> {
     'export const VALIDATE_SUBCOMMANDS = new Set<string>(VALIDATE_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     'export const ROADMAP_SUBCOMMANDS = new Set<string>(ROADMAP_COMMAND_ALIASES.map((entry) => entry.subcommand));',
     '',
-
   ].join('\n');
-  await writeFile(outPath, header + body, 'utf-8');
+  await writeFile(tsOutPath, tsHeader + tsBody, 'utf-8');
+
+  // Also generate the CJS mirror used by get-shit-done/bin/lib/ seams.
+  const cjsOutPath = fileURLToPath(new URL('../../get-shit-done/bin/lib/command-aliases.generated.cjs', import.meta.url));
+  const cjsHeader = `'use strict';\n\n/**\n * GENERATED FILE — state.*, verify.*, init.*, phase.*, phases.*, validate.*, roadmap.*, and non-family alias/subcommand metadata for CJS routing.\n * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap,non-family}.ts\n */\n\n`;
+  const cjsBody = [
+    `const STATE_COMMAND_ALIASES = ${JSON.stringify(stateEntries, null, 2)};`,
+    '',
+    `const VERIFY_COMMAND_ALIASES = ${JSON.stringify(verifyEntries, null, 2)};`,
+    '',
+    `const INIT_COMMAND_ALIASES = ${JSON.stringify(initEntries, null, 2)};`,
+    '',
+    `const PHASE_COMMAND_ALIASES = ${JSON.stringify(phaseEntries, null, 2)};`,
+    '',
+    `const PHASES_COMMAND_ALIASES = ${JSON.stringify(phasesEntries, null, 2)};`,
+    '',
+    `const VALIDATE_COMMAND_ALIASES = ${JSON.stringify(validateEntries, null, 2)};`,
+    '',
+    `const ROADMAP_COMMAND_ALIASES = ${JSON.stringify(roadmapEntries, null, 2)};`,
+    '',
+    `const NON_FAMILY_COMMAND_ALIASES = ${JSON.stringify(nonFamilyEntries, null, 2)};`,
+    '',
+    `const STATE_SUBCOMMANDS = STATE_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    `const VERIFY_SUBCOMMANDS = VERIFY_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    `const INIT_SUBCOMMANDS = INIT_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    `const PHASE_SUBCOMMANDS = PHASE_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    `const PHASES_SUBCOMMANDS = PHASES_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    `const VALIDATE_SUBCOMMANDS = VALIDATE_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    `const ROADMAP_SUBCOMMANDS = ROADMAP_COMMAND_ALIASES.map((entry) => entry.subcommand);`,
+    '',
+    `module.exports = {`,
+    `  STATE_COMMAND_ALIASES,`,
+    `  VERIFY_COMMAND_ALIASES,`,
+    `  INIT_COMMAND_ALIASES,`,
+    `  PHASE_COMMAND_ALIASES,`,
+    `  PHASES_COMMAND_ALIASES,`,
+    `  VALIDATE_COMMAND_ALIASES,`,
+    `  ROADMAP_COMMAND_ALIASES,`,
+    `  NON_FAMILY_COMMAND_ALIASES,`,
+    `  STATE_SUBCOMMANDS,`,
+    `  VERIFY_SUBCOMMANDS,`,
+    `  INIT_SUBCOMMANDS,`,
+    `  PHASE_SUBCOMMANDS,`,
+    `  PHASES_SUBCOMMANDS,`,
+    `  VALIDATE_SUBCOMMANDS,`,
+    `  ROADMAP_SUBCOMMANDS,`,
+    `};`,
+  ].join('\n');
+  await writeFile(cjsOutPath, cjsHeader + cjsBody, 'utf-8');
 }
 
 main().catch((err) => {

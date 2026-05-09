@@ -8,6 +8,10 @@ export interface NonFamilyCommandManifestEntry {
 }
 
 export const NON_FAMILY_COMMAND_MANIFEST: readonly NonFamilyCommandManifestEntry[] = [
+  { canonical: 'check.decision-coverage-plan', aliases: ['check decision-coverage-plan'], mutation: false, outputMode: 'json' },
+  { canonical: 'check.decision-coverage-verify', aliases: ['check decision-coverage-verify'], mutation: false, outputMode: 'json' },
+
+  { canonical: 'frontmatter.get', aliases: [], mutation: false, outputMode: 'json' },
   { canonical: 'frontmatter.set', aliases: [], mutation: true, outputMode: 'json' },
   { canonical: 'frontmatter.merge', aliases: [], mutation: true, outputMode: 'json' },
   { canonical: 'frontmatter.validate', aliases: ['frontmatter validate'], mutation: true, outputMode: 'json' },
@@ -28,12 +32,25 @@ export const NON_FAMILY_COMMAND_MANIFEST: readonly NonFamilyCommandManifestEntry
   { canonical: 'todo.complete', aliases: ['todo complete'], mutation: true, outputMode: 'json' },
   { canonical: 'milestone.complete', aliases: ['milestone complete'], mutation: true, outputMode: 'json' },
 
+  { canonical: 'phase.mvp-mode', aliases: ['phase mvp-mode'], mutation: false, outputMode: 'json' },
+
+  { canonical: 'progress.bar', aliases: ['progress bar'], mutation: false, outputMode: 'json' },
+
+  { canonical: 'stats.json', aliases: ['stats json'], mutation: false, outputMode: 'json' },
+
+  { canonical: 'task.is-behavior-adding', aliases: ['task is-behavior-adding'], mutation: false, outputMode: 'json' },
+
+  { canonical: 'todo.match-phase', aliases: ['todo match-phase'], mutation: false, outputMode: 'json' },
+
+  { canonical: 'uat.render-checkpoint', aliases: ['uat render-checkpoint'], mutation: false, outputMode: 'json' },
+
   {
     canonical: 'workstream.create',
     aliases: ['workstream create'],
     mutation: true,
     outputMode: 'json',
   },
+  { canonical: 'workstream.list', aliases: ['workstream list'], mutation: false, outputMode: 'json' },
   { canonical: 'workstream.set', aliases: ['workstream set'], mutation: true, outputMode: 'json' },
   {
     canonical: 'workstream.complete',

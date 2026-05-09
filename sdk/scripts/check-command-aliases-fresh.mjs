@@ -36,7 +36,12 @@ const {
   PHASES_COMMAND_ALIASES,
   VALIDATE_COMMAND_ALIASES,
   ROADMAP_COMMAND_ALIASES,
+  NON_FAMILY_COMMAND_ALIASES,
 } = await import('../dist/query/command-aliases.generated.js');
+
+const {
+  NON_FAMILY_COMMAND_MANIFEST,
+} = await import('../dist/query/command-manifest.non-family.js');
 
 const cjsAliases = require(resolve(here, '..', '..', 'get-shit-done', 'bin', 'lib', 'command-aliases.generated.cjs'));
 
@@ -48,6 +53,16 @@ function toAliasEntries(manifest, family) {
     subcommand: entry.canonical.slice(prefix.length),
     mutation: entry.mutation,
   }));
+}
+
+function toNonFamilyAliasEntries(manifest) {
+  return [...manifest]
+    .sort((a, b) => a.canonical.localeCompare(b.canonical))
+    .map((entry) => ({
+      canonical: entry.canonical,
+      aliases: [...entry.aliases],
+      mutation: entry.mutation,
+    }));
 }
 
 function assertEqual(label, actual, expected) {
@@ -67,6 +82,7 @@ const expectedPhase = toAliasEntries(PHASE_COMMAND_MANIFEST, 'phase');
 const expectedPhases = toAliasEntries(PHASES_COMMAND_MANIFEST, 'phases');
 const expectedValidate = toAliasEntries(VALIDATE_COMMAND_MANIFEST, 'validate');
 const expectedRoadmap = toAliasEntries(ROADMAP_COMMAND_MANIFEST, 'roadmap');
+const expectedNonFamily = toNonFamilyAliasEntries(NON_FAMILY_COMMAND_MANIFEST);
 
 assertEqual('TS STATE_COMMAND_ALIASES', STATE_COMMAND_ALIASES, expectedState);
 assertEqual('TS VERIFY_COMMAND_ALIASES', VERIFY_COMMAND_ALIASES, expectedVerify);
@@ -75,6 +91,7 @@ assertEqual('TS PHASE_COMMAND_ALIASES', PHASE_COMMAND_ALIASES, expectedPhase);
 assertEqual('TS PHASES_COMMAND_ALIASES', PHASES_COMMAND_ALIASES, expectedPhases);
 assertEqual('TS VALIDATE_COMMAND_ALIASES', VALIDATE_COMMAND_ALIASES, expectedValidate);
 assertEqual('TS ROADMAP_COMMAND_ALIASES', ROADMAP_COMMAND_ALIASES, expectedRoadmap);
+assertEqual('TS NON_FAMILY_COMMAND_ALIASES', NON_FAMILY_COMMAND_ALIASES, expectedNonFamily);
 
 assertEqual('CJS STATE_COMMAND_ALIASES', cjsAliases.STATE_COMMAND_ALIASES, expectedState);
 assertEqual('CJS VERIFY_COMMAND_ALIASES', cjsAliases.VERIFY_COMMAND_ALIASES, expectedVerify);
@@ -83,5 +100,6 @@ assertEqual('CJS PHASE_COMMAND_ALIASES', cjsAliases.PHASE_COMMAND_ALIASES, expec
 assertEqual('CJS PHASES_COMMAND_ALIASES', cjsAliases.PHASES_COMMAND_ALIASES, expectedPhases);
 assertEqual('CJS VALIDATE_COMMAND_ALIASES', cjsAliases.VALIDATE_COMMAND_ALIASES, expectedValidate);
 assertEqual('CJS ROADMAP_COMMAND_ALIASES', cjsAliases.ROADMAP_COMMAND_ALIASES, expectedRoadmap);
+assertEqual('CJS NON_FAMILY_COMMAND_ALIASES', cjsAliases.NON_FAMILY_COMMAND_ALIASES, expectedNonFamily);
 
 console.log('command alias artifacts are fresh');

@@ -1,6 +1,6 @@
 /**
- * GENERATED FILE — command alias expansion for state.*, verify.*, init.*, phase.*, phases.*, validate.*, and roadmap.* pilots.
- * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap}.ts
+ * GENERATED FILE — command alias expansion for state.*, verify.*, init.*, phase.*, phases.*, validate.*, roadmap.*, and non-family commands.
+ * Source: sdk/src/query/command-manifest.{state,verify,init,phase,phases,validate,roadmap,non-family}.ts
  */
 
 export interface FamilyCommandAlias {
@@ -95,6 +95,55 @@ export const ROADMAP_COMMAND_ALIASES: readonly FamilyCommandAlias[] = [
   { canonical: 'roadmap.get-phase', aliases: ['roadmap get-phase'], subcommand: 'get-phase', mutation: false },
   { canonical: 'roadmap.update-plan-progress', aliases: ['roadmap update-plan-progress'], subcommand: 'update-plan-progress', mutation: true },
   { canonical: 'roadmap.annotate-dependencies', aliases: ['roadmap annotate-dependencies'], subcommand: 'annotate-dependencies', mutation: true },
+] as const;
+
+export interface NonFamilyCommandAlias {
+  canonical: string;
+  aliases: string[];
+  mutation: boolean;
+}
+
+export const NON_FAMILY_COMMAND_ALIASES: readonly NonFamilyCommandAlias[] = [
+  { canonical: 'check-commit', aliases: [], mutation: true },
+  { canonical: 'check.decision-coverage-plan', aliases: ['check decision-coverage-plan'], mutation: false },
+  { canonical: 'check.decision-coverage-verify', aliases: ['check decision-coverage-verify'], mutation: false },
+  { canonical: 'commit', aliases: [], mutation: true },
+  { canonical: 'commit-to-subrepo', aliases: [], mutation: true },
+  { canonical: 'config-ensure-section', aliases: [], mutation: true },
+  { canonical: 'config-new-project', aliases: [], mutation: true },
+  { canonical: 'config-set', aliases: [], mutation: true },
+  { canonical: 'config-set-model-profile', aliases: [], mutation: true },
+  { canonical: 'docs-init', aliases: [], mutation: true },
+  { canonical: 'frontmatter.get', aliases: [], mutation: false },
+  { canonical: 'frontmatter.merge', aliases: [], mutation: true },
+  { canonical: 'frontmatter.set', aliases: [], mutation: true },
+  { canonical: 'frontmatter.validate', aliases: ['frontmatter validate'], mutation: true },
+  { canonical: 'generate-claude-md', aliases: [], mutation: true },
+  { canonical: 'generate-claude-profile', aliases: [], mutation: true },
+  { canonical: 'generate-dev-preferences', aliases: [], mutation: true },
+  { canonical: 'intel.patch-meta', aliases: ['intel patch-meta'], mutation: true },
+  { canonical: 'intel.snapshot', aliases: ['intel snapshot'], mutation: true },
+  { canonical: 'learnings.copy', aliases: ['learnings copy'], mutation: true },
+  { canonical: 'learnings.delete', aliases: ['learnings delete'], mutation: true },
+  { canonical: 'learnings.prune', aliases: ['learnings prune'], mutation: true },
+  { canonical: 'milestone.complete', aliases: ['milestone complete'], mutation: true },
+  { canonical: 'phase.mvp-mode', aliases: ['phase mvp-mode'], mutation: false },
+  { canonical: 'progress.bar', aliases: ['progress bar'], mutation: false },
+  { canonical: 'requirements.mark-complete', aliases: ['requirements mark-complete'], mutation: true },
+  { canonical: 'stats.json', aliases: ['stats json'], mutation: false },
+  { canonical: 'task.is-behavior-adding', aliases: ['task is-behavior-adding'], mutation: false },
+  { canonical: 'template.fill', aliases: [], mutation: true },
+  { canonical: 'template.select', aliases: ['template select'], mutation: true },
+  { canonical: 'todo.complete', aliases: ['todo complete'], mutation: true },
+  { canonical: 'todo.match-phase', aliases: ['todo match-phase'], mutation: false },
+  { canonical: 'uat.render-checkpoint', aliases: ['uat render-checkpoint'], mutation: false },
+  { canonical: 'verify-summary', aliases: ['verify.summary', 'verify summary'], mutation: false },
+  { canonical: 'workstream.complete', aliases: ['workstream complete'], mutation: true },
+  { canonical: 'workstream.create', aliases: ['workstream create'], mutation: true },
+  { canonical: 'workstream.list', aliases: ['workstream list'], mutation: false },
+  { canonical: 'workstream.progress', aliases: ['workstream progress'], mutation: true },
+  { canonical: 'workstream.set', aliases: ['workstream set'], mutation: true },
+  { canonical: 'write-profile', aliases: [], mutation: true },
 ] as const;
 
 export const STATE_SUBCOMMANDS = new Set<string>(STATE_COMMAND_ALIASES.map((entry) => entry.subcommand));
