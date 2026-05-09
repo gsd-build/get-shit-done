@@ -434,6 +434,16 @@ describe('resolveModelInternal', () => {
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'sonnet');
     });
 
+    test('returns opus for unknown agent type with quality profile', () => {
+      writeConfig({ model_profile: 'quality' });
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'opus');
+    });
+
+    test('returns haiku for unknown agent type with budget profile', () => {
+      writeConfig({ model_profile: 'budget' });
+      assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'haiku');
+    });
+
     test('returns inherit for unknown agent type with inherit profile', () => {
       writeConfig({ model_profile: 'inherit' });
       assert.strictEqual(resolveModelInternal(tmpDir, 'gsd-nonexistent'), 'inherit');
