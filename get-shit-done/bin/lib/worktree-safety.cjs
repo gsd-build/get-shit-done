@@ -8,16 +8,43 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-function execGitDefault(cwd, args) {
+// Default timeout for worktree-related git subprocess calls.
+// 10 s is generous enough for normal git operations on large repos while still
+// providing a deterministic failure path when git stalls (locked index, hung
+// remote, stalled NFS mount, etc.).  Callers can override via deps.timeout.
+const DEFAULT_GIT_TIMEOUT_MS = 10000;
+
+/**
+ * Execute a git command with a bounded timeout.
+ *
+ * Return shape: { exitCode, stdout, stderr, timedOut, error }
+ *   - exitCode: process exit status (null when killed by signal)
+ *   - timedOut: true when spawnSync reports SIGTERM + ETIMEDOUT — callers must
+ *               branch on this to surface a structured warning instead of
+ *               silently treating the empty output as success (PRED.k302)
+ *   - error:    the Error object from spawnSync when the process could not start
+ *               or was killed; null otherwise
+ *
+ * Backward-compatible: existing callers that only read exitCode/stdout/stderr
+ * continue to work unchanged.
+ */
+function execGitDefault(cwd, args, options = {}) {
+  const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
   const result = spawnSync('git', args, {
     cwd,
     stdio: 'pipe',
     encoding: 'utf-8',
+    timeout,
   });
+  // spawnSync sets signal='SIGTERM' and error.code='ETIMEDOUT' when the timeout
+  // fires and the subprocess is killed.
+  const timedOut = result.signal === 'SIGTERM' && result.error?.code === 'ETIMEDOUT';
   return {
     exitCode: result.status ?? 1,
     stdout: (result.stdout ?? '').toString().trim(),
     stderr: (result.stderr ?? '').toString().trim(),
+    timedOut,
+    error: result.error ?? null,
   };
 }
 
@@ -51,6 +78,17 @@ function parseWorktreeListPaths(porcelain) {
 function readWorktreeList(repoRoot, deps = {}) {
   const execGit = deps.execGit || execGitDefault;
   const listResult = execGit(repoRoot, ['worktree', 'list', '--porcelain']);
+  if (listResult.timedOut) {
+    // AC2 / AC4: surface timeout as a distinct reason so callers can emit a
+    // structured warning rather than silently treating the failure as a generic
+    // list error (PRED.k302 — error-swallowing-empty-sentinel).
+    return {
+      ok: false,
+      reason: 'git_timed_out',
+      porcelain: '',
+      entries: [],
+    };
+  }
   if (listResult.exitCode !== 0) {
     return {
       ok: false,
@@ -158,10 +196,23 @@ function executeWorktreePrunePlan(plan, deps = {}) {
   }
 
   const result = execGit(plan.repoRoot, ['worktree', 'prune']);
+  if (result.timedOut) {
+    // AC4: surface timedOut as a first-class field so callers (e.g.
+    // pruneOrphanedWorktrees in core.cjs) can log a structured WARNING rather
+    // than silently ignoring it (PRED.k302 — error-swallowing-empty-sentinel).
+    return {
+      ok: false,
+      action: plan.action,
+      reason: 'git_timed_out',
+      timedOut: true,
+      pruned: [],
+    };
+  }
   return {
     ok: result.exitCode === 0,
     action: plan.action,
     reason: plan.reason,
+    timedOut: false,
     pruned: [],
   };
 }

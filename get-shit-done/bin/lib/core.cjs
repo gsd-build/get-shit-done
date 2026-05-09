@@ -722,16 +722,38 @@ function normalizeMd(content) {
   return text;
 }
 
-function execGit(cwd, args) {
+// Default timeout for worktree-related git subprocess calls (matches worktree-safety.cjs).
+// Prevents `git worktree list --porcelain` and similar calls from blocking the parent
+// process indefinitely when git is stalled (locked index, hung remote, NFS mount freeze).
+// Callers can override via an options bag if needed.
+const DEFAULT_GIT_TIMEOUT_MS = 10000;
+
+/**
+ * Execute a git command with a bounded timeout.
+ *
+ * Return shape: { exitCode, stdout, stderr, timedOut, error }
+ *   - timedOut: true when spawnSync reports SIGTERM + ETIMEDOUT — callers must
+ *               branch on this to surface a structured warning (PRED.k302).
+ *   - error:    spawnSync error object or null
+ *
+ * Backward-compatible: existing callers that only read exitCode/stdout/stderr
+ * continue to work unchanged.
+ */
+function execGit(cwd, args, options = {}) {
+  const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
   const result = spawnSync('git', args, {
     cwd,
     stdio: 'pipe',
     encoding: 'utf-8',
+    timeout,
   });
+  const timedOut = result.signal === 'SIGTERM' && result.error?.code === 'ETIMEDOUT';
   return {
     exitCode: result.status ?? 1,
     stdout: (result.stdout ?? '').toString().trim(),
     stderr: (result.stderr ?? '').toString().trim(),
+    timedOut,
+    error: result.error ?? null,
   };
 }
 
@@ -778,7 +800,16 @@ function pruneOrphanedWorktrees(repoRoot) {
       { allowDestructive: false },
       { execGit, parseWorktreePorcelain }
     );
-    executeWorktreePrunePlan(plan, { execGit });
+    const pruneResult = executeWorktreePrunePlan(plan, { execGit });
+    if (pruneResult && pruneResult.timedOut) {
+      // AC2: surface structured warning instead of silently swallowing the timeout.
+      // Uses process.stderr.write to match the [gsd-tools] WARNING prefix style.
+      process.stderr.write(
+        '[gsd-tools] WARNING: worktree health check degraded' +
+        ' — git worktree prune timed out after 10s.' +
+        ' Orphaned worktree metadata may remain until the next successful run.\n'
+      );
+    }
   } catch { /* never crash the caller */ }
   return [];
 }

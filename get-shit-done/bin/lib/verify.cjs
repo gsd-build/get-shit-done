@@ -913,7 +913,17 @@ function cmdValidateHealth(cwd, options, raw) {
       { staleAfterMs: 60 * 60 * 1000 },
       { execGit, existsSync: fs.existsSync, statSync: fs.statSync }
     );
-    if (worktreeHealth.ok) {
+    if (!worktreeHealth.ok) {
+      // AC2 / AC3: surface degraded-git state as a structured warning instead
+      // of silently suppressing it (PRED.k302 — error-swallowing-empty-sentinel).
+      if (worktreeHealth.reason === 'git_timed_out') {
+        addIssue('warning', 'W018',
+          'Worktree health check degraded: git worktree list timed out after 10s — orphan/stale worktrees could not be inspected',
+          'Run: git worktree list --porcelain to diagnose; check for .git/index.lock or a hung git process');
+      }
+      // Other non-ok reasons (not_a_git_repo, git_list_failed) are silent — not
+      // meaningful for users who have no git repo or whose git is not configured.
+    } else {
       for (const finding of worktreeHealth.findings) {
         if (finding.kind === 'orphan') {
           addIssue('warning', 'W017',
