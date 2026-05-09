@@ -3977,7 +3977,13 @@ function validateCodexConfigSchema(content) {
       };
     }
 
-    if (!section.array && section.path.startsWith('hooks.')) {
+    // hooks.state.* is Codex's persistent hook-trust namespace (added in
+    // Codex CLI 0.130.0). It uses regular-table shape, NOT array-of-tables.
+    // Any section whose path is exactly `hooks.state` or starts with
+    // `hooks.state.` must be allowed as a bare table. All other hooks.*
+    // paths (event handlers like hooks.SessionStart) still require AoT.
+    if (!section.array && section.path.startsWith('hooks.') &&
+        section.path !== 'hooks.state' && !section.path.startsWith('hooks.state.')) {
       return {
         ok: false,
         reason: `bare [${section.path}] table is invalid in current Codex schema (expected [[${section.path}]] array-of-tables)`,
@@ -3997,6 +4003,9 @@ function validateCodexConfigSchema(content) {
     }
     if (typeof parsed.hooks === 'object' && parsed.hooks !== null) {
       for (const [event, value] of Object.entries(parsed.hooks)) {
+        // hooks.state is Codex's persistent hook-trust namespace — a regular
+        // object, not an array of event-handler tables. Skip it entirely.
+        if (event === 'state') continue;
         // Skip the nested .hooks sub-array — it lives under hooks.<Event>[n].hooks
         // and is validated separately below.
         if (!Array.isArray(value)) {
