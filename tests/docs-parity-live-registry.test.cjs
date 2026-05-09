@@ -57,6 +57,76 @@ function isReleaseDoc(filePath) {
   return path.basename(filePath).startsWith('RELEASE-') && filePath.endsWith('.md');
 }
 
+// Slugs that appear in docs as internal component names or documentation
+// syntax placeholders — they match the /gsd-* regex but are NOT user-typable
+// slash commands and never appear in the command registry. Adding a slug here
+// requires a code comment explaining why it is not a slash command.
+//
+// Do NOT add here:
+//   - deleted slash commands (those should be scrubbed from docs)
+//   - renamed commands (update the docs instead)
+const INTERNAL_COMPONENT_SLUGS = new Set([
+  // Documentation syntax placeholder — "command-name" is used in ARCHITECTURE.md,
+  // COMMANDS.md, and USER-GUIDE.md to show the template form of a slash command
+  // (e.g. "/gsd-command-name [args]"). It is not a registered command.
+  'command-name',
+  'command',
+
+  // gsd-tools.cjs — the legacy Node CLI binary (bin/gsd-tools.cjs).
+  // Docs reference it as a path component in shell examples, not as a slash command.
+  // Example: node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" state validate
+  'tools',
+
+  // Hook scripts — internal runtime hooks, not user-invocable slash commands.
+  //   hooks/gsd-statusline.js      — session statusline hook
+  //   hooks/gsd-context-monitor.js — context-window monitor hook
+  //   hooks/gsd-update-banner.js   — update-available banner hook
+  // These appear in docs as file-path references (e.g. "gsd-statusline.js reads
+  // the cache"), not as command invocations.
+  'statusline',
+  'context-monitor',
+  'update-banner',
+
+  // gsd-update-check.json — background update-check CACHE FILE, not a slash command.
+  // ARCHITECTURE.md references "~/.cache/gsd/gsd-update-check.json" as a path;
+  // the regex captures "/gsd-update-check" from the path component.
+  'update-check',
+
+  // Internal agent names referenced in ARCHITECTURE.md tables of agents.
+  // These are spawned agents (gsd-planner, etc.), not user-typable slash commands.
+  'planner',
+
+  // Malformed token from SDK init reference: "/gsd-init-" appears as a truncated
+  // prefix in CLI-TOOLS.md describing the gsd-sdk init command family
+  // (e.g., "gsd-sdk query init.phase-op 12"). The regex captures "/gsd-init-"
+  // without a following slug — this is a documentation formatting artifact, not
+  // a real command token.
+  'init-',
+
+  // gsd-build — GitHub organization name: "github.com/gsd-build/get-shit-done".
+  // Every occurrence of "/gsd-build" in docs is the path component of a GitHub URL
+  // (e.g., "[#2792](https://github.com/gsd-build/get-shit-done/issues/2792)").
+  // The regex captures "/gsd-build" from the URL path. Not a slash command.
+  'build',
+
+  // ~/gsd-workspaces/ — filesystem directory path used by /gsd-workspace.
+  // Docs reference "~/gsd-workspaces/<name>" as the default workspace directory
+  // in shell examples and option tables (e.g. "--path /target (default: ~/gsd-workspaces/<name>)").
+  // The regex captures "/gsd-workspaces" from the path component. The LIVE slash
+  // command is "/gsd-workspace" (singular) — not "/gsd-workspaces" (plural).
+  'workspaces',
+
+  // Portuguese translation of "command" — pt-BR/ARCHITECTURE.md uses "/gsd-comando"
+  // as the localized equivalent of the "/gsd-command-name" English placeholder
+  // in an architecture flow diagram. Not a registered command.
+  'comando',
+
+  // GitHub repository name: zh-CN/README.md references "github.com/rokicool/gsd-opencode"
+  // as an external community project URL. The regex captures "/gsd-opencode" from
+  // the URL path. Not a user-typable slash command in this product.
+  'opencode',
+]);
+
 /**
  * Strip HTML comments from content to avoid flagging commented-out examples
  * or prose that names a dead command for historical context (e.g. "previously
@@ -73,13 +143,33 @@ function stripHtmlComments(content) {
  *   /gsd:slug  — Gemini
  *   $gsd-slug  — Codex
  *
+ * Internal component slugs (INTERNAL_COMPONENT_SLUGS) are filtered out —
+ * those are file-path references or documentation placeholders, not slash
+ * command invocations.
+ *
  * Returns: { slash: Set<string>, colon: Set<string>, dollar: Set<string> }
  */
 function extractCommandTokens(content) {
   const stripped = stripHtmlComments(content);
-  const slash = new Set((stripped.match(/\/gsd-[a-z0-9][a-z0-9-]*/g) || []));
-  const colon = new Set((stripped.match(/\/gsd:[a-z0-9][a-z0-9-]*/g) || []));
-  const dollar = new Set((stripped.match(/\$gsd-[a-z0-9][a-z0-9-]*/g) || []));
+
+  function isInternal(token) {
+    // Strip the /gsd- or /gsd: or $gsd- prefix to get the slug
+    const slug = token.replace(/^(?:\/gsd[:-]|\$gsd-)/, '');
+    // Exact match OR prefix match for 'init-' (which ends with a dash)
+    if (INTERNAL_COMPONENT_SLUGS.has(slug)) return true;
+    for (const s of INTERNAL_COMPONENT_SLUGS) {
+      if (s.endsWith('-') && slug.startsWith(s)) return true;
+    }
+    return false;
+  }
+
+  const allSlash = (stripped.match(/\/gsd-[a-z0-9][a-z0-9-]*/g) || []);
+  const allColon = (stripped.match(/\/gsd:[a-z0-9][a-z0-9-]*/g) || []);
+  const allDollar = (stripped.match(/\$gsd-[a-z0-9][a-z0-9-]*/g) || []);
+
+  const slash = new Set(allSlash.filter(t => !isInternal(t)));
+  const colon = new Set(allColon.filter(t => !isInternal(t)));
+  const dollar = new Set(allDollar.filter(t => !isInternal(t)));
   return { slash, colon, dollar };
 }
 

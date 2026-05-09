@@ -517,7 +517,7 @@
 
 ### 12. Freeform Routing
 
-**Command:** `/gsd-do`
+**Command:** `/gsd-fast` (see also `/gsd-manager` for interactive routing)
 
 **Purpose:** Analyze freeform text and route to the appropriate GSD command.
 
@@ -531,7 +531,7 @@
 
 ### 13. Note Capture
 
-**Command:** `/gsd-note`
+**Command:** `/gsd-capture`
 
 **Purpose:** Zero-friction idea capture without interrupting workflow. Append timestamped notes, list all notes, or promote notes to structured todos.
 
@@ -1080,7 +1080,6 @@ The banner is silent when up-to-date and rate-limits "check failed" diagnostics 
 
 **Generated Artifacts:**
 - `USER-PROFILE.md` — Full behavioral profile with evidence citations
-- `/gsd-dev-preferences` command — Load preferences in any session
 - `CLAUDE.md` profile section — Auto-discovered by Claude Code
 
 **Flags:**
@@ -2198,13 +2197,13 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 97. Rapid Codebase Scan
 
-**Command:** `/gsd-scan [--focus tech|arch|quality|concerns|tech+arch]`
+**Command:** `/gsd-map-codebase --fast [--focus tech|arch|quality|concerns]`
 
 **Purpose:** Lightweight alternative to `/gsd-map-codebase` that spawns a single mapper agent for a specific focus area, producing targeted output in `.planning/codebase/` without the overhead of 4 parallel agents.
 
 **Requirements:**
 - REQ-SCAN-01: Scan MUST spawn exactly one mapper agent (not four parallel agents)
-- REQ-SCAN-02: Focus area MUST be one of: `tech`, `arch`, `quality`, `concerns`, `tech+arch` (default)
+- REQ-SCAN-02: Focus area MUST be one of: `tech`, `arch`, `quality`, `concerns` (default: `tech+arch`)
 - REQ-SCAN-03: Output MUST be written to `.planning/codebase/` in the same format as `/gsd-map-codebase`
 
 ---
@@ -2322,7 +2321,7 @@ Test suite that scans all agent, workflow, and command files for embedded inject
 
 ### 105. GSD-2 Reverse Migration
 
-**Command:** `/gsd-from-gsd2 [--dry-run] [--force] [--path <dir>]`
+**Command:** `/gsd-import --from-gsd2 [--dry-run] [--force] [--path <dir>]`
 
 **Purpose:** Migrate a project from GSD-2 format (`.gsd/` directory with Milestone→Slice→Task hierarchy) back to the v1 `.planning/` format, restoring full compatibility with all GSD v1 commands.
 
@@ -2653,12 +2652,12 @@ Users who run a memory / knowledge-base MCP server (for example, ExoCortex-style
 **Purpose:** Replace the flat eager skill listing with a two-stage hierarchical routing layer. The model sees 6 namespace routers instead of 86 entries, selects a namespace, then routes to the sub-skill. Descriptions use pipe-separated keyword tags (≤ 60 chars) for routing density.
 
 **Commands:**
-- `/gsd-ns-workflow` — phase pipeline router (discuss / plan / execute / verify / phase / progress)
-- `/gsd-ns-project` — project lifecycle (milestones, audits, summary)
-- `/gsd-ns-review` — quality gates (code review, debug, audit, security, eval, ui)
-- `/gsd-ns-context` — codebase intelligence (map, graphify, docs, learnings)
-- `/gsd-ns-manage` — config / workspace / workstreams / thread / update / ship / inbox
-- `/gsd-ns-ideate` — exploration & capture (explore, sketch, spike, spec, capture)
+- `/gsd-workflow` — phase pipeline router (discuss / plan / execute / verify / phase / progress)
+- `/gsd-project` — project lifecycle (milestones, audits, summary)
+- `/gsd-review` — quality gates (code review, debug, audit, security, eval, ui)
+- `/gsd-context` — codebase intelligence (map, graphify, docs, learnings)
+- `/gsd-manage` — config / workspace / workstreams / thread / update / ship / inbox
+- `/gsd-ideate` — exploration & capture (explore, sketch, spike, spec, capture)
 
 **Token cost:**
 

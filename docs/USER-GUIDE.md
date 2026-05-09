@@ -40,12 +40,12 @@ v1.40 ships six **namespace meta-skills** as the first-stage entry points for hi
 
 | Namespace | Router | Routes to |
 |-----------|--------|-----------|
-| Phase pipeline | `/gsd-ns-workflow` | discuss / plan / execute / verify / phase / progress |
-| Project lifecycle | `/gsd-ns-project` | milestones, audits, summary |
-| Quality gates | `/gsd-ns-review` | code review, debug, audit, security, eval, ui |
-| Codebase intelligence | `/gsd-ns-context` | map, graphify, docs, learnings |
-| Management | `/gsd-ns-manage` | config, workspace, workstreams, thread, update, ship, inbox |
-| Exploration & capture | `/gsd-ns-ideate` | explore, sketch, spike, spec, capture |
+| Phase pipeline | `/gsd-workflow` | discuss / plan / execute / verify / phase / progress |
+| Project lifecycle | `/gsd-project` | milestones, audits, summary |
+| Quality gates | `/gsd-review` | code review, debug, audit, security, eval, ui |
+| Codebase intelligence | `/gsd-context` | map, graphify, docs, learnings |
+| Management | `/gsd-manage` | config, workspace, workstreams, thread, update, ship, inbox |
+| Exploration & capture | `/gsd-ideate` | explore, sketch, spike, spec, capture |
 
 You almost never need to type a namespace router yourself. Their value is in the routing layer the model uses to discover the right sub-skill — they exist so the system prompt can list 6 entries instead of 86. If you already know the concrete command (e.g. `/gsd-plan-phase`), call it directly.
 
@@ -915,9 +915,9 @@ Intel files cover stack, API surface, dependency graph, file roles, and architec
 For a focused assessment without full `/gsd-map-codebase` overhead:
 
 ```bash
-/gsd-scan                      # Quick tech + arch overview
-/gsd-scan --focus quality      # Quality and code health only
-/gsd-scan --focus concerns     # Risk areas and concerns
+/gsd-map-codebase --fast                        # Quick tech + arch overview
+/gsd-map-codebase --fast --focus quality        # Quality and code health only
+/gsd-map-codebase --fast --focus concerns       # Risk areas and concerns
 ```
 
 ---
