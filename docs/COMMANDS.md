@@ -22,7 +22,7 @@ Six namespace routers ship as the first-stage entry points in v1.40. They keep t
 |---------|-----------|
 | `/gsd-workflow` | Phase pipeline — discuss / plan / execute / verify / phase / progress |
 | `/gsd-project` | Project lifecycle — milestones, audits, summary |
-| `/gsd-review` | Quality gates — code review, debug, audit, security, eval, ui |
+| `/gsd-quality` | Quality gates — code review, debug, audit, security, eval, ui |
 | `/gsd-context` | Codebase intelligence — map, graphify, docs, learnings |
 | `/gsd-manage` | Management — config, workspace, workstreams, thread, update, ship, inbox |
 | `/gsd-ideate` | Exploration & capture — explore, sketch, spike, spec, capture |

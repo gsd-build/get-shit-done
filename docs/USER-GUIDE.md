@@ -42,7 +42,7 @@ v1.40 ships six **namespace meta-skills** as the first-stage entry points for hi
 |-----------|--------|-----------|
 | Phase pipeline | `/gsd-workflow` | discuss / plan / execute / verify / phase / progress |
 | Project lifecycle | `/gsd-project` | milestones, audits, summary |
-| Quality gates | `/gsd-review` | code review, debug, audit, security, eval, ui |
+| Quality gates | `/gsd-quality` | code review, debug, audit, security, eval, ui |
 | Codebase intelligence | `/gsd-context` | map, graphify, docs, learnings |
 | Management | `/gsd-manage` | config, workspace, workstreams, thread, update, ship, inbox |
 | Exploration & capture | `/gsd-ideate` | explore, sketch, spike, spec, capture |

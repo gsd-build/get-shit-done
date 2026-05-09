@@ -610,7 +610,7 @@ These six skills exist primarily for the model to perform two-stage hierarchical
 - **`/gsd-ideate`** — Exploration / capture routing (explore, sketch, spike, spec, capture).
 - **`/gsd-manage`** — Configuration and workspace routing (workstreams, thread, update, ship, inbox).
 - **`/gsd-project`** — Project-lifecycle routing (milestones, audits, summary).
-- **`/gsd-review`** — Quality-gate routing (code review, debug, audit, security, eval, ui).
+- **`/gsd-quality`** — Quality-gate routing (code review, debug, audit, security, eval, ui).
 - **`/gsd-workflow`** — Phase-pipeline routing (discuss, plan, execute, verify, phase, progress).
 
 ## Files & Structure

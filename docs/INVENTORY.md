@@ -66,7 +66,7 @@ These six routers are descriptor-only entries that the model picks first; the bo
 |---------|------|--------|
 | `/gsd-workflow` | Phase pipeline router — discuss / plan / execute / verify / phase / progress. | [commands/gsd/ns-workflow.md](../commands/gsd/ns-workflow.md) |
 | `/gsd-project` | Project lifecycle router — milestones, audits, summary. | [commands/gsd/ns-project.md](../commands/gsd/ns-project.md) |
-| `/gsd-review` | Quality-gate router — code review, debug, audit, security, eval, ui. | [commands/gsd/ns-review.md](../commands/gsd/ns-review.md) |
+| `/gsd-quality` | Quality-gate router — code review, debug, audit, security, eval, ui. | [commands/gsd/ns-review.md](../commands/gsd/ns-review.md) |
 | `/gsd-context` | Codebase-intelligence router — map, graphify, docs, learnings. | [commands/gsd/ns-context.md](../commands/gsd/ns-context.md) |
 | `/gsd-manage` | Management router — config, workspace, workstreams, thread, update, ship, inbox. | [commands/gsd/ns-manage.md](../commands/gsd/ns-manage.md) |
 | `/gsd-ideate` | Exploration & capture router — explore, sketch, spike, spec, capture. | [commands/gsd/ns-ideate.md](../commands/gsd/ns-ideate.md) |

@@ -1,5 +1,5 @@
 ---
-name: gsd-review
+name: gsd-quality
 description: "quality gates | code review debug audit security eval ui"
 argument-hint: ""
 allowed-tools:
