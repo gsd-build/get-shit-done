@@ -46,16 +46,16 @@ let _cache = null;
  * introducing a YAML parser dependency would be disproportionate.
  *
  * Supported name forms:
- *   name: gsd:slug     -> slug = "slug"
- *   name: gsd-slug     -> slug = "slug"
- *   name: "gsd:slug"   -> slug = "slug"  (quoted)
- *   name: "gsd-slug"   -> slug = "slug"  (quoted)
+ *   name: gsd:slug     → slug = "slug"
+ *   name: gsd-slug     → slug = "slug"
+ *   name: "gsd:slug"   → slug = "slug"  (quoted)
+ *   name: "gsd-slug"   → slug = "slug"  (quoted)
  */
 function parseSlug(content, filePath) {
   // Frontmatter must start with '---' on the very first line.
   if (!content.startsWith('---')) {
     throw new Error(
-      '[live-command-registry] ' + filePath + ': missing YAML frontmatter — file must start with \'---\''
+      `[live-command-registry] ${filePath}: missing YAML frontmatter — file must start with '---'`
     );
   }
 
@@ -63,7 +63,7 @@ function parseSlug(content, filePath) {
   const closingIdx = content.indexOf('\n---', 3);
   if (closingIdx < 0) {
     throw new Error(
-      '[live-command-registry] ' + filePath + ': unclosed YAML frontmatter — no closing \'---\' found'
+      `[live-command-registry] ${filePath}: unclosed YAML frontmatter — no closing '---' found`
     );
   }
 
@@ -72,11 +72,11 @@ function parseSlug(content, filePath) {
   // Match `name:` line, allowing optional quotes around the value.
   // The value must be one of: gsd:<slug> or gsd-<slug>
   // where slug = [a-z0-9][a-z0-9-]*
-  const nameMatch = frontmatter.match(/^name:\s*"?(gsd[:-])([a-z0-9][a-z0-9-]*)"?\s*$/m);
+  const nameMatch = frontmatter.match(/^name:\s*"?(gsd[:‑-])([a-z0-9][a-z0-9-]*)"?\s*$/m);
   if (!nameMatch) {
     throw new Error(
-      '[live-command-registry] ' + filePath + ': could not extract slug from frontmatter ' +
-      '(expected "name: gsd:<slug>" or "name: gsd-<slug>")'
+      `[live-command-registry] ${filePath}: could not extract slug from frontmatter ` +
+      `(expected "name: gsd:<slug>" or "name: gsd-<slug>")`
     );
   }
 
@@ -96,12 +96,12 @@ function getLiveCommandTokens() {
 
   if (!fs.existsSync(COMMANDS_DIR)) {
     throw new Error(
-      '[live-command-registry] commands directory not found: ' + COMMANDS_DIR
+      `[live-command-registry] commands directory not found: ${COMMANDS_DIR}`
     );
   }
 
   const entries = fs.readdirSync(COMMANDS_DIR)
-    .filter(function(f) { return f.endsWith('.md'); })
+    .filter(f => f.endsWith('.md'))
     .sort(); // deterministic order for reproducible error messages
 
   const tokens = new Set();
@@ -113,16 +113,16 @@ function getLiveCommandTokens() {
       content = fs.readFileSync(filePath, 'utf-8');
     } catch (err) {
       throw new Error(
-        '[live-command-registry] failed to read ' + filePath + ': ' + err.message
+        `[live-command-registry] failed to read ${filePath}: ${err.message}`
       );
     }
 
     const slug = parseSlug(content, filePath);
 
     // Emit all three canonical token forms per slug.
-    tokens.add('/gsd-' + slug);   // Claude / non-Gemini
-    tokens.add('/gsd:' + slug);   // Gemini
-    tokens.add('$gsd-' + slug);   // Codex
+    tokens.add(`/gsd-${slug}`);   // Claude / non-Gemini
+    tokens.add(`/gsd:${slug}`);   // Gemini
+    tokens.add(`$gsd-${slug}`);   // Codex
   }
 
   _cache = tokens;
