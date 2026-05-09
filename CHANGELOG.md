@@ -8,7 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Enhancement
 
-- **`docs/adr/` index and structural test** — added `docs/adr/README.md` as an indexed entry point linking all seven ADRs. ADR 0005 (SDK architecture seam-map) enumerates SDK seam ownership (Dispatch Policy, Model Catalog, Planning Workspace, SDK Package Seam, Planning Path Projection). ADR 0006 (planning-path projection) documents how SDK query handlers project planning paths. A structural test gates on ADR completeness: required headings, Status/Date metadata, and README linkage for every ADR file. (#3271)
+- **Shared `scanPhasePlans()` helper extracted to `bin/lib/plan-scan.cjs` (k014)** — four divergent copies of the plan-scan algorithm in `state.cjs`, `roadmap.cjs`, `init.cjs`, and `phase.cjs` are now replaced by a single canonical implementation. Each copy had subtle differences (regex shapes, flat vs nested coverage, pre-bounce exclusion patterns) that caused plan-count drift between the four callers. The helper covers both the flat layout (`*-PLAN.md`, `PLAN.md`) and the nested layout (`plans/PLAN-NN-slug.md`) introduced in #3139, and returns `{ planCount, summaryCount, completed, hasNestedPlans, planFiles, summaryFiles }`. (#3262)
 
 ### Fixed
 
