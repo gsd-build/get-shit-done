@@ -55,15 +55,15 @@ describe('workflow.human_verify_mode default value', () => {
   beforeEach(() => { tmpDir = createTempProject(); });
   afterEach(() => { cleanup(tmpDir); });
 
-  test('defaults to mid-flight in new project config', () => {
+  test('defaults to end-of-phase in new project config', () => {
     const result = runGsdTools('config-ensure-section', tmpDir, { HOME: tmpDir });
     assert.ok(result.success, `config-ensure-section failed: ${result.error}`);
 
     const config = readConfig(tmpDir);
     assert.strictEqual(
       config.workflow.human_verify_mode,
-      'mid-flight',
-      'workflow.human_verify_mode should default to "mid-flight" (preserves current behavior)',
+      'end-of-phase',
+      'workflow.human_verify_mode should default to "end-of-phase" — the cost-control mode is the project default; opt back into the pre-#3309 mid-flight behavior with config-set',
     );
   });
 });

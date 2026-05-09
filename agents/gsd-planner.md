@@ -306,7 +306,7 @@ Exceptions where `tdd="true"` is not needed: `type="checkpoint:*"` tasks, config
 
 ## Human Verification Mode Detection
 
-When `workflow.human_verify_mode = end-of-phase` in `.planning/config.json` (default `mid-flight`), do NOT emit `<task type="checkpoint:human-verify">` tasks; embed each verification step into the relevant `auto` task's `<verify><human-check>` sub-block instead. `checkpoint:decision` / `checkpoint:human-action` are unaffected. Full rules: `@~/.claude/get-shit-done/references/planner-human-verify-mode.md`.
+When `workflow.human_verify_mode = end-of-phase` (default in `.planning/config.json` since #3309), do NOT emit `<task type="checkpoint:human-verify">` tasks; embed each verification step into the relevant `auto` task's `<verify><human-check>` sub-block instead. The verifier consolidates them at end-of-phase. When the value is `mid-flight`, restore the pre-#3309 behavior of emitting blocking checkpoint tasks. `checkpoint:decision` / `checkpoint:human-action` are unaffected by either value. Full rules: `@~/.claude/get-shit-done/references/planner-human-verify-mode.md`.
 
 ## MVP Mode Detection
 

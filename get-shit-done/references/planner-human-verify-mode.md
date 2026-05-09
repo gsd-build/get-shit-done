@@ -1,27 +1,12 @@
 # Planner — Human Verification Mode
 
-> Loaded by `gsd-planner` when deciding whether to emit `<task type="checkpoint:human-verify">` tasks. Read `workflow.human_verify_mode` from `.planning/config.json` (default `mid-flight`).
+> Loaded by `gsd-planner` when deciding whether to emit `<task type="checkpoint:human-verify">` tasks. Read `workflow.human_verify_mode` from `.planning/config.json` (default `end-of-phase` since #3309).
 
 ## The two modes
 
-### `mid-flight` (default — current behavior)
+### `end-of-phase` (default — issue #3309)
 
-Emit `<task type="checkpoint:human-verify">` tasks at the points where human confirmation is required. The executor halts at each one and asks the user.
-
-```xml
-<task type="checkpoint:human-verify" gate="blocking">
-  <what-built>Dev server running at http://localhost:3000</what-built>
-  <how-to-verify>
-    1. Visit /dashboard
-    2. Sidebar collapses at 768px
-  </how-to-verify>
-  <resume-signal>"approved" or describe issues</resume-signal>
-</task>
-```
-
-### `end-of-phase` (cost-control — issue #3309)
-
-Do **not** emit any `<task type="checkpoint:human-verify">` tasks. Every mid-flight halt costs a full executor cold-start (CLAUDE.md, MEMORY.md, STATE.md, plan re-read on respawn) because subagent context is discarded across the pause; a plan with N human-verify checkpoints pays the cold-start cost N+1 times. The user opts out of that cost by setting this flag.
+Do **not** emit any `<task type="checkpoint:human-verify">` tasks. Every mid-flight halt costs a full executor cold-start (CLAUDE.md, MEMORY.md, STATE.md, plan re-read on respawn) because subagent context is discarded across the pause; a plan with N human-verify checkpoints pays the cold-start cost N+1 times — measured at "tens of thousands of tokens" per round-trip on real projects. This is the default for that reason.
 
 Instead, fold each would-be verification step into the relevant `auto` task using a `<verify><human-check>` sub-block:
 
@@ -43,6 +28,23 @@ Instead, fold each would-be verification step into the relevant `auto` task usin
 ```
 
 The verifier (Step 8) harvests every `<verify><human-check>` block at end-of-phase and consolidates them into the existing `human_needed` → HUMAN-UAT.md path in `workflows/execute-phase.md`. The user reviews everything in one batch instead of paying a cold-start cost per item.
+
+### `mid-flight` (opt-back-in — pre-#3309 behavior)
+
+Set `gsd config-set workflow.human_verify_mode mid-flight` to restore the canonical mid-flight pattern: emit `<task type="checkpoint:human-verify">` tasks at the points where human confirmation is required, and the executor halts at each one to ask the user.
+
+```xml
+<task type="checkpoint:human-verify" gate="blocking">
+  <what-built>Dev server running at http://localhost:3000</what-built>
+  <how-to-verify>
+    1. Visit /dashboard
+    2. Sidebar collapses at 768px
+  </how-to-verify>
+  <resume-signal>"approved" or describe issues</resume-signal>
+</task>
+```
+
+Choose `mid-flight` when you genuinely need the work to stop before any subsequent task runs (e.g., the next task depends on visual confirmation of the previous one), and you accept the cold-start cost as the price of that hard barrier.
 
 ## What is *not* affected
 
