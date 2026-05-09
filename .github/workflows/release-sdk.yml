@@ -391,7 +391,7 @@ jobs:
           CURRENT=$(node -p "require('./package.json').version")
           if [ "$CURRENT" != "$VERSION" ]; then
             npm version "$VERSION" --no-git-tag-version
-            git add package.json
+            git add package.json package-lock.json
             if [ -f sdk/package.json ]; then
               (cd sdk && npm version "$VERSION" --no-git-tag-version)
               git add sdk/package.json
@@ -455,7 +455,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-          cache-dependency-path: sdk/package-lock.json
 
       - name: Determine version
         id: ver
@@ -562,7 +561,7 @@ jobs:
           cd sdk && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
-        run: npm install --no-package-lock
+        run: npm ci
 
       - name: Run full test suite with coverage (parity with release.yml)
         run: npm run test:coverage

@@ -43,7 +43,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-          cache-dependency-path: sdk/package-lock.json
 
       - name: Determine canary version
         id: canary
@@ -73,7 +72,7 @@ jobs:
 
       - name: Install and test
         run: |
-          npm install --no-package-lock
+          npm ci
           npm test
 
       - name: Build SDK dist for tarball

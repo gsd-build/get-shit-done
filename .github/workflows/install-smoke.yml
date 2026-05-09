@@ -22,7 +22,7 @@ on:
       - 'bin/gsd-sdk.js'
       - 'sdk/**'
       - 'package.json'
-      - 'sdk/package-lock.json'
+      - 'package-lock.json'
       - '.github/workflows/install-smoke.yml'
       - '.github/workflows/release.yml'
   push:
@@ -117,11 +117,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-          cache-dependency-path: sdk/package-lock.json
 
       - name: Install root deps
         if: steps.skip.outputs.skip != 'true'
-        run: npm install --no-package-lock
+        run: npm ci
 
       # Isolated SDK typecheck — if the build fails, emit a clear "stale base
       # or real type error" diagnostic instead of letting the failure cascade
@@ -243,10 +242,9 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
-          cache-dependency-path: sdk/package-lock.json
 
       - name: Install root deps
-        run: npm install --no-package-lock
+        run: npm ci
 
       - name: Build SDK dist (sdk/dist is gitignored — must build for unpacked install)
         run: npm run build:sdk
