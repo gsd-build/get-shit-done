@@ -151,9 +151,8 @@ module.exports = { catalog };
     fs.mkdirSync(gsdSharedDir, { recursive: true });
 
     // Copy the real model-catalog.cjs into the fake install.
-    const realCjsContent = fs.readFileSync(MODEL_CATALOG_CJS, 'utf8');
     const catalogCjsPath = path.join(gsdLibDir, 'model-catalog.cjs');
-    fs.writeFileSync(catalogCjsPath, realCjsContent);
+    fs.copyFileSync(MODEL_CATALOG_CJS, catalogCjsPath);
 
     // Copy the real model-catalog.json to the co-located path.
     fs.copyFileSync(MODEL_CATALOG_JSON, path.join(gsdSharedDir, 'model-catalog.json'));

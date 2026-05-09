@@ -7951,6 +7951,28 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('get-shit-done');
   }
 
+  // #3288 — Copy sdk/shared/model-catalog.json into the get-shit-done payload
+  // at the co-located path that model-catalog.cjs resolves first:
+  //   get-shit-done/bin/shared/model-catalog.json
+  //
+  // The install copies get-shit-done/ but NOT sdk/ — the CJS module's legacy
+  // path (3 levels up → sdk/shared/) therefore resolves to a non-existent
+  // location in every post-install layout.  Copying the catalog alongside the
+  // CJS files ensures require() succeeds without needing sdk/ to exist.
+  const modelCatalogSrc = path.join(src, 'sdk', 'shared', 'model-catalog.json');
+  const modelCatalogDest = path.join(skillDest, 'bin', 'shared', 'model-catalog.json');
+  if (fs.existsSync(modelCatalogSrc)) {
+    fs.mkdirSync(path.dirname(modelCatalogDest), { recursive: true });
+    fs.copyFileSync(modelCatalogSrc, modelCatalogDest);
+    if (verifyFileInstalled(modelCatalogDest, 'get-shit-done/bin/shared/model-catalog.json')) {
+      console.log(`  ${green}✓${reset} Installed get-shit-done/bin/shared/model-catalog.json`);
+    } else {
+      failures.push('get-shit-done/bin/shared/model-catalog.json');
+    }
+  } else {
+    failures.push('sdk/shared/model-catalog.json (source missing)');
+  }
+
   // Copy agents to agents directory.
   // Skipped under --minimal: gsd-* subagent descriptions are eagerly loaded
   // into the runtime's Agent tool schema, costing ~6k tokens per turn even

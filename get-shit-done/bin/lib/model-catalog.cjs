@@ -1,7 +1,44 @@
 'use strict';
 
 const path = require('node:path');
-const catalog = require(path.join(__dirname, '..', '..', '..', 'sdk', 'shared', 'model-catalog.json'));
+
+// Resolve model-catalog.json via a prioritised candidate list so the module
+// works in every layout:
+//
+//   1. Co-located install path — get-shit-done/bin/shared/model-catalog.json
+//      Written by bin/install.js (#3288 fix). This is the canonical post-install
+//      location across all runtimes (Claude Code, Codex, OpenCode, etc.).
+//
+//   2. Source-repo dev path — sdk/shared/model-catalog.json
+//      Three levels up from bin/lib/: works when running directly from the
+//      gsd-build/get-shit-done clone (the original path introduced by #3230).
+//
+//   3. GSD_MODEL_CATALOG env override — allows test harnesses and custom
+//      deployments to point at an arbitrary catalog file.
+//
+// Throws with a diagnostic message that lists all candidates when none resolve,
+// so MODULE_NOT_FOUND surfaces as a clear actionable error (PRED.k301).
+const _catalogCandidates = [
+  path.resolve(__dirname, '..', 'shared', 'model-catalog.json'),
+  path.resolve(__dirname, '..', '..', '..', 'sdk', 'shared', 'model-catalog.json'),
+  process.env.GSD_MODEL_CATALOG ? path.resolve(process.env.GSD_MODEL_CATALOG) : null,
+].filter(Boolean);
+
+let catalog = null;
+let _catalogLastErr = null;
+for (const _p of _catalogCandidates) {
+  try {
+    catalog = require(_p);
+    break;
+  } catch (e) {
+    _catalogLastErr = e;
+  }
+}
+if (!catalog) {
+  throw new Error(
+    `model-catalog.json not found. Tried:\n${_catalogCandidates.map((p) => `  ${p}`).join('\n')}\nLast error: ${_catalogLastErr?.message}`
+  );
+}
 
 const VALID_PROFILES = [...catalog.profiles];
 const VALID_PHASE_TYPES = new Set(catalog.phaseTypes);
