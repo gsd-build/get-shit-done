@@ -792,7 +792,11 @@ function cmdScaffold(cwd, type, options, raw) {
         error('phase and name required for phase-dir scaffold');
       }
       const slug = generateSlugInternal(name);
-      const dirName = `${padded}-${slug}`;
+      // #3287: apply project_code prefix to stay consistent with phase.add/phase.insert
+      const scaffoldConfig = loadConfig(cwd);
+      const scaffoldProjectCode = scaffoldConfig.project_code || '';
+      const scaffoldPrefix = scaffoldProjectCode ? `${scaffoldProjectCode}-` : '';
+      const dirName = `${scaffoldPrefix}${padded}-${slug}`;
       const phasesParent = planningPaths(cwd).phases;
       fs.mkdirSync(phasesParent, { recursive: true });
       const dirPath = path.join(phasesParent, dirName);

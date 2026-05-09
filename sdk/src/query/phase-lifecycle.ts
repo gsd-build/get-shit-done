@@ -539,7 +539,15 @@ export const phaseScaffold: QueryHandler = async (args, projectDir, workstream) 
       throw new GSDError('phase and name required for phase-dir scaffold', ErrorClassification.Validation);
     }
     const slug = generatePhaseSlug(name);
-    const dirNameNew = `${padded}-${slug}`;
+    // #3287: apply project_code prefix to stay consistent with phase.add/phase.insert
+    let scaffoldConfig: Record<string, unknown> = {};
+    try {
+      scaffoldConfig = JSON.parse(await readFile(planningPaths(projectDir, workstream).config, 'utf-8'));
+    } catch { /* use defaults */ }
+    const scaffoldProjectCode = (scaffoldConfig.project_code as string) || '';
+    assertSafeProjectCode(scaffoldProjectCode);
+    const scaffoldPrefix = scaffoldProjectCode ? `${scaffoldProjectCode}-` : '';
+    const dirNameNew = `${scaffoldPrefix}${padded}-${slug}`;
     assertSafePhaseDirName(dirNameNew, 'scaffold phase directory');
     const phasesParent = planningPaths(projectDir, workstream).phases;
     await mkdir(phasesParent, { recursive: true });
