@@ -29,7 +29,6 @@ import { maskIfSecret } from './secrets.js';
 import { findPhase } from './phase.js';
 import { roadmapGetPhase, getMilestoneInfo, extractCurrentMilestone, extractPhasesFromSection } from './roadmap.js';
 import { planningPaths, normalizePhaseName, toPosixPath, resolveAgentsDir, detectRuntime } from './helpers.js';
-import { relPlanningPath } from '../workstream-utils.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
@@ -279,7 +278,8 @@ export const initExecutePhase: QueryHandler = async (args, projectDir, workstrea
   }
 
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, relPlanningPath(workstream));
+  const paths = planningPaths(projectDir, workstream);
+  const planningDir = paths.planning;
 
   const { phaseInfo, roadmapPhase } = await getPhaseInfoWithFallback(phase, projectDir, workstream);
   const phase_req_ids = extractReqIds(roadmapPhase);
@@ -361,7 +361,8 @@ export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) 
   }
 
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, relPlanningPath(workstream));
+  const paths = planningPaths(projectDir, workstream);
+  const planningDir = paths.planning;
 
   const { phaseInfo, roadmapPhase } = await getPhaseInfoWithFallback(phase, projectDir, workstream);
   const phase_req_ids = extractReqIds(roadmapPhase);
@@ -630,7 +631,8 @@ export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) =>
   }
 
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, relPlanningPath(workstream));
+  const paths = planningPaths(projectDir, workstream);
+  const planningDir = paths.planning;
 
   // findPhase with archived override: if only match is archived, prefer ROADMAP
   const phaseResult = await findPhase([phase], projectDir, workstream);
@@ -796,7 +798,8 @@ export const initTodos: QueryHandler = async (args, projectDir) => {
  */
 export const initMilestoneOp: QueryHandler = async (_args, projectDir, workstream) => {
   const config = await loadConfig(projectDir);
-  const planningDir = join(projectDir, relPlanningPath(workstream));
+  const paths = planningPaths(projectDir, workstream);
+  const planningDir = paths.planning;
   const milestone = await getMilestoneInfo(projectDir, workstream);
 
   const phasesDir = join(planningDir, 'phases');
