@@ -76,9 +76,13 @@ describe('skill frontmatter: /gsd-plan-phase --research-phase flag absorbs the s
     const content = read('get-shit-done/workflows/plan-phase.md');
     // The arg-parsing section of the workflow must mention the new flag
     // by name. This is the structural seam the LLM follows.
+    // Anchored to the argument/flags section to avoid false positives from prose.
+    const argsIdx = content.search(/(?:argument|args?|flags?)\b/i);
+    assert.ok(argsIdx >= 0, 'plan-phase workflow must contain an argument/flags section');
+    const argsWindow = content.slice(argsIdx, argsIdx + 1200);
     assert.ok(
-      content.includes('--research-phase'),
-      'plan-phase.md workflow must reference the --research-phase flag in its argument-parsing section'
+      /--research-phase/.test(argsWindow),
+      'plan-phase.md workflow must reference --research-phase in the argument-parsing section (within 1200 chars of the args/flags header)'
     );
   });
 
@@ -150,15 +154,21 @@ describe('skill frontmatter: /gsd-plan-phase --research-phase flag absorbs the s
     // must short-circuit the "RESEARCH.md exists, what do you want to
     // do?" prompt and unconditionally re-spawn. Assert the workflow
     // documents the combined semantics.
-    const forceRefreshPatterns = [
-      /--research[^\n]*force[^\n]*refresh/i,
-      /--research[^\n]*re[ -]?research/i,
-      /force[ -]?refresh[^\n]*--research/i,
-    ];
-    const hits = forceRefreshPatterns.filter((re) => re.test(content));
+    // Find the --research-phase description section (headed by the ** marker),
+    // then assert that --research and force/refresh semantics are documented
+    // within the same section — verifying the COMBINATION is documented.
+    // The section header starts at "**`--research-phase <N>`" and runs ~1200
+    // chars to cover the modifiers sub-list (--research and --view bullets).
+    const sectionIdx = content.indexOf('**`--research-phase');
+    assert.ok(sectionIdx >= 0, 'plan-phase workflow must contain a --research-phase description section');
+    const sectionWindow = content.slice(sectionIdx, sectionIdx + 1200);
+    const hasResearch = /--research\b/.test(sectionWindow);
+    const hasForceRefresh = /(?:force[ -]?refresh|re-research|re-spawn|overwrites)/i.test(sectionWindow);
     assert.ok(
-      hits.length > 0,
-      'plan-phase workflow must document that --research forces re-research (skip the "exists" prompt) when used with --research-phase'
+      hasResearch && hasForceRefresh,
+      'plan-phase workflow must document that --research forces re-research when used with --research-phase ' +
+        '(expected --research and force/refresh prose in the --research-phase section; got hasResearch=' +
+        hasResearch + ' hasForceRefresh=' + hasForceRefresh + ')'
     );
   });
 
