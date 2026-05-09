@@ -172,9 +172,15 @@ if [ -z "$FILES_OVERRIDE" ]; then
         for (const line of yaml.split('\n')) {
           if (/^\s+created:/.test(line)) { inSection = 'created'; continue; }
           if (/^\s+modified:/.test(line)) { inSection = 'modified'; continue; }
-          if (/^\s*\w+:/.test(line) && !/^\s*-/.test(line)) { inSection = null; continue; }
+          if (/^\s*[\w-]+:/.test(line) && !/^\s*-/.test(line)) { inSection = null; continue; }
           if (inSection && /^\s+-\s+(.+)/.test(line)) {
-            files.push(line.match(/^\s+-\s+(.+)/)[1].trim());
+            let raw = line.match(/^\s+-\s+(.+)/)[1].trim();
+            raw = raw.replace(/^['"]|['"]$/g, '');
+            raw = raw.replace(/\s+\([^)]*\)\s*$/, '');
+            raw = raw.split(/\s+—\s/)[0].trim();
+            if (/\//.test(raw) && /\.[A-Za-z0-9]+$/.test(raw)) {
+              files.push(raw);
+            }
           }
         }
         if (files.length) console.log(files.join('\n'));
@@ -429,7 +435,7 @@ FRONTMATTER=$(REVIEW_PATH="${REVIEW_PATH}" node -e "
 # Parse fields from frontmatter only (not full file)
 STATUS=$(echo "$FRONTMATTER" | grep "^status:" | cut -d: -f2 | xargs)
 FILES_REVIEWED=$(echo "$FRONTMATTER" | grep "^files_reviewed:" | cut -d: -f2 | xargs)
-CRITICAL=$(echo "$FRONTMATTER" | grep "critical:" | head -1 | cut -d: -f2 | xargs)
+CRITICAL=$(echo "$FRONTMATTER" | grep -E "^\s*(critical|blocker):" | head -1 | cut -d: -f2 | xargs)
 WARNING=$(echo "$FRONTMATTER" | grep "warning:" | head -1 | cut -d: -f2 | xargs)
 INFO=$(echo "$FRONTMATTER" | grep "info:" | head -1 | cut -d: -f2 | xargs)
 TOTAL=$(echo "$FRONTMATTER" | grep "total:" | head -1 | cut -d: -f2 | xargs)
@@ -478,7 +484,7 @@ Next steps:
 If critical > 0 or warning > 0, list top 3 issues inline:
 ```bash
 echo "Top issues:"
-grep -A 3 "^### CR-\|^### WR-" "${REVIEW_PATH}" | head -n 12
+grep -A 3 "^### CR-\|^### BL-\|^### WR-" "${REVIEW_PATH}" | head -n 12
 ```
 
 **Note on tests:** Automated tests for this command and workflow are planned for Phase 4 (Pipeline Integration & Testing, requirement INFR-03). Phase 2 focuses on correct implementation; Phase 4 adds regression coverage across platforms.

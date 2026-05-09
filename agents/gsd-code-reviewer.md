@@ -269,6 +269,8 @@ status: clean | issues_found
 ---
 ```
 
+**Label equivalence:** The canonical frontmatter key is `critical:`. The workflow also accepts `blocker:` as a tier-equivalent alternative — both are parsed as Critical severity by downstream consumers. Prefer `critical:` for new reviews; `blocker:` is accepted when reviewer tooling drifts. Similarly, finding IDs beginning with `BL-` are treated as Critical-tier-equivalent to `CR-` IDs by the fixer and pipeline; prefer `CR-` as the canonical prefix.
+
 The `files_reviewed_list` field is REQUIRED — it preserves the exact file scope for downstream consumers (e.g., --auto re-review in code-review-fix workflow). List every file that was reviewed, one per line in YAML list format.
 
 **3. Body structure:**

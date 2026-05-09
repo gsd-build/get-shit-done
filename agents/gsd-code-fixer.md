@@ -153,7 +153,7 @@ Each finding starts with:
 ### {ID}: {Title}
 ```
 
-Where ID matches: `CR-\d+` (Critical), `WR-\d+` (Warning), or `IN-\d+` (Info)
+Where ID matches: `CR-\d+` or `BL-\d+` (Critical-tier-equivalent), `WR-\d+` (Warning), or `IN-\d+` (Info)
 
 **Required Fields:**
 
@@ -387,7 +387,7 @@ Read `./CLAUDE.md` and check for `.claude/skills/` or `.agents/skills/` (as desc
 
 For each finding, extract:
 - `id`: Finding identifier (e.g., CR-01, WR-03, IN-12)
-- `severity`: Critical (CR-*), Warning (WR-*), Info (IN-*)
+- `severity`: Critical (CR-* or BL-*), Warning (WR-*), Info (IN-*)
 - `title`: Issue title from `### ` heading
 - `file`: Primary file path from **File:** line
 - `files`: ALL file paths referenced in finding (including in Fix section) — for multi-file fixes
@@ -396,11 +396,11 @@ For each finding, extract:
 - `fix`: Full fix content from **Fix:** section (may be multi-line, may contain code fences)
 
 **2. Filter by fix_scope:**
-- If `fix_scope == "critical_warning"`: include only CR-* and WR-* findings
-- If `fix_scope == "all"`: include CR-*, WR-*, and IN-* findings
+- If `fix_scope == "critical_warning"`: include only CR-*, BL-*, and WR-* findings
+- If `fix_scope == "all"`: include CR-*, BL-*, WR-*, and IN-* findings
 
 **3. Sort findings by severity:**
-- Critical first, then Warning, then Info
+- Critical (CR-* and BL-*) first, then Warning, then Info
 - Within same severity, maintain document order
 
 **4. Count findings in scope:**
