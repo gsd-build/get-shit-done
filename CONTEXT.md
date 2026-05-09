@@ -40,6 +40,12 @@ Module owning command resolution, policy projection (`mutation`, `output_mode`),
 ### Query Pre-Project Config Policy Module
 Module policy that defines query-time behavior when `.planning/config.json` is absent: use built-in defaults for parity-sensitive query Interfaces, and emit parity-aligned empty model ids for pre-project model resolution surfaces.
 
+### Planning Workspace Module
+Module owning `.planning` path resolution, active workstream pointer policy (`session-scoped > shared`), pointer self-heal behavior, and planning lock semantics for workstream-aware execution.
+
+### Worktree Root Resolution Adapter Module
+Adapter Module owning linked-worktree root mapping and metadata-prune policy (`git worktree prune` non-destructive default) for planning/workstream callers.
+
 ### SDK Package Seam Module
 Module owning SDK-to-`get-shit-done-cc` compatibility policy: legacy asset discovery, install-layout probing, transition-only error messaging, and thin Adapter access for CJS-era assets that native SDK Modules have not replaced yet.
 
