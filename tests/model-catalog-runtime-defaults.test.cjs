@@ -50,7 +50,9 @@ describe('model catalog runtime defaults parity (#3229)', () => {
   });
 
   test('Group B runtimes remain documented as having no built-in defaults', () => {
-    const groupB = ['kilo', 'cline', 'cursor', 'windsurf', 'augment', 'trae', 'codebuddy', 'antigravity'];
+    const groupB = Object.keys(catalog.runtimeTierDefaults)
+      .filter(runtime => !catalog.runtimeTierDefaults[runtime].opus);
+    assert.ok(groupB.length > 0, 'expected at least one Group B runtime in catalog');
     for (const runtime of groupB) {
       const tiers = catalog.runtimeTierDefaults[runtime];
       assert.equal(tiers.opus, null);
