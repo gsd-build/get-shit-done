@@ -128,15 +128,16 @@ export function buildPhaseRoadmapEntry(
   description: string,
   namingMode: unknown,
 ): string {
-  const dependsOn = namingMode === 'custom'
+  const prevPhase = typeof phaseId === 'number' ? phaseId - 1 : null;
+  const dependsOn = namingMode === 'custom' || prevPhase === null || prevPhase < 1
     ? ''
-    : `\n**Depends on:** Phase ${typeof phaseId === 'number' ? phaseId - 1 : 'TBD'}`;
+    : `\n**Depends on:** Phase ${prevPhase}`;
   return `\n### Phase ${phaseId}: ${description}\n\n**Goal:** [To be planned]\n**Requirements**: TBD${dependsOn}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd-plan-phase ${phaseId} to break down)\n`;
 }
 
 export function collectDecimalSuffixesFromDirNames(basePhase: string, dirNames: string[]): Set<number> {
   const decimalSet = new Set<number>();
-  const decimalPattern = new RegExp(`^(?:[A-Z]{1,6}-)?${escapeRegex(basePhase)}\\.(\\d+)`);
+  const decimalPattern = new RegExp(`^(?:[A-Z][A-Z0-9]*-)?${escapeRegex(basePhase)}\\.(\\d+)`, 'i');
   for (const dir of dirNames) {
     const match = dir.match(decimalPattern);
     if (match) decimalSet.add(parseInt(match[1], 10));
