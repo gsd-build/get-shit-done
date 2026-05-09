@@ -61,8 +61,12 @@ export async function readModifyWriteRoadmapMd(
     let content: string;
     try {
       content = await readFile(roadmapPath, 'utf-8');
-    } catch {
-      content = '';
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        content = '';
+      } else {
+        throw err;
+      }
     }
     const modified = await modifier(content);
     await writeFile(roadmapPath, modified, 'utf-8');
