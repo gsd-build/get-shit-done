@@ -210,15 +210,25 @@ describe('install-profiles: cleanupStagedSkills', () => {
     cleanupStagedSkills();
     const src = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-fullmode-'));
     fs.writeFileSync(path.join(src, 'plan-phase.md'), '# plan\n');
+    const realMkdtemp = fs.mkdtempSync;
+    let minimalStageDirCreated = false;
+    fs.mkdtempSync = (prefix, ...rest) => {
+      if (typeof prefix === 'string' && prefix.endsWith('gsd-minimal-skills-')) {
+        minimalStageDirCreated = true;
+      }
+      return realMkdtemp(prefix, ...rest);
+    };
     try {
-      const before = listTmpStageDirs();
       const result = stageSkillsForMode(src, 'full');
       assert.strictEqual(result, src, 'full mode returns original src unchanged');
       cleanupStagedSkills();
-      const after = listTmpStageDirs();
-      // No new gsd-minimal-skills- dirs should have been created.
-      assert.deepStrictEqual(after, before);
+      assert.equal(
+        minimalStageDirCreated,
+        false,
+        'full mode should not create a gsd-minimal-skills stage dir',
+      );
     } finally {
+      fs.mkdtempSync = realMkdtemp;
       fs.rmSync(src, { recursive: true, force: true });
     }
   });
