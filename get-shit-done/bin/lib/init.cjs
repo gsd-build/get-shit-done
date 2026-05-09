@@ -8,6 +8,7 @@ const { execSync } = require('child_process');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, toPosixPath, output, error, checkAgentsInstalled, phaseTokenMatches } = require('./core.cjs');
 const { planningPaths, planningDir, planningRoot } = require('./planning-workspace.cjs');
 const { maskIfSecret } = require('./secrets.cjs');
+const scanPhasePlans = require('./plan-scan.cjs');
 
 // Accept all bold/colon variants of the Requirements header (#2769):
 // **Requirements:** / **Requirements**: / **Requirements** : render the
@@ -15,27 +16,11 @@ const { maskIfSecret } = require('./secrets.cjs');
 const REQUIREMENTS_HEADER_RE = /^\*\*Requirements:?\*\*[^\S\n]*:?[^\S\n]*([^\n]*)$/m;
 
 function listPhaseSummaryFiles(phaseDir) {
-  const phaseFiles = fs.readdirSync(phaseDir);
-  const rootSummaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-  const plansDir = path.join(phaseDir, 'plans');
-  let nestedSummaries = [];
-  if (fs.existsSync(plansDir)) {
-    const files = fs.readdirSync(plansDir);
-    nestedSummaries = files.filter(f => /^SUMMARY-\d+.*\.md$/i.test(f));
-  }
-  return rootSummaries.concat(nestedSummaries);
+  return scanPhasePlans(phaseDir).summaryFiles;
 }
 
 function listPhasePlanFiles(phaseDir) {
-  const phaseFiles = fs.readdirSync(phaseDir);
-  const rootPlans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
-  const plansDir = path.join(phaseDir, 'plans');
-  let nestedPlans = [];
-  if (fs.existsSync(plansDir)) {
-    const files = fs.readdirSync(plansDir);
-    nestedPlans = files.filter(f => /^PLAN-\d+.*\.md$/i.test(f));
-  }
-  return rootPlans.concat(nestedPlans);
+  return scanPhasePlans(phaseDir).planFiles;
 }
 
 function getLatestCompletedMilestone(cwd) {
