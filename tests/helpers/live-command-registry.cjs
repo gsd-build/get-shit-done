@@ -1,3 +1,6 @@
+// allow-test-rule: source-text-is-the-product
+// commands/gsd/*.md files ARE the deployed registry — reading their frontmatter
+// validates the structural contract of the command surface, not application source.
 'use strict';
 /**
  * live-command-registry.cjs

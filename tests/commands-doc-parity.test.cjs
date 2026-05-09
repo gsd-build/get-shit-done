@@ -33,6 +33,7 @@ const commandFiles = fs.readdirSync(COMMANDS_DIR).filter((f) => f.endsWith('.md'
  * Throws if frontmatter is missing or malformed.
  */
 function parseSlugFromFrontmatter(content, filePath) {
+  // allow-test-rule: validating YAML frontmatter delimiter structure, not application source
   if (!content.startsWith('---')) {
     throw new Error('commands-doc-parity: missing YAML frontmatter in ' + filePath);
   }
