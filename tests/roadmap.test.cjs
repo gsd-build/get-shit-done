@@ -771,6 +771,41 @@ describe('roadmap update-plan-progress command', () => {
     assert.ok(roadmapContent.includes('1/1'), 'roadmap should contain updated plan count');
   });
 
+  test('updates unpadded ROADMAP phase entries when called with padded phase argument', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap
+
+- [ ] **Phase 3: Build** - description
+
+### Phase 3: Build
+**Goal:** Test goal
+**Plans:** 0 plans
+- [ ] 03-01-PLAN.md
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 3. Build | 0/1 | Planned |  |
+`
+    );
+
+    const p3 = path.join(tmpDir, '.planning', 'phases', '03-build');
+    fs.mkdirSync(p3, { recursive: true });
+    fs.writeFileSync(path.join(p3, '03-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(p3, '03-01-SUMMARY.md'), '# Summary 1');
+
+    const result = runGsdTools('roadmap update-plan-progress 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmapContent = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.match(roadmapContent, /- \[x\] \*\*Phase 3: Build\*\* - description \(completed \d{4}-\d{2}-\d{2}\)/);
+    assert.ok(roadmapContent.includes('**Plans:** 1/1 plans complete'), 'phase detail plan count should be updated');
+    assert.match(roadmapContent, /\| 3\. Build \| 1\/1 \| Complete\s+\| \d{4}-\d{2}-\d{2} \|/);
+    assert.ok(roadmapContent.includes('- [x] 03-01-PLAN.md'), 'completed plan checkbox should still be marked');
+  });
+
   test('missing ROADMAP.md returns updated false', () => {
     // Create phase dir with plans and summaries but NO ROADMAP.md
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-test');
@@ -858,4 +893,3 @@ describe('roadmap update-plan-progress command', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // phase add command
 // ─────────────────────────────────────────────────────────────────────────────
-
