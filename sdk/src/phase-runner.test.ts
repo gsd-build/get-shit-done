@@ -206,10 +206,17 @@ function getEmittedEvents(deps: PhaseRunnerDeps): GSDEvent[] {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('PhaseRunner', () => {
+  let tempProjectDirs: string[] = [];
+
   beforeEach(() => {
+    tempProjectDirs = [];
     vi.clearAllMocks();
     mockRunPhaseStepSession.mockResolvedValue(makePlanResult());
     mockParsePlanFile.mockResolvedValue(makeParsedPlan());
+  });
+
+  afterEach(async () => {
+    await Promise.all(tempProjectDirs.map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
   // ─── Happy path ────────────────────────────────────────────────────────
@@ -754,60 +761,54 @@ Use TypeScript.`, 'utf-8');
 
     it('keeps phase pending when changed phase files contain unresolved TBD/FIXME/XXX markers', async () => {
       const projectDir = await mkdtemp(join(tmpdir(), 'gsd-architectural-debt-'));
-      try {
-        const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
-        const sourceDir = join(projectDir, 'scripts', 'upstream');
-        await mkdir(phaseDir, { recursive: true });
-        await mkdir(sourceDir, { recursive: true });
-        await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
-        await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\n# TBD: wire retry handling before release\n', 'utf-8');
+      tempProjectDirs.push(projectDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      const sourceDir = join(projectDir, 'scripts', 'upstream');
+      await mkdir(phaseDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
+      await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\n# TBD: wire retry handling before release\n', 'utf-8');
 
-        const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
-        const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
-        const deps = makeDeps({ projectDir, config });
-        (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
-        mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/run.sh']));
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/run.sh']));
 
-        const runner = new PhaseRunner(deps);
-        const result = await runner.run('1');
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
 
-        expect(result.success).toBe(false);
-        expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
-        expect(result.steps.map(s => s.step)).not.toContain(PhaseStepType.Advance);
+      expect(result.success).toBe(false);
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
+      expect(result.steps.map(s => s.step)).not.toContain(PhaseStepType.Advance);
 
-        const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
-        expect(verifyStep?.success).toBe(false);
-        expect(verifyStep?.error).toBe('verification_architectural_debt');
-      } finally {
-        await rm(projectDir, { recursive: true, force: true });
-      }
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('verification_architectural_debt');
     });
 
     it('allows changed-file debt markers when they reference tracked follow-up work', async () => {
       const projectDir = await mkdtemp(join(tmpdir(), 'gsd-tracked-debt-'));
-      try {
-        const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
-        const sourceDir = join(projectDir, 'scripts', 'upstream');
-        await mkdir(phaseDir, { recursive: true });
-        await mkdir(sourceDir, { recursive: true });
-        await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
-        await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\n# FIXME(issue #3322): preserve upstream retry behavior\n', 'utf-8');
+      tempProjectDirs.push(projectDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      const sourceDir = join(projectDir, 'scripts', 'upstream');
+      await mkdir(phaseDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
+      await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\n# FIXME(issue #3322): preserve upstream retry behavior\n', 'utf-8');
 
-        const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
-        const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
-        const deps = makeDeps({ projectDir, config });
-        (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
-        mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/run.sh']));
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/run.sh']));
 
-        const runner = new PhaseRunner(deps);
-        const result = await runner.run('1');
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
 
-        expect(result.success).toBe(true);
-        expect(deps.tools.phaseComplete).toHaveBeenCalledWith('1');
-        expect(result.steps.map(s => s.step)).toContain(PhaseStepType.Advance);
-      } finally {
-        await rm(projectDir, { recursive: true, force: true });
-      }
+      expect(result.success).toBe(true);
+      expect(deps.tools.phaseComplete).toHaveBeenCalledWith('1');
+      expect(result.steps.map(s => s.step)).toContain(PhaseStepType.Advance);
     });
 
     it('does not advance when verification status cannot be checked', async () => {
