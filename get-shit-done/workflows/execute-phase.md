@@ -519,6 +519,11 @@ increases monotonically across waves. `{status}` is `complete` (success),
    EXPECTED_BASE=$(git rev-parse HEAD)
    DISPATCH_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
    EXPECTED_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+   if [ "${USE_WORKTREES_FOR_PLAN:-true}" != "false" ] && [ -z "${WAVE_WORKTREE_MANIFEST:-}" ]; then
+     WAVE_WORKTREE_MANIFEST=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-wave-XXXXXX.json")
+     printf '{"worktrees":[]}\n' > "$WAVE_WORKTREE_MANIFEST"
+     export WAVE_WORKTREE_MANIFEST
+   fi
    ```
 
    **Sequential dispatch for parallel execution (waves with 2+ agents):**
@@ -636,6 +641,8 @@ increases monotonically across waves. `{status}` is `complete` (success),
    )
    ```
 
+   Immediately after each worktree `Agent()` spawn returns metadata, atomically append `{agent_id, worktree_path, branch, expected_base}` to `WAVE_WORKTREE_MANIFEST`. If any field is missing, stop and ask for recovery instead of scanning all agent worktrees.
+
    > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above to spawn executor agent(s), stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
    **Sequential mode** (`USE_WORKTREES_FOR_PLAN` is `false` — either project-level `USE_WORKTREES=false`, or per-plan submodule intersection forced it false in step 2.5):
@@ -727,13 +734,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
    When executor agents ran in worktree isolation, their commits land on temporary branches in separate working trees. After the wave completes, merge these changes back and clean up:
 
-   **Manifest source of truth (#3384):** Before dispatching the first worktree-isolated agent in a wave, create `WAVE_WORKTREE_MANIFEST`. Immediately after each worktree `Agent()` spawn returns metadata, atomically append `{agent_id, worktree_path, branch, expected_base}`; if any field is missing, stop and ask for recovery instead of scanning all agent worktrees.
-
-   ```bash
-   WAVE_WORKTREE_MANIFEST=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-wave-XXXXXX.json")
-   printf '{"worktrees":[]}\n' > "$WAVE_WORKTREE_MANIFEST"
-   EXPECTED_BASE=$(git rev-parse HEAD)
-   ```
+   **Manifest source of truth (#3384):** Cleanup consumes the `WAVE_WORKTREE_MANIFEST` created and populated during executor dispatch in step 3. Do not recreate or truncate it here.
 
    Prefer the bounded helper, which validates branch identity, expected base, deletion
    diffs, merge result, and worktree removal before deleting the temporary branch.
