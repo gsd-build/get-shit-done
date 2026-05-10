@@ -265,7 +265,7 @@ Use \${PHASE} in shell examples.
     assert.ok(!result.includes('${PHASE}'), 'removes Gemini template-string pattern');
   });
 
-  test('excludes Claude agent dispatcher tools from Gemini frontmatter', () => {
+  test('excludes Claude-only agent interaction tools from Gemini frontmatter', () => {
     const input = `---
 name: gsd-debug-session-manager
 description: Manages debug sessions.
@@ -274,17 +274,21 @@ tools: Read, Task, Agent, AskUserQuestion
 
 <role>
 Coordinate debugger agents.
+Offer choices via AskUserQuestion when user input is needed.
 </role>`;
 
     const result = convertClaudeToGeminiAgent(input);
     const frontmatter = result.split('---')[1] || '';
 
     assert.ok(frontmatter.includes('  - read_file'), 'maps Read -> read_file');
-    assert.ok(frontmatter.includes('  - ask_user'), 'maps AskUserQuestion -> ask_user');
+    assert.ok(!frontmatter.includes('  - ask_user'), 'does not emit invalid Gemini ask_user tool');
     assert.ok(!frontmatter.includes('  - task'), 'does not emit invalid Gemini task tool');
     assert.ok(!frontmatter.includes('  - agent'), 'does not emit invalid Gemini agent tool');
     assert.ok(!frontmatter.includes('Task'), 'does not preserve Claude-only Task tool');
     assert.ok(!frontmatter.includes('Agent'), 'does not preserve Claude-only Agent tool');
+    assert.ok(!frontmatter.includes('AskUserQuestion'), 'does not preserve Claude-only AskUserQuestion tool');
+    assert.ok(!result.includes('AskUserQuestion'), 'does not leave Claude-only tool references in the body');
+    assert.ok(result.includes('conversational prompting'), 'uses runtime-neutral body wording for user prompts');
   });
 });
 

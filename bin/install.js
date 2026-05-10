@@ -594,8 +594,15 @@ function resolveNodeRunner() {
  *
  * Returns true if any entry was rewritten.
  */
-function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
+function formatHookCommandForShell(command, opts) {
+  const platform = (opts && opts.platform) || process.platform;
+  return platform === 'win32' ? `& ${command}` : command;
+}
+
+function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
   if (!settings || !settings.hooks || !absoluteRunner) return false;
+  if (!opts) opts = {};
+  const platform = opts.platform || process.platform;
   const MANAGED_HOOK_FILES = new Set([
     'gsd-check-update.js',
     'gsd-statusline.js',
@@ -613,7 +620,11 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
       if (!entry || !Array.isArray(entry.hooks)) continue;
       for (const h of entry.hooks) {
         if (!h || typeof h.command !== 'string') continue;
-        const trimmed = h.command.trim();
+        let trimmed = h.command.trim();
+        const hadPowerShellCallOperator = platform === 'win32' && /^&\s+/.test(trimmed);
+        if (hadPowerShellCallOperator) {
+          trimmed = trimmed.replace(/^&\s+/, '').trim();
+        }
         // Match two runner forms:
         //   1. Legacy bare-node form: `node <script>` (#2979/#3002)
         //   2. Cellar-path form: `"/usr/local/Cellar/node/<v>/bin/node" <script>`
@@ -642,8 +653,10 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
           runnerToken = m[1];
           const runnerPath = (m[2] || m[3] || m[4] || '').replace(/\\/g, '/');
           const stableRunner = normalizeNodePath(runnerPath);
-          // Only process if the runner IS a Cellar path that normalizes to something different
-          if (stableRunner === runnerPath) continue;
+          // Process Cellar paths so they normalize to a stable symlink. On
+          // Windows, also process already-absolute runners so PowerShell gets
+          // the call operator needed to invoke a quoted executable path (#3362).
+          if (stableRunner === runnerPath && platform !== 'win32') continue;
           scriptToken = m[5];
           scriptPath = m[6] || m[7] || m[8] || '';
         }
@@ -654,10 +667,12 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner) {
         const scriptBase = scriptPath.split(/[\\/]/).pop() || '';
         if (!MANAGED_HOOK_FILES.has(scriptBase)) continue;
 
-        // Skip if already using the desired stable runner
-        if (runnerToken !== 'node' && runnerToken === absoluteRunner) continue;
+        // Skip if already using the desired stable runner.
+        if (runnerToken !== 'node' && runnerToken === absoluteRunner) {
+          if (platform !== 'win32' || hadPowerShellCallOperator) continue;
+        }
 
-        h.command = `${absoluteRunner} ${scriptToken}`;
+        h.command = formatHookCommandForShell(`${absoluteRunner} ${scriptToken}`, opts);
         changed = true;
       }
     }
@@ -765,10 +780,11 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
  *
  * @param {string} configDir - Resolved absolute config directory path
  * @param {string} hookName - Hook filename (e.g. 'gsd-statusline.js')
- * @param {{ portableHooks?: boolean }} [opts] - Options
+ * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform }} [opts] - Options
  *   portableHooks: when true, emit $HOME-relative paths instead of absolute paths.
  *   Safe for Linux/macOS global installs and WSL/Docker bind-mount scenarios.
  *   Not suitable for pure Windows (cmd.exe/PowerShell do not expand $HOME).
+ *   platform: test injection for shell command formatting. Defaults to process.platform.
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
@@ -797,12 +813,12 @@ function buildHookCommand(configDir, hookName, opts) {
     const relative = normalized.startsWith(home)
       ? '$HOME' + normalized.slice(home.length)
       : normalized;
-    return `${runner} "${relative}/hooks/${hookName}"`;
+    return formatHookCommandForShell(`${runner} "${relative}/hooks/${hookName}"`, opts);
   }
 
   // Default: absolute path with forward slashes (Windows-safe, fixes #2045/#2046).
   const hooksPath = configDir.replace(/\\/g, '/') + '/hooks/' + hookName;
-  return `${runner} "${hooksPath}"`;
+  return formatHookCommandForShell(`${runner} "${hooksPath}"`, opts);
 }
 
 /**
@@ -1215,7 +1231,6 @@ const claudeToGeminiTools = {
   WebSearch: 'google_web_search',
   WebFetch: 'web_fetch',
   TodoWrite: 'write_todos',
-  AskUserQuestion: 'ask_user',
 };
 
 /**
@@ -1248,8 +1263,10 @@ function convertGeminiToolName(claudeTool) {
   if (claudeTool.startsWith('mcp__')) {
     return null;
   }
-  // Task/Agent: exclude — agents are auto-registered as callable tools
-  if (claudeTool === 'Task' || claudeTool === 'Agent') {
+  // Task/Agent: exclude — agents are auto-registered as callable tools.
+  // AskUserQuestion: exclude — Gemini CLI does not expose an ask_user tool;
+  // emitting it causes frontmatter validation errors (#3362).
+  if (claudeTool === 'Task' || claudeTool === 'Agent' || claudeTool === 'AskUserQuestion') {
     return null;
   }
   // Check for explicit mapping
@@ -4736,6 +4753,10 @@ function convertSlashCommandsToGeminiMentions(content) {
 function convertClaudeToGeminiMarkdown(content, { isCommand = false } = {}) {
   // Apply Gemini-specific slash command namespacing
   let converted = convertSlashCommandsToGeminiMentions(content);
+  // Gemini CLI does not expose Claude's AskUserQuestion tool. Convert body
+  // references to runtime-neutral wording so converted agents do not instruct
+  // Gemini to call a nonexistent tool (#3362).
+  converted = converted.replace(/\bAskUserQuestion\b/g, 'conversational prompting');
   // Strip HTML subscript tags — terminals can't render them. Done before
   // TOML conversion so the prompt body of a command file is also clean.
   converted = stripSubTags(converted);
@@ -8699,7 +8720,7 @@ function install(isGlobal, runtime = 'claude') {
   // `node` command that recreates the #2979 failure.
   const localCmd = (hookFile) => localNodeRunner === null
     ? null
-    : localNodeRunner + ' ' + localPrefix + '/hooks/' + hookFile;
+    : formatHookCommandForShell(localNodeRunner + ' ' + localPrefix + '/hooks/' + hookFile, hookOpts);
   const statuslineCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-statusline.js', hookOpts)
     : localCmd('gsd-statusline.js');
