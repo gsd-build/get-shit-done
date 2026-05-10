@@ -83,16 +83,25 @@ describe('#3357 — Codex install removes legacy GSD hooks.json entries', { conc
   });
 
   test('preserves user hooks.json entries while removing the legacy GSD hook', () => {
+    const userOwnedSameBasenameHook = {
+      hooks: [{
+        type: 'command',
+        command: 'node "/Users/example/bin/gsd-check-update.js"',
+      }],
+    };
     fs.writeFileSync(
       path.join(codexHome, 'hooks.json'),
-      JSON.stringify({ SessionStart: [legacyGsdHook(codexHome), userHook()] }, null, 2),
+      JSON.stringify({ SessionStart: [legacyGsdHook(codexHome), userHook(), userOwnedSameBasenameHook] }, null, 2),
     );
 
     withCodexHome(codexHome, () => install(true, 'codex'));
 
     const hooksJson = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
     const commands = hooksJson.SessionStart.flatMap((entry) => entry.hooks).map((hook) => hook.command);
-    assert.deepEqual(commands, ['node "/Users/example/bin/user-hook.js"']);
+    assert.deepEqual(commands, [
+      'node "/Users/example/bin/user-hook.js"',
+      'node "/Users/example/bin/gsd-check-update.js"',
+    ]);
     assert.equal(tomlGsdHookCount(codexHome), 1);
   });
 });

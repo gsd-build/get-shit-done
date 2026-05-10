@@ -759,17 +759,21 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
   return { content: updated, changed };
 }
 
-function isManagedCodexHookCommand(command) {
+function isManagedCodexHookCommand(command, targetDir) {
   if (typeof command !== 'string') return false;
-  return /(^|[\\/\s"'])(gsd-check-update\.js|gsd-update-check\.js)(?=$|[\s"'])/.test(command);
+  if (typeof targetDir !== 'string' || targetDir.length === 0) return false;
+  const normalizedCommand = command.replace(/\\/g, '/');
+  const managedHooksDir = `${path.join(targetDir, 'hooks').replace(/\\/g, '/')}/`;
+  if (!normalizedCommand.includes(managedHooksDir)) return false;
+  return /(^|[\\/\s"'])(gsd-check-update\.js|gsd-update-check\.js)(?=$|[\s"'])/.test(normalizedCommand);
 }
 
-function pruneGsdManagedHooksJsonValue(value) {
+function pruneGsdManagedHooksJsonValue(value, targetDir) {
   if (Array.isArray(value)) {
     let changed = false;
     const next = [];
     for (const item of value) {
-      const pruned = pruneGsdManagedHooksJsonValue(item);
+      const pruned = pruneGsdManagedHooksJsonValue(item, targetDir);
       if (pruned.changed) changed = true;
       if (!isStructurallyEmpty(pruned.value)) next.push(pruned.value);
       else changed = true;
@@ -778,14 +782,14 @@ function pruneGsdManagedHooksJsonValue(value) {
   }
 
   if (value && typeof value === 'object') {
-    if (isManagedCodexHookCommand(value.command)) {
+    if (isManagedCodexHookCommand(value.command, targetDir)) {
       return { value: null, changed: true };
     }
 
     let changed = false;
     const next = {};
     for (const [key, child] of Object.entries(value)) {
-      const pruned = pruneGsdManagedHooksJsonValue(child);
+      const pruned = pruneGsdManagedHooksJsonValue(child, targetDir);
       if (pruned.changed) changed = true;
       if (!isStructurallyEmpty(pruned.value)) next[key] = pruned.value;
       else changed = true;
@@ -813,7 +817,7 @@ function cleanupLegacyCodexHooksJson(targetDir) {
     return { changed: false, removedFile: false, skipped: 'invalid_json' };
   }
 
-  const pruned = pruneGsdManagedHooksJsonValue(parsed);
+  const pruned = pruneGsdManagedHooksJsonValue(parsed, targetDir);
   if (!pruned.changed) return { changed: false, removedFile: false };
 
   if (isStructurallyEmpty(pruned.value)) {
@@ -821,7 +825,7 @@ function cleanupLegacyCodexHooksJson(targetDir) {
     return { changed: true, removedFile: true };
   }
 
-  fs.writeFileSync(hooksPath, JSON.stringify(pruned.value, null, 2) + '\n');
+  atomicWriteFileSync(hooksPath, JSON.stringify(pruned.value, null, 2) + '\n', 'utf8');
   return { changed: true, removedFile: false };
 }
 
