@@ -28,6 +28,9 @@ Module owning projection from dispatch results/errors to CLI `{ exitCode, stdout
 ### STATE.md Document Module
 Shared CJS/SDK pure transform Module owning STATE.md parse, field extraction, field replacement, status normalization, and frontmatter reconstruction. It does not scan `.planning/phases` and does not own persistence or locking; phase/plan/summary counts arrive from inventory/progress Modules as inputs, and CJS/SDK read-modify-write paths remain Adapters.
 
+### STATE.md Mutation Transaction Module
+Shared transaction-policy Module for STATE.md writes. Owns the lock/read/mutate/project/write cycle for migrated STATE.md mutation paths, including frontmatter projection, configured progress preservation, status preservation, dry-run projection for sync verification, and atomic write ordering. CJS and SDK command handlers should be thin Adapters over this seam. Pure STATE.md text transforms remain in the STATE.md Document Module; disk inventory/progress scanning remains outside this seam and is supplied through projection helpers.
+
 ### Query Execution Policy Module
 Module owning query transport routing policy projection (`preferNative`, fallback policy, workstream subprocess forcing) at execution seam.
 
