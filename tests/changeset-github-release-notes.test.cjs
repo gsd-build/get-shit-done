@@ -148,5 +148,15 @@ describe('changeset github release notes: tag-range renderer (#3382)', () => {
       }),
       /Invalid repoSlug format/,
     );
+
+    assert.throws(
+      () => serializeGithubReleaseNotes({
+        ir: { sections: [] },
+        fromRef: 'v1.0.0',
+        toRef: 'v1.0.1',
+        installCommand: 'echo `bad`',
+      }),
+      /installCommand cannot contain backtick/,
+    );
   });
 });

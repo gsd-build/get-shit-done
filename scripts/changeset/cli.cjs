@@ -221,7 +221,7 @@ function usage() {
   return [
     'usage:',
     '  changeset/cli.cjs render --repo <dir> --version V --date D [--json]',
-    '  changeset/cli.cjs github-release-notes --repo <dir> --from REF --to REF [--output FILE] [--json]',
+    '  changeset/cli.cjs github-release-notes --repo <dir> --from REF --to REF [--output FILE] [--repo-slug OWNER/REPO] [--install-command CMD] [--json]',
     '',
   ].join('\n');
 }
