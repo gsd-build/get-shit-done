@@ -1669,6 +1669,44 @@ describe('phase remove command', () => {
     // Phase 5 should be renumbered to 4
     assert.ok(roadmap.includes('Phase 4: Final'), 'Phase 5 should be renumbered to Phase 4');
   });
+
+  test('bug-3355: integer phase remove renumbers roadmap once without collapsing later phases', () => {
+    const lines = ['# Roadmap', '', '## Progress', '', '| Phase | Plans | Status | Notes |', '|---|---:|---|---|'];
+    for (let n = 26; n <= 35; n++) {
+      lines.push(`| ${n}. Phase ${n} | 0/1 | Planned | - |`);
+    }
+    lines.push('');
+    for (let n = 26; n <= 35; n++) {
+      lines.push(`### Phase ${n}: Phase ${n}`);
+      lines.push(`**Goal:** Build phase ${n}`);
+      lines.push('**Depends on:** Phase ' + (n - 1));
+      lines.push('');
+
+      const phaseDir = path.join(tmpDir, '.planning', 'phases', `${String(n).padStart(2, '0')}-phase-${n}`);
+      fs.mkdirSync(phaseDir, { recursive: true });
+      fs.writeFileSync(path.join(phaseDir, `${String(n).padStart(2, '0')}-01-PLAN.md`), '# Plan');
+    }
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), lines.join('\n'));
+
+    const result = runGsdTools('phase remove 27 --force', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const roadmap = fs.readFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+    assert.equal((roadmap.match(/\|\s*27\.\s/g) || []).length, 1, 'progress row 27 appears once');
+    assert.equal((roadmap.match(/\|\s*28\.\s/g) || []).length, 1, 'progress row 28 appears once');
+    assert.equal((roadmap.match(/\|\s*34\.\s/g) || []).length, 1, 'progress row 34 appears once');
+    assert.equal((roadmap.match(/\|\s*35\.\s/g) || []).length, 0, 'old progress row 35 removed by renumber');
+    assert.equal((roadmap.match(/^### Phase 27:/gm) || []).length, 1, 'heading 27 appears once');
+    assert.equal((roadmap.match(/^### Phase 34:/gm) || []).length, 1, 'heading 34 appears once');
+    assert.equal((roadmap.match(/^### Phase 35:/gm) || []).length, 0, 'old heading 35 removed by renumber');
+
+    for (let n = 27; n <= 34; n++) {
+      assert.ok(
+        fs.existsSync(path.join(tmpDir, '.planning', 'phases', `${String(n).padStart(2, '0')}-phase-${n + 1}`)),
+        `phase directory ${n} should preserve original phase slug ${n + 1}`,
+      );
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -851,6 +851,18 @@ function renameIntegerPhases(phasesDir, removedInt) {
   return { renamedDirs, renamedFiles };
 }
 
+function decrementRoadmapPhaseNumber(raw, removedInt) {
+  const num = parseInt(raw, 10);
+  if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
+  return String(num - 1);
+}
+
+function decrementRoadmapPaddedPhaseNumber(raw, removedInt) {
+  const num = parseInt(raw, 10);
+  if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
+  return String(num - 1).padStart(raw.length, '0');
+}
+
 /**
  * Remove a phase section from ROADMAP.md and renumber all subsequent integer phases.
  */
@@ -865,17 +877,26 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
     content = content.replace(new RegExp(`\\n?\\|\\s*${escaped}\\.?\\s[^|]*\\|[^\\n]*`, 'gi'), '');
 
     if (!isDecimal) {
-      const MAX_PHASE = 99;
-      for (let oldNum = MAX_PHASE; oldNum > removedInt; oldNum--) {
-        const newNum = oldNum - 1;
-        const oldStr = String(oldNum), newStr = String(newNum);
-        const oldPad = oldStr.padStart(2, '0'), newPad = newStr.padStart(2, '0');
-        content = content.replace(new RegExp(`(#{2,4}\\s*Phase\\s+)${oldStr}(\\s*:)`, 'gi'), `$1${newStr}$2`);
-        content = content.replace(new RegExp(`(Phase\\s+)${oldStr}([:\\s])`, 'g'), `$1${newStr}$2`);
-        content = content.replace(new RegExp(`(?<![0-9-])${oldPad}-(\\d{2})(?![0-9-])`, 'g'), `${newPad}-$1`);
-        content = content.replace(new RegExp(`(\\|\\s*)${oldStr}\\.\\s`, 'g'), `$1${newStr}. `);
-        content = content.replace(new RegExp(`(Depends on:\\*\\*\\s*Phase\\s+)${oldStr}\\b`, 'gi'), `$1${newStr}`);
-      }
+      content = content.replace(
+        /(#{2,4}\s*Phase\s+)(\d+)(\s*:)/gi,
+        (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`
+      );
+      content = content.replace(
+        /(-\s*\[[ x]\]\s*.*?Phase\s+)(\d+)(\s*:|\s+)/gi,
+        (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`
+      );
+      content = content.replace(
+        /(\|\s*)(\d+)(\.\s)/g,
+        (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`
+      );
+      content = content.replace(
+        /(?<![0-9-])(\d{2})-(\d{2})(?![0-9-])/g,
+        (_match, phaseNum, planNum) => `${decrementRoadmapPaddedPhaseNumber(phaseNum, removedInt)}-${planNum}`
+      );
+      content = content.replace(
+        /(Depends on:\*\*\s*Phase\s+)(\d+)\b/gi,
+        (_match, prefix, num) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}`
+      );
     }
 
     atomicWriteFileSync(roadmapPath, content);
