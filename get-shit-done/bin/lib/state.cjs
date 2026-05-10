@@ -1325,29 +1325,35 @@ function cmdStateMilestoneSwitch(cwd, version, name, raw) {
   const resolvedName = (name && String(name).trim()) || 'milestone';
   const statePath = planningPaths(cwd).state;
   const today = new Date().toISOString().split('T')[0];
+  let existingStateVersion = '1.0';
 
-  const lockPath = acquireStateLock(statePath);
-  try {
-    const content = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf-8') : '';
-    const existingFm = extractFrontmatter(content);
-    const body = stripFrontmatter(content);
+  runStateMutationTransaction({
+    statePath,
+    cwd,
+    transform: (content) => {
+      const existingFm = extractFrontmatter(content);
+      existingStateVersion = existingFm.gsd_state_version || '1.0';
+      const body = stripFrontmatter(content);
 
-    const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
-    const resetPositionBody =
-      `\nPhase: Not started (defining requirements)\n` +
-      `Plan: —\n` +
-      `Status: Defining requirements\n` +
-      `Last activity: ${today} — Milestone ${version} started\n\n`;
-    let newBody;
-    if (positionPattern.test(body)) {
-      newBody = body.replace(positionPattern, (_m, header) => `${header}${resetPositionBody}`);
-    } else {
-      const preface = body.trim().length > 0 ? body : '# Project State\n';
-      newBody = `${preface.trimEnd()}\n\n## Current Position\n${resetPositionBody}`;
-    }
-
-    const fm = {
-      gsd_state_version: existingFm.gsd_state_version || '1.0',
+      const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+      const resetPositionBody =
+        `\nPhase: Not started (defining requirements)\n` +
+        `Plan: —\n` +
+        `Status: Defining requirements\n` +
+        `Last activity: ${today} — Milestone ${version} started\n\n`;
+      let newBody;
+      if (positionPattern.test(body)) {
+        newBody = body.replace(positionPattern, (_m, header) => `${header}${resetPositionBody}`);
+      } else {
+        const preface = body.trim().length > 0 ? body : '# Project State\n';
+        newBody = `${preface.trimEnd()}\n\n## Current Position\n${resetPositionBody}`;
+      }
+      return newBody.replace(/^\n+/, '');
+    },
+    acquireStateLock,
+    releaseStateLock,
+    buildStateFrontmatter: () => ({
+      gsd_state_version: existingStateVersion,
       milestone: version,
       milestone_name: resolvedName,
       status: 'planning',
@@ -1360,19 +1366,20 @@ function cmdStateMilestoneSwitch(cwd, version, name, raw) {
         completed_plans: 0,
         percent: 0,
       },
-    };
-
-    const yamlStr = reconstructFrontmatter(fm);
-    const assembled = `---\n${yamlStr}\n---\n\n${newBody.replace(/^\n+/, '')}`;
-    atomicWriteFileSync(statePath, normalizeMd(assembled), 'utf-8');
-    output(
-      { switched: true, version, name: resolvedName, status: 'planning' },
-      raw,
-      'true',
-    );
-  } finally {
-    releaseStateLock(lockPath);
-  }
+    }),
+    normalizeMd,
+    atomicWriteFileSync,
+    extractFrontmatter,
+    stripFrontmatter,
+    reconstructFrontmatter,
+    fs,
+    mutationSurface: 'full',
+  });
+  output(
+    { switched: true, version, name: resolvedName, status: 'planning' },
+    raw,
+    'true',
+  );
 }
 
 /**

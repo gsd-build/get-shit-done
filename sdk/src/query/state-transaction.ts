@@ -45,7 +45,7 @@ export async function runStateMutationTransaction(options: StateMutationTransact
     stripFrontmatter,
     reconstructFrontmatter,
     resync = true,
-    preserveExistingProgress,
+    preserveExistingProgress = false,
     mutationSurface = 'body',
     dryRun = false,
   } = options;
@@ -68,7 +68,7 @@ export async function runStateMutationTransaction(options: StateMutationTransact
 
     if (!resync && preFm && preFm.progress) {
       projectedFm.progress = preFm.progress;
-    } else if (preserveExistingProgress !== false && shouldPreserveExistingProgress(existingFm.progress, projectedFm.progress)) {
+    } else if (preserveExistingProgress && shouldPreserveExistingProgress(existingFm.progress, projectedFm.progress)) {
       projectedFm.progress = normalizeProgressNumbers(existingFm.progress);
     }
 

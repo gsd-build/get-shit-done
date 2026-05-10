@@ -182,4 +182,67 @@ describe('STATE.md Mutation Transaction Module', () => {
     assert.match(after, /status: executing/);
     assert.match(after, /current_phase: 03/);
   });
+
+  test('dry run returns projected content without writing but still releases lock', () => {
+    const dir = makeTempDir();
+    const statePath = path.join(dir, 'STATE.md');
+    fs.writeFileSync(statePath, '# State\n\nStatus: Planning\n', 'utf-8');
+    const lockPath = `${statePath}.lock`;
+
+    const projected = runStateMutationTransaction({
+      statePath,
+      cwd: dir,
+      transform: (content) => content.replace('Status: Planning', 'Status: Complete'),
+      acquireStateLock: (p) => {
+        fs.writeFileSync(`${p}.lock`, String(process.pid), 'utf-8');
+        return `${p}.lock`;
+      },
+      releaseStateLock: (p) => fs.rmSync(p, { force: true }),
+      buildStateFrontmatter: () => ({ status: 'completed' }),
+      normalizeMd: (content) => content,
+      atomicWriteFileSync: fs.writeFileSync,
+      extractFrontmatter,
+      stripFrontmatter,
+      reconstructFrontmatter,
+      fs,
+      dryRun: true,
+      mutationSurface: 'full',
+    });
+
+    assert.equal(fs.existsSync(lockPath), false);
+    assert.match(projected, /Status: Complete/);
+    assert.doesNotMatch(fs.readFileSync(statePath, 'utf-8'), /Status: Complete/);
+  });
+
+  test('releases lock when mutation throws', () => {
+    const dir = makeTempDir();
+    const statePath = path.join(dir, 'STATE.md');
+    fs.writeFileSync(statePath, '# State\n\nStatus: Planning\n', 'utf-8');
+    const lockPath = `${statePath}.lock`;
+
+    assert.throws(() => {
+      runStateMutationTransaction({
+        statePath,
+        cwd: dir,
+        transform: () => {
+          throw new Error('boom');
+        },
+        acquireStateLock: (p) => {
+          fs.writeFileSync(`${p}.lock`, String(process.pid), 'utf-8');
+          return `${p}.lock`;
+        },
+        releaseStateLock: (p) => fs.rmSync(p, { force: true }),
+        buildStateFrontmatter: () => ({ status: 'completed' }),
+        normalizeMd: (content) => content,
+        atomicWriteFileSync: fs.writeFileSync,
+        extractFrontmatter,
+        stripFrontmatter,
+        reconstructFrontmatter,
+        fs,
+        mutationSurface: 'full',
+      });
+    }, /boom/);
+
+    assert.equal(fs.existsSync(lockPath), false);
+  });
 });

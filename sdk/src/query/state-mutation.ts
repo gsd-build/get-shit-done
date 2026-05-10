@@ -220,7 +220,7 @@ async function readModifyWriteStateMd(
     stripFrontmatter,
     reconstructFrontmatter,
     resync,
-    preserveExistingProgress: options.preserveExistingProgress,
+    preserveExistingProgress: options.preserveExistingProgress !== false,
     mutationSurface: 'body',
   });
 }
@@ -1118,41 +1118,42 @@ export const stateMilestoneSwitch: QueryHandler = async (args, projectDir, works
 
   const today = new Date().toISOString().split('T')[0]!;
   const statePath = planningPaths(projectDir, workstream).state;
-  const lockPath = await acquireStateLock(statePath);
+  let existingStateVersion: unknown = '1.0';
 
-  try {
-    let content = '';
-    try {
-      content = await readFile(statePath, 'utf-8');
-    } catch { /* STATE.md may not exist yet */ }
+  await runStateMutationTransaction({
+    statePath,
+    projectDir,
+    workstream,
+    transform: (content) => {
+      const existingFm = extractFrontmatter(content);
+      existingStateVersion = existingFm.gsd_state_version || '1.0';
+      const body = stripFrontmatter(content);
 
-    const existingFm = extractFrontmatter(content);
-    const body = stripFrontmatter(content);
-
-    // Reset Current Position section body so body-derived extraction stays
-    // consistent with the new frontmatter.
-    const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
-    const resetPositionBody =
-      `\nPhase: Not started (defining requirements)\n` +
-      `Plan: —\n` +
-      `Status: Defining requirements\n` +
-      `Last activity: ${today} — Milestone ${version} started\n\n`;
-    let newBody: string;
-    if (positionPattern.test(body)) {
-      newBody = body.replace(positionPattern, (_m, header: string) => `${header}${resetPositionBody}`);
-    } else {
-      // Preserve any existing body but prepend a Current Position section.
-      const preface = body.trim().length > 0 ? body : '# Project State\n';
-      newBody = `${preface.trimEnd()}\n\n## Current Position\n${resetPositionBody}`;
-    }
-
-    // Build fresh frontmatter explicitly — do NOT rely on buildStateFrontmatter
-    // here, because getMilestoneInfo reads the ON-DISK STATE.md and would
-    // return the OLD milestone until we write it first. This is the crux of
-    // bug #2630: any sync-based approach races against the very file it is
-    // about to rewrite.
-    const fm: Record<string, unknown> = {
-      gsd_state_version: '1.0',
+      // Reset Current Position section body so body-derived extraction stays
+      // consistent with the new frontmatter.
+      const positionPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+      const resetPositionBody =
+        `\nPhase: Not started (defining requirements)\n` +
+        `Plan: —\n` +
+        `Status: Defining requirements\n` +
+        `Last activity: ${today} — Milestone ${version} started\n\n`;
+      let newBody: string;
+      if (positionPattern.test(body)) {
+        newBody = body.replace(positionPattern, (_m, header: string) => `${header}${resetPositionBody}`);
+      } else {
+        // Preserve any existing body but prepend a Current Position section.
+        const preface = body.trim().length > 0 ? body : '# Project State\n';
+        newBody = `${preface.trimEnd()}\n\n## Current Position\n${resetPositionBody}`;
+      }
+      return newBody.replace(/^\n+/, '');
+    },
+    acquireStateLock,
+    releaseStateLock,
+    // Build fresh frontmatter explicitly -- do not rely on buildStateFrontmatter
+    // here, because getMilestoneInfo reads the on-disk STATE.md and would return
+    // the old milestone until we write it first. This is the crux of #2630.
+    buildStateFrontmatter: async () => ({
+      gsd_state_version: existingStateVersion,
       milestone: version,
       milestone_name: name,
       status: 'planning',
@@ -1165,28 +1166,23 @@ export const stateMilestoneSwitch: QueryHandler = async (args, projectDir, works
         completed_plans: 0,
         percent: 0,
       },
-    };
-    // Preserve frontmatter-only fields the caller may still care about
-    // (paused_at cleared deliberately — a new milestone is a fresh start).
-    if (existingFm.gsd_state_version) {
-      fm.gsd_state_version = existingFm.gsd_state_version;
-    }
+    }),
+    normalizeMd,
+    writeFile,
+    extractFrontmatter,
+    stripFrontmatter,
+    reconstructFrontmatter,
+    mutationSurface: 'full',
+  });
 
-    const yamlStr = reconstructFrontmatter(fm);
-    const assembled = `---\n${yamlStr}\n---\n\n${newBody.replace(/^\n+/, '')}`;
-    await writeFile(statePath, normalizeMd(assembled), 'utf-8');
-
-    return {
-      data: {
-        switched: true,
-        version,
-        name,
-        status: 'planning',
-      },
-    };
-  } finally {
-    await releaseStateLock(lockPath);
-  }
+  return {
+    data: {
+      switched: true,
+      version,
+      name,
+      status: 'planning',
+    },
+  };
 };
 
 // ─── parseNamedArgs (matches gsd-tools.cjs) ───────────────────────────────
