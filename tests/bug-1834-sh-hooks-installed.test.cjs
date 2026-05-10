@@ -1,3 +1,8 @@
+// allow-test-rule: structural-regression-guard
+// This test includes a source-level guard for the executor hook copy helper so
+// future refactors cannot accidentally drop .sh handling while E2E install
+// coverage still happens to pass through stale built artifacts.
+
 /**
  * Regression tests for bug #1834
  *
@@ -24,6 +29,7 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 
 const INSTALL_SCRIPT = path.join(__dirname, '..', 'bin', 'install.js');
+const INSTALL_EXECUTOR_SCRIPT = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'runtime-install-executor.cjs');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 const isWindows = process.platform === 'win32';
 
@@ -139,36 +145,34 @@ describe('#1834: installer deploys .sh hooks alongside .js hooks', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Source-level correctness: install.js copies non-.js files
+// 2. Source-level correctness: runtime install executor copies non-.js files
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('#1834: install.js source handles .sh files in the hook copy loop', () => {
+describe('#1834: runtime install executor source handles .sh files in the hook copy loop', () => {
   let src;
 
   before(() => {
-    src = fs.readFileSync(INSTALL_SCRIPT, 'utf-8');
+    src = fs.readFileSync(INSTALL_EXECUTOR_SCRIPT, 'utf-8');
   });
 
-  test('hook copy loop has an else branch for non-.js files', () => {
-    // The loop must handle files that are not .js — specifically .sh hooks.
+  test('hook copy helper has a branch for .sh files', () => {
+    // The helper must handle files that are not .js — specifically .sh hooks.
     // The v1.32.0 bug was that only the if(entry.endsWith('.js')) branch
     // existed; non-.js files (i.e. .sh hooks) were silently skipped.
     //
-    // Find the hook copy loop by anchoring on its unique context: the
-    // configDirReplacement variable is declared only once in install.js,
-    // right before the entry.endsWith('.js') branch.
-    const anchorPhrase = 'configDirReplacement';
+    // Find the hook copy helper by anchoring on its unique function name.
+    const anchorPhrase = 'copyRuntimeHookFile';
     const anchorIdx = src.indexOf(anchorPhrase);
-    assert.ok(anchorIdx !== -1, 'hook copy loop anchor (configDirReplacement) not found in install.js');
-    // Extract a window large enough to contain the if/else block (≈1500 chars)
-    const region = src.slice(anchorIdx, anchorIdx + 1500);
+    assert.ok(anchorIdx !== -1, 'hook copy helper anchor (copyRuntimeHookFile) not found in runtime install executor');
+    // Extract a window large enough to contain the JS and shell branches.
+    const region = src.slice(anchorIdx, anchorIdx + 2000);
     assert.ok(
       region.includes("entry.endsWith('.js')"),
-      "install.js hook copy loop must check entry.endsWith('.js')"
+      "runtime install executor hook copy helper must check entry.endsWith('.js')"
     );
     assert.ok(
-      region.includes('} else {') || region.includes('else {'),
-      'hook copy loop must have an else branch to handle .sh and other non-.js files — ' +
+      region.includes("entry.endsWith('.sh')"),
+      'hook copy helper must have a .sh branch to handle shell files — ' +
       'without it, .sh hooks are silently skipped (root cause of #1834)'
     );
   });
@@ -178,7 +182,7 @@ describe('#1834: install.js source handles .sh files in the hook copy loop', () 
     // Without this, .sh hooks exist but are not executable.
     assert.ok(
       src.includes("entry.endsWith('.sh')"),
-      "install.js must check entry.endsWith('.sh') to apply chmod after copying"
+      "runtime install executor must check entry.endsWith('.sh') to apply chmod after copying"
     );
   });
 
@@ -187,7 +191,7 @@ describe('#1834: install.js source handles .sh files in the hook copy loop', () 
     for (const hook of SH_HOOKS) {
       assert.ok(
         src.includes(hook),
-        `install.js must reference '${hook}' in its post-copy verification`
+        `runtime install executor must reference '${hook}' in its post-copy verification`
       );
     }
   });

@@ -173,7 +173,7 @@ module.exports = { catalog };
   });
 
   // ── test C ──────────────────────────────────────────────────────────────────
-  test('post-install: install() copies model-catalog.json to co-located path', () => {
+  test('post-install: install() copies shared catalogs to co-located path', () => {
     // Run the real installer against a tmp target dir, then assert the co-located
     // json is present and parseable.
     const claudeDir = path.join(tmpRoot, '.claude');
@@ -241,5 +241,36 @@ module.exports = { catalog };
 
     assert.ok(installedMod.catalog, 'installed module must export catalog');
     assert.ok(installedMod.VALID_PROFILES.length > 0, 'installed module must have valid profiles');
+
+    const colocatedRuntimePolicyJson = path.join(
+      claudeDir,
+      'get-shit-done',
+      'bin',
+      'shared',
+      'runtime-install-policy.json',
+    );
+    assert.ok(
+      fs.existsSync(colocatedRuntimePolicyJson),
+      `runtime-install-policy.json must be present at co-located path post-install: ${colocatedRuntimePolicyJson}`,
+    );
+    const parsedRuntimePolicy = JSON.parse(fs.readFileSync(colocatedRuntimePolicyJson, 'utf8'));
+    assert.ok(parsedRuntimePolicy.runtimes.claude, 'runtime install policy must include claude');
+
+    const installedRuntimePolicyCjs = path.join(
+      claudeDir,
+      'get-shit-done',
+      'bin',
+      'lib',
+      'runtime-install-policy.cjs',
+    );
+    assert.ok(fs.existsSync(installedRuntimePolicyCjs), `runtime-install-policy.cjs must be installed at: ${installedRuntimePolicyCjs}`);
+
+    delete require.cache[installedRuntimePolicyCjs];
+    let installedRuntimePolicy;
+    assert.doesNotThrow(() => {
+      installedRuntimePolicy = require(installedRuntimePolicyCjs);
+    }, 'installed runtime-install-policy.cjs must not throw MODULE_NOT_FOUND after install');
+
+    assert.equal(installedRuntimePolicy.getDirName('claude'), '.claude');
   });
 });

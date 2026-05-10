@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { GSDError } from '../errors.js';
@@ -31,6 +32,15 @@ import {
   type Runtime,
 } from './helpers.js';
 import { homedir } from 'node:os';
+
+const RUNTIME_INSTALL_POLICY = JSON.parse(
+  readFileSync(new URL('../../shared/runtime-install-policy.json', import.meta.url), 'utf-8')
+) as {
+  runtimes: Record<string, {
+    global: { fallback: string[] };
+    skillsLayout: 'flat' | 'hermes-nested' | 'none';
+  }>;
+};
 
 // ─── escapeRegex ────────────────────────────────────────────────────────────
 
@@ -336,11 +346,21 @@ describe('getRuntimeConfigDir', () => {
     hermes: join(homedir(), '.hermes'),
   };
 
+  it('supported SDK runtimes match the shared runtime install policy', () => {
+    expect([...SUPPORTED_RUNTIMES].sort()).toEqual(Object.keys(RUNTIME_INSTALL_POLICY.runtimes).sort());
+  });
+
   for (const runtime of SUPPORTED_RUNTIMES) {
     it(`resolves default path for ${runtime}`, () => {
       expect(getRuntimeConfigDir(runtime)).toBe(defaults[runtime]);
     });
   }
+
+  it('runtime defaults match shared runtime install policy fallbacks', () => {
+    for (const runtime of SUPPORTED_RUNTIMES) {
+      expect(getRuntimeConfigDir(runtime)).toBe(join(homedir(), ...RUNTIME_INSTALL_POLICY.runtimes[runtime].global.fallback));
+    }
+  });
 
   const envOverrides: Array<[Runtime, string, string]> = [
     ['claude', 'CLAUDE_CONFIG_DIR', '/x/claude'],
@@ -470,6 +490,13 @@ describe('runtime-global skills directory helpers', () => {
     expect(resolveGlobalSkillsBase('codex')).toBe(join('/codex', 'skills'));
     expect(resolveGlobalSkillDir('codex', 'demo')).toBe(join('/codex', 'skills', 'demo'));
     expect(resolveGlobalSkillMarkdownPath('codex', 'demo')).toBe(join('/codex', 'skills', 'demo', 'SKILL.md'));
+  });
+
+  it('uses shared runtime policy for special skills layouts', () => {
+    process.env.HERMES_HOME = '/hermes';
+    expect(RUNTIME_INSTALL_POLICY.runtimes.hermes.skillsLayout).toBe('hermes-nested');
+    expect(resolveGlobalSkillsBase('hermes')).toBe(join('/hermes', 'skills', 'gsd'));
+    expect(resolveGlobalSkillDir('hermes', 'demo')).toBe(join('/hermes', 'skills', 'gsd', 'demo'));
   });
 
   it('returns null for cline and renders unsupported display path', () => {

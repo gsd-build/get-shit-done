@@ -30,8 +30,34 @@ import { relPlanningPath, validateWorkstreamName } from '../workstream-utils.js'
 
 // ─── Runtime-aware agents directory resolution ─────────────────────────────
 
+interface RuntimeInstallPolicy {
+  localDir: string;
+  global: {
+    env?: string;
+    fileEnv?: string;
+    xdgName?: string;
+    fallback: string[];
+  };
+  skillsLayout: 'flat' | 'hermes-nested' | 'none';
+}
+
+interface RuntimeInstallPolicyCatalog {
+  runtimes: Record<string, RuntimeInstallPolicy>;
+}
+
+const RUNTIME_INSTALL_POLICY_PATH = new URL('../../shared/runtime-install-policy.json', import.meta.url);
+const RUNTIME_INSTALL_POLICY: RuntimeInstallPolicyCatalog = JSON.parse(
+  readFileSync(RUNTIME_INSTALL_POLICY_PATH, 'utf-8')
+);
+
 function expandTilde(p: string): string {
   return p.startsWith('~/') || p === '~' ? join(homedir(), p.slice(1)) : p;
+}
+
+function getRuntimeInstallPolicy(runtime: Runtime): RuntimeInstallPolicy {
+  const policy = RUNTIME_INSTALL_POLICY.runtimes[runtime];
+  if (!policy) throw new Error(`Unknown runtime: ${String(runtime)}`);
+  return policy;
 }
 
 /**
@@ -39,48 +65,13 @@ function expandTilde(p: string): string {
  * `bin/install.js:getGlobalDir()`. Agents live at `<configDir>/agents`.
  */
 export function getRuntimeConfigDir(runtime: Runtime): string {
-  switch (runtime) {
-    case 'claude':
-      return process.env.CLAUDE_CONFIG_DIR
-        ? expandTilde(process.env.CLAUDE_CONFIG_DIR)
-        : join(homedir(), '.claude');
-    case 'opencode':
-      if (process.env.OPENCODE_CONFIG_DIR) return expandTilde(process.env.OPENCODE_CONFIG_DIR);
-      if (process.env.OPENCODE_CONFIG) return dirname(expandTilde(process.env.OPENCODE_CONFIG));
-      if (process.env.XDG_CONFIG_HOME) return join(expandTilde(process.env.XDG_CONFIG_HOME), 'opencode');
-      return join(homedir(), '.config', 'opencode');
-    case 'kilo':
-      if (process.env.KILO_CONFIG_DIR) return expandTilde(process.env.KILO_CONFIG_DIR);
-      if (process.env.KILO_CONFIG) return dirname(expandTilde(process.env.KILO_CONFIG));
-      if (process.env.XDG_CONFIG_HOME) return join(expandTilde(process.env.XDG_CONFIG_HOME), 'kilo');
-      return join(homedir(), '.config', 'kilo');
-    case 'gemini':
-      return process.env.GEMINI_CONFIG_DIR ? expandTilde(process.env.GEMINI_CONFIG_DIR) : join(homedir(), '.gemini');
-    case 'codex':
-      return process.env.CODEX_HOME ? expandTilde(process.env.CODEX_HOME) : join(homedir(), '.codex');
-    case 'copilot':
-      return process.env.COPILOT_CONFIG_DIR ? expandTilde(process.env.COPILOT_CONFIG_DIR) : join(homedir(), '.copilot');
-    case 'antigravity':
-      return process.env.ANTIGRAVITY_CONFIG_DIR ? expandTilde(process.env.ANTIGRAVITY_CONFIG_DIR) : join(homedir(), '.gemini', 'antigravity');
-    case 'cursor':
-      return process.env.CURSOR_CONFIG_DIR ? expandTilde(process.env.CURSOR_CONFIG_DIR) : join(homedir(), '.cursor');
-    case 'windsurf':
-      return process.env.WINDSURF_CONFIG_DIR ? expandTilde(process.env.WINDSURF_CONFIG_DIR) : join(homedir(), '.codeium', 'windsurf');
-    case 'augment':
-      return process.env.AUGMENT_CONFIG_DIR ? expandTilde(process.env.AUGMENT_CONFIG_DIR) : join(homedir(), '.augment');
-    case 'trae':
-      return process.env.TRAE_CONFIG_DIR ? expandTilde(process.env.TRAE_CONFIG_DIR) : join(homedir(), '.trae');
-    case 'qwen':
-      return process.env.QWEN_CONFIG_DIR ? expandTilde(process.env.QWEN_CONFIG_DIR) : join(homedir(), '.qwen');
-    case 'codebuddy':
-      return process.env.CODEBUDDY_CONFIG_DIR ? expandTilde(process.env.CODEBUDDY_CONFIG_DIR) : join(homedir(), '.codebuddy');
-    case 'cline':
-      return process.env.CLINE_CONFIG_DIR ? expandTilde(process.env.CLINE_CONFIG_DIR) : join(homedir(), '.cline');
-    case 'hermes':
-      return process.env.HERMES_HOME ? expandTilde(process.env.HERMES_HOME) : join(homedir(), '.hermes');
-    default:
-      throw new Error(`Unknown runtime: ${String(runtime)}`);
-  }
+  const policy = getRuntimeInstallPolicy(runtime);
+  const envValue = policy.global.env ? process.env[policy.global.env] : undefined;
+  if (envValue) return expandTilde(envValue);
+  const fileEnvValue = policy.global.fileEnv ? process.env[policy.global.fileEnv] : undefined;
+  if (fileEnvValue) return dirname(expandTilde(fileEnvValue));
+  if (policy.global.xdgName && process.env.XDG_CONFIG_HOME) return join(expandTilde(process.env.XDG_CONFIG_HOME), policy.global.xdgName);
+  return join(homedir(), ...policy.global.fallback);
 }
 
 /**
@@ -126,8 +117,11 @@ export function resolveAgentsDir(runtime: Runtime = 'claude'): string {
  * `cline` is rules-based and has no global skills directory.
  */
 export function resolveGlobalSkillsBase(runtime: Runtime): string | null {
-  if (runtime === 'cline') return null;
-  return join(getRuntimeConfigDir(runtime), 'skills');
+  const policy = getRuntimeInstallPolicy(runtime);
+  if (policy.skillsLayout === 'none') return null;
+  const configDir = getRuntimeConfigDir(runtime);
+  if (policy.skillsLayout === 'hermes-nested') return join(configDir, 'skills', 'gsd');
+  return join(configDir, 'skills');
 }
 
 /**

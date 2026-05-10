@@ -178,14 +178,17 @@ describe('Trae local install/uninstall', () => {
     const result = install(false, 'trae');
     const targetDir = path.join(tmpDir, '.trae');
 
-    assert.deepStrictEqual(result, {
+    assert.deepStrictEqual({ ...result, installPlan: undefined }, {
       settingsPath: null,
       settings: null,
       statuslineCommand: null,
       updateBannerCommand: null,
       runtime: 'trae',
       configDir: fs.realpathSync(targetDir),
+      installPlan: undefined,
     });
+    assert.strictEqual(result.installPlan.runtime, 'trae');
+    assert.strictEqual(result.installPlan.targetDir, fs.realpathSync(targetDir));
 
     assert.ok(fs.existsSync(path.join(targetDir, 'skills', 'gsd-help', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(targetDir, 'get-shit-done', 'VERSION')));

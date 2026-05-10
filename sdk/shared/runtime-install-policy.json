@@ -1,0 +1,189 @@
+{
+  "allRuntimesOption": "16",
+  "runtimes": {
+    "claude": {
+      "option": "1",
+      "label": "Claude Code",
+      "promptPath": "~/.claude",
+      "localDir": ".claude",
+      "global": { "env": "CLAUDE_CONFIG_DIR", "fallback": [".claude"] },
+      "configDirFromHomeGlobal": ["'.claude'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "antigravity": {
+      "option": "2",
+      "label": "Antigravity",
+      "promptPath": "~/.gemini/antigravity",
+      "localDir": ".agent",
+      "global": { "env": "ANTIGRAVITY_CONFIG_DIR", "fallback": [".gemini", "antigravity"] },
+      "configDirFromHomeGlobal": ["'.gemini'", "'antigravity'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "augment": {
+      "option": "3",
+      "label": "Augment",
+      "promptPath": "~/.augment",
+      "localDir": ".augment",
+      "global": { "env": "AUGMENT_CONFIG_DIR", "fallback": [".augment"] },
+      "configDirFromHomeGlobal": ["'.augment'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "cline": {
+      "option": "4",
+      "label": "Cline",
+      "promptPath": ".clinerules",
+      "localDir": ".cline",
+      "localTarget": "project-root",
+      "global": { "env": "CLINE_CONFIG_DIR", "fallback": [".cline"] },
+      "configDirFromHomeGlobal": ["'.cline'"],
+      "skillsLayout": "none",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": false, "settingsJson": false, "hooks": false, "toml": false, "rulesFile": true, "statusline": false, "updateBanner": false },
+      "configMutations": [{ "target": ".clinerules", "adapter": "cline-rules", "operation": "ensure-runtime-rules" }]
+    },
+    "codebuddy": {
+      "option": "5",
+      "label": "CodeBuddy",
+      "promptPath": "~/.codebuddy",
+      "localDir": ".codebuddy",
+      "global": { "env": "CODEBUDDY_CONFIG_DIR", "fallback": [".codebuddy"] },
+      "configDirFromHomeGlobal": ["'.codebuddy'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "codex": {
+      "option": "6",
+      "label": "Codex",
+      "promptPath": "~/.codex",
+      "localDir": ".codex",
+      "global": { "env": "CODEX_HOME", "fallback": [".codex"] },
+      "configDirFromHomeGlobal": ["'.codex'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "$gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": true, "toml": true, "rulesFile": false, "statusline": false, "updateBanner": false },
+      "configMutations": [
+        { "target": "config.toml", "adapter": "codex-toml", "operation": "ensure-agent-profiles" },
+        { "target": "config.toml", "adapter": "codex-toml", "operation": "ensure-managed-hook-block" }
+      ]
+    },
+    "copilot": {
+      "option": "7",
+      "label": "Copilot",
+      "promptPath": "~/.copilot",
+      "localDir": ".github",
+      "global": { "env": "COPILOT_CONFIG_DIR", "fallback": [".copilot"] },
+      "configDirFromHomeGlobal": ["'.copilot'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": true, "toml": false, "rulesFile": false, "statusline": false, "updateBanner": false },
+      "configMutations": [{ "target": "copilot-instructions.md", "adapter": "copilot-instructions", "operation": "ensure-managed-instructions" }]
+    },
+    "cursor": {
+      "option": "8",
+      "label": "Cursor",
+      "promptPath": "~/.cursor",
+      "localDir": ".cursor",
+      "global": { "env": "CURSOR_CONFIG_DIR", "fallback": [".cursor"] },
+      "configDirFromHomeGlobal": ["'.cursor'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "gsd-new-project (mention the skill name)",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "gemini": {
+      "option": "9",
+      "label": "Gemini",
+      "promptPath": "~/.gemini",
+      "localDir": ".gemini",
+      "global": { "env": "GEMINI_CONFIG_DIR", "fallback": [".gemini"] },
+      "configDirFromHomeGlobal": ["'.gemini'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "hermes": {
+      "option": "10",
+      "label": "Hermes Agent",
+      "promptPath": "~/.hermes",
+      "localDir": ".hermes",
+      "global": { "env": "HERMES_HOME", "fallback": [".hermes"] },
+      "configDirFromHomeGlobal": ["'.hermes'"],
+      "skillsLayout": "hermes-nested",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": false, "toml": false, "rulesFile": false, "statusline": false, "updateBanner": false },
+      "configMutations": []
+    },
+    "kilo": {
+      "option": "11",
+      "label": "Kilo",
+      "promptPath": "~/.config/kilo",
+      "localDir": ".kilo",
+      "global": { "env": "KILO_CONFIG_DIR", "fileEnv": "KILO_CONFIG", "xdgName": "kilo", "fallback": [".config", "kilo"] },
+      "configDirFromHomeGlobal": ["'.config'", "'kilo'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": true, "toml": false, "rulesFile": false, "statusline": false, "updateBanner": false, "jsonConfig": true },
+      "configMutations": [{ "target": "kilo.json", "adapter": "kilo-json", "operation": "ensure-permissions" }]
+    },
+    "opencode": {
+      "option": "12",
+      "label": "OpenCode",
+      "promptPath": "~/.config/opencode",
+      "localDir": ".opencode",
+      "global": { "env": "OPENCODE_CONFIG_DIR", "fileEnv": "OPENCODE_CONFIG", "xdgName": "opencode", "fallback": [".config", "opencode"] },
+      "configDirFromHomeGlobal": ["'.config'", "'opencode'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": true, "toml": false, "rulesFile": false, "statusline": false, "updateBanner": false, "jsonConfig": true },
+      "configMutations": [{ "target": "opencode.json", "adapter": "opencode-json", "operation": "ensure-permissions" }]
+    },
+    "qwen": {
+      "option": "13",
+      "label": "Qwen Code",
+      "promptPath": "~/.qwen",
+      "localDir": ".qwen",
+      "global": { "env": "QWEN_CONFIG_DIR", "fallback": [".qwen"] },
+      "configDirFromHomeGlobal": ["'.qwen'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": true, "hooks": true, "toml": false, "rulesFile": false, "statusline": true, "updateBanner": true },
+      "configMutations": [{ "target": "settings.json", "adapter": "settings-json", "operation": "ensure-managed-hooks" }]
+    },
+    "trae": {
+      "option": "14",
+      "label": "Trae",
+      "promptPath": "~/.trae",
+      "localDir": ".trae",
+      "global": { "env": "TRAE_CONFIG_DIR", "fallback": [".trae"] },
+      "configDirFromHomeGlobal": ["'.trae'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": false, "toml": false, "rulesFile": false, "statusline": false, "updateBanner": false },
+      "configMutations": []
+    },
+    "windsurf": {
+      "option": "15",
+      "label": "Windsurf",
+      "promptPath": "~/.codeium/windsurf",
+      "localDir": ".windsurf",
+      "global": { "env": "WINDSURF_CONFIG_DIR", "fallback": [".codeium", "windsurf"] },
+      "configDirFromHomeGlobal": ["'.windsurf'"],
+      "skillsLayout": "flat",
+      "firstRunCommand": "/gsd-new-project",
+      "capabilities": { "agents": true, "skills": true, "settingsJson": false, "hooks": false, "toml": false, "rulesFile": false, "statusline": false, "updateBanner": false },
+      "configMutations": []
+    }
+  }
+}

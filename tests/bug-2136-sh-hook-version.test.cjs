@@ -24,14 +24,14 @@
  *
  * This fix requires THREE parts working in concert:
  *   1. Bash hooks ship with "# gsd-hook-version: {{GSD_VERSION}}"
- *   2. install.js substitutes {{GSD_VERSION}} in .sh files at install time
+ *   2. runtime install executor substitutes {{GSD_VERSION}} in .sh files at install time
  *   3. gsd-check-update.js regex matches both "//" and "#" comment styles
  *
  * Neither fix alone is sufficient:
- *   - Headers + regex fix only (no install.js fix): installed hooks contain
+ *   - Headers + regex fix only (no executor fix): installed hooks contain
  *     literal "{{GSD_VERSION}}" — the {{-guard silently skips them, making
  *     bash hook staleness permanently undetectable after future updates.
- *   - Headers + install.js fix only (no regex fix): installed hooks are
+ *   - Headers + executor fix only (no regex fix): installed hooks are
  *     stamped correctly but the detector still can't read bash "#" comments,
  *     so they still land in the "unknown / stale" branch on every session.
  */
@@ -52,6 +52,7 @@ const HOOKS_DIR = path.join(__dirname, '..', 'hooks');
 const CHECK_UPDATE_FILE = path.join(HOOKS_DIR, 'gsd-check-update.js');
 const WORKER_FILE = path.join(HOOKS_DIR, 'gsd-check-update-worker.js');
 const INSTALL_SCRIPT = path.join(__dirname, '..', 'bin', 'install.js');
+const INSTALL_EXECUTOR_SCRIPT = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'runtime-install-executor.cjs');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 
 const SH_HOOKS = [
@@ -199,31 +200,31 @@ describe('bug #2136 part 2: stale-hook detector handles bash comment syntax', ()
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Part 3a: install.js bundled path substitutes {{GSD_VERSION}} in .sh hooks
+// Part 3a: runtime install executor substitutes {{GSD_VERSION}} in .sh hooks
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('bug #2136 part 3a: install.js bundled path substitutes {{GSD_VERSION}} in .sh hooks', () => {
+describe('bug #2136 part 3a: runtime install executor substitutes {{GSD_VERSION}} in .sh hooks', () => {
   let src;
 
   before(() => {
-    src = fs.readFileSync(INSTALL_SCRIPT, 'utf8');
+    src = fs.readFileSync(INSTALL_EXECUTOR_SCRIPT, 'utf8');
   });
 
   test('.sh branch in bundled hook copy loop reads file and substitutes GSD_VERSION', () => {
-    // Anchor on configDirReplacement — unique to the bundled-hooks path.
+    // Anchor on configDirReplacement — unique to the executor hook copy path.
     const anchorIdx = src.indexOf('configDirReplacement');
-    assert.ok(anchorIdx !== -1, 'bundled hook copy loop anchor (configDirReplacement) not found');
+    assert.ok(anchorIdx !== -1, 'executor hook copy loop anchor (configDirReplacement) not found');
 
     // Window large enough for the if/else block
     const region = src.slice(anchorIdx, anchorIdx + 2000);
 
     assert.ok(
       region.includes("entry.endsWith('.sh')"),
-      "bundled hook copy loop must check entry.endsWith('.sh')"
+      "executor hook copy loop must check entry.endsWith('.sh')"
     );
     assert.ok(
       region.includes('GSD_VERSION'),
-      'bundled .sh branch must reference GSD_VERSION substitution. Without this, ' +
+      'executor .sh branch must reference GSD_VERSION substitution. Without this, ' +
       'installed .sh hooks contain the literal "{{GSD_VERSION}}" placeholder and ' +
       'bash hook staleness becomes permanently undetectable after future updates'
     );
@@ -232,38 +233,38 @@ describe('bug #2136 part 3a: install.js bundled path substitutes {{GSD_VERSION}}
     const shBranchRegion = region.slice(shBranchIdx, shBranchIdx + 400);
     assert.ok(
       shBranchRegion.includes('readFileSync') || shBranchRegion.includes('writeFileSync'),
-      'bundled .sh branch must read the file (readFileSync) to perform substitution, ' +
+      'executor .sh branch must read the file (readFileSync) to perform substitution, ' +
       'not copyFileSync directly (which skips template expansion)'
     );
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Part 3b: install.js Codex path also substitutes {{GSD_VERSION}} in .sh hooks
+// Part 3b: install.js routes Codex hook copying through the executor path
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('bug #2136 part 3b: install.js Codex path substitutes {{GSD_VERSION}} in .sh hooks', () => {
-  let src;
+describe('bug #2136 part 3b: install.js Codex path routes through executor stamping', () => {
+  let installSrc;
+  let executorSrc;
 
   before(() => {
-    src = fs.readFileSync(INSTALL_SCRIPT, 'utf8');
+    installSrc = fs.readFileSync(INSTALL_SCRIPT, 'utf8');
+    executorSrc = fs.readFileSync(INSTALL_EXECUTOR_SCRIPT, 'utf8');
   });
 
-  test('.sh branch in Codex hook copy block substitutes GSD_VERSION', () => {
-    // Anchor on codexHooksSrc — unique to the Codex path.
-    const anchorIdx = src.indexOf('codexHooksSrc');
-    assert.ok(anchorIdx !== -1, 'Codex hook copy block anchor (codexHooksSrc) not found');
-
-    const region = src.slice(anchorIdx, anchorIdx + 2000);
-
+  test('Codex hook copy call opts into executor TOML hooks and executor stamps .sh hooks', () => {
     assert.ok(
-      region.includes("entry.endsWith('.sh')"),
-      "Codex hook copy block must check entry.endsWith('.sh')"
+      installSrc.includes('runtimeInstallExecutor.copyBundledHooksArtifact(installPlan') &&
+      installSrc.includes('allowTomlHooks: true'),
+      'install.js Codex path must route hook copying through runtimeInstallExecutor with allowTomlHooks enabled'
     );
+
+    const anchorIdx = executorSrc.indexOf("entry.endsWith('.sh')");
+    assert.ok(anchorIdx !== -1, "executor hook copy path must check entry.endsWith('.sh')");
+    const region = executorSrc.slice(anchorIdx, anchorIdx + 500);
     assert.ok(
       region.includes('GSD_VERSION'),
-      'Codex .sh branch must substitute {{GSD_VERSION}}. The bundled path was fixed ' +
-      'but Codex installs a separate copy of the hooks from hooks/dist that also needs stamping'
+      'executor .sh branch must substitute {{GSD_VERSION}} for Codex installs as well as bundled installs'
     );
   });
 });
@@ -299,7 +300,7 @@ describe('bug #2136 part 4: installed .sh hooks contain stamped concrete version
       assert.ok(
         !content.includes('{{GSD_VERSION}}'),
         `installed ${sh} must not contain literal "{{GSD_VERSION}}" — ` +
-        `install.js must substitute it with the concrete package version`
+        `the runtime install executor must substitute it with the concrete package version`
       );
 
       const versionMatch = content.match(/# gsd-hook-version:\s*(\S+)/);
@@ -373,7 +374,7 @@ describe('bug #2136 part 4: installed .sh hooks contain stamped concrete version
       [],
       `Fresh install must produce zero stale bash hooks.\n` +
       `Got: ${JSON.stringify(staleHooks, null, 2)}\n` +
-      `This indicates either the version header was not stamped by install.js, ` +
+      `This indicates either the version header was not stamped by the runtime install executor, ` +
       `or the detector regex cannot match bash "#" comment syntax.`
     );
   });

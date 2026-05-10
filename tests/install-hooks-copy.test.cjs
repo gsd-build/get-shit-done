@@ -23,6 +23,7 @@ const { execFileSync } = require('child_process');
 const { cleanup, createTempDir } = require('./helpers.cjs');
 
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
+const INSTALL_EXECUTOR_SRC = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'runtime-install-executor.cjs');
 const { writeManifest, validateHookFields } = require(INSTALL_SRC);
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 const HOOKS_DIST = path.join(__dirname, '..', 'hooks', 'dist');
@@ -148,16 +149,18 @@ describe('#1755: .sh hooks are copied and executable after install', () => {
 
 describe('install.js source correctness', () => {
   let src;
+  let executorSrc;
 
   before(() => {
     src = fs.readFileSync(INSTALL_SRC, 'utf-8');
+    executorSrc = fs.readFileSync(INSTALL_EXECUTOR_SRC, 'utf-8');
   });
 
   test('.sh files get chmod after copyFileSync', () => {
     // The else branch for non-.js hooks should apply chmod for .sh files
     assert.ok(
-      src.includes("if (entry.endsWith('.sh'))"),
-      'install.js should check for .sh extension to apply chmod'
+      executorSrc.includes("if (entry.endsWith('.sh'))"),
+      'runtime install executor should check for .sh extension to apply chmod'
     );
   });
 
@@ -256,8 +259,8 @@ describe('install.js source correctness', () => {
 
   test('verifyInstalled warns about missing .sh hooks', () => {
     assert.ok(
-      src.includes('Missing expected hook:'),
-      'install should warn about missing .sh hooks after verification'
+      executorSrc.includes('Missing expected hook:'),
+      'runtime install executor should warn about missing .sh hooks after verification'
     );
   });
 });

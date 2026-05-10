@@ -76,6 +76,10 @@ const {
   isMinimalMode,
   stageSkillsForMode,
 } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
+const runtimeInstallPolicy = require(path.join(_gsdLibDir, 'runtime-install-policy.cjs'));
+const runtimeInstallExecutor = require(path.join(_gsdLibDir, 'runtime-install-executor.cjs'));
+const runtimeMap = runtimeInstallPolicy.runtimeMap;
+const allRuntimes = runtimeInstallPolicy.allRuntimes;
 
 // Parse args
 const args = process.argv.slice(2);
@@ -114,7 +118,7 @@ if (hasSdk && hasNoSdk) {
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline'];
+  selectedRuntimes = allRuntimes.slice();
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -171,21 +175,7 @@ Then re-run: npx get-shit-done-cc@latest
 
 // Helper to get directory name for a runtime (used for local/project installs)
 function getDirName(runtime) {
-  if (runtime === 'copilot') return '.github';
-  if (runtime === 'opencode') return '.opencode';
-  if (runtime === 'gemini') return '.gemini';
-  if (runtime === 'kilo') return '.kilo';
-  if (runtime === 'codex') return '.codex';
-  if (runtime === 'antigravity') return '.agent';
-  if (runtime === 'cursor') return '.cursor';
-  if (runtime === 'windsurf') return '.windsurf';
-  if (runtime === 'augment') return '.augment';
-  if (runtime === 'trae') return '.trae';
-  if (runtime === 'qwen') return '.qwen';
-  if (runtime === 'hermes') return '.hermes';
-  if (runtime === 'codebuddy') return '.codebuddy';
-  if (runtime === 'cline') return '.cline';
-  return '.claude';
+  return runtimeInstallPolicy.getDirName(runtime);
 }
 
 /**
@@ -195,247 +185,43 @@ function getDirName(runtime) {
  * @param {boolean} isGlobal - Whether this is a global install
  */
 function getConfigDirFromHome(runtime, isGlobal) {
-  if (!isGlobal) {
-    // Local installs use the same dir name pattern
-    return `'${getDirName(runtime)}'`;
-  }
-  // Global installs - OpenCode uses XDG path structure
-  if (runtime === 'copilot') return "'.copilot'";
-  if (runtime === 'opencode') {
-    // OpenCode: ~/.config/opencode -> '.config', 'opencode'
-    // Return as comma-separated for path.join() replacement
-    return "'.config', 'opencode'";
-  }
-  if (runtime === 'gemini') return "'.gemini'";
-  if (runtime === 'kilo') return "'.config', 'kilo'";
-  if (runtime === 'codex') return "'.codex'";
-  if (runtime === 'antigravity') {
-    if (!isGlobal) return "'.agent'";
-    return "'.gemini', 'antigravity'";
-  }
-  if (runtime === 'cursor') return "'.cursor'";
-  if (runtime === 'windsurf') return "'.windsurf'";
-  if (runtime === 'augment') return "'.augment'";
-  if (runtime === 'trae') return "'.trae'";
-  if (runtime === 'qwen') return "'.qwen'";
-  if (runtime === 'hermes') return "'.hermes'";
-  if (runtime === 'codebuddy') return "'.codebuddy'";
-  if (runtime === 'cline') return "'.cline'";
-  return "'.claude'";
-}
-
-/**
- * Get the global config directory for OpenCode
- * OpenCode follows XDG Base Directory spec and uses ~/.config/opencode/
- * Priority: OPENCODE_CONFIG_DIR > dirname(OPENCODE_CONFIG) > XDG_CONFIG_HOME/opencode > ~/.config/opencode
- */
-function getOpencodeGlobalDir() {
-  // 1. Explicit OPENCODE_CONFIG_DIR env var
-  if (process.env.OPENCODE_CONFIG_DIR) {
-    return expandTilde(process.env.OPENCODE_CONFIG_DIR);
-  }
-
-  // 2. OPENCODE_CONFIG env var (use its directory)
-  if (process.env.OPENCODE_CONFIG) {
-    return path.dirname(expandTilde(process.env.OPENCODE_CONFIG));
-  }
-
-  // 3. XDG_CONFIG_HOME/opencode
-  if (process.env.XDG_CONFIG_HOME) {
-    return path.join(expandTilde(process.env.XDG_CONFIG_HOME), 'opencode');
-  }
-
-  // 4. Default: ~/.config/opencode (XDG default)
-  return path.join(os.homedir(), '.config', 'opencode');
-}
-
-/**
- * Get the global config directory for Kilo
- * Kilo follows XDG Base Directory spec and uses ~/.config/kilo/
- * Priority: KILO_CONFIG_DIR > dirname(KILO_CONFIG) > XDG_CONFIG_HOME/kilo > ~/.config/kilo
- */
-function getKiloGlobalDir() {
-  // 1. Explicit KILO_CONFIG_DIR env var
-  if (process.env.KILO_CONFIG_DIR) {
-    return expandTilde(process.env.KILO_CONFIG_DIR);
-  }
-
-  // 2. KILO_CONFIG env var (use its directory)
-  if (process.env.KILO_CONFIG) {
-    return path.dirname(expandTilde(process.env.KILO_CONFIG));
-  }
-
-  // 3. XDG_CONFIG_HOME/kilo
-  if (process.env.XDG_CONFIG_HOME) {
-    return path.join(expandTilde(process.env.XDG_CONFIG_HOME), 'kilo');
-  }
-
-  // 4. Default: ~/.config/kilo (XDG default)
-  return path.join(os.homedir(), '.config', 'kilo');
+  return runtimeInstallPolicy.getConfigDirFromHome(runtime, isGlobal);
 }
 
 /**
  * Get the global config directory for a runtime
- * @param {string} runtime - 'claude', 'opencode', 'gemini', 'codex', or 'copilot'
+ * @param {string} runtime - supported runtime key
  * @param {string|null} explicitDir - Explicit directory from --config-dir flag
  */
 function getGlobalDir(runtime, explicitDir = null) {
-  if (runtime === 'opencode') {
-    // For OpenCode, --config-dir overrides env vars
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    return getOpencodeGlobalDir();
-  }
+  return runtimeInstallPolicy.getGlobalDir(runtime, explicitDir);
+}
 
-  if (runtime === 'kilo') {
-    // For Kilo, --config-dir overrides env vars
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    return getKiloGlobalDir();
-  }
+function createRuntimeInstallPlanForExecution(runtime, isGlobal, opts = {}) {
+  return runtimeInstallPolicy.createRuntimeInstallPlan({
+    runtime,
+    scope: isGlobal ? 'global' : 'local',
+    explicitConfigDir,
+    installMode,
+    ...opts,
+  });
+}
 
-  if (runtime === 'gemini') {
-    // Gemini: --config-dir > GEMINI_CONFIG_DIR > ~/.gemini
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.GEMINI_CONFIG_DIR) {
-      return expandTilde(process.env.GEMINI_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.gemini');
-  }
+function hasConfigMutation(plan, adapter, operation = null) {
+  return runtimeInstallExecutor.hasConfigMutation(plan, adapter, operation);
+}
 
-  if (runtime === 'codex') {
-    // Codex: --config-dir > CODEX_HOME > ~/.codex
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.CODEX_HOME) {
-      return expandTilde(process.env.CODEX_HOME);
-    }
-    return path.join(os.homedir(), '.codex');
-  }
-
-  if (runtime === 'copilot') {
-    // Copilot: --config-dir > COPILOT_CONFIG_DIR > ~/.copilot
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.COPILOT_CONFIG_DIR) {
-      return expandTilde(process.env.COPILOT_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.copilot');
-  }
-
-  if (runtime === 'antigravity') {
-    // Antigravity: --config-dir > ANTIGRAVITY_CONFIG_DIR > ~/.gemini/antigravity
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.ANTIGRAVITY_CONFIG_DIR) {
-      return expandTilde(process.env.ANTIGRAVITY_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.gemini', 'antigravity');
-  }
-
-  if (runtime === 'cursor') {
-    // Cursor: --config-dir > CURSOR_CONFIG_DIR > ~/.cursor
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.CURSOR_CONFIG_DIR) {
-      return expandTilde(process.env.CURSOR_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.cursor');
-  }
-
-  if (runtime === 'windsurf') {
-    // Windsurf: --config-dir > WINDSURF_CONFIG_DIR > ~/.codeium/windsurf
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.WINDSURF_CONFIG_DIR) {
-      return expandTilde(process.env.WINDSURF_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.codeium', 'windsurf');
-  }
-
-  if (runtime === 'augment') {
-    // Augment: --config-dir > AUGMENT_CONFIG_DIR > ~/.augment
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.AUGMENT_CONFIG_DIR) {
-      return expandTilde(process.env.AUGMENT_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.augment');
-  }
-  if (runtime === 'trae') {
-    // Trae: --config-dir > TRAE_CONFIG_DIR > ~/.trae
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.TRAE_CONFIG_DIR) {
-      return expandTilde(process.env.TRAE_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.trae');
-  }
-
-  if (runtime === 'qwen') {
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.QWEN_CONFIG_DIR) {
-      return expandTilde(process.env.QWEN_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.qwen');
-  }
-
-  if (runtime === 'hermes') {
-    // Hermes Agent: --config-dir > HERMES_HOME > ~/.hermes
-    // Honors HERMES_HOME which Hermes users set for profile mode / Docker
-    // deploys (docs: https://hermes-agent.nousresearch.com/docs).
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.HERMES_HOME) {
-      return expandTilde(process.env.HERMES_HOME);
-    }
-    return path.join(os.homedir(), '.hermes');
-  }
-
-  if (runtime === 'codebuddy') {
-    // CodeBuddy: --config-dir > CODEBUDDY_CONFIG_DIR > ~/.codebuddy
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.CODEBUDDY_CONFIG_DIR) {
-      return expandTilde(process.env.CODEBUDDY_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.codebuddy');
-  }
-
-  if (runtime === 'cline') {
-    // Cline: --config-dir > CLINE_CONFIG_DIR > ~/.cline
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.CLINE_CONFIG_DIR) {
-      return expandTilde(process.env.CLINE_CONFIG_DIR);
-    }
-    return path.join(os.homedir(), '.cline');
-  }
-
-  // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
-  if (explicitDir) {
-    return expandTilde(explicitDir);
-  }
-  if (process.env.CLAUDE_CONFIG_DIR) {
-    return expandTilde(process.env.CLAUDE_CONFIG_DIR);
-  }
-  return path.join(os.homedir(), '.claude');
+function applyConfigMutations(plan, context = {}) {
+  return runtimeInstallExecutor.applyConfigMutations(plan, {
+    ...context,
+    adapters: {
+      writeSettings,
+      validateHookFields,
+      configureOpencodePermissions,
+      configureKiloPermissions,
+      ...(context.adapters || {}),
+    },
+  });
 }
 
 const banner = '\n' +
@@ -7416,6 +7202,7 @@ function reportLocalPatches(configDir, runtime = 'claude') {
 }
 
 function install(isGlobal, runtime = 'claude') {
+  const installPlan = createRuntimeInstallPlanForExecution(runtime, isGlobal);
   const isOpencode = runtime === 'opencode';
   const isGemini = runtime === 'gemini';
   const isKilo = runtime === 'kilo';
@@ -7430,21 +7217,11 @@ function install(isGlobal, runtime = 'claude') {
   const isHermes = runtime === 'hermes';
   const isCodebuddy = runtime === 'codebuddy';
   const isCline = runtime === 'cline';
-  const dirName = getDirName(runtime);
+  const dirName = installPlan.localDir;
   const src = path.join(__dirname, '..');
 
-  // Get the target directory based on runtime and install type.
-  // Cline local installs write to the project root (like Claude Code) — .clinerules
-  // lives at the root, not inside a .cline/ subdirectory.
-  const targetDir = isGlobal
-    ? getGlobalDir(runtime, explicitConfigDir)
-    : isCline
-      ? process.cwd()
-      : path.join(process.cwd(), dirName);
-
-  const locationLabel = isGlobal
-    ? targetDir.replace(os.homedir(), '~')
-    : targetDir.replace(process.cwd(), '.');
+  const targetDir = installPlan.targetDir;
+  const locationLabel = installPlan.locationLabel;
 
   // Path prefix for file references in markdown content (e.g. gsd-tools.cjs).
   // Replaces $HOME/.claude/ or ~/.claude/ so the result is <pathPrefix>get-shit-done/bin/...
@@ -7466,21 +7243,7 @@ function install(isGlobal, runtime = 'claude') {
     homeDir,
   });
 
-  let runtimeLabel = 'Claude Code';
-  if (isOpencode) runtimeLabel = 'OpenCode';
-  if (isGemini) runtimeLabel = 'Gemini';
-  if (isKilo) runtimeLabel = 'Kilo';
-  if (isCodex) runtimeLabel = 'Codex';
-  if (isCopilot) runtimeLabel = 'Copilot';
-  if (isAntigravity) runtimeLabel = 'Antigravity';
-  if (isCursor) runtimeLabel = 'Cursor';
-  if (isWindsurf) runtimeLabel = 'Windsurf';
-  if (isAugment) runtimeLabel = 'Augment';
-  if (isTrae) runtimeLabel = 'Trae';
-  if (isQwen) runtimeLabel = 'Qwen Code';
-  if (isHermes) runtimeLabel = 'Hermes Agent';
-  if (isCodebuddy) runtimeLabel = 'CodeBuddy';
-  if (isCline) runtimeLabel = 'Cline';
+  const runtimeLabel = installPlan.label;
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -7531,7 +7294,7 @@ function install(isGlobal, runtime = 'claude') {
   // Map<filename, Buffer> — content snapshot of each pre-existing gsd-* agent file.
   const codexPreInstallAgentContents = new Map();
   let codexPreInstallVersionBytes = null;
-  if (isCodex && !isMinimalMode(installMode)) {
+  if (hasConfigMutation(installPlan, 'codex-toml', 'ensure-agent-profiles') && !isMinimalMode(installMode)) {
     const _preSkillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(_preSkillsDir)) {
       for (const entry of fs.readdirSync(_preSkillsDir, { withFileTypes: true })) {
@@ -7985,26 +7748,31 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('get-shit-done');
   }
 
-  // #3288 — Copy sdk/shared/model-catalog.json into the get-shit-done payload
-  // at the co-located path that model-catalog.cjs resolves first:
+  // Copy sdk/shared/*.json catalogs into the get-shit-done payload at the
+  // co-located paths CJS modules resolve first:
   //   get-shit-done/bin/shared/model-catalog.json
+  //   get-shit-done/bin/shared/runtime-install-policy.json
   //
   // The install copies get-shit-done/ but NOT sdk/ — the CJS module's legacy
   // path (3 levels up → sdk/shared/) therefore resolves to a non-existent
   // location in every post-install layout.  Copying the catalog alongside the
   // CJS files ensures require() succeeds without needing sdk/ to exist.
-  const modelCatalogSrc = path.join(src, 'sdk', 'shared', 'model-catalog.json');
-  const modelCatalogDest = path.join(skillDest, 'bin', 'shared', 'model-catalog.json');
-  if (fs.existsSync(modelCatalogSrc)) {
-    fs.mkdirSync(path.dirname(modelCatalogDest), { recursive: true });
-    fs.copyFileSync(modelCatalogSrc, modelCatalogDest);
-    if (verifyFileInstalled(modelCatalogDest, 'get-shit-done/bin/shared/model-catalog.json')) {
-      console.log(`  ${green}✓${reset} Installed get-shit-done/bin/shared/model-catalog.json`);
+  const sharedCatalogs = ['model-catalog.json', 'runtime-install-policy.json'];
+  for (const catalogName of sharedCatalogs) {
+    const catalogSrc = path.join(src, 'sdk', 'shared', catalogName);
+    const catalogDest = path.join(skillDest, 'bin', 'shared', catalogName);
+    const manifestPath = `get-shit-done/bin/shared/${catalogName}`;
+    if (fs.existsSync(catalogSrc)) {
+      fs.mkdirSync(path.dirname(catalogDest), { recursive: true });
+      fs.copyFileSync(catalogSrc, catalogDest);
+      if (verifyFileInstalled(catalogDest, manifestPath)) {
+        console.log(`  ${green}✓${reset} Installed ${manifestPath}`);
+      } else {
+        failures.push(manifestPath);
+      }
     } else {
-      failures.push('get-shit-done/bin/shared/model-catalog.json');
+      failures.push(`sdk/shared/${catalogName} (source missing)`);
     }
-  } else {
-    failures.push('sdk/shared/model-catalog.json (source missing)');
   }
 
   // Copy agents to agents directory.
@@ -8153,73 +7921,16 @@ function install(isGlobal, runtime = 'claude') {
     failures.push('VERSION');
   }
 
-  if (!isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isCline) {
-    // Write package.json to force CommonJS mode for GSD scripts
-    // Prevents "require is not defined" errors when project has "type": "module"
-    // Node.js walks up looking for package.json - this stops inheritance from project
-    const pkgJsonDest = path.join(targetDir, 'package.json');
-    fs.writeFileSync(pkgJsonDest, '{"type":"commonjs"}\n');
-    console.log(`  ${green}✓${reset} Wrote package.json (CommonJS mode)`);
-
-    // Copy hooks from dist/ (bundled with dependencies)
-    // Template paths for the target runtime (replaces '.claude' with correct config dir)
-    const hooksSrc = path.join(src, 'hooks', 'dist');
-    if (fs.existsSync(hooksSrc)) {
-      const hooksDest = path.join(targetDir, 'hooks');
-      fs.mkdirSync(hooksDest, { recursive: true });
-      const hookEntries = fs.readdirSync(hooksSrc);
-      const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
-      for (const entry of hookEntries) {
-        const srcFile = path.join(hooksSrc, entry);
-        if (fs.statSync(srcFile).isFile()) {
-          const destFile = path.join(hooksDest, entry);
-          // Template .js files to replace '.claude' with runtime-specific config dir
-          // and stamp the current GSD version into the hook version header
-          if (entry.endsWith('.js')) {
-            let content = fs.readFileSync(srcFile, 'utf8');
-            content = content.replace(/'\.claude'/g, configDirReplacement);
-            content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
-            content = content.replace(/\.claude\//g, `${getDirName(runtime)}/`);
-            if (isQwen) {
-              content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
-              content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
-            }
-            if (isHermes) {
-              content = content.replace(/CLAUDE\.md/g, 'HERMES.md');
-              content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
-            }
-            content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-            fs.writeFileSync(destFile, content);
-            // Ensure hook files are executable (fixes #1162 — missing +x permission)
-            try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
-          } else {
-            // .sh hooks carry a gsd-hook-version header so gsd-check-update.js can
-            // detect staleness after updates — stamp the version just like .js hooks.
-            if (entry.endsWith('.sh')) {
-              let content = fs.readFileSync(srcFile, 'utf8');
-              content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-              fs.writeFileSync(destFile, content);
-              try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows doesn't support chmod */ }
-            } else {
-              fs.copyFileSync(srcFile, destFile);
-            }
-          }
-        }
-      }
-      if (verifyInstalled(hooksDest, 'hooks')) {
-        console.log(`  ${green}✓${reset} Installed hooks (bundled)`);
-        // Warn if expected community .sh hooks are missing (non-fatal)
-        const expectedShHooks = ['gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh'];
-        for (const sh of expectedShHooks) {
-          if (!fs.existsSync(path.join(hooksDest, sh))) {
-            console.warn(`  ${yellow}⚠${reset}  Missing expected hook: ${sh}`);
-          }
-        }
-      } else {
-        failures.push('hooks');
-      }
-    }
-  }
+  const bundledHooksResult = runtimeInstallExecutor.copyBundledHooksArtifact(installPlan, {
+    packageSrc: src,
+    targetDir,
+    version: pkg.version,
+    verifyInstalled,
+    log: console.log,
+    warn: console.warn,
+    colors: { green, yellow, reset },
+  });
+  failures.push(...bundledHooksResult.failures);
 
   // Clear stale update cache so next session re-evaluates hook versions
   // Cache lives at ~/.cache/gsd/ (see hooks/gsd-check-update.js line 35-36)
@@ -8447,39 +8158,18 @@ function install(isGlobal, runtime = 'claude') {
     console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
     console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
-    // Copy hook files that are referenced in config.toml (#2153)
-    // The main hook-copy block is gated to non-Codex runtimes, but Codex registers
-    // gsd-check-update.js in config.toml — the file must physically exist.
-    const codexHooksSrc = path.join(src, 'hooks', 'dist');
-    if (fs.existsSync(codexHooksSrc)) {
-      const codexHooksDest = path.join(targetDir, 'hooks');
-      fs.mkdirSync(codexHooksDest, { recursive: true });
-      const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
-      for (const entry of fs.readdirSync(codexHooksSrc)) {
-        const srcFile = path.join(codexHooksSrc, entry);
-        if (!fs.statSync(srcFile).isFile()) continue;
-        const destFile = path.join(codexHooksDest, entry);
-        if (entry.endsWith('.js')) {
-          let content = fs.readFileSync(srcFile, 'utf8');
-          content = content.replace(/'\.claude'/g, configDirReplacement);
-          content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
-          content = content.replace(/\.claude\//g, `${getDirName(runtime)}/`);
-          content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-          fs.writeFileSync(destFile, content);
-          try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
-        } else {
-          if (entry.endsWith('.sh')) {
-            let content = fs.readFileSync(srcFile, 'utf8');
-            content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-            fs.writeFileSync(destFile, content);
-            try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
-          } else {
-            fs.copyFileSync(srcFile, destFile);
-          }
-        }
-      }
-      console.log(`  ${green}✓${reset} Installed hooks`);
-    }
+    // Copy hook files that are referenced in config.toml (#2153).
+    runtimeInstallExecutor.copyBundledHooksArtifact(installPlan, {
+      packageSrc: src,
+      targetDir,
+      version: pkg.version,
+      allowTomlHooks: true,
+      writeCommonJsPackageJson: false,
+      bundledLabel: false,
+      log: console.log,
+      warn: console.warn,
+      colors: { green, yellow, reset },
+    });
 
     // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
     const configPath = path.join(targetDir, 'config.toml');
@@ -8612,10 +8302,10 @@ function install(isGlobal, runtime = 'claude') {
       throw wrapped;
     }
 
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
 
-  if (isCopilot) {
+  if (hasConfigMutation(installPlan, 'copilot-instructions', 'ensure-managed-instructions')) {
     // Generate copilot-instructions.md
     const templatePath = path.join(targetDir, 'get-shit-done', 'templates', 'copilot-instructions.md');
     const instructionsPath = path.join(targetDir, 'copilot-instructions.md');
@@ -8625,25 +8315,25 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Generated copilot-instructions.md`);
     }
     // Copilot: no settings.json, no hooks, no statusline (like Codex)
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
 
   if (isCursor) {
     // Cursor uses skills — no config.toml, no settings.json hooks needed
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
 
   if (isWindsurf) {
     // Windsurf uses skills — no config.toml, no settings.json hooks needed
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
 
   if (isTrae) {
     // Trae uses skills — no settings.json hooks needed
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
 
-  if (isCline) {
+  if (hasConfigMutation(installPlan, 'cline-rules', 'ensure-runtime-rules')) {
     // Cline uses .clinerules — generate a rules file with GSD system instructions
     const clinerulesDest = path.join(targetDir, '.clinerules');
     const clinerules = [
@@ -8660,7 +8350,11 @@ function install(isGlobal, runtime = 'claude') {
     ].join('\n') + '\n';
     fs.writeFileSync(clinerulesDest, clinerules);
     console.log(`  ${green}✓${reset} Wrote .clinerules`);
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
+  }
+
+  if (!installPlan.capabilities.settingsJson) {
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
 
   // Configure statusline and hooks in settings.json
@@ -8670,7 +8364,7 @@ function install(isGlobal, runtime = 'claude') {
   const rawSettings = readSettings(settingsPath);
   if (rawSettings === null) {
     console.log('  ' + yellow + 'i' + reset + '  Skipping settings.json configuration — file could not be parsed (comments or malformed JSON). Your existing settings are preserved.');
-    return;
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir, installPlan };
   }
   const settings = validateHookFields(cleanupOrphanedHooks(rawSettings));
   // #3002 CR: rewrite legacy `node .../gsd-*.js` command strings carried over
@@ -8746,7 +8440,7 @@ function install(isGlobal, runtime = 'claude') {
   }
 
   // Configure SessionStart hook for update checking (skip for opencode)
-  if (!isOpencode && !isKilo) {
+  if (hasConfigMutation(installPlan, 'settings-json', 'ensure-managed-hooks')) {
     if (!settings.hooks) {
       settings.hooks = {};
     }
@@ -9009,7 +8703,7 @@ function install(isGlobal, runtime = 'claude') {
   // installAllRuntimes can register it at finalize time when the user opts
   // in (#2795). Computed here (not in finishInstall) so the same buildHookCommand
   // / localCmd resolution logic is shared with the other JS hooks.
-  const updateBannerCommand = isOpencode || isKilo
+  const updateBannerCommand = !installPlan.capabilities.updateBanner
     ? null
     : (isGlobal
       ? buildHookCommand(targetDir, 'gsd-update-banner.js', hookOpts)
@@ -9022,6 +8716,7 @@ function install(isGlobal, runtime = 'claude') {
     updateBannerCommand,
     runtime,
     configDir: targetDir,
+    installPlan,
   };
 }
 
@@ -9029,16 +8724,9 @@ function install(isGlobal, runtime = 'claude') {
  * Apply statusline config, then print completion message
  */
 function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallStatusline, runtime = 'claude', isGlobal = true, configDir = null, bannerOpts = {}) {
-  const isOpencode = runtime === 'opencode';
-  const isKilo = runtime === 'kilo';
-  const isCodex = runtime === 'codex';
-  const isCopilot = runtime === 'copilot';
-  const isCursor = runtime === 'cursor';
-  const isWindsurf = runtime === 'windsurf';
-  const isTrae = runtime === 'trae';
-  const isCline = runtime === 'cline';
+  const installPlan = bannerOpts.installPlan || createRuntimeInstallPlanForExecution(runtime, isGlobal);
 
-  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae) {
+  if (shouldInstallStatusline && installPlan.capabilities.statusline) {
     if (!isGlobal && !forceStatusline) {
       // Local installs skip statusLine by default: repo settings.json takes precedence over
       // profile-level settings.json in Claude Code, so writing here would silently clobber
@@ -9064,7 +8752,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   // settings.json hooks block — opencode/kilo/codex/cursor/windsurf/trae/
   // cline either lack the surface or use a different config schema.
   const { shouldInstallBanner, bannerCommand } = bannerOpts;
-  if (shouldInstallBanner && settings && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isCline) {
+  if (shouldInstallBanner && settings && installPlan.capabilities.updateBanner) {
     if (!bannerCommand) {
       console.warn(`  ${yellow}⚠${reset}  Skipped update banner registration — Node executable path unavailable. See #2979 / #3002.`);
     } else {
@@ -9096,19 +8784,12 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   // {type: 'command', command: null} items that the runtime hook schema
   // rejects at parse time. validateHookFields filters those out so the file
   // we write is always schema-valid.
-  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline) {
-    writeSettings(settingsPath, validateHookFields(settings));
-  }
-
-  // Configure OpenCode permissions
-  if (isOpencode) {
-    configureOpencodePermissions(isGlobal, configDir);
-  }
-
-  // Configure Kilo permissions
-  if (isKilo) {
-    configureKiloPermissions(isGlobal, configDir);
-  }
+  applyConfigMutations(installPlan, {
+    isGlobal,
+    configDir,
+    settingsPath,
+    settings,
+  });
 
   // For non-Claude runtimes, set resolve_model_ids: "omit" in ~/.gsd/defaults.json
   // so resolveModelInternal() returns '' instead of Claude aliases (opus/sonnet/haiku)
@@ -9131,35 +8812,8 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
     }
   }
 
-  let program = 'Claude Code';
-  if (runtime === 'opencode') program = 'OpenCode';
-  if (runtime === 'gemini') program = 'Gemini';
-  if (runtime === 'kilo') program = 'Kilo';
-  if (runtime === 'codex') program = 'Codex';
-  if (runtime === 'copilot') program = 'Copilot';
-  if (runtime === 'antigravity') program = 'Antigravity';
-  if (runtime === 'cursor') program = 'Cursor';
-  if (runtime === 'windsurf') program = 'Windsurf';
-  if (runtime === 'augment') program = 'Augment';
-  if (runtime === 'trae') program = 'Trae';
-  if (runtime === 'cline') program = 'Cline';
-  if (runtime === 'qwen') program = 'Qwen Code';
-  if (runtime === 'hermes') program = 'Hermes Agent';
-
-  let command = '/gsd-new-project';
-  if (runtime === 'opencode') command = '/gsd-new-project';
-  if (runtime === 'kilo') command = '/gsd-new-project';
-  if (runtime === 'gemini') command = '/gsd:new-project';
-  if (runtime === 'codex') command = '$gsd-new-project';
-  if (runtime === 'copilot') command = '/gsd-new-project';
-  if (runtime === 'antigravity') command = '/gsd-new-project';
-  if (runtime === 'cursor') command = 'gsd-new-project (mention the skill name)';
-  if (runtime === 'windsurf') command = '/gsd-new-project';
-  if (runtime === 'augment') command = '/gsd-new-project';
-  if (runtime === 'trae') command = '/gsd-new-project';
-  if (runtime === 'cline') command = '/gsd-new-project';
-  if (runtime === 'qwen') command = '/gsd-new-project';
-  if (runtime === 'hermes') command = '/gsd-new-project';
+  const program = installPlan.label;
+  const command = installPlan.firstRunCommand;
 
   // Claude Code global installs use the skills/ format (CC 2.1.88+).
   // Restart is required for CC to pick up newly-installed skills, and the
@@ -9236,54 +8890,12 @@ function handleStatusline(settings, isInteractive, callback) {
  * Prompt for runtime selection
  */
 /**
- * Runtime selection options for the interactive installer prompt.
- * Module-level so tests can import and assert structurally without grepping source.
- */
-const runtimeMap = {
-  '1': 'claude',
-  '2': 'antigravity',
-  '3': 'augment',
-  '4': 'cline',
-  '5': 'codebuddy',
-  '6': 'codex',
-  '7': 'copilot',
-  '8': 'cursor',
-  '9': 'gemini',
-  '10': 'hermes',
-  '11': 'kilo',
-  '12': 'opencode',
-  '13': 'qwen',
-  '14': 'trae',
-  '15': 'windsurf'
-};
-const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'hermes', 'kilo', 'opencode', 'qwen', 'trae', 'windsurf'];
-const ALL_RUNTIMES_OPTION = '16';
-
-/**
  * Build the runtime-selection prompt text shown by the interactive installer.
  * Pure function — no I/O. Exported for tests so they can assert against the
  * rendered prompt instead of grepping bin/install.js source text.
  */
 function buildRuntimePromptText() {
-  return `  ${yellow}Which runtime(s) would you like to install for?${reset}\n\n  ${cyan}1${reset}) Claude Code  ${dim}(~/.claude)${reset}
-  ${cyan}2${reset}) Antigravity  ${dim}(~/.gemini/antigravity)${reset}
-  ${cyan}3${reset}) Augment      ${dim}(~/.augment)${reset}
-  ${cyan}4${reset}) Cline        ${dim}(.clinerules)${reset}
-  ${cyan}5${reset}) CodeBuddy    ${dim}(~/.codebuddy)${reset}
-  ${cyan}6${reset}) Codex        ${dim}(~/.codex)${reset}
-  ${cyan}7${reset}) Copilot      ${dim}(~/.copilot)${reset}
-  ${cyan}8${reset}) Cursor       ${dim}(~/.cursor)${reset}
-  ${cyan}9${reset}) Gemini       ${dim}(~/.gemini)${reset}
-  ${cyan}10${reset}) Hermes Agent ${dim}(~/.hermes)${reset}
-  ${cyan}11${reset}) Kilo         ${dim}(~/.config/kilo)${reset}
-  ${cyan}12${reset}) OpenCode     ${dim}(~/.config/opencode)${reset}
-  ${cyan}13${reset}) Qwen Code    ${dim}(~/.qwen)${reset}
-  ${cyan}14${reset}) Trae         ${dim}(~/.trae)${reset}
-  ${cyan}15${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
-  ${cyan}16${reset}) All
-
-  ${dim}Select multiple: 1,2,6 or 1 2 6${reset}
-`;
+  return runtimeInstallPolicy.buildRuntimePromptText();
 }
 
 /**
@@ -9295,24 +8907,7 @@ function buildRuntimePromptText() {
  *  - Falls back to ['claude'] when nothing valid is selected
  */
 function parseRuntimeInput(answer) {
-  const input = (answer == null ? '' : String(answer)).trim() || '1';
-
-  // Tokenize first so the all-runtimes shortcut also fires for inputs the
-  // prompt encourages — "16,", "16 1", etc. — not just the bare "16".
-  const choices = input.split(/[\s,]+/).filter(Boolean);
-  if (choices.includes(ALL_RUNTIMES_OPTION)) {
-    return allRuntimes.slice();
-  }
-
-  const selected = [];
-  for (const c of choices) {
-    const runtime = runtimeMap[c];
-    if (runtime && !selected.includes(runtime)) {
-      selected.push(runtime);
-    }
-  }
-
-  return selected.length > 0 ? selected : ['claude'];
+  return runtimeInstallPolicy.parseRuntimeInput(answer);
 }
 
 function promptRuntime(callback) {
@@ -10448,7 +10043,7 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
           result.runtime,
           isGlobal,
           result.configDir,
-          { shouldInstallBanner: !!shouldInstallBanner, bannerCommand: result.updateBannerCommand }
+          { shouldInstallBanner: !!shouldInstallBanner, bannerCommand: result.updateBannerCommand, installPlan: result.installPlan }
         );
       }
     };
@@ -10604,6 +10199,11 @@ if (process.env.GSD_TEST_MODE) {
     allRuntimes,
     parseRuntimeInput,
     buildRuntimePromptText,
+    createRuntimeInstallPlan: runtimeInstallPolicy.createRuntimeInstallPlan,
+    createRuntimeInstallPlanForExecution,
+    hasConfigMutation,
+    applyConfigMutations,
+    RUNTIME_REGISTRY: runtimeInstallPolicy.RUNTIME_REGISTRY,
     buildUpdateBannerPromptText,
     parseUpdateBannerInput,
     buildUpdateBannerHookEntry,

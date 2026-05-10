@@ -38,6 +38,8 @@ const {
   stripGsdFromCopilotInstructions,
   writeManifest,
   reportLocalPatches,
+  runtimeMap,
+  allRuntimes,
 } = require('../bin/install.js');
 
 // ─── getDirName ─────────────────────────────────────────────────────────────────
@@ -147,18 +149,15 @@ describe('Source code integration (Copilot)', () => {
   });
 
   test('CLI-02: promptRuntime runtimeMap has Copilot as option 7', () => {
-    assert.ok(src.includes("'7': 'copilot'"), 'runtimeMap has 7 -> copilot');
+    assert.strictEqual(runtimeMap['7'], 'copilot', 'runtimeMap has 7 -> copilot');
   });
 
   test('CLI-02: promptRuntime allRuntimes array includes copilot', () => {
-    const allMatch = src.match(/const allRuntimes = \[([^\]]+)\]/);
-    assert.ok(allMatch && allMatch[1].includes('copilot'), 'allRuntimes includes copilot');
+    assert.ok(allRuntimes.includes('copilot'), 'allRuntimes includes copilot');
   });
 
   test('CLI-02: promptRuntime keeps Kilo above OpenCode in allRuntimes', () => {
-    const allMatch = src.match(/const allRuntimes = \[([^\]]+)\]/);
-    assert.ok(allMatch, 'allRuntimes array found');
-    assert.ok(allMatch[1].indexOf("'kilo'") < allMatch[1].indexOf("'opencode'"), 'kilo appears before opencode');
+    assert.ok(allRuntimes.indexOf('kilo') < allRuntimes.indexOf('opencode'), 'kilo appears before opencode');
   });
 
   test('isCopilot variable exists in install function', () => {

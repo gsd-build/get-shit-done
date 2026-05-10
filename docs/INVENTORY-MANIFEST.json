@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-09",
+  "generated": "2026-05-10",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -292,6 +292,8 @@
       "roadmap-command-router.cjs",
       "roadmap.cjs",
       "runtime-homes.cjs",
+      "runtime-install-executor.cjs",
+      "runtime-install-policy.cjs",
       "schema-detect.cjs",
       "secrets.cjs",
       "security.cjs",

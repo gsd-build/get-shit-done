@@ -359,7 +359,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (50 shipped)
+## CLI Modules (52 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -400,6 +400,8 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `roadmap-command-router.cjs` | Thin CJS subcommand router adapter for `gsd-tools roadmap` |
 | `roadmap.cjs` | ROADMAP.md parsing, phase extraction, plan progress |
 | `runtime-homes.cjs` | Canonical runtime → global config/skills directory mapping; first-class support for all 15 runtimes including Hermes nested layout and Cline rules-based exclusion (#3126) |
+| `runtime-install-executor.cjs` | Runtime Install Executor Module; executes selected runtime install plan intents, including bundled hook artifact copying and config mutation dispatch |
+| `runtime-install-policy.cjs` | Runtime Install Policy Module; owns runtime registry facts and pure install plan projection for supported runtimes |
 | `schema-detect.cjs` | Schema-drift detection for ORM patterns (Prisma, Drizzle, etc.) |
 | `secrets.cjs` | Secret-config masking convention (`****<last-4>`) for integration keys managed by `/gsd-config --integrations` — keeps plaintext out of `config-set` output |
 | `security.cjs` | Path traversal prevention, prompt injection detection, safe JSON/shell helpers |

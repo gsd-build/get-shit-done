@@ -73,6 +73,7 @@ Currently accepted ADRs:
 | `0005-sdk-architecture-seam-map.md` | SDK Architecture seam map for query/runtime surfaces |
 | `0006-planning-path-projection-module.md` | Planning Path Projection Module for SDK query handlers |
 | `0007-sdk-package-seam-module.md` | SDK Package Seam Module owns SDK-to-get-shit-done-cc compatibility |
+| `0008-runtime-install-policy-module.md` | Runtime Install Policy Module as shared runtime data |
 
 ### When an ADR is required
 
@@ -121,7 +122,7 @@ Reference sibling ADRs by filename, not by title prose: `see \`0001-dispatch-pol
 
 ### ADR README index
 
-`docs/adr/` does not currently maintain a separate `README.md` index. The canonical index is the table in this document (above). If an ADR is added, update this table in the same PR.
+`docs/adr/README.md` maintains the browsable ADR index. The contributor-facing index is the table in this document (above). If an ADR is added, update both tables in the same PR.
 
 ### Governance
 

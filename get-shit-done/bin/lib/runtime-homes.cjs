@@ -6,9 +6,8 @@
  * Single source of truth for resolving the global config base directory and
  * the correct global skills directory for every GSD-supported runtime.
  *
- * Mirrors the logic in bin/install.js getGlobalDir() but as a pure,
- * side-effect-free module safe to require() at any point without triggering
- * the installer. bin/install.js is the authoritative source — keep in sync.
+ * Thin query adapter over the Runtime Install Policy Module. Safe to require()
+ * without triggering the installer.
  *
  * Runtime-specific notes:
  *   hermes  — GSD skills nest under skills/gsd/<skillName>/ (not the flat
@@ -22,6 +21,7 @@
 
 const os = require('os');
 const path = require('path');
+const { getGlobalDir, getRuntimePolicy } = require('./runtime-install-policy.cjs');
 
 /**
  * Expand a leading ~ to os.homedir().
@@ -36,93 +36,13 @@ function expandTilde(p) {
 
 /**
  * Return the global config base directory for the given runtime.
- * Respects the same env-var overrides as bin/install.js getGlobalDir().
+ * Respects the env-var overrides owned by Runtime Install Policy.
  *
  * @param {string} runtime
  * @returns {string} Absolute path to the runtime's global config directory
  */
 function getGlobalConfigDir(runtime) {
-  const home = os.homedir();
-  const env = process.env;
-
-  switch (runtime) {
-    // ── Claude Code ──────────────────────────────────────────────────────────
-    case 'claude':
-      return env.CLAUDE_CONFIG_DIR ? expandTilde(env.CLAUDE_CONFIG_DIR) : path.join(home, '.claude');
-
-    // ── Cursor ───────────────────────────────────────────────────────────────
-    case 'cursor':
-      return env.CURSOR_CONFIG_DIR ? expandTilde(env.CURSOR_CONFIG_DIR) : path.join(home, '.cursor');
-
-    // ── Gemini CLI ───────────────────────────────────────────────────────────
-    case 'gemini':
-      return env.GEMINI_CONFIG_DIR ? expandTilde(env.GEMINI_CONFIG_DIR) : path.join(home, '.gemini');
-
-    // ── Codex ────────────────────────────────────────────────────────────────
-    case 'codex':
-      return env.CODEX_HOME ? expandTilde(env.CODEX_HOME) : path.join(home, '.codex');
-
-    // ── Copilot (VS Code) ────────────────────────────────────────────────────
-    case 'copilot':
-      return env.COPILOT_CONFIG_DIR ? expandTilde(env.COPILOT_CONFIG_DIR) : path.join(home, '.copilot');
-
-    // ── Antigravity ──────────────────────────────────────────────────────────
-    case 'antigravity':
-      return env.ANTIGRAVITY_CONFIG_DIR
-        ? expandTilde(env.ANTIGRAVITY_CONFIG_DIR)
-        : path.join(home, '.gemini', 'antigravity');
-
-    // ── Windsurf ─────────────────────────────────────────────────────────────
-    case 'windsurf':
-      return env.WINDSURF_CONFIG_DIR
-        ? expandTilde(env.WINDSURF_CONFIG_DIR)
-        : path.join(home, '.codeium', 'windsurf');
-
-    // ── Augment ──────────────────────────────────────────────────────────────
-    case 'augment':
-      return env.AUGMENT_CONFIG_DIR ? expandTilde(env.AUGMENT_CONFIG_DIR) : path.join(home, '.augment');
-
-    // ── Trae ─────────────────────────────────────────────────────────────────
-    case 'trae':
-      return env.TRAE_CONFIG_DIR ? expandTilde(env.TRAE_CONFIG_DIR) : path.join(home, '.trae');
-
-    // ── Qwen Code ────────────────────────────────────────────────────────────
-    case 'qwen':
-      return env.QWEN_CONFIG_DIR ? expandTilde(env.QWEN_CONFIG_DIR) : path.join(home, '.qwen');
-
-    // ── Hermes Agent ─────────────────────────────────────────────────────────
-    // Note: skills use a nested layout (skills/gsd/<skill>/) — see getGlobalSkillDir().
-    case 'hermes':
-      return env.HERMES_HOME ? expandTilde(env.HERMES_HOME) : path.join(home, '.hermes');
-
-    // ── CodeBuddy ────────────────────────────────────────────────────────────
-    case 'codebuddy':
-      return env.CODEBUDDY_CONFIG_DIR ? expandTilde(env.CODEBUDDY_CONFIG_DIR) : path.join(home, '.codebuddy');
-
-    // ── Cline ────────────────────────────────────────────────────────────────
-    // Note: Cline is rules-based (.clinerules) — no skills/ directory.
-    // getGlobalSkillDir() returns null for cline.
-    case 'cline':
-      return env.CLINE_CONFIG_DIR ? expandTilde(env.CLINE_CONFIG_DIR) : path.join(home, '.cline');
-
-    // ── OpenCode (XDG) ───────────────────────────────────────────────────────
-    case 'opencode': {
-      if (env.OPENCODE_CONFIG_DIR) return expandTilde(env.OPENCODE_CONFIG_DIR);
-      if (env.XDG_CONFIG_HOME) return path.join(expandTilde(env.XDG_CONFIG_HOME), 'opencode');
-      return path.join(home, '.config', 'opencode');
-    }
-
-    // ── Kilo (XDG) ───────────────────────────────────────────────────────────
-    case 'kilo': {
-      if (env.KILO_CONFIG_DIR) return expandTilde(env.KILO_CONFIG_DIR);
-      if (env.XDG_CONFIG_HOME) return path.join(expandTilde(env.XDG_CONFIG_HOME), 'kilo');
-      return path.join(home, '.config', 'kilo');
-    }
-
-    // ── Default (Claude fallback) ─────────────────────────────────────────────
-    default:
-      return env.CLAUDE_CONFIG_DIR ? expandTilde(env.CLAUDE_CONFIG_DIR) : path.join(home, '.claude');
-  }
+  return getGlobalDir(runtime);
 }
 
 /**
@@ -135,9 +55,10 @@ function getGlobalConfigDir(runtime) {
  * @returns {string|null}
  */
 function getGlobalSkillsBase(runtime) {
-  if (runtime === 'cline') return null;
+  const policy = getRuntimePolicy(runtime);
+  if (policy.skillsLayout === 'none') return null;
   const configDir = getGlobalConfigDir(runtime);
-  if (runtime === 'hermes') return path.join(configDir, 'skills', 'gsd');
+  if (policy.skillsLayout === 'hermes-nested') return path.join(configDir, 'skills', 'gsd');
   return path.join(configDir, 'skills');
 }
 

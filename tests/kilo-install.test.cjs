@@ -25,6 +25,8 @@ const {
   getConfigDirFromHome,
   resolveKiloConfigPath,
   configureKiloPermissions,
+  createRuntimeInstallPlan,
+  hasConfigMutation,
 } = require('../bin/install.js');
 
 describe('getDirName (Kilo)', () => {
@@ -256,11 +258,15 @@ describe('Source code integration (Kilo)', () => {
   });
 
   test('hooks are skipped for Kilo', () => {
-    assert.ok(src.includes('!isOpencode && !isKilo'), 'hooks skip check includes kilo');
+    const plan = createRuntimeInstallPlan({ runtime: 'kilo', scope: 'global', explicitConfigDir: '/tmp/kilo' });
+    assert.strictEqual(plan.capabilities.settingsJson, false, 'Kilo does not use settings.json hooks');
+    assert.strictEqual(hasConfigMutation(plan, 'settings-json', 'ensure-managed-hooks'), false);
   });
 
   test('settings.json write excludes Kilo', () => {
-    assert.ok(src.includes('!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf'), 'settings write excludes kilo');
+    const plan = createRuntimeInstallPlan({ runtime: 'kilo', scope: 'global', explicitConfigDir: '/tmp/kilo' });
+    assert.strictEqual(plan.capabilities.settingsJson, false, 'Kilo does not write settings.json');
+    assert.strictEqual(hasConfigMutation(plan, 'kilo-json', 'ensure-permissions'), true);
   });
 
   test('agent path replacement does not exclude Kilo', () => {
@@ -268,7 +274,8 @@ describe('Source code integration (Kilo)', () => {
   });
 
   test('finishInstall passes the actual config dir to Kilo permissions', () => {
-    assert.ok(src.includes('configureKiloPermissions(isGlobal, configDir);'), 'Kilo permission config uses actual install dir');
+    assert.ok(src.includes('applyConfigMutations(installPlan'), 'finishInstall dispatches policy config mutations');
+    assert.ok(src.includes('configureKiloPermissions,'), 'Kilo mutation adapter is wired into executor');
   });
 
   test('uninstall cleans Kilo permissions from the resolved target dir', () => {

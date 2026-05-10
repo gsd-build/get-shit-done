@@ -18,9 +18,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { createTempDir, cleanup } = require('./helpers.cjs');
-const { configureOpencodePermissions } = require('../bin/install.js');
-
-const installSrc = fs.readFileSync(path.join(__dirname, '..', 'bin', 'install.js'), 'utf8');
+const {
+  configureOpencodePermissions,
+  createRuntimeInstallPlan,
+  hasConfigMutation,
+} = require('../bin/install.js');
 
 const envKeys = ['OPENCODE_CONFIG_DIR', 'OPENCODE_CONFIG', 'XDG_CONFIG_HOME'];
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -77,9 +79,14 @@ describe('configureOpencodePermissions', () => {
   });
 
   test('finishInstall passes the actual config dir to OpenCode permissions', () => {
-    assert.ok(
-      installSrc.includes('configureOpencodePermissions(isGlobal, configDir);'),
-      'OpenCode permission config uses actual install dir'
-    );
+    const plan = createRuntimeInstallPlan({ runtime: 'opencode', scope: 'global', explicitConfigDir: configDir });
+    assert.strictEqual(hasConfigMutation(plan, 'opencode-json', 'ensure-permissions'), true);
+
+    configureOpencodePermissions(true, configDir);
+
+    const config = JSON.parse(fs.readFileSync(path.join(configDir, 'opencode.json'), 'utf8'));
+    const gsdPath = `${configDir.replace(/\\/g, '/')}/get-shit-done/*`;
+    assert.strictEqual(config.permission.read[gsdPath], 'allow');
+    assert.strictEqual(config.permission.external_directory[gsdPath], 'allow');
   });
 });
