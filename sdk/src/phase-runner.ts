@@ -1282,21 +1282,20 @@ export class PhaseRunner {
 
   private findUnresolvedDebtMarkers(file: string, content: string): ArchitecturalDebtFinding[] {
     const findings: ArchitecturalDebtFinding[] = [];
-    const markerPattern = /\b(TBD|FIXME|XXX)\b/gi;
+    const markerPattern = /\b(TBD|FIXME|XXX)\b/;
     const lines = content.split(/\r?\n/);
 
     lines.forEach((line, index) => {
-      markerPattern.lastIndex = 0;
-      let match: RegExpExecArray | null;
-      while ((match = markerPattern.exec(line)) !== null) {
-        if (!this.hasFormalDebtReference(line)) {
-          findings.push({
-            file,
-            line: index + 1,
-            marker: match[1].toUpperCase(),
-            text: line.trim(),
-          });
-        }
+      if (this.hasFormalDebtReference(line)) return;
+
+      const match = markerPattern.exec(line);
+      if (match) {
+        findings.push({
+          file,
+          line: index + 1,
+          marker: match[1],
+          text: line.trim(),
+        });
       }
     });
 
