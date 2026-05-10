@@ -1232,6 +1232,11 @@ export class PhaseRunner {
         const content = await readFile(absolutePath, 'utf-8');
         findings.push(...this.findUnresolvedDebtMarkers(file, content));
       } catch (err) {
+        const code = typeof err === 'object' && err !== null && 'code' in err ? (err as { code?: unknown }).code : undefined;
+        if (code === 'ENOENT') {
+          continue;
+        }
+
         findings.push({
           file,
           line: 0,

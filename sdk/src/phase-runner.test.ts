@@ -818,6 +818,27 @@ Use TypeScript.`, 'utf-8');
       expect(result.steps.map(s => s.step)).toContain(PhaseStepType.Advance);
     });
 
+    it('allows changed-file entries for files deleted by the phase', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'gsd-deleted-file-debt-scan-'));
+      tempProjectDirs.push(projectDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      await mkdir(phaseDir, { recursive: true });
+      await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/deleted.sh"]\n---\n', 'utf-8');
+
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/deleted.sh']));
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
+
+      expect(result.success).toBe(true);
+      expect(deps.tools.phaseComplete).toHaveBeenCalledWith('1');
+      expect(result.steps.map(s => s.step)).toContain(PhaseStepType.Advance);
+    });
+
     it('allows lowercase placeholder text when scanning debt markers', async () => {
       const projectDir = await mkdtemp(join(tmpdir(), 'gsd-lowercase-placeholder-'));
       tempProjectDirs.push(projectDir);
