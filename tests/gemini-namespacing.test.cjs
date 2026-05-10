@@ -18,6 +18,7 @@ const { createTempDir, cleanup } = require('./helpers.cjs');
 const {
   convertSlashCommandsToGeminiMentions,
   convertClaudeToGeminiMarkdown,
+  convertClaudeToGeminiAgent,
   _resetGsdCommandRoster,
   install
 } = require('../bin/install.js');
@@ -131,6 +132,24 @@ describe('Gemini Markdown Processor', () => {
     const result = convertClaudeToGeminiMarkdown(input, { isCommand: false });
     assert.doesNotMatch(result, /<sub>|<\/sub>/, '<sub> tags must be stripped');
     assert.match(result, /\/gsd:help/, 'slash command must still be converted');
+  });
+
+  test('removes AskUserQuestion and ask_user from Gemini agent tools and body (#3362)', () => {
+    const input = [
+      '---',
+      'name: tester',
+      'tools: Read, AskUserQuestion, ask_user',
+      '---',
+      'Use AskUserQuestion or ask_user to ask the user.'
+    ].join('\n');
+
+    const result = convertClaudeToGeminiAgent(input);
+
+    assert.match(result, /^  - read_file$/m, 'Read should still map to Gemini read_file');
+    assert.doesNotMatch(result, /^  - ask_user$/m, 'ask_user must not be emitted as a Gemini tool');
+    assert.doesNotMatch(result, /\bAskUserQuestion\b/, 'Claude tool references must be neutralized');
+    assert.doesNotMatch(result, /\bask_user\b/, 'lowercase ask_user references must be neutralized');
+    assert.match(result, /conversational prompting/, 'body should use runtime-neutral wording');
   });
 });
 

@@ -1266,7 +1266,12 @@ function convertGeminiToolName(claudeTool) {
   // Task/Agent: exclude — agents are auto-registered as callable tools.
   // AskUserQuestion: exclude — Gemini CLI does not expose an ask_user tool;
   // emitting it causes frontmatter validation errors (#3362).
-  if (claudeTool === 'Task' || claudeTool === 'Agent' || claudeTool === 'AskUserQuestion') {
+  if (
+    claudeTool === 'Task' ||
+    claudeTool === 'Agent' ||
+    claudeTool === 'AskUserQuestion' ||
+    claudeTool === 'ask_user'
+  ) {
     return null;
   }
   // Check for explicit mapping
@@ -4756,7 +4761,7 @@ function convertClaudeToGeminiMarkdown(content, { isCommand = false } = {}) {
   // Gemini CLI does not expose Claude's AskUserQuestion tool. Convert body
   // references to runtime-neutral wording so converted agents do not instruct
   // Gemini to call a nonexistent tool (#3362).
-  converted = converted.replace(/\bAskUserQuestion\b/g, 'conversational prompting');
+  converted = converted.replace(/\b(?:AskUserQuestion|ask_user)\b/g, 'conversational prompting');
   // Strip HTML subscript tags — terminals can't render them. Done before
   // TOML conversion so the prompt body of a command file is also clean.
   converted = stripSubTags(converted);
