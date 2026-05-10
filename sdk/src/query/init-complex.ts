@@ -43,7 +43,7 @@ import type { QueryHandler } from './utils.js';
 async function getModelAlias(agentType: string, projectDir: string): Promise<string> {
   const result = await resolveModel([agentType], projectDir);
   const data = result.data as Record<string, unknown>;
-  return (data.model as string) || 'sonnet';
+  return typeof data.model === 'string' ? data.model : 'sonnet';
 }
 
 /**

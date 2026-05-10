@@ -173,6 +173,34 @@ describe('initProgress', () => {
     expect(typeof data.config_path).toBe('string');
   });
 
+  it('reports Codex runtime override models when resolve_model_ids is omit (#3358)', async () => {
+    await writeFile(join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      model_profile: 'balanced',
+      runtime: 'codex',
+      resolve_model_ids: 'omit',
+      model_profile_overrides: {
+        codex: {
+          opus: { model: 'gpt-5.5', reasoning_effort: 'high' },
+          sonnet: 'gpt-5.3-codex',
+          haiku: 'gpt-5.4-mini',
+        },
+      },
+      commit_docs: false,
+      git: {
+        branching_strategy: 'none',
+        phase_branch_template: 'gsd/phase-{phase}-{slug}',
+        milestone_branch_template: 'gsd/{milestone}-{slug}',
+        quick_branch_template: null,
+      },
+      workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: true },
+    }));
+
+    const result = await initProgress([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.planner_model).toBe('gpt-5.5');
+    expect(data.executor_model).toBe('gpt-5.3-codex');
+  });
+
   // ── #2646: ROADMAP checkbox fallback when no phases/ directory ─────────
   it('derives completed_count from ROADMAP [x] checkboxes when phases/ is absent', async () => {
     // Fresh fixture: NO phases/ directory at all, checkbox-driven ROADMAP.
