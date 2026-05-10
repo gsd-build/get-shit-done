@@ -1294,7 +1294,7 @@ export class PhaseRunner {
 
   private findUnresolvedDebtMarkers(file: string, content: string): ArchitecturalDebtFinding[] {
     const findings: ArchitecturalDebtFinding[] = [];
-    const markerPattern = /\b(TBD|FIXME|XXX)\b(?!\.)/i;
+    const markerPattern = /(?:^|[^\w.])(TBD|FIXME|XXX)(?=\b(?:\.(?:\s|$)|[^\w.]|$))/i;
     const lines = content.split(/\r?\n/);
 
     lines.forEach((line, index) => {
@@ -1315,7 +1315,7 @@ export class PhaseRunner {
   }
 
   private hasFormalDebtReference(line: string): boolean {
-    return /\bDEF-[A-Z0-9-]+\b/i.test(line) || /\b(?:issue|issues|pr|pull request)\s+#?\d+\b/i.test(line) || /#\d+\b/.test(line);
+    return /\bDEF-[A-Z0-9-]+\b/i.test(line) || /\b(?:issue|issues|pr|pull request)\s+#?\d+\b/i.test(line) || /(?:^|\s)#\d+\b/.test(line);
   }
 
   private resolveProjectPath(pathValue: string): string | undefined {
