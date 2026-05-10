@@ -20,20 +20,44 @@ const ROOT = path.join(__dirname, '..');
 const EXECUTE_PHASE = path.join(ROOT, 'get-shit-done', 'workflows', 'execute-phase.md');
 const { getCodexSkillAdapterHeader } = require('../bin/install.js');
 
+function parseWorkflowSteps(content) {
+  return [...content.matchAll(/<step name="([^"]+)"[^>]*>([\s\S]*?)<\/step>/g)]
+    .map((match) => {
+      const body = match[2];
+      return {
+        name: match[1],
+        readsRuntimeConfig: body.includes('RUNTIME=$(gsd-sdk query config-get runtime --default claude'),
+        codexWorktreeGuard: body.includes('Codex execute-phase worktree isolation is unsupported'),
+        worktreeDispatchGuidance: body.includes('isolation="worktree"'),
+      };
+    });
+}
+
+function executePhaseWorktreeContract(content) {
+  const steps = parseWorkflowSteps(content);
+  const initializeIndex = steps.findIndex((step) => step.name === 'initialize');
+  const firstWorktreeDispatchIndex = steps.findIndex((step) => step.worktreeDispatchGuidance);
+  assert.notEqual(initializeIndex, -1, 'workflow must have an initialize step');
+  assert.notEqual(firstWorktreeDispatchIndex, -1, 'workflow must still document worktree dispatch guidance');
+
+  const initialize = steps[initializeIndex];
+  return {
+    initializeReadsRuntimeConfig: initialize.readsRuntimeConfig,
+    initializeHasCodexWorktreeGuard: initialize.codexWorktreeGuard,
+    guardStepPrecedesWorktreeDispatch: initializeIndex <= firstWorktreeDispatchIndex,
+  };
+}
+
 describe('#3360 — Codex execute-phase fails closed for unsupported worktree isolation', () => {
   test('execute-phase reads runtime before worktree dispatch and blocks Codex worktree mode', () => {
     const workflow = fs.readFileSync(EXECUTE_PHASE, 'utf8');
-    const runtimeIdx = workflow.indexOf('RUNTIME=$(gsd-sdk query config-get runtime --default claude');
-    const guardIdx = workflow.indexOf('Codex execute-phase worktree isolation is unsupported');
-    const worktreeDispatchIdx = workflow.indexOf('isolation="worktree"');
+    const contract = executePhaseWorktreeContract(workflow);
 
-    assert.notEqual(runtimeIdx, -1, 'workflow must read runtime before dispatch');
-    assert.notEqual(guardIdx, -1, 'workflow must fail closed for Codex + worktrees');
-    assert.notEqual(worktreeDispatchIdx, -1, 'test expects the Claude worktree dispatch path to exist');
-    assert.ok(
-      runtimeIdx < guardIdx && guardIdx < worktreeDispatchIdx,
-      'Codex worktree guard must run before any isolation="worktree" dispatch guidance',
-    );
+    assert.deepEqual(contract, {
+      initializeReadsRuntimeConfig: true,
+      initializeHasCodexWorktreeGuard: true,
+      guardStepPrecedesWorktreeDispatch: true,
+    });
   });
 
   test('Codex adapter documents that worktree isolation has no direct spawn_agent mapping', () => {
