@@ -438,7 +438,7 @@ describe('configNewProject', () => {
 
     const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
     expect(raw.model_profile).toBe('balanced');
-    expect(raw.commit_docs).toBe(false);
+    expect(raw.commit_docs).toBe(true);
   });
 
   it('merges user choices', async () => {
