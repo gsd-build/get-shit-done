@@ -79,7 +79,7 @@ fi
 ```
 
 If any `git worktree remove` fails, stop before deleting the workspace directory:
-```
+```text
 Refusing to delete "$WORKSPACE_PATH" because one or more git worktrees could not be removed.
 Resolve the failed worktree removal manually, then rerun remove-workspace.
 ```
