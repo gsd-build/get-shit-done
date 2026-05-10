@@ -9933,7 +9933,8 @@ function installSdkIfNeeded(opts) {
   // shell. A gsd-sdk found there must NOT count as "on PATH".
   const shimSrc = path.resolve(__dirname, 'gsd-sdk.js');
   const persistentPath = filterNpxFromPath(process.env.PATH || '');
-  let onPath = isGsdSdkOnPath(persistentPath);
+  let resolvedSdkPath = findGsdSdkOnPath(persistentPath);
+  let onPath = !!resolvedSdkPath;
 
   // Track WHERE we wrote the shim so the diagnostic can be specific even
   // when isGsdSdkOnPath() returns false because the write target isn't on
@@ -9950,7 +9951,8 @@ function installSdkIfNeeded(opts) {
     const linked = trySelfLinkGsdSdk(shimSrc);
     if (linked) {
       shimDir = path.dirname(linked);
-      onPath = isGsdSdkOnPath(persistentPath);
+      resolvedSdkPath = findGsdSdkOnPath(persistentPath);
+      onPath = !!resolvedSdkPath;
       if (onPath) {
         console.log(`  ${dim}↪ linked gsd-sdk → ${linked}${reset}`);
       }
@@ -9983,16 +9985,24 @@ function installSdkIfNeeded(opts) {
     const persistentUserShellPath = process.platform === 'win32'
       ? userShellPath  // already filtered by getUserShellWindowsPersistentPath
       : filterNpxFromPath(userShellPath);
-    const userSees = isGsdSdkOnPath(persistentUserShellPath);
-    if (!userSees) {
+    const userSdkPath = findGsdSdkOnPath(persistentUserShellPath);
+    if (!userSdkPath) {
       onPath = false;
+      resolvedSdkPath = null;
+    } else {
+      resolvedSdkPath = userSdkPath;
     }
   }
   // If userShellPath is null (probe failed or unavailable), onPath reflects
   // the persistent-PATH check — that is the best available invariant.
 
   if (onPath) {
-    console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+    const versionReport = buildGsdSdkVersionMismatchReport(resolvedSdkPath, pkg.version);
+    if (versionReport) {
+      renderGsdSdkVersionMismatchReport(versionReport);
+    } else {
+      console.log(`  ${green}✓${reset} GSD SDK ready (sdk/dist/cli.js)`);
+    }
   } else {
     // #3011: actionable diagnostic. The previous shape printed a generic
     // "not on your PATH" message that didn't tell the user where to look.
@@ -10099,7 +10109,7 @@ function filterNpxFromPath(pathString) {
 }
 
 /**
- * #2775 helper: check whether a callable `gsd-sdk` exists on a PATH.
+ * #2775 helper: find a callable `gsd-sdk` on a PATH.
  *
  * Pure PATH walk (no spawn) — we look for a regular file or symlink named
  * `gsd-sdk` (or `gsd-sdk.cmd`/`.exe` on Windows) in any directory on PATH and
@@ -10117,7 +10127,7 @@ function filterNpxFromPath(pathString) {
  * isLegacyGsdSdkShim — a symlink pointing at the deprecated gsd-tools.cjs
  * binary must NOT be treated as "on PATH" even if it is executable.
  */
-function isGsdSdkOnPath(pathString) {
+function findGsdSdkOnPath(pathString) {
   const path = require('path');
   const fs = require('fs');
   // Type-guard the explicit input (#3028 CR): callers may pass null
@@ -10133,13 +10143,13 @@ function isGsdSdkOnPath(pathString) {
         const st = fs.statSync(candidate);
         if (st.isFile()) {
           if (process.platform === 'win32') {
-            if (!isLegacyGsdSdkShim(candidate)) return true;
+            if (!isLegacyGsdSdkShim(candidate)) return candidate;
           } else if ((st.mode & 0o111) !== 0) {
             // #3231: resolve symlink before sniffing, so we detect legacy
             // through any level of indirection.
             let target = candidate;
             try { target = fs.realpathSync(candidate); } catch {}
-            if (!isLegacyGsdSdkShim(target)) return true;
+            if (!isLegacyGsdSdkShim(target)) return candidate;
           }
         }
       } catch {
@@ -10147,7 +10157,60 @@ function isGsdSdkOnPath(pathString) {
       }
     }
   }
-  return false;
+  return null;
+}
+
+function isGsdSdkOnPath(pathString) {
+  return !!findGsdSdkOnPath(pathString);
+}
+
+function parseGsdSdkVersion(text) {
+  const match = String(text || '').match(/\bv?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/);
+  return match ? match[1] : null;
+}
+
+function readGsdSdkVersion(sdkPath) {
+  if (!sdkPath) return null;
+  const cp = require('child_process');
+  try {
+    const isWindowsCommandShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(String(sdkPath));
+    const result = cp.spawnSync(isWindowsCommandShim ? 'cmd.exe' : sdkPath, isWindowsCommandShim ? ['/c', sdkPath, '--version'] : ['--version'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 2000,
+      env: process.env,
+    });
+    if (result.error || result.status !== 0) return null;
+    return parseGsdSdkVersion(`${result.stdout || ''}\n${result.stderr || ''}`);
+  } catch {
+    return null;
+  }
+}
+
+function buildGsdSdkVersionMismatchReport(sdkPath, expectedVersion) {
+  const actualVersion = readGsdSdkVersion(sdkPath);
+  if (!actualVersion || !expectedVersion) return null;
+  if (actualVersion === expectedVersion) return null;
+  return {
+    ok: false,
+    reason: 'gsd_sdk_version_mismatch',
+    sdk_path: sdkPath,
+    actual_version: actualVersion,
+    expected_version: expectedVersion,
+    fix_command: 'npm install -g get-shit-done-cc@latest',
+  };
+}
+
+function renderGsdSdkVersionMismatchReport(ir) {
+  console.log('');
+  console.log(`  ${yellow}⚠${reset} ${bold}gsd-sdk version mismatch${reset} — PATH resolves a stale SDK.`);
+  console.log(`    Resolved gsd-sdk: ${ir.sdk_path}`);
+  console.log(`    Resolved version: ${ir.actual_version}`);
+  console.log(`    Installer version: ${ir.expected_version}`);
+  console.log(`    Workflows that call ${cyan}gsd-sdk query …${reset} will use the stale executable first.`);
+  console.log(`    Fix: ${cyan}${ir.fix_command}${reset}`);
+  console.log(`    Or remove the stale global install / adjust PATH so the current shim is first.`);
+  console.log('');
 }
 
 /**
@@ -10637,6 +10700,7 @@ if (process.env.GSD_TEST_MODE) {
     buildSdkFailFastReport,
     renderSdkFailFastReport,
     classifySdkInstall,
+    readGsdSdkVersion,
     convertClaudeCommandToCodexSkill,
     convertClaudeToOpencodeFrontmatter,
     convertClaudeToKiloFrontmatter,
