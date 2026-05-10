@@ -28,7 +28,16 @@ const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
+
+// On Windows, 'npm' is a .cmd script and cannot be found by execFileSync without shell.
+// execNpm() wraps the call with { shell: true } on Windows for cross-platform compat.
+function execNpm(args, options = {}) {
+  if (process.platform === 'win32') {
+    return execSync(['npm', ...args].join(' '), { ...options, shell: true });
+  }
+  return execFileSync('npm', args, options);
+}
 
 const REPO_ROOT = path.join(__dirname, '..');
 const PKG_PATH = path.join(REPO_ROOT, 'package.json');
@@ -98,14 +107,13 @@ describe('bug #2647: outer tarball ships sdk/dist so gsd-sdk query works', () =>
       // Build requires node_modules; install if missing, then build.
       const sdkNodeModules = path.join(sdkDir, 'node_modules');
       if (!fs.existsSync(sdkNodeModules)) {
-        execFileSync('npm', ['ci', '--silent'], { cwd: sdkDir, stdio: 'pipe' });
+        execNpm(['ci', '--silent'], { cwd: sdkDir, stdio: 'pipe' });
       }
-      execFileSync('npm', ['run', 'build'], { cwd: sdkDir, stdio: 'pipe' });
+      execNpm(['run', 'build'], { cwd: sdkDir, stdio: 'pipe' });
     }
     assert.ok(fs.existsSync(cliJs), 'sdk build must produce sdk/dist/cli.js');
 
-    const out = execFileSync(
-      'npm',
+    const out = execNpm(
       ['pack', '--dry-run', '--json', '--ignore-scripts'],
       { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
     ).toString('utf-8');

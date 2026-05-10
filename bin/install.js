@@ -921,7 +921,11 @@ function writeSettings(settingsPath, settings) {
  */
 function readGsdGlobalModelOverrides() {
   try {
-    const defaultsPath = path.join(os.homedir(), '.gsd', 'defaults.json');
+    // Use process.env.HOME / USERPROFILE so tests can sandbox the home dir.
+    // os.homedir() may return a cached value that ignores runtime env changes,
+    // which breaks test isolation on some platforms (Windows USERPROFILE, etc.).
+    const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
+    const defaultsPath = path.join(homeDir, '.gsd', 'defaults.json');
     if (!fs.existsSync(defaultsPath)) return null;
     const raw = fs.readFileSync(defaultsPath, 'utf-8');
     const parsed = JSON.parse(raw);

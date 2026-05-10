@@ -60,7 +60,13 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    // On Windows, process.chdir(tmpDir) inside tests prevents rmSync from
+    // deleting the directory (EPERM). Ensure cwd is outside tmpDir first.
+    try {
+      const cwd = process.cwd();
+      if (cwd.startsWith(tmpDir)) process.chdir(require('os').tmpdir());
+    } catch { /* ignore chdir errors */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors on Windows */ }
   });
 
   // Helper: pre-populate .codex/config.toml with a GSD marker + stale hooks block

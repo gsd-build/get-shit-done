@@ -272,7 +272,8 @@ describe('codebase prompt injection scan', () => {
     const boundaryPattern = /<\/?(?:system|assistant|human)>/i;
 
     for (const file of allFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to forward slashes so ALLOWLIST entries match on Windows too.
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
       // Allow .md files to use common tags in examples/docs
       // But flag .js/.cjs files that embed these

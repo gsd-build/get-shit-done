@@ -37,7 +37,11 @@ const TEST_ENV_BASE = {
 function runGsdTools(args, cwd = process.cwd(), env = {}) {
   try {
     let result;
-    const childEnv = { ...process.env, ...TEST_ENV_BASE, ...env };
+    // On Windows, os.homedir() reads USERPROFILE (not HOME). When tests pass
+    // { HOME: fakeDir } to sandbox home-dir lookups, also set USERPROFILE so
+    // os.homedir() in child processes returns the fake directory.
+    const windowsHomeCompat = (env.HOME && !env.USERPROFILE) ? { USERPROFILE: env.HOME } : {};
+    const childEnv = { ...process.env, ...TEST_ENV_BASE, ...windowsHomeCompat, ...env };
     if (Array.isArray(args)) {
       result = execFileSync(process.execPath, [TOOLS_PATH, ...args], {
         cwd,

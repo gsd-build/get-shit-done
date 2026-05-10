@@ -84,7 +84,8 @@ describe('gsd-settings-advanced — file scaffolding', () => {
   });
 
   test('command frontmatter has name, description, allowed-tools', () => {
-    const text = fs.readFileSync(COMMAND_PATH, 'utf-8');
+    // Normalize CRLF to LF so Windows git checkouts don't break the /^---\n/ anchor.
+    const text = fs.readFileSync(COMMAND_PATH, 'utf-8').replace(/\r\n/g, '\n');
     const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
     assert.ok(fmMatch, 'command file missing frontmatter block');
     const fm = fmMatch[1];

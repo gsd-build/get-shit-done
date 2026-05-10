@@ -37,7 +37,9 @@ describe('enh-2500: gsd-codebase-mapper arch focus — rich architecture output'
 
   before(() => {
     assert.ok(fs.existsSync(AGENT_PATH), 'agents/gsd-codebase-mapper.md must exist');
-    agentContent = fs.readFileSync(AGENT_PATH, 'utf-8');
+    // Normalize CRLF to LF so Windows git checkouts don't break line-anchored
+    // regex patterns (e.g. /^\s*1\..+\n\s*2\..+\n\s*3\./m).
+    agentContent = fs.readFileSync(AGENT_PATH, 'utf-8').replace(/\r\n/g, '\n');
 
     // Isolate the ARCHITECTURE.md template section from the agent file.
     // End boundary is the STRUCTURE.md Template heading that immediately follows it.

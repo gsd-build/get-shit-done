@@ -171,9 +171,12 @@ describe('pruneOrphanedWorktrees', () => {
     execSync('git worktree add "' + worktreeDir + '" -b fix/stale-ref', { cwd: repoDir, stdio: 'pipe' });
     assert.ok(fs.existsSync(worktreeDir), 'worktree dir should exist before manual deletion');
 
-    // Verify it appears in git worktree list
+    // Verify it appears in git worktree list.
+    // On Windows, git outputs forward-slash paths while path.join uses backslashes,
+    // so normalize worktreeDir to forward slashes before comparing.
+    const normalizedWorktreeDir = worktreeDir.replace(/\\/g, '/');
     const beforeList = execSync('git worktree list --porcelain', { cwd: repoDir, encoding: 'utf8' });
-    assert.ok(beforeList.includes(worktreeDir), 'worktree should appear in list before deletion');
+    assert.ok(beforeList.includes(normalizedWorktreeDir), 'worktree should appear in list before deletion');
 
     // Manually delete the worktree directory (simulate orphan)
     fs.rmSync(worktreeDir, { recursive: true, force: true });
@@ -185,7 +188,7 @@ describe('pruneOrphanedWorktrees', () => {
     // Assert: git worktree list no longer shows the stale entry
     const afterList = execSync('git worktree list --porcelain', { cwd: repoDir, encoding: 'utf8' });
     assert.ok(
-      !afterList.includes(worktreeDir),
+      !afterList.includes(normalizedWorktreeDir),
       'git worktree list still shows stale entry after prune:\n' + afterList
     );
   });
