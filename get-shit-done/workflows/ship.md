@@ -42,8 +42,8 @@ Verify the work is ready to ship:
    ```bash
    VERIFICATION=$(cat ${PHASE_DIR}/*-VERIFICATION.md 2>/dev/null)
    ```
-   Check for `status: passed` or `status: human_needed` (with human approval).
-   If no VERIFICATION.md or status is `gaps_found`: warn and ask user to confirm.
+   Check for `status: passed`.
+   If no VERIFICATION.md or status is `human_needed` / `gaps_found`: block with `PHASE_VERIFICATION_INCOMPLETE`; complete or formally re-run verification before shipping.
 
 2. **Clean working tree?**
    ```bash

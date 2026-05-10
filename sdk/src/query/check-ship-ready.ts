@@ -73,13 +73,14 @@ export const checkShipReady: QueryHandler = async (args, projectDir) => {
   try {
     const verRes = await checkVerificationStatus([raw], projectDir);
     const vdata = verRes.data as Record<string, unknown>;
-    verification_passed = vdata.status !== 'fail';
+    const status = String(vdata.status ?? '').toLowerCase();
+    verification_passed = status === 'pass' || status === 'passed';
   } catch {
     verification_passed = false;
   }
 
   // Collect blockers
-  if (!verification_passed) blockers.push('verification status is fail or missing');
+  if (!verification_passed) blockers.push('verification status is not passed');
   if (!clean_tree) blockers.push('working tree is not clean (uncommitted changes)');
   if (!on_feature_branch) blockers.push('not on a feature branch (currently on main/master or unknown)');
   if (!remote_configured) blockers.push('no git remote configured');

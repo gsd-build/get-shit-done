@@ -647,7 +647,7 @@ Use TypeScript.`, 'utf-8');
       expect(result.success).toBe(true);
     });
 
-    it('invokes onVerificationReview when verification returns human_needed', async () => {
+    it('keeps phase pending when verification review is accepted for human_needed', async () => {
       const onVerificationReview = vi.fn().mockResolvedValue('accept');
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 1 });
       const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
@@ -671,7 +671,61 @@ Use TypeScript.`, 'utf-8');
       });
 
       expect(onVerificationReview).toHaveBeenCalled();
-      expect(result.success).toBe(true); // callback accepted
+      expect(result.success).toBe(false);
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
+      expect(result.steps.map(s => s.step)).not.toContain(PhaseStepType.Advance);
+
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('verification_human_needed');
+    });
+
+    it('routes VERIFICATION.md status human_needed through the human review gate', async () => {
+      const onVerificationReview = vi.fn().mockResolvedValue('accept');
+      const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      (deps.tools.exec as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+        if (cmd === 'check.verification-status') return Promise.resolve({ status: 'human_needed' });
+        return Promise.resolve(undefined);
+      });
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1', {
+        callbacks: { onVerificationReview },
+      });
+
+      expect(onVerificationReview).toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
+      expect(result.steps.map(s => s.step)).not.toContain(PhaseStepType.Advance);
+
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('verification_human_needed');
+    });
+
+    it('does not advance when verification status is missing', async () => {
+      const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      (deps.tools.exec as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+        if (cmd === 'check.verification-status') return Promise.resolve({ status: 'missing' });
+        return Promise.resolve(undefined);
+      });
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
+
+      expect(result.success).toBe(false);
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
+      expect(result.steps.map(s => s.step)).not.toContain(PhaseStepType.Advance);
+
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('verification_gaps_found');
     });
 
     it('halts when verification review callback rejects', async () => {
@@ -1258,7 +1312,7 @@ Use TypeScript.`, 'utf-8');
       expect(stepTypes).toContain(PhaseStepType.Research);
     });
 
-    it('auto-accepts when verification callback throws', async () => {
+    it('keeps human verification pending when verification callback throws', async () => {
       const phaseOp = makePhaseOp({ has_context: true, has_plans: true, plan_count: 1 });
       const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
       const deps = makeDeps({ config });
@@ -1281,9 +1335,11 @@ Use TypeScript.`, 'utf-8');
         },
       });
 
-      // Should auto-accept and proceed to advance
+      // Should acknowledge the callback failure but still avoid advancing.
       const stepTypes = result.steps.map(s => s.step);
-      expect(stepTypes).toContain(PhaseStepType.Advance);
+      expect(stepTypes).not.toContain(PhaseStepType.Advance);
+      expect(result.success).toBe(false);
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
     it('auto-approves advance when advance callback throws', async () => {
