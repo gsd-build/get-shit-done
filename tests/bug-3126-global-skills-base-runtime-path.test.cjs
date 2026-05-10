@@ -83,9 +83,12 @@ describe('bug #3126: runtime-homes getGlobalConfigDir — defaults', () => {
       }
     });
   }
-  test('unknown runtime falls back to ~/.claude', () => {
+  test('unknown runtime fails fast instead of falling back to ~/.claude', () => {
     withEnv('CLAUDE_CONFIG_DIR', undefined, () => {
-      assert.strictEqual(getGlobalConfigDir('unknown-xyz'), path.join(os.homedir(), '.claude'));
+      assert.throws(
+        () => getGlobalConfigDir('unknown-xyz'),
+        /Unsupported runtime: unknown-xyz/,
+      );
     });
   });
 });
@@ -164,6 +167,25 @@ describe('runtime install materialization adapters', () => {
     assert.strictEqual(getRuntimeInstallAdapter('hermes').skillCategory, 'gsd');
     assert.strictEqual(getRuntimeInstallAdapter('cline').skillsLayout, 'none');
     assert.strictEqual(getGlobalSkillsBase('cline'), null);
+  });
+
+  test('adapter metadata is recursively frozen', () => {
+    assert.ok(Object.isFrozen(RUNTIME_INSTALL_ADAPTERS));
+    assert.ok(Object.isFrozen(RUNTIME_INSTALL_ADAPTERS.claude));
+    assert.ok(Object.isFrozen(RUNTIME_INSTALL_ADAPTERS.claude.globalHomeSegments));
+    assert.ok(Object.isFrozen(RUNTIME_INSTALL_ADAPTERS.claude.ownedCleanupDirs));
+    assert.throws(() => {
+      RUNTIME_INSTALL_ADAPTERS.claude.globalHomeSegments.push('mutated');
+    }, TypeError);
+  });
+
+  test('unknown runtimes fail fast while omitted runtime uses default adapter', () => {
+    assert.strictEqual(getRuntimeInstallAdapter().runtime, 'claude');
+    assert.strictEqual(getRuntimeInstallAdapter('').runtime, 'claude');
+    assert.throws(
+      () => getRuntimeInstallAdapter('claud'),
+      /Unsupported runtime: claud/,
+    );
   });
 
   test('runtime install adapter resolves local dir and config-dir fragments', () => {

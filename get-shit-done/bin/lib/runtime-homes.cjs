@@ -25,7 +25,18 @@ const path = require('path');
 
 const DEFAULT_RUNTIME = 'claude';
 
-const RUNTIME_INSTALL_ADAPTERS = Object.freeze({
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object') return value;
+
+  for (const nested of Object.values(value)) {
+    deepFreeze(nested);
+  }
+
+  if (Object.isFrozen(value)) return value;
+  return Object.freeze(value);
+}
+
+const RUNTIME_INSTALL_ADAPTERS = deepFreeze({
   claude: Object.freeze({
     runtime: 'claude',
     label: 'Claude Code',
@@ -180,7 +191,16 @@ function expandTilde(p) {
 }
 
 function getRuntimeInstallAdapter(runtime) {
-  return RUNTIME_INSTALL_ADAPTERS[runtime] || RUNTIME_INSTALL_ADAPTERS[DEFAULT_RUNTIME];
+  if (runtime == null || runtime === '') {
+    return RUNTIME_INSTALL_ADAPTERS[DEFAULT_RUNTIME];
+  }
+
+  const adapter = RUNTIME_INSTALL_ADAPTERS[runtime];
+  if (!adapter) {
+    throw new Error(`Unsupported runtime: ${runtime}`);
+  }
+
+  return adapter;
 }
 
 function getRuntimeLocalDirName(runtime) {
