@@ -39,7 +39,13 @@ function extractStep55Block(content) {
 }
 
 describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3264)', () => {
-  const content = fs.readFileSync(WORKFLOW_PATH, 'utf-8');
+  function readWorkflow() {
+    try {
+      return fs.readFileSync(WORKFLOW_PATH, 'utf-8');
+    } catch (err) {
+      throw new Error(`failed to read workflow fixture at ${WORKFLOW_PATH}: ${err.message}`);
+    }
+  }
 
   test('workflow file exists', () => {
     assert.ok(fs.existsSync(WORKFLOW_PATH), 'workflows/execute-phase.md should exist');
@@ -47,11 +53,13 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
 
   test('step 5.5 block exists and is bounded', () => {
     // extractStep55Block throws on failure — this test validates the helper itself
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(block.length > 0, 'step 5.5 block must be non-empty');
   });
 
   test('step 5.5 documents the standard wave contract', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('Standard wave contract'),
@@ -60,6 +68,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('step 5.5 names cross-wave dependency deviation as a supported execution mode', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('Cross-wave dependency deviation'),
@@ -68,6 +77,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('cleanup-tail snippet contains git worktree prune', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('git worktree prune'),
@@ -76,6 +86,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('cleanup-tail snippet contains git worktree remove --force', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('git worktree remove') && block.includes('--force'),
@@ -84,6 +95,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('cleanup-tail snippet contains git worktree unlock', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('git worktree unlock'),
@@ -92,6 +104,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('cleanup-tail snippet contains git branch -D', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('git branch -D'),
@@ -100,6 +113,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('skip conditions enumerate empty-WAVE_WORKTREE_PLANS case', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     assert.ok(
       block.includes('WAVE_WORKTREE_PLANS'),
@@ -108,6 +122,7 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
   });
 
   test('skip conditions enumerate custom-merge-deviation case', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
     // The deviation skip condition must reference the cleanup-tail as the alternative
     assert.ok(
@@ -116,25 +131,30 @@ describe('execute-phase step 5.5: cross-wave-deviation cleanup documentation (#3
     );
   });
 
-  test('cleanup-tail uses inclusion-based filter for agent namespace', () => {
+  test('cleanup-tail uses wave manifest instead of agent namespace discovery', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
-    // Must use .claude/worktrees/agent- inclusion filter, not exclusion (per #2774 precedent)
     assert.ok(
-      block.includes('.claude/worktrees/agent-'),
-      'cleanup-tail must use inclusion-based filter matching .claude/worktrees/agent- namespace',
+      block.includes('WAVE_WORKTREE_MANIFEST'),
+      'cleanup-tail must consume the current wave manifest',
+    );
+    assert.ok(
+      block.includes('avoid touching unrelated active agents'),
+      'cleanup-tail must document why manifest-scoped cleanup is required',
     );
   });
 
-  test('cleanup-tail reads git worktree list --porcelain line-by-line', () => {
+  test('cleanup-tail does not rediscover global agent worktrees', () => {
+    const content = readWorkflow();
     const block = extractStep55Block(content);
-    assert.ok(
-      block.includes('git worktree list --porcelain'),
-      'cleanup-tail must parse git worktree list --porcelain output',
+    assert.doesNotMatch(
+      block,
+      /git worktree list --porcelain.*\.claude\/worktrees\/agent-/s,
+      'cleanup-tail must not parse global git worktree list output for agent worktrees',
     );
-    // Line-by-line reading requires IFS= read -r pattern
     assert.ok(
       block.includes('IFS= read -r'),
-      'cleanup-tail must read line-by-line to preserve paths with whitespace',
+      'cleanup-tail still reads manifest paths line-by-line to preserve paths with whitespace',
     );
   });
 });
