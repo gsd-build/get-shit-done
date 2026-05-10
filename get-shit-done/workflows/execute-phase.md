@@ -77,13 +77,20 @@ Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelizat
 
 **If `response_language` is set:** Include `response_language: {value}` in all spawned subagent prompts so any user-facing output stays in the configured language.
 
-Read worktree config:
+Read runtime/worktree config and fail closed before any executor dispatch:
 
 ```bash
+RUNTIME=$(gsd-sdk query config-get runtime --default claude 2>/dev/null || echo "claude")
 USE_WORKTREES=$(gsd-sdk query config-get workflow.use_worktrees 2>/dev/null || echo "true")
 EXECUTOR_STALL_INTERVAL_MINUTES=$(gsd-sdk query config-get executor.stall_detect_interval_minutes 2>/dev/null || echo "5")
 EXECUTOR_STALL_THRESHOLD_MINUTES=$(gsd-sdk query config-get executor.stall_threshold_minutes 2>/dev/null || echo "10")
+
+if [ "$RUNTIME" = "codex" ] && [ "$USE_WORKTREES" != "false" ]; then
+  echo "FATAL: Codex execute-phase worktree isolation is unsupported. Set workflow.use_worktrees=false or use a runtime with Agent isolation=\"worktree\" support." >&2
+  exit 1
+fi
 ```
+Codex maps subagents to `spawn_agent`, which has no direct Codex mapping for Claude Code's `isolation="worktree"` parameter. Failing closed prevents main-checkout edits while the workflow believes agents are isolated.
 
 If the project uses git submodules, worktree isolation is unsafe **only when a plan touches a submodule path** — the executor commit protocol cannot correctly handle submodule commits inside isolated worktrees. The previous behavior unconditionally disabled worktree isolation whenever `.gitmodules` existed, which penalised every plan in a submodule project even when the plan was nowhere near a submodule. Compute submodule paths once and intersect them per-plan with the plan's declared `files_modified` frontmatter.
 
@@ -499,9 +506,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
    **Emit a plan-start heartbeat (literal line, no tool call) immediately before
    each `Agent()` dispatch (#2410):**
 
-   ```
-   [checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} starting ({P}/{Q} plans done)
-   ```
+   `[checkpoint] phase {PHASE_NUMBER} wave {N}/{M} plan {plan_id} starting ({P}/{Q} plans done)`
 
    Pass paths only — executors read files themselves with their fresh context window.
    For 200k models, this keeps orchestrator context lean (~10-15%).
@@ -517,19 +522,13 @@ increases monotonically across waves. `{status}` is `complete` (success),
    ```
 
    **Sequential dispatch for parallel execution (waves with 2+ agents):**
-   When spawning multiple agents in a wave, dispatch each `Agent()` call **one at a time
-   with `run_in_background: true`** — do NOT send all Agent calls in a single message.
-   `git worktree add` acquires an exclusive lock on `.git/config.lock`, so simultaneous
-   calls race for this lock and fail. Sequential dispatch ensures each worktree finishes
-   creation before the next begins (the round-trip latency of each tool call provides
-   natural spacing), while all agents still **run in parallel** once created.
+   Dispatch each `Agent()` call **one at a time with `run_in_background: true`**. Do NOT
+   send all Agent calls in a single message: simultaneous `git worktree add` calls race
+   on `.git/config.lock`. Agents still run in parallel once their worktrees are created.
 
    ```text
-   # CORRECT: dispatch one Agent() per message, each with run_in_background: true
-   # → worktrees created sequentially, agents execute in parallel
-   #
-   # WRONG: multiple Agent() calls in a single message
-   # → simultaneous git worktree add → .git/config.lock contention → failures
+   # CORRECT: one Agent() per message with run_in_background: true
+   # WRONG: multiple Agent() calls in one message -> .git/config.lock contention
    ```
 
    ```text
