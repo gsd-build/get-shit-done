@@ -1240,7 +1240,7 @@ function convertToolName(claudeTool) {
  * Convert a Claude Code tool name to Gemini CLI format
  * - Applies Claude→Gemini mapping (Read→read_file, Bash→run_shell_command, etc.)
  * - Filters out MCP tools (mcp__*) — they are auto-discovered at runtime in Gemini
- * - Filters out Task — agents are auto-registered as tools in Gemini
+ * - Filters out Task/Agent — agents are auto-registered as tools in Gemini
  * @returns {string|null} Gemini tool name, or null if tool should be excluded
  */
 function convertGeminiToolName(claudeTool) {
@@ -1248,8 +1248,8 @@ function convertGeminiToolName(claudeTool) {
   if (claudeTool.startsWith('mcp__')) {
     return null;
   }
-  // Task: exclude — agents are auto-registered as callable tools
-  if (claudeTool === 'Task') {
+  // Task/Agent: exclude — agents are auto-registered as callable tools
+  if (claudeTool === 'Task' || claudeTool === 'Agent') {
     return null;
   }
   // Check for explicit mapping
