@@ -46,10 +46,13 @@ const mockParsePlanFile = vi.mocked(parsePlanFile);
 
 // ─── Factory helpers ─────────────────────────────────────────────────────────
 
+let defaultProjectDir = '/tmp/project';
+const defaultPhaseDir = '.planning/phases/01-auth';
+
 function makePhaseOp(overrides: Partial<PhaseOpInfo> = {}): PhaseOpInfo {
   return {
     phase_found: true,
-    phase_dir: '/tmp/project/.planning/phases/01-auth',
+    phase_dir: defaultPhaseDir,
     phase_number: '1',
     phase_name: 'Authentication',
     phase_slug: 'auth',
@@ -62,8 +65,8 @@ function makePhaseOp(overrides: Partial<PhaseOpInfo> = {}): PhaseOpInfo {
     roadmap_exists: true,
     planning_exists: true,
     commit_docs: true,
-    context_path: '/tmp/project/.planning/phases/01-auth/CONTEXT.md',
-    research_path: '/tmp/project/.planning/phases/01-auth/RESEARCH.md',
+    context_path: join(defaultProjectDir, defaultPhaseDir, 'CONTEXT.md'),
+    research_path: join(defaultProjectDir, defaultPhaseDir, 'RESEARCH.md'),
     ...overrides,
   };
 }
@@ -159,7 +162,7 @@ function makeDeps(overrides: Partial<PhaseRunnerDeps> = {}): PhaseRunnerDeps {
   const events: GSDEvent[] = [];
 
   return {
-    projectDir: '/tmp/project',
+    projectDir: defaultProjectDir,
     tools: {
       initPhaseOp: vi.fn().mockResolvedValue(makePhaseOp()),
       phaseComplete: vi.fn().mockResolvedValue(undefined),
@@ -208,8 +211,12 @@ function getEmittedEvents(deps: PhaseRunnerDeps): GSDEvent[] {
 describe('PhaseRunner', () => {
   let tempProjectDirs: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tempProjectDirs = [];
+    defaultProjectDir = await mkdtemp(join(tmpdir(), 'gsd-phase-runner-default-'));
+    tempProjectDirs.push(defaultProjectDir);
+    await mkdir(join(defaultProjectDir, defaultPhaseDir), { recursive: true });
+    await writeFile(join(defaultProjectDir, defaultPhaseDir, '01-PLAN.md'), '---\nfiles_modified: []\n---\n', 'utf-8');
     vi.clearAllMocks();
     mockRunPhaseStepSession.mockResolvedValue(makePlanResult());
     mockParsePlanFile.mockResolvedValue(makeParsedPlan());
@@ -831,6 +838,27 @@ Use TypeScript.`, 'utf-8');
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
       expect(verifyStep?.success).toBe(false);
       expect(verifyStep?.error).toBe('verification_gaps_found');
+    });
+
+    it('keeps phase pending when plan files cannot be listed for the debt scan', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'gsd-debt-missing-plans-'));
+      tempProjectDirs.push(projectDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
+
+      expect(result.success).toBe(false);
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
+      expect(result.steps.map(s => s.step)).not.toContain(PhaseStepType.Advance);
+
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('verification_architectural_debt');
     });
 
     it('halts when verification review callback rejects', async () => {

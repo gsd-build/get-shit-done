@@ -1185,7 +1185,16 @@ export class PhaseRunner {
       return { pass: false, findings: [] };
     }
 
-    const planPaths = await this.listPhasePlanPaths(phaseOp.phase_dir);
+    let planPaths: string[];
+    try {
+      planPaths = await this.listPhasePlanPaths(phaseOp.phase_dir);
+    } catch {
+      return { pass: false, findings: [] };
+    }
+    if (phaseOp.has_plans && planPaths.length === 0) {
+      this.logger?.warn(`No phase plans found for architectural debt check in phase ${phaseNumber}`);
+      return { pass: false, findings: [] };
+    }
     const filesToScan = new Set<string>();
 
     for (const planPath of planPaths) {
@@ -1228,7 +1237,11 @@ export class PhaseRunner {
 
   private async listPhasePlanPaths(phaseDir: string): Promise<string[]> {
     const absolutePhaseDir = this.resolveProjectPath(phaseDir);
-    if (!absolutePhaseDir) return [];
+    if (!absolutePhaseDir) {
+      const err = new Error(`Phase directory is outside the project root: ${phaseDir}`);
+      this.logger?.warn(err.message);
+      throw err;
+    }
 
     try {
       const entries = await readdir(absolutePhaseDir, { withFileTypes: true });
@@ -1237,7 +1250,7 @@ export class PhaseRunner {
         .map((entry) => join(absolutePhaseDir, entry.name));
     } catch (err) {
       this.logger?.warn(`Could not list phase plans for architectural debt check (${phaseDir}): ${err instanceof Error ? err.message : String(err)}`);
-      return [];
+      throw err;
     }
   }
 
