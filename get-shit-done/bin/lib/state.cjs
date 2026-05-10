@@ -1510,19 +1510,24 @@ function cmdStateSync(cwd, options, raw) {
 
   const finalTransform = (input) => {
     let modified = input;
+    const currentPlansField = stateExtractField(modified, 'Total Plans in Phase');
     if (highestIncompletePhase) {
-      const currentPlansField = stateExtractField(modified, 'Total Plans in Phase');
       if (currentPlansField && parseInt(currentPlansField, 10) !== highestIncompletePhaseplanCount) {
         changes.push(`Total Plans in Phase: ${currentPlansField} -> ${highestIncompletePhaseplanCount}`);
         const result = stateReplaceField(modified, 'Total Plans in Phase', String(highestIncompletePhaseplanCount));
         if (result) modified = result;
       }
+    } else if (currentPlansField && parseInt(currentPlansField, 10) !== 0) {
+      changes.push(`Total Plans in Phase: ${currentPlansField} -> 0`);
+      const result = stateReplaceField(modified, 'Total Plans in Phase', '0');
+      if (result) modified = result;
     }
 
     const oldActivity = stateExtractField(modified, 'Last Activity');
     const activityResult = stateReplaceField(modified, 'Last Activity', today);
     if (activityResult) modified = activityResult;
 
+    _diskScanCache.delete(cwd);
     const projectedFm = buildStateFrontmatter(stripFrontmatter(modified), cwd);
     const projectedProgress = projectedFm.progress && typeof projectedFm.progress === 'object' ? projectedFm.progress : {};
     const percent = Number.isFinite(Number(projectedProgress.percent)) ? Number(projectedProgress.percent) : 0;

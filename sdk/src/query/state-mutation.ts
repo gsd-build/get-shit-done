@@ -1403,13 +1403,17 @@ export const stateSync: QueryHandler = async (args, projectDir, workstream) => {
 
   const runModifier = async (modified: string): Promise<string> => {
     let m = modified;
+    const currentPlansField = stateExtractField(m, 'Total Plans in Phase');
     if (highestIncompletePhase) {
-      const currentPlansField = stateExtractField(m, 'Total Plans in Phase');
       if (currentPlansField && parseInt(currentPlansField, 10) !== highestIncompletePhaseplanCount) {
         changes.push(`Total Plans in Phase: ${currentPlansField} -> ${highestIncompletePhaseplanCount}`);
         const result = stateReplaceField(m, 'Total Plans in Phase', String(highestIncompletePhaseplanCount));
         if (result) m = result;
       }
+    } else if (currentPlansField && parseInt(currentPlansField, 10) !== 0) {
+      changes.push(`Total Plans in Phase: ${currentPlansField} -> 0`);
+      const result = stateReplaceField(m, 'Total Plans in Phase', '0');
+      if (result) m = result;
     }
 
     const oldActivity = stateExtractField(m, 'Last Activity');

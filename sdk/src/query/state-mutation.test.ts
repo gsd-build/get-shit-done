@@ -1220,4 +1220,34 @@ describe('stateSync', () => {
     ]));
     await expect(readFile(statePath, 'utf-8')).resolves.toBe(before);
   });
+
+  it('resets Total Plans in Phase to zero when disk has no plans', async () => {
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      [
+        '# Project State',
+        '',
+        'Status: Planning',
+        'Current Phase: 02',
+        'Total Plans in Phase: 4',
+        'Current Plan: 0',
+        'Progress: 25%',
+        'Last Activity: 2026-04-01',
+        '',
+      ].join('\n'),
+      'utf-8',
+    );
+    await mkdir(join(tmpDir, '.planning', 'phases', '02-empty'), { recursive: true });
+
+    const { stateSync } = await import('./state-mutation.js');
+    const result = await stateSync([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.synced).toBe(true);
+    expect(data.changes).toEqual(expect.arrayContaining([
+      'Total Plans in Phase: 4 -> 0',
+    ]));
+
+    const after = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(after).toContain('Total Plans in Phase: 0');
+  });
 });

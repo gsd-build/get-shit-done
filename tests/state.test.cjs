@@ -2242,6 +2242,26 @@ describe('state sync command', () => {
     const after = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     assert.strictEqual(before, after, 'File should not be modified in verify mode');
   });
+
+  test('resets Total Plans in Phase to zero when disk has no plans', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# Project State\n\n**Status:** Planning\n**Current Phase:** 1\n**Total Plans in Phase:** 4\n**Current Plan:** 0\n**Progress:** 25%\n`
+    );
+
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-empty'), { recursive: true });
+
+    const result = runGsdTools('state sync', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.changes.includes('Total Plans in Phase: 4 -> 0'),
+      `Should report Total Plans in Phase reset; got ${JSON.stringify(output.changes)}`
+    );
+
+    const stateAfter = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(stateAfter.match(/Total Plans in Phase.*0/), 'Total Plans should reset to 0');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
