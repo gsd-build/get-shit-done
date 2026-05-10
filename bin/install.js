@@ -759,6 +759,72 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
   return { content: updated, changed };
 }
 
+function isManagedCodexHookCommand(command) {
+  if (typeof command !== 'string') return false;
+  return /(^|[\\/\s"'])(gsd-check-update\.js|gsd-update-check\.js)(?=$|[\s"'])/.test(command);
+}
+
+function pruneGsdManagedHooksJsonValue(value) {
+  if (Array.isArray(value)) {
+    let changed = false;
+    const next = [];
+    for (const item of value) {
+      const pruned = pruneGsdManagedHooksJsonValue(item);
+      if (pruned.changed) changed = true;
+      if (!isStructurallyEmpty(pruned.value)) next.push(pruned.value);
+      else changed = true;
+    }
+    return { value: next, changed };
+  }
+
+  if (value && typeof value === 'object') {
+    if (isManagedCodexHookCommand(value.command)) {
+      return { value: null, changed: true };
+    }
+
+    let changed = false;
+    const next = {};
+    for (const [key, child] of Object.entries(value)) {
+      const pruned = pruneGsdManagedHooksJsonValue(child);
+      if (pruned.changed) changed = true;
+      if (!isStructurallyEmpty(pruned.value)) next[key] = pruned.value;
+      else changed = true;
+    }
+    return { value: next, changed };
+  }
+
+  return { value, changed: false };
+}
+
+function isStructurallyEmpty(value) {
+  if (value === null || value === undefined) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return typeof value === 'object' && Object.keys(value).length === 0;
+}
+
+function cleanupLegacyCodexHooksJson(targetDir) {
+  const hooksPath = path.join(targetDir, 'hooks.json');
+  if (!fs.existsSync(hooksPath)) return { changed: false, removedFile: false };
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
+  } catch {
+    return { changed: false, removedFile: false, skipped: 'invalid_json' };
+  }
+
+  const pruned = pruneGsdManagedHooksJsonValue(parsed);
+  if (!pruned.changed) return { changed: false, removedFile: false };
+
+  if (isStructurallyEmpty(pruned.value)) {
+    fs.unlinkSync(hooksPath);
+    return { changed: true, removedFile: true };
+  }
+
+  fs.writeFileSync(hooksPath, JSON.stringify(pruned.value, null, 2) + '\n');
+  return { changed: true, removedFile: false };
+}
+
 /**
  * Build a hook command path using forward slashes for cross-platform compatibility.
  * On Windows, $HOME is not expanded by cmd.exe/PowerShell, so we use the actual path.
@@ -8586,6 +8652,10 @@ function install(isGlobal, runtime = 'claude') {
         throw wrapped;
       }
       console.log(`  ${green}✓${reset} Configured Codex hooks (SessionStart)`);
+      const legacyHooksCleanup = cleanupLegacyCodexHooksJson(targetDir);
+      if (legacyHooksCleanup.changed) {
+        console.log(`  ${green}✓${reset} Removed legacy GSD hooks.json entries`);
+      }
     } catch (e) {
       // #2760 — schema-validation and write failures must be loud and fatal
       // so the user is never left with a config Codex refuses to load (or no
@@ -10613,6 +10683,7 @@ if (process.env.GSD_TEST_MODE) {
     rewriteLegacyManagedNodeHookCommands,
     buildCodexHookBlock,
     rewriteLegacyCodexHookBlock,
+    cleanupLegacyCodexHooksJson,
   };
 } else {
 
