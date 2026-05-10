@@ -27,8 +27,8 @@ import type { ContextEngine } from './context-engine.js';
 import type { GSDLogger } from './logger.js';
 import { runPhaseStepSession, runPlanSession } from './session-runner.js';
 import { parsePlanFile } from './plan-parser.js';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { checkResearchGate } from './research-gate.js';
 
 // ─── Error type ──────────────────────────────────────────────────────────────
@@ -47,7 +47,14 @@ export class PhaseRunnerError extends Error {
 
 // ─── Verification result enum ────────────────────────────────────────────────
 
-export type VerificationOutcome = 'passed' | 'human_needed' | 'gaps_found';
+export type VerificationOutcome = 'passed' | 'human_needed' | 'gaps_found' | 'architectural_debt';
+
+interface ArchitecturalDebtFinding {
+  file: string;
+  line: number;
+  marker: string;
+  text: string;
+}
 
 // ─── PhaseRunner deps interface ──────────────────────────────────────────────
 
@@ -889,6 +896,15 @@ export class PhaseRunner {
       outcome = await this.parseVerificationOutcome(lastResult, phaseNumber);
 
       if (outcome === 'passed') {
+        const debtCheck = await this.checkArchitecturalDebt(phaseNumber);
+        if (!debtCheck.pass) {
+          this.logger?.warn(`Verification blocked by unresolved architectural debt markers in phase ${phaseNumber}`, {
+            phase: phaseNumber,
+            findings: debtCheck.findings,
+          });
+          outcome = 'architectural_debt';
+          break;
+        }
         break;
       }
 
@@ -1149,10 +1165,134 @@ export class PhaseRunner {
       this.logger?.warn(`Unknown verification status '${status}' for phase ${phaseNumber}, treating as gaps_found`);
       return 'gaps_found';
     } catch (err) {
-      // Can't parse VERIFICATION.md — fall back to session result
+      // Can't parse VERIFICATION.md — fail closed so a missing/broken status check never completes the phase.
       this.logger?.warn(`Could not check verification status for phase ${phaseNumber}: ${err instanceof Error ? err.message : String(err)}`);
-      return 'passed';
+      return 'gaps_found';
     }
+  }
+
+  /**
+   * Block phase completion when source files changed by this phase still contain
+   * unresolved TBD/FIXME/XXX comments. Markers are allowed only when the same
+   * line references tracked follow-up work (issue/PR number or DEF-* id).
+   */
+  private async checkArchitecturalDebt(phaseNumber: string): Promise<{ pass: boolean; findings: ArchitecturalDebtFinding[] }> {
+    let phaseOp: PhaseOpInfo;
+    try {
+      phaseOp = await this.tools.initPhaseOp(phaseNumber);
+    } catch (err) {
+      this.logger?.warn(`Could not initialize phase ${phaseNumber} for architectural debt check: ${err instanceof Error ? err.message : String(err)}`);
+      return { pass: false, findings: [] };
+    }
+
+    const planPaths = await this.listPhasePlanPaths(phaseOp.phase_dir);
+    const filesToScan = new Set<string>();
+
+    for (const planPath of planPaths) {
+      try {
+        const parsedPlan = await parsePlanFile(planPath);
+        for (const file of this.extractPlanFiles(parsedPlan)) {
+          if (this.shouldScanForArchitecturalDebt(file)) {
+            filesToScan.add(file);
+          }
+        }
+      } catch (err) {
+        this.logger?.warn(`Could not parse plan for architectural debt check (${planPath}): ${err instanceof Error ? err.message : String(err)}`);
+        return { pass: false, findings: [] };
+      }
+    }
+
+    const findings: ArchitecturalDebtFinding[] = [];
+    for (const file of filesToScan) {
+      const absolutePath = this.resolveProjectPath(file);
+      if (!absolutePath) {
+        findings.push({ file, line: 0, marker: 'path', text: 'File is outside the project root' });
+        continue;
+      }
+
+      try {
+        const content = await readFile(absolutePath, 'utf-8');
+        findings.push(...this.findUnresolvedDebtMarkers(file, content));
+      } catch (err) {
+        findings.push({
+          file,
+          line: 0,
+          marker: 'read',
+          text: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { pass: findings.length === 0, findings };
+  }
+
+  private async listPhasePlanPaths(phaseDir: string): Promise<string[]> {
+    const absolutePhaseDir = this.resolveProjectPath(phaseDir);
+    if (!absolutePhaseDir) return [];
+
+    try {
+      const entries = await readdir(absolutePhaseDir, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isFile() && (entry.name === 'PLAN.md' || entry.name.endsWith('-PLAN.md')))
+        .map((entry) => join(absolutePhaseDir, entry.name));
+    } catch (err) {
+      this.logger?.warn(`Could not list phase plans for architectural debt check (${phaseDir}): ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
+  }
+
+  private extractPlanFiles(parsedPlan: ParsedPlan): string[] {
+    const files = new Set<string>();
+    for (const file of parsedPlan.frontmatter.files_modified ?? []) {
+      files.add(file);
+    }
+    for (const task of parsedPlan.tasks ?? []) {
+      for (const file of task.files ?? []) {
+        files.add(file);
+      }
+    }
+    return [...files];
+  }
+
+  private shouldScanForArchitecturalDebt(file: string): boolean {
+    return !/\.(md|markdown)$/i.test(file);
+  }
+
+  private findUnresolvedDebtMarkers(file: string, content: string): ArchitecturalDebtFinding[] {
+    const findings: ArchitecturalDebtFinding[] = [];
+    const markerPattern = /\b(TBD|FIXME|XXX)\b/gi;
+    const lines = content.split(/\r?\n/);
+
+    lines.forEach((line, index) => {
+      markerPattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = markerPattern.exec(line)) !== null) {
+        if (!this.hasFormalDebtReference(line)) {
+          findings.push({
+            file,
+            line: index + 1,
+            marker: match[1].toUpperCase(),
+            text: line.trim(),
+          });
+        }
+      }
+    });
+
+    return findings;
+  }
+
+  private hasFormalDebtReference(line: string): boolean {
+    return /\bDEF-[A-Z0-9-]+\b/i.test(line) || /\b(?:issue|issues|pr|pull request)\s+#?\d+\b/i.test(line) || /#\d+\b/.test(line);
+  }
+
+  private resolveProjectPath(pathValue: string): string | undefined {
+    const root = resolve(this.projectDir);
+    const absolutePath = isAbsolute(pathValue) ? resolve(pathValue) : resolve(root, pathValue);
+    const relativePath = relative(root, absolutePath);
+    if (relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath))) {
+      return absolutePath;
+    }
+    return undefined;
   }
 
   /**
