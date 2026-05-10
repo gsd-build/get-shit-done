@@ -355,6 +355,12 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     }
   }
 
+  // Human verification checkpoint mode (#3309)
+  const VALID_HUMAN_VERIFY_MODES = ['mid-flight', 'end-of-phase'];
+  if (keyPath === 'workflow.human_verify_mode' && !VALID_HUMAN_VERIFY_MODES.includes(String(parsedValue))) {
+    error(`Invalid workflow.human_verify_mode '${value}'. Valid values: ${VALID_HUMAN_VERIFY_MODES.join(', ')}`);
+  }
+
   const setConfigValueResult = setConfigValue(cwd, keyPath, parsedValue);
 
   // Mask secrets in both JSON and text output. The plaintext is written

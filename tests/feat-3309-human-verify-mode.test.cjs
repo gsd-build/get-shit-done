@@ -7,16 +7,16 @@
 /**
  * Enhancement #3309: workflow.human_verify_mode = end-of-phase
  *
- * Default "mid-flight" preserves the current behavior — the planner emits
+ * "mid-flight" preserves the pre-#3309 behavior — the planner emits
  * `<task type="checkpoint:human-verify">` tasks, and the executor halts at
  * each one. Each halt costs a full executor cold-start (CLAUDE.md, MEMORY.md,
  * STATE.md, plan re-read) because subagent context is discarded across the
  * pause.
  *
- * "end-of-phase" instructs the planner NOT to emit `checkpoint:human-verify`
- * tasks and instead embed the verification details into the relevant `auto`
- * task's `<verify><human-check>` block. The verifier (Step 8) harvests these
- * blocks at end-of-phase and consolidates them into the existing
+ * "end-of-phase" (the new default) instructs the planner NOT to emit
+ * `checkpoint:human-verify` tasks and instead embed the verification details
+ * into the relevant `auto` task's `<verify><human-check>` block. The verifier
+ * (Step 8) harvests these blocks at end-of-phase and consolidates them into the existing
  * `human_needed` → HUMAN-UAT.md path, restoring the v1.35-shaped behavior
  * the reporter wanted without resurrecting the v1.35 writer.
  */
@@ -103,6 +103,13 @@ describe('workflow.human_verify_mode config round-trip', () => {
     assert.strictEqual(config.workflow.human_verify_mode, 'end-of-phase');
     assert.strictEqual(typeof config.workflow.human_verify_mode, 'string');
   });
+
+  test('rejects invalid mode values', () => {
+    const result = runGsdTools('config-set workflow.human_verify_mode midflight', tmpDir);
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /Invalid workflow\.human_verify_mode 'midflight'/);
+    assert.match(result.error, /mid-flight, end-of-phase/);
+  });
 });
 
 // ─── Planner agent contract ──────────────────────────────────────────────────
@@ -136,8 +143,10 @@ describe('agents/gsd-planner.md acknowledges workflow.human_verify_mode', () => 
   test('routes deferred verification through the <verify><human-check> block on auto tasks', () => {
     plannerSrc = plannerSrc || fs.readFileSync(path.join(REPO_ROOT, 'agents', 'gsd-planner.md'), 'utf-8');
     assert.ok(
-      /<verify>\s*[\s\S]{0,200}<human-check>/i.test(plannerSrc) || plannerSrc.includes('<verify><human-check>'),
-      'planner must document the <verify><human-check>...</human></verify> shape so the verifier can harvest deferred items',
+      /`?<verify>`?\s*[\s\S]{0,200}`?<human-check>`?/i.test(plannerSrc) ||
+      plannerSrc.includes('<verify><human-check>') ||
+      plannerSrc.includes('`<verify><human-check>`'),
+      'planner must document the <verify><human-check>...</human-check></verify> shape so the verifier can harvest deferred items',
     );
   });
 });

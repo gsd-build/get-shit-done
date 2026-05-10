@@ -36,7 +36,7 @@ export interface WorkflowConfig {
    * cost (CLAUDE.md, MEMORY.md, STATE.md, plan re-read on respawn) per
    * round-trip.
    */
-  human_verify_mode: string;
+  human_verify_mode: 'mid-flight' | 'end-of-phase';
   auto_advance: boolean;
   /** Internal auto-chain flag used by workflow routing. */
   _auto_chain_active?: boolean;
