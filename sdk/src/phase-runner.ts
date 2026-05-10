@@ -57,6 +57,14 @@ interface ArchitecturalDebtFinding {
   text: string;
 }
 
+type ArchitecturalDebtCheckReason = 'markers_found' | 'scan_error';
+
+interface ArchitecturalDebtCheck {
+  pass: boolean;
+  findings: ArchitecturalDebtFinding[];
+  reason?: ArchitecturalDebtCheckReason;
+}
+
 // ─── PhaseRunner deps interface ──────────────────────────────────────────────
 
 export interface PhaseRunnerDeps {
@@ -899,8 +907,13 @@ export class PhaseRunner {
       if (outcome === 'passed') {
         const debtCheck = await this.checkArchitecturalDebt(phaseNumber);
         if (!debtCheck.pass) {
-          this.logger?.warn(`Verification blocked by unresolved architectural debt markers in phase ${phaseNumber}`, {
+          const message =
+            debtCheck.reason === 'scan_error'
+              ? `Verification blocked because architectural debt scan could not complete for phase ${phaseNumber}`
+              : `Verification blocked by unresolved architectural debt markers in phase ${phaseNumber}`;
+          this.logger?.warn(message, {
             phase: phaseNumber,
+            reason: debtCheck.reason,
             findingCount: debtCheck.findings.length,
             findings: debtCheck.findings.map(({ file, line, marker }) => ({ file, line, marker })),
           });
@@ -1192,24 +1205,24 @@ export class PhaseRunner {
    * not expanded, and files modified during execution but omitted from the plan
    * are not scanned; git-diff-based coverage would be a separate enhancement.
    */
-  private async checkArchitecturalDebt(phaseNumber: string): Promise<{ pass: boolean; findings: ArchitecturalDebtFinding[] }> {
+  private async checkArchitecturalDebt(phaseNumber: string): Promise<ArchitecturalDebtCheck> {
     let phaseOp: PhaseOpInfo;
     try {
       phaseOp = await this.tools.initPhaseOp(phaseNumber);
     } catch (err) {
       this.logger?.warn(`Could not initialize phase ${phaseNumber} for architectural debt check: ${err instanceof Error ? err.message : String(err)}`);
-      return { pass: false, findings: [] };
+      return { pass: false, findings: [], reason: 'scan_error' };
     }
 
     let planPaths: string[];
     try {
       planPaths = await this.listPhasePlanPaths(phaseOp.phase_dir);
     } catch {
-      return { pass: false, findings: [] };
+      return { pass: false, findings: [], reason: 'scan_error' };
     }
     if (phaseOp.has_plans && planPaths.length === 0) {
       this.logger?.warn(`No phase plans found for architectural debt check in phase ${phaseNumber}`);
-      return { pass: false, findings: [] };
+      return { pass: false, findings: [], reason: 'scan_error' };
     }
     const filesToScan = new Set<string>();
 
@@ -1223,7 +1236,7 @@ export class PhaseRunner {
         }
       } catch (err) {
         this.logger?.warn(`Could not parse plan for architectural debt check (${planPath}): ${err instanceof Error ? err.message : String(err)}`);
-        return { pass: false, findings: [] };
+        return { pass: false, findings: [], reason: 'scan_error' };
       }
     }
 
@@ -1253,7 +1266,12 @@ export class PhaseRunner {
       }
     }
 
-    return { pass: findings.length === 0, findings };
+    const hasDebtMarkers = findings.some(({ marker }) => marker !== 'path' && marker !== 'read');
+    return {
+      pass: findings.length === 0,
+      findings,
+      reason: findings.length === 0 ? undefined : hasDebtMarkers ? 'markers_found' : 'scan_error',
+    };
   }
 
   private async listPhasePlanPaths(phaseDir: string): Promise<string[]> {

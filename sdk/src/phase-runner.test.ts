@@ -1046,9 +1046,10 @@ Use TypeScript.`, 'utf-8');
       const projectDir = await mkdtemp(join(tmpdir(), 'gsd-debt-missing-plans-'));
       tempProjectDirs.push(projectDir);
       const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      const logger = { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any;
       const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
       const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
-      const deps = makeDeps({ projectDir, config });
+      const deps = makeDeps({ projectDir, config, logger });
       (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
 
       const runner = new PhaseRunner(deps);
@@ -1061,6 +1062,8 @@ Use TypeScript.`, 'utf-8');
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
       expect(verifyStep?.success).toBe(false);
       expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(logger.warn.mock.calls.some(([message]: [string]) => message.includes('unresolved architectural debt markers'))).toBe(false);
+      expect(logger.warn.mock.calls.some(([message]: [string]) => message.includes('architectural debt scan could not complete'))).toBe(true);
     });
 
     it('halts when verification review callback rejects', async () => {
