@@ -857,6 +857,14 @@ function decrementRoadmapPhaseNumber(raw, removedInt) {
   return String(num - 1);
 }
 
+function decrementRoadmapPhaseToken(raw, removedInt) {
+  const match = String(raw).match(/^(\d+)(\.\d+)?$/);
+  if (!match) return raw;
+  const num = parseInt(match[1], 10);
+  if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
+  return `${num - 1}${match[2] || ''}`;
+}
+
 function decrementRoadmapPaddedPhaseNumber(raw, removedInt) {
   const num = parseInt(raw, 10);
   if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
@@ -872,14 +880,14 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
     let content = fs.readFileSync(roadmapPath, 'utf-8');
     const escaped = escapeRegex(targetPhase);
 
-    content = content.replace(new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d|$)`, 'i'), '');
+    content = content.replace(new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d+\\s*:|$)`, 'i'), '');
     content = content.replace(new RegExp(`\\n?-\\s*\\[[ x]\\]\\s*.*Phase\\s+${escaped}[:\\s][^\\n]*`, 'gi'), '');
     content = content.replace(new RegExp(`\\n?\\|\\s*${escaped}\\.?\\s[^|]*\\|[^\\n]*`, 'gi'), '');
 
     if (!isDecimal) {
       content = content.replace(
-        /(#{2,4}\s*Phase\s+)(\d+)(\s*:)/gi,
-        (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`
+        /(#{2,4}\s*Phase\s+)(\d+(?:\.\d+)?)(\s*:)/gi,
+        (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseToken(num, removedInt)}${suffix}`
       );
       content = content.replace(
         /(-\s*\[[ x]\]\s*.*?Phase\s+)(\d+)(\s*:|\s+)/gi,
@@ -890,12 +898,16 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
         (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`
       );
       content = content.replace(
-        /(?<![0-9-])(\d{2})-(\d{2})(?![0-9-])/g,
+        /(?<![0-9-])(\d{2})-(\d{2})(?=(?:-(?:PLAN|SUMMARY)\.md)?(?![0-9-]))/g,
         (_match, phaseNum, planNum) => `${decrementRoadmapPaddedPhaseNumber(phaseNum, removedInt)}-${planNum}`
       );
       content = content.replace(
-        /(Depends on:\*\*\s*Phase\s+)(\d+)\b/gi,
-        (_match, prefix, num) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}`
+        /(\*\*Depends on\*\*\s*:\s*Phase\s+)(\d+(?:\.\d+)?)\b/gi,
+        (_match, prefix, num) => `${prefix}${decrementRoadmapPhaseToken(num, removedInt)}`
+      );
+      content = content.replace(
+        /(Depends on:\*\*\s*Phase\s+)(\d+(?:\.\d+)?)\b/gi,
+        (_match, prefix, num) => `${prefix}${decrementRoadmapPhaseToken(num, removedInt)}`
       );
     }
 
