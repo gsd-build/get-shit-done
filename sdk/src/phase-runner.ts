@@ -1184,6 +1184,11 @@ export class PhaseRunner {
    * Block phase completion when source files changed by this phase still contain
    * unresolved TBD/FIXME/XXX comments. Markers are allowed only when the same
    * line references tracked follow-up work (issue/PR number or DEF-* id).
+   *
+   * The debt scan is intentionally scoped to literal source paths declared in
+   * phase plan frontmatter `files_modified` and task `files`. Glob patterns are
+   * not expanded, and files modified during execution but omitted from the plan
+   * are not scanned; git-diff-based coverage would be a separate enhancement.
    */
   private async checkArchitecturalDebt(phaseNumber: string): Promise<{ pass: boolean; findings: ArchitecturalDebtFinding[] }> {
     let phaseOp: PhaseOpInfo;
