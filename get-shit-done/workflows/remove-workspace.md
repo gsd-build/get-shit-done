@@ -62,11 +62,15 @@ Use AskUserQuestion:
 
 **If strategy is `worktree`:**
 
-For each repo in the workspace:
+Initialize the failure flag once before iterating repos:
 
 ```bash
 REMOVE_FAILED=false
+```
 
+For each repo in the workspace:
+
+```bash
 cd "$SOURCE_REPO_PATH"
 if ! git worktree remove "$WORKSPACE_PATH/$REPO_NAME" 2>&1; then
   echo "Warning: Could not remove worktree for $REPO_NAME — source repo may have been moved, deleted, locked, or dirty." >&2

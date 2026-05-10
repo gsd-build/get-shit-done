@@ -11,6 +11,16 @@ function read(relPath) {
 }
 
 describe('bug #3384: adjacent worktree data-loss guards', () => {
+  test('worktree cleanup CLI preserves caller cwd instead of resolving project root', () => {
+    const source = read('get-shit-done/bin/gsd-tools.cjs');
+    const skipSet = source.slice(
+      source.indexOf('const SKIP_ROOT_RESOLUTION = new Set(['),
+      source.indexOf('if (!SKIP_ROOT_RESOLUTION.has(command))'),
+    );
+
+    assert.match(skipSet, /'worktree'/);
+  });
+
   test('diagnose-issues agents assert disposable worktree branch before reset --hard', () => {
     const source = read('get-shit-done/workflows/diagnose-issues.md');
     const branchCheck = source.indexOf('HEAD_REF=$(git symbolic-ref --quiet HEAD || echo');
@@ -24,13 +34,17 @@ describe('bug #3384: adjacent worktree data-loss guards', () => {
 
   test('remove-workspace fails closed when git worktree remove fails', () => {
     const source = read('get-shit-done/workflows/remove-workspace.md');
+    const init = source.indexOf('REMOVE_FAILED=false');
+    const loop = source.indexOf('For each repo in the workspace');
+    const remove = source.indexOf('git worktree remove "$WORKSPACE_PATH/$REPO_NAME"');
 
     assert.doesNotMatch(
       source,
       /git worktree remove "\$WORKSPACE_PATH\/\$REPO_NAME" 2>&1 \|\| true/,
       'worktree removal failures must not be swallowed',
     );
-    assert.match(source, /REMOVE_FAILED=false/);
+    assert.ok(init > 0 && init < loop, 'REMOVE_FAILED must initialize once before the per-repo loop');
+    assert.ok(remove > loop, 'worktree removal should remain inside the per-repo loop');
     assert.match(source, /Refusing to delete "\$WORKSPACE_PATH"/);
   });
 

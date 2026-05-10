@@ -727,11 +727,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
    When executor agents ran in worktree isolation, their commits land on temporary branches in separate working trees. After the wave completes, merge these changes back and clean up:
 
-   **Manifest source of truth (#3384):** Before dispatching the first worktree-isolated
-   agent in a wave, create `WAVE_WORKTREE_MANIFEST` and append each executor's exact
-   `{agent_id, worktree_path, branch, expected_base}`. Cleanup must consume this
-   manifest only; if an executor's worktree cannot be identified uniquely, stop and
-   ask for recovery instead of scanning all agent worktrees.
+   **Manifest source of truth (#3384):** Before dispatching the first worktree-isolated agent in a wave, create `WAVE_WORKTREE_MANIFEST`. Immediately after each worktree `Agent()` spawn returns metadata, atomically append `{agent_id, worktree_path, branch, expected_base}`; if any field is missing, stop and ask for recovery instead of scanning all agent worktrees.
 
    ```bash
    WAVE_WORKTREE_MANIFEST=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-wave-XXXXXX.json")
@@ -755,6 +751,8 @@ increases monotonically across waves. `{status}` is `complete` (success),
    else
      echo "WARN: gsd-sdk unavailable; using manifest-scoped shell fallback (#3384)." >&2
 
+   WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
+   node -e 'const fs=require("fs");const p=process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("WAVE_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read WAVE_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
    while IFS= read -r WT; do
      [ -z "$WT" ] && continue
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -855,7 +853,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
          echo "⚠ Keeping branch $WT_BRANCH because worktree removal failed (#3384)"
        fi
      fi
-   done < <(node -e 'const fs=require("fs");const p=process.env.WAVE_WORKTREE_MANIFEST;const j=JSON.parse(fs.readFileSync(p,"utf8"));for (const w of j.worktrees||[]) if (w.worktree_path) console.log(w.worktree_path);')
+   done < "$WT_PATHS_FILE"
    fi
    ```
 
@@ -866,6 +864,8 @@ increases monotonically across waves. `{status}` is `complete` (success),
    ```bash
    # Cleanup-tail: remove residual agent worktrees after a cross-wave-dependency deviation.
    # Uses only the current wave manifest to avoid touching unrelated active agents (#3384).
+   WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
+   node -e 'const fs=require("fs");const p=process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("WAVE_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read WAVE_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
    while IFS= read -r WT; do
      [ -z "$WT" ] && continue
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -883,7 +883,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
      else
        git branch -D "$WT_BRANCH" 2>/dev/null || true
      fi
-   done < <(node -e 'const fs=require("fs");const p=process.env.WAVE_WORKTREE_MANIFEST;const j=JSON.parse(fs.readFileSync(p,"utf8"));for (const w of j.worktrees||[]) if (w.worktree_path) console.log(w.worktree_path);')
+   done < "$WT_PATHS_FILE"
    git worktree prune
    ```
 

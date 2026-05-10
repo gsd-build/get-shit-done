@@ -418,6 +418,7 @@ async function main() {
   const SKIP_ROOT_RESOLUTION = new Set([
     'generate-slug', 'current-timestamp', 'verify-path-exists',
     'verify-summary', 'template', 'frontmatter', 'detect-custom-files',
+    'worktree',
   ]);
   if (!SKIP_ROOT_RESOLUTION.has(command)) {
     cwd = findProjectRoot(cwd);

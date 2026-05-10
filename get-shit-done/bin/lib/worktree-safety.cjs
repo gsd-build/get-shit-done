@@ -478,6 +478,17 @@ function executeWorktreeWaveCleanupPlan(plan, deps = {}) {
       break;
     }
 
+    const worktreeStatus = execGit(plan.repoRoot, ['-C', entry.worktree_path, 'status', '--porcelain', '--untracked-files=all']);
+    if (!gitResultOk(worktreeStatus) || worktreeStatus.stdout) {
+      result.status = 'blocked';
+      result.reason = 'worktree_dirty';
+      result.stderr = worktreeStatus?.stdout || worktreeStatus?.stderr || '';
+      results.push(result);
+      pending.push(...entries.slice(i + 1));
+      ok = false;
+      break;
+    }
+
     const merge = execGit(plan.repoRoot, ['merge', entry.branch, '--no-ff', '--no-edit', '-m', `chore: merge executor worktree (${entry.branch})`]);
     if (!gitResultOk(merge)) {
       result.status = 'blocked';

@@ -152,6 +152,9 @@ describe('bug #3384: worktree cleanup is manifest-scoped and fail-closed', () =>
         if (key === 'diff --diff-filter=D --name-only HEAD...worktree-agent-a1') {
           return { exitCode: 0, stdout: '', stderr: '' };
         }
+        if (key === '-C /repo/.claude/worktrees/agent-a1 status --porcelain --untracked-files=all') {
+          return { exitCode: 0, stdout: '', stderr: '' };
+        }
         if (key.startsWith('merge worktree-agent-a1')) {
           return { exitCode: 1, stdout: '', stderr: 'CONFLICT' };
         }
@@ -165,10 +168,56 @@ describe('bug #3384: worktree cleanup is manifest-scoped and fail-closed', () =>
     assert.deepEqual(result.pending.map((entry) => entry.branch), ['worktree-agent-a2']);
   });
 
+  test('cleanup executor blocks dirty worktrees before merge/remove/delete', () => {
+    const calls = [];
+    const plan = {
+      ok: true,
+      repoRoot: '/repo/main',
+      action: 'cleanup_wave',
+      discovery: 'manifest',
+      entries: [{
+        agent_id: 'a1',
+        worktree_path: '/repo/.claude/worktrees/agent-a1',
+        branch: 'worktree-agent-a1',
+        expected_base: 'abc123',
+      }],
+    };
+
+    const result = executeWorktreeWaveCleanupPlan(plan, {
+      execGit: (_cwd, args) => {
+        calls.push(args.join(' '));
+        const key = args.join(' ');
+        if (key === '-C /repo/.claude/worktrees/agent-a1 rev-parse --abbrev-ref HEAD') {
+          return { exitCode: 0, stdout: 'worktree-agent-a1', stderr: '' };
+        }
+        if (key === 'merge-base HEAD worktree-agent-a1') {
+          return { exitCode: 0, stdout: 'abc123', stderr: '' };
+        }
+        if (key === 'diff --diff-filter=D --name-only HEAD...worktree-agent-a1') {
+          return { exitCode: 0, stdout: '', stderr: '' };
+        }
+        if (key === '-C /repo/.claude/worktrees/agent-a1 status --porcelain --untracked-files=all') {
+          return { exitCode: 0, stdout: '?? scratch.txt', stderr: '' };
+        }
+        throw new Error(`unexpected git call after dirty check: ${key}`);
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.entries[0].reason, 'worktree_dirty');
+    assert.equal(calls.some((call) => call.startsWith('merge worktree-agent-a1')), false);
+    assert.equal(calls.some((call) => call === 'worktree remove /repo/.claude/worktrees/agent-a1 --force'), false);
+    assert.equal(calls.some((call) => call === 'branch -D worktree-agent-a1'), false);
+  });
+
   test('execute-phase contract requires a cleanup manifest instead of global worktree discovery', () => {
     const content = readWorkflow(EXECUTE_PHASE_PATH);
     assert.match(content, /WAVE_WORKTREE_MANIFEST/);
     assert.match(content, /worktree\.cleanup-wave/);
+    assert.match(content, /atomically append `\{agent_id, worktree_path, branch, expected_base\}`/);
+    assert.match(content, /try\{if\(!p\)throw new Error\("WAVE_WORKTREE_MANIFEST is unset"\)/);
+    assert.match(content, /WT_PATHS_FILE=.*gsd-worktree-paths-/);
+    assert.doesNotMatch(content, /done < <\(node -e 'const fs=require\("fs"\);const p=process\.env\.WAVE_WORKTREE_MANIFEST/);
     assert.doesNotMatch(content, /done < <\(git worktree list --porcelain \| grep "\^worktree " \| grep "\\\.claude\/worktrees\/agent-"/);
   });
 
@@ -176,6 +225,11 @@ describe('bug #3384: worktree cleanup is manifest-scoped and fail-closed', () =>
     const content = readWorkflow(QUICK_PATH);
     assert.match(content, /WAVE_WORKTREE_MANIFEST|QUICK_WORKTREE_MANIFEST/);
     assert.match(content, /worktree\.cleanup-wave/);
+    assert.match(content, /mktemp "\$\{TMPDIR:-\/tmp\}\/gsd-quick-worktree-/);
+    assert.match(content, /append its returned `\{agent_id, worktree_path, branch, expected_base\}`/);
+    assert.match(content, /try\{if\(!p\)throw new Error\("QUICK_WORKTREE_MANIFEST is unset"\)/);
+    assert.match(content, /WT_PATHS_FILE=.*gsd-worktree-paths-/);
+    assert.doesNotMatch(content, /done < <\(node -e 'const fs=require\("fs"\);const p=process\.env\.QUICK_WORKTREE_MANIFEST/);
     assert.doesNotMatch(content, /done < <\(git worktree list --porcelain \| grep "\^worktree " \| grep "\\\.claude\/worktrees\/agent-"/);
   });
 });

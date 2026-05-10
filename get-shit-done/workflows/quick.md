@@ -663,6 +663,11 @@ fi
 Capture current HEAD before spawning (used for worktree branch check):
 ```bash
 EXPECTED_BASE=$(git rev-parse HEAD)
+if [ "${USE_WORKTREES:-true}" != "false" ]; then
+  QUICK_WORKTREE_MANIFEST=$(mktemp "${TMPDIR:-/tmp}/gsd-quick-worktree-XXXXXX.json")
+  printf '{"worktrees":[]}\n' > "$QUICK_WORKTREE_MANIFEST"
+  export QUICK_WORKTREE_MANIFEST
+fi
 ```
 
 Spawn gsd-executor with plan reference:
@@ -763,6 +768,8 @@ SUMMARY.md and stop — the user must rerun with worktrees disabled.
 
 > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
+If the executor ran with `isolation="worktree"`, append its returned `{agent_id, worktree_path, branch, expected_base}` metadata to `QUICK_WORKTREE_MANIFEST` before cleanup. If any field is unavailable, stop and ask for recovery; do not discover global worktrees.
+
 After executor returns:
 1. **Worktree cleanup:** If the executor ran with `isolation="worktree"`, merge the worktree branch back and clean up:
    ```bash
@@ -788,6 +795,8 @@ After executor returns:
    # setups, and the cross-drive Windows case where `git worktree list` reports the
    # registry path on a different drive than `$(pwd)`).
    # Read line-by-line so worktree paths containing whitespace are preserved (#2774).
+   WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
+   node -e 'const fs=require("fs");const p=process.env.QUICK_WORKTREE_MANIFEST||process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("QUICK_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read QUICK_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
    while IFS= read -r WT; do
      [ -z "$WT" ] && continue
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -886,7 +895,7 @@ After executor returns:
          echo "⚠ Keeping branch $WT_BRANCH because worktree removal failed (#3384)"
        fi
      fi
-   done < <(node -e 'const fs=require("fs");const p=process.env.QUICK_WORKTREE_MANIFEST||process.env.WAVE_WORKTREE_MANIFEST;const j=JSON.parse(fs.readFileSync(p,"utf8"));for (const w of j.worktrees||[]) if (w.worktree_path) console.log(w.worktree_path);')
+   done < "$WT_PATHS_FILE"
    fi
    ```
    If `workflow.use_worktrees` is `false`, skip this step.
