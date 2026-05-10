@@ -113,12 +113,18 @@ describe('bug #2136 part 1: bash hook sources carry gsd-hook-version placeholder
     // — POSIX guarantees /bin/sh but not /bin/bash, and distros like NixOS
     // do not ship /bin/bash by default.
     for (const sh of SH_HOOKS) {
+<<<<<<< Updated upstream
       const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').split('\n');
       assert.strictEqual(
         lines[0],
         '#!/usr/bin/env bash',
         `${sh} line 1 must be "#!/usr/bin/env bash" for cross-distro portability`
       );
+=======
+      // Normalize CRLF to LF so Windows git checkouts don't cause false failures.
+      const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').replace(/\r\n/g, '\n').split('\n');
+      assert.strictEqual(lines[0], '#!/bin/bash', `${sh} line 1 must be #!/bin/bash`);
+>>>>>>> Stashed changes
       assert.ok(
         lines[1].startsWith('# gsd-hook-version:'),
         `${sh} line 2 must be the gsd-hook-version header (got: "${lines[1]}")`
