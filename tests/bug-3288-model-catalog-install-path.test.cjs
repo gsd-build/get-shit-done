@@ -257,12 +257,22 @@ module.exports = { catalog };
       fs.existsSync(colocatedRuntimePolicyJson),
       `runtime-install-policy.json must be present at co-located path post-install: ${colocatedRuntimePolicyJson}`,
     );
-    const parsedRuntimePolicy = JSON.parse(fs.readFileSync(colocatedRuntimePolicyJson, 'utf8'));
+    let parsedRuntimePolicy;
+    assert.doesNotThrow(() => {
+      parsedRuntimePolicy = JSON.parse(fs.readFileSync(colocatedRuntimePolicyJson, 'utf8'));
+    }, 'runtime-install-policy.json must be valid JSON');
+    assert.ok(
+      parsedRuntimePolicy && typeof parsedRuntimePolicy === 'object',
+      'runtime install policy must be an object',
+    );
     assert.ok(
       parsedRuntimePolicy.runtimes && typeof parsedRuntimePolicy.runtimes === 'object',
       'runtime install policy must include runtimes object',
     );
-    assert.ok(parsedRuntimePolicy.runtimes.claude, 'runtime install policy must include claude');
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(parsedRuntimePolicy.runtimes, 'claude'),
+      'runtime install policy must include claude',
+    );
 
     const installedRuntimePolicyCjs = path.join(
       claudeDir,

@@ -159,13 +159,6 @@ extract_and_check_blobs() {
   while IFS=: read -r line_num blob; do
       [[ -z "$line_num" || -z "$blob" ]] && continue
 
-      # Skip data URIs — legitimate base64 usage
-      local line
-      line=$(sed -n "${line_num}p" "$file")
-      if is_data_uri "$line"; then
-        continue
-      fi
-
       # Check ignorelist
       if [[ ${#IGNORED_PATTERNS[@]} -gt 0 ]] && is_ignored "$blob"; then
         continue
@@ -191,6 +184,13 @@ extract_and_check_blobs() {
       printable_count=$(echo -n "$decoded" | LC_ALL=C tr -cd '[:print:]' | wc -c | tr -d ' ')
       # Skip if less than 70% printable (likely binary data, not obfuscated text)
       if [[ $((printable_count * 100 / total_chars)) -lt 70 ]]; then
+        continue
+      fi
+
+      # Skip data URIs — legitimate base64 usage
+      local line
+      line=$(sed -n "${line_num}p" "$file")
+      if is_data_uri "$line"; then
         continue
       fi
 
