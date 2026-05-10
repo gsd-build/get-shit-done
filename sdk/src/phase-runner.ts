@@ -1191,7 +1191,7 @@ export class PhaseRunner {
   }
 
   private verificationErrorForOutcome(outcome: VerificationOutcome): string {
-    if (outcome === 'status_unreadable') return 'verification_gaps_found';
+    if (outcome === 'status_unreadable' || outcome === 'architectural_debt') return 'verification_gaps_found';
     return `verification_${outcome}`;
   }
 
@@ -1316,10 +1316,11 @@ export class PhaseRunner {
     const lines = content.split(/\r?\n/);
 
     lines.forEach((line, index) => {
-      if (this.hasFormalDebtReference(line)) return;
-
       const match = markerPattern.exec(line);
       if (match) {
+        const markerSegment = line.slice(match.index);
+        if (this.hasFormalDebtReference(markerSegment)) return;
+
         findings.push({
           file,
           line: index + 1,

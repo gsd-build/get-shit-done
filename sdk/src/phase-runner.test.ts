@@ -791,7 +791,7 @@ Use TypeScript.`, 'utf-8');
 
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
       expect(verifyStep?.success).toBe(false);
-      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(verifyStep?.error).toBe('verification_gaps_found');
     });
 
     it('allows changed-file debt markers when they reference tracked follow-up work', async () => {
@@ -884,7 +884,7 @@ Use TypeScript.`, 'utf-8');
 
       expect(result.success).toBe(false);
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
-      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(verifyStep?.error).toBe('verification_gaps_found');
       expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
@@ -909,7 +909,7 @@ Use TypeScript.`, 'utf-8');
 
       expect(result.success).toBe(false);
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
-      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(verifyStep?.error).toBe('verification_gaps_found');
       expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
@@ -958,7 +958,32 @@ Use TypeScript.`, 'utf-8');
 
       expect(result.success).toBe(false);
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
-      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(verifyStep?.error).toBe('verification_gaps_found');
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
+    });
+
+    it('does not allow unrelated earlier issue text to satisfy a later debt marker', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'gsd-unrelated-debt-ref-'));
+      tempProjectDirs.push(projectDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      const sourceDir = join(projectDir, 'scripts', 'upstream');
+      await mkdir(phaseDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
+      await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\nlabel="issue #123"; # FIXME temp styling\n', 'utf-8');
+
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/run.sh']));
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
+
+      expect(result.success).toBe(false);
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.error).toBe('verification_gaps_found');
       expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
@@ -1014,7 +1039,7 @@ Use TypeScript.`, 'utf-8');
 
       expect(result.success).toBe(false);
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
-      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(verifyStep?.error).toBe('verification_gaps_found');
       expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
@@ -1061,7 +1086,7 @@ Use TypeScript.`, 'utf-8');
 
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
       expect(verifyStep?.success).toBe(false);
-      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(verifyStep?.error).toBe('verification_gaps_found');
       expect(logger.warn.mock.calls.some(([message]: [string]) => message.includes('unresolved architectural debt markers'))).toBe(false);
       expect(logger.warn.mock.calls.some(([message]: [string]) => message.includes('architectural debt scan could not complete'))).toBe(true);
     });
