@@ -485,6 +485,43 @@ npm test -- --grep "$PHASE_TEST_PATTERN" 2>&1 | grep -q "passing"
 - Do not modify state (no writes, no mutations, no side effects)
 - If the project has no runnable entry points yet, skip with: "Step 7b: SKIPPED (no runnable entry points)"
 
+## Step 7c: Probe Execution
+
+SUMMARY.md probe pass claims are not evidence. If a phase declares or implies probe-based verification, the verifier must run the probe in its own process and record the command result.
+
+**When to run:** For migration phases, CLI/tooling phases, or any phase whose PLAN/SUMMARY/verification criteria mention probes, PASS markers, stage markers, runnable checks, or `scripts/*/tests/probe-*.sh`.
+
+**Probe discovery:**
+
+```bash
+# Conventional project probes
+find scripts -path '*/tests/probe-*.sh' -type f 2>/dev/null | sort
+
+# Phase-declared probes
+grep -R -n -E 'probe-[^[:space:]]+\.sh|scripts/.*/tests/probe-.*\.sh' "$PHASE_DIR"/*-PLAN.md "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
+```
+
+**Execution contract:**
+
+1. Build the probe list from explicit PLAN declarations first; include conventional `scripts/*/tests/probe-*.sh` when the phase is a migration/tooling phase or the success criteria mention probes.
+2. For every documented probe path, if the file is missing or not executable/readable, mark `MISSING_PROBE` and set `status: gaps_found`.
+3. Run each discovered probe from the repository root:
+
+```bash
+for probe in $(find scripts -path '*/tests/probe-*.sh' -type f 2>/dev/null | sort); do
+  timeout 30s bash "$probe"
+done
+```
+
+4. Exit code 0 is PASS. Any non-zero exit is FAILED and must include stdout/stderr evidence in VERIFICATION.md.
+5. Do not substitute executor narration, SUMMARY.md PASS-marker counts, or a different dry-run driver command for the probe result.
+
+**Probe status:**
+
+| Probe | Command | Result | Status |
+| ----- | ------- | ------ | ------ |
+| `scripts/.../probe-name.sh` | `bash "$probe"` | exit code/output | PASS / FAILED / MISSING_PROBE |
+
 ## Step 8: Identify Human Verification Needs
 
 **Always needs human:** Visual appearance, user flow completion, real-time behavior, external service integration, performance feel, error message clarity.
@@ -719,6 +756,11 @@ Only include this section if deferred items exist (from Step 9b).
 
 | Behavior | Command | Result | Status |
 | -------- | ------- | ------ | ------ |
+
+### Probe Execution
+
+| Probe | Command | Result | Status |
+| ----- | ------- | ------ | ------ |
 
 ### Requirements Coverage
 
