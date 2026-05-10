@@ -27,8 +27,9 @@ import type { ContextEngine } from './context-engine.js';
 import type { GSDLogger } from './logger.js';
 import { runPhaseStepSession, runPlanSession } from './session-runner.js';
 import { parsePlanFile } from './plan-parser.js';
+import { realpathSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { checkResearchGate } from './research-gate.js';
 
 // ─── Error type ──────────────────────────────────────────────────────────────
@@ -900,7 +901,8 @@ export class PhaseRunner {
         if (!debtCheck.pass) {
           this.logger?.warn(`Verification blocked by unresolved architectural debt markers in phase ${phaseNumber}`, {
             phase: phaseNumber,
-            findings: debtCheck.findings,
+            findingCount: debtCheck.findings.length,
+            findings: debtCheck.findings.map(({ file, line, marker }) => ({ file, line, marker })),
           });
           outcome = 'architectural_debt';
           break;
@@ -1292,7 +1294,7 @@ export class PhaseRunner {
 
   private findUnresolvedDebtMarkers(file: string, content: string): ArchitecturalDebtFinding[] {
     const findings: ArchitecturalDebtFinding[] = [];
-    const markerPattern = /\b(TBD|FIXME|XXX)\b/;
+    const markerPattern = /\b(TBD|FIXME|XXX)\b(?!\.)/i;
     const lines = content.split(/\r?\n/);
 
     lines.forEach((line, index) => {
@@ -1303,7 +1305,7 @@ export class PhaseRunner {
         findings.push({
           file,
           line: index + 1,
-          marker: match[1],
+          marker: match[1].toUpperCase(),
           text: line.trim(),
         });
       }
@@ -1317,13 +1319,38 @@ export class PhaseRunner {
   }
 
   private resolveProjectPath(pathValue: string): string | undefined {
-    const root = resolve(this.projectDir);
-    const absolutePath = isAbsolute(pathValue) ? resolve(pathValue) : resolve(root, pathValue);
-    const relativePath = relative(root, absolutePath);
+    const root = this.realpathForBoundary(resolve(this.projectDir));
+    if (!root) return undefined;
+
+    const absolutePath = isAbsolute(pathValue) ? resolve(pathValue) : resolve(this.projectDir, pathValue);
+    const canonicalPath = this.realpathForBoundary(absolutePath);
+    if (!canonicalPath) return undefined;
+
+    const relativePath = relative(root, canonicalPath);
     if (relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath))) {
-      return absolutePath;
+      return canonicalPath;
     }
     return undefined;
+  }
+
+  private realpathForBoundary(pathValue: string): string | undefined {
+    const missingSegments: string[] = [];
+    let currentPath = pathValue;
+
+    while (true) {
+      try {
+        return join(realpathSync(currentPath), ...missingSegments.reverse());
+      } catch (err) {
+        const code = typeof err === 'object' && err !== null && 'code' in err ? (err as { code?: unknown }).code : undefined;
+        if (code !== 'ENOENT') return undefined;
+
+        const parent = dirname(currentPath);
+        if (parent === currentPath) return undefined;
+
+        missingSegments.push(basename(currentPath));
+        currentPath = parent;
+      }
+    }
   }
 
   /**

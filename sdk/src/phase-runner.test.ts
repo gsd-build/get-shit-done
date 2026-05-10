@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PhaseRunner, PhaseRunnerError } from './phase-runner.js';
@@ -839,7 +839,7 @@ Use TypeScript.`, 'utf-8');
       expect(result.steps.map(s => s.step)).toContain(PhaseStepType.Advance);
     });
 
-    it('allows lowercase placeholder text when scanning debt markers', async () => {
+    it('allows dotted lowercase xxx placeholder text when scanning debt markers', async () => {
       const projectDir = await mkdtemp(join(tmpdir(), 'gsd-lowercase-placeholder-'));
       tempProjectDirs.push(projectDir);
       const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
@@ -847,7 +847,7 @@ Use TypeScript.`, 'utf-8');
       await mkdir(phaseDir, { recursive: true });
       await mkdir(sourceDir, { recursive: true });
       await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
-      await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\napi_host="xxx.example.test"\n# tbd in a lowercase note\n', 'utf-8');
+      await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\napi_host="xxx.example.test"\n', 'utf-8');
 
       const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
       const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
@@ -861,6 +861,31 @@ Use TypeScript.`, 'utf-8');
       expect(result.success).toBe(true);
       expect(deps.tools.phaseComplete).toHaveBeenCalledWith('1');
       expect(result.steps.map(s => s.step)).toContain(PhaseStepType.Advance);
+    });
+
+    it('keeps phase pending when changed files contain lowercase debt markers', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'gsd-lowercase-debt-'));
+      tempProjectDirs.push(projectDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      const sourceDir = join(projectDir, 'scripts', 'upstream');
+      await mkdir(phaseDir, { recursive: true });
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["scripts/upstream/run.sh"]\n---\n', 'utf-8');
+      await writeFile(join(sourceDir, 'run.sh'), '#!/usr/bin/env bash\n# fixme: wire retry handling before release\n', 'utf-8');
+
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      mockParsePlanFile.mockResolvedValue(makeParsedPlan(['scripts/upstream/run.sh']));
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
+
+      expect(result.success).toBe(false);
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
     it('reports one unresolved debt finding per line', async () => {
@@ -891,6 +916,32 @@ Use TypeScript.`, 'utf-8');
         line: 2,
         marker: 'TBD',
       });
+      expect(blockCall?.[1].findings[0]).not.toHaveProperty('text');
+    });
+
+    it('keeps phase pending when a declared file resolves through a symlink outside the project', async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'gsd-symlink-project-'));
+      const externalDir = await mkdtemp(join(tmpdir(), 'gsd-symlink-external-'));
+      tempProjectDirs.push(projectDir, externalDir);
+      const phaseDir = join(projectDir, '.planning', 'phases', '01-auth');
+      await mkdir(phaseDir, { recursive: true });
+      await writeFile(join(phaseDir, '01-PLAN.md'), '---\nfiles_modified: ["linked-outside/secret.sh"]\n---\n', 'utf-8');
+      await writeFile(join(externalDir, 'secret.sh'), '#!/usr/bin/env bash\necho safe\n', 'utf-8');
+      await symlink(externalDir, join(projectDir, 'linked-outside'), 'dir');
+
+      const phaseOp = makePhaseOp({ phase_dir: phaseDir, has_context: true, has_plans: true, plan_count: 1 });
+      const config = makeConfig({ workflow: { research: false, skip_discuss: true, plan_check: false } as any });
+      const deps = makeDeps({ projectDir, config });
+      (deps.tools.initPhaseOp as ReturnType<typeof vi.fn>).mockResolvedValue(phaseOp);
+      mockParsePlanFile.mockResolvedValue(makeParsedPlan(['linked-outside/secret.sh']));
+
+      const runner = new PhaseRunner(deps);
+      const result = await runner.run('1');
+
+      expect(result.success).toBe(false);
+      const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
+      expect(verifyStep?.error).toBe('verification_architectural_debt');
+      expect(deps.tools.phaseComplete).not.toHaveBeenCalled();
     });
 
     it('does not advance when verification status cannot be checked', async () => {
