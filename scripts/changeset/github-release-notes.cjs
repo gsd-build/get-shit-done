@@ -37,8 +37,26 @@ function runGit(repo, args) {
   });
 }
 
+function validateGitRef({ repo, ref, label }) {
+  if (typeof ref !== 'string' || ref.trim() !== ref || ref.length === 0) {
+    throw new Error(`Invalid git ref for ${label}: expected a non-empty trimmed string`);
+  }
+  if (
+    ref.startsWith('-') ||
+    ref.includes('..') ||
+    ref.includes('//') ||
+    !/^[A-Za-z0-9._/-]+$/.test(ref)
+  ) {
+    throw new Error(`Invalid git ref for ${label}: ${ref}`);
+  }
+  runGit(repo, ['rev-parse', '--verify', `${ref}^{commit}`]);
+  return ref;
+}
+
 function changedFragmentPaths({ repo, fromRef, toRef }) {
-  const out = runGit(repo, ['diff', '--name-only', `${fromRef}..${toRef}`, '--', '.changeset']);
+  const from = validateGitRef({ repo, ref: fromRef, label: 'fromRef' });
+  const to = validateGitRef({ repo, ref: toRef, label: 'toRef' });
+  const out = runGit(repo, ['diff', '--name-only', `${from}..${to}`, '--', '.changeset']);
   return out
     .split(/\r?\n/)
     .filter(Boolean)
@@ -107,13 +125,20 @@ function buildGithubReleaseNotesIr({ fragments }) {
 }
 
 function formatBullet(fragment) {
+  if (!Number.isInteger(fragment.pr) || fragment.pr <= 0) {
+    throw new Error(`Fragment ${fragment.slug || fragment.file || '<unknown>'} missing valid pr field`);
+  }
   const body = `${fragment.body.trim()} (#${fragment.pr})`;
   const lines = body.split(/\r?\n/);
   return lines.map((line, index) => (index === 0 ? `- ${line}` : `  ${line}`)).join('\n');
 }
 
 function compareUrl({ repoSlug, fromRef, toRef }) {
-  return `https://github.com/${repoSlug}/compare/${fromRef}...${toRef}`;
+  const normalizedSlug = String(repoSlug || '').trim();
+  if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(normalizedSlug)) {
+    throw new Error(`Invalid repoSlug format: ${repoSlug} (expected "owner/repo")`);
+  }
+  return `https://github.com/${normalizedSlug}/compare/${fromRef}...${toRef}`;
 }
 
 function serializeGithubReleaseNotes({
@@ -166,4 +191,5 @@ module.exports = {
   serializeGithubReleaseNotes,
   renderGithubReleaseNotes,
   classifyGroup,
+  validateGitRef,
 };

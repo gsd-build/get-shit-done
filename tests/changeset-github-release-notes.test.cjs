@@ -13,6 +13,7 @@ const SCRIPT = path.join(ROOT, 'scripts', 'changeset', 'cli.cjs');
 const {
   loadFragmentsFromRange,
   buildGithubReleaseNotesIr,
+  serializeGithubReleaseNotes,
   renderGithubReleaseNotes,
 } = require(path.join(ROOT, 'scripts', 'changeset', 'github-release-notes.cjs'));
 
@@ -111,5 +112,41 @@ describe('changeset github release notes: tag-range renderer (#3382)', () => {
       installCommand: 'npx get-shit-done-cc@latest',
     });
     assert.equal(fs.readFileSync(output, 'utf8'), generated.body);
+  });
+
+  test('rejects unsafe git refs before rendering a range', () => {
+    const repo = createTaggedRepo();
+    assert.throws(
+      () => loadFragmentsFromRange({ repo, fromRef: '--help', toRef: 'v1.0.1' }),
+      /Invalid git ref/,
+    );
+  });
+
+  test('validates PR metadata and repo slug before serializing release notes', () => {
+    assert.throws(
+      () => serializeGithubReleaseNotes({
+        ir: {
+          sections: [
+            {
+              type: 'Fixed',
+              groups: [{ title: 'Other fixes', bullets: [{ slug: 'missing-pr', body: 'missing pr' }] }],
+            },
+          ],
+        },
+        fromRef: 'v1.0.0',
+        toRef: 'v1.0.1',
+      }),
+      /missing valid pr field/,
+    );
+
+    assert.throws(
+      () => serializeGithubReleaseNotes({
+        ir: { sections: [] },
+        fromRef: 'v1.0.0',
+        toRef: 'v1.0.1',
+        repoSlug: 'owner/repo/extra',
+      }),
+      /Invalid repoSlug format/,
+    );
   });
 });

@@ -181,7 +181,6 @@ function cmdRender(opts) {
 }
 
 function cmdGithubReleaseNotes(opts) {
-  const fs = require('node:fs');
   const repo = path.resolve(opts.repo);
   const report = renderGithubReleaseNotes({
     repo,
