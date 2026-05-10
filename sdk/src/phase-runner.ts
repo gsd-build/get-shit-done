@@ -47,7 +47,7 @@ export class PhaseRunnerError extends Error {
 
 // ─── Verification result enum ────────────────────────────────────────────────
 
-export type VerificationOutcome = 'passed' | 'human_needed' | 'gaps_found' | 'architectural_debt';
+export type VerificationOutcome = 'passed' | 'human_needed' | 'gaps_found' | 'architectural_debt' | 'status_unreadable';
 
 interface ArchitecturalDebtFinding {
   file: string;
@@ -945,6 +945,10 @@ export class PhaseRunner {
         }
       }
 
+      if (outcome === 'status_unreadable') {
+        break;
+      }
+
       if (outcome === 'gaps_found') {
         if (gapRetryCount < maxGapRetries) {
           gapRetryCount++;
@@ -1002,7 +1006,7 @@ export class PhaseRunner {
       step: PhaseStepType.Verify,
       success: verifySuccess,
       durationMs,
-      ...(!verifySuccess && { error: `verification_${outcome}` }),
+      ...(!verifySuccess && { error: this.verificationErrorForOutcome(outcome) }),
     });
 
     return {
@@ -1010,7 +1014,7 @@ export class PhaseRunner {
       success: verifySuccess,
       durationMs,
       planResults: allPlanResults,
-      ...(!verifySuccess && { error: `verification_${outcome}` }),
+      ...(!verifySuccess && { error: this.verificationErrorForOutcome(outcome) }),
     };
   }
 
@@ -1167,8 +1171,13 @@ export class PhaseRunner {
     } catch (err) {
       // Can't parse VERIFICATION.md — fail closed so a missing/broken status check never completes the phase.
       this.logger?.warn(`Could not check verification status for phase ${phaseNumber}: ${err instanceof Error ? err.message : String(err)}`);
-      return 'gaps_found';
+      return 'status_unreadable';
     }
+  }
+
+  private verificationErrorForOutcome(outcome: VerificationOutcome): string {
+    if (outcome === 'status_unreadable') return 'verification_gaps_found';
+    return `verification_${outcome}`;
   }
 
   /**

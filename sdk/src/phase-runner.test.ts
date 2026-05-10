@@ -838,6 +838,8 @@ Use TypeScript.`, 'utf-8');
       const verifyStep = result.steps.find(s => s.step === PhaseStepType.Verify);
       expect(verifyStep?.success).toBe(false);
       expect(verifyStep?.error).toBe('verification_gaps_found');
+      expect(mockRunPhaseStepSession.mock.calls.filter((call) => call[1] === PhaseStepType.Plan)).toHaveLength(1);
+      expect(mockRunPhaseStepSession.mock.calls.filter((call) => call[1] === PhaseStepType.Execute)).toHaveLength(1);
     });
 
     it('keeps phase pending when plan files cannot be listed for the debt scan', async () => {

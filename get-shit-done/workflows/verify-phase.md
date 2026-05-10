@@ -329,8 +329,8 @@ Extract files modified in this phase from SUMMARY.md, scan each:
 
 | Pattern | Search | Severity |
 |---------|--------|----------|
-| TBD/FIXME/XXX without same-line `issue #123`, `PR #123`, `#123`, or `DEF-*` reference | `grep -n -E "TBD|FIXME|XXX"` | 🛑 Blocker |
-| TODO/HACK | `grep -n -E "TODO|HACK"` | ⚠️ Warning |
+| TBD/FIXME/XXX without same-line `issue #123`, `PR #123`, `#123`, or `DEF-*` reference | `grep -n -e TBD -e FIXME -e XXX` | 🛑 Blocker |
+| TODO/HACK | `grep -n -e TODO -e HACK` | ⚠️ Warning |
 | Placeholder content | `grep -n -iE "placeholder\|coming soon\|will be here"` | 🛑 Blocker |
 | Empty returns | `grep -n -E "return null\|return \{\}\|return \[\]\|=> \{\}"` | ⚠️ Warning |
 | Log-only functions | Functions containing only console.log | ⚠️ Warning |
