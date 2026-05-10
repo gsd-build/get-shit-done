@@ -16,7 +16,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const { installSdkIfNeeded } = require('../bin/install.js');
+const { installSdkIfNeeded, readGsdSdkVersion } = require('../bin/install.js');
+const cp = require('node:child_process');
 const pkg = require('../package.json');
 const { createTempDir, cleanup } = require('./helpers.cjs');
 
@@ -87,7 +88,7 @@ describe('bug #3359: installer detects stale gsd-sdk earlier on PATH', () => {
     cleanup(tmpRoot);
   });
 
-  test('does not print ready when resolved gsd-sdk version differs from installer package version', () => {
+	  test('does not print ready when resolved gsd-sdk version differs from installer package version', () => {
     const staleSdk = path.join(pathDir, 'gsd-sdk');
     fs.writeFileSync(
       staleSdk,
@@ -120,5 +121,49 @@ describe('bug #3359: installer detects stale gsd-sdk earlier on PATH', () => {
       !/GSD SDK ready/.test(combined),
       `installer must not report ready while PATH resolves a stale gsd-sdk. Output:\n${combined}`,
     );
-  });
-});
+	  });
+
+	  test('prints ready when no stale gsd-sdk is on PATH', () => {
+	    const currentSdk = path.join(pathDir, 'gsd-sdk');
+	    fs.writeFileSync(
+	      currentSdk,
+	      `#!/bin/sh\nprintf "%s\\n" "gsd-sdk v${pkg.version}"\n`,
+	      { mode: 0o755 },
+	    );
+
+	    const { stdout, stderr } = captureConsole(() => {
+	      installSdkIfNeeded({ sdkDir });
+	    });
+	    const combined = `${stdout}\n${stderr}`;
+
+	    assert.ok(
+	      /GSD SDK ready/.test(combined),
+	      `installer must report ready when no stale gsd-sdk exists. Output:\n${combined}`,
+	    );
+	  });
+
+	  test('reads Windows cmd shim versions through cmd.exe', () => {
+	    const originalSpawnSync = cp.spawnSync;
+	    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+	    const calls = [];
+	    cp.spawnSync = (command, args, options) => {
+	      calls.push({ command, args, options });
+	      return { status: 0, stdout: `gsd-sdk v${pkg.version}\n`, stderr: '' };
+	    };
+	    Object.defineProperty(process, 'platform', { value: 'win32' });
+
+	    try {
+	      assert.equal(readGsdSdkVersion('C:\\tools\\gsd-sdk.cmd'), pkg.version);
+	    } finally {
+	      cp.spawnSync = originalSpawnSync;
+	      Object.defineProperty(process, 'platform', platformDescriptor);
+	    }
+
+	    assert.deepEqual(calls.map(({ command, args }) => ({ command, args })), [{
+	      command: 'cmd.exe',
+	      args: ['/c', 'C:\\tools\\gsd-sdk.cmd', '--version'],
+	    }]);
+	    assert.equal(calls[0].options.encoding, 'utf8');
+	    assert.equal(calls[0].options.timeout, 2000);
+	  });
+	});

@@ -10069,7 +10069,8 @@ function readGsdSdkVersion(sdkPath) {
   if (!sdkPath) return null;
   const cp = require('child_process');
   try {
-    const result = cp.spawnSync(sdkPath, ['--version'], {
+    const isWindowsCommandShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(String(sdkPath));
+    const result = cp.spawnSync(isWindowsCommandShim ? 'cmd.exe' : sdkPath, isWindowsCommandShim ? ['/c', sdkPath, '--version'] : ['--version'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 2000,
@@ -10595,6 +10596,7 @@ if (process.env.GSD_TEST_MODE) {
     buildSdkFailFastReport,
     renderSdkFailFastReport,
     classifySdkInstall,
+    readGsdSdkVersion,
     convertClaudeCommandToCodexSkill,
     convertClaudeToOpencodeFrontmatter,
     convertClaudeToKiloFrontmatter,
