@@ -26,11 +26,11 @@ function runGsd(args, cwd) {
 describe('bug #3212 execute-phase stall detection and safe resume', () => {
   test('config schemas register executor stall detector keys', () => {
     const cjs = require('../get-shit-done/bin/lib/config-schema.cjs');
-    const sdk = read('sdk/src/query/config-schema.ts');
+    const sharedSchema = JSON.parse(read('sdk/shared/config-schema.json'));
 
     for (const key of ['executor.stall_detect_interval_minutes', 'executor.stall_threshold_minutes']) {
       assert.ok(cjs.VALID_CONFIG_KEYS.has(key), `CJS VALID_CONFIG_KEYS must include ${key}`);
-      assert.ok(sdk.includes(`'${key}'`), `SDK VALID_CONFIG_KEYS must include ${key}`);
+      assert.ok(sharedSchema.validConfigKeys.includes(key), `Config Schema Module must include ${key}`);
     }
   });
 

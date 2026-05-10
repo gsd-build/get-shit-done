@@ -16,6 +16,9 @@ Canonical error kind set:
 ### Command Definition Module
 Canonical command metadata Interface powering alias, catalog, and semantics generation.
 
+### Config Schema Module
+Shared schema-data Module owning exact config key registration, runtime-state config key registration, and dynamic config key pattern sources. CJS and SDK config schema files are thin Adapters over this seam; config mutation handlers consume the projected Interface for validation and suggestions, while docs tests consume the user-facing exact-key projection for documentation parity.
+
 ### Query Runtime Context Module
 Module owning query-time context resolution for `projectDir` and `ws`, including precedence and validation policy used by query adapters.
 

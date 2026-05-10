@@ -1,118 +1,61 @@
 'use strict';
 
 /**
- * CJS↔SDK config-schema parity (#2653).
+ * Config Schema Module Interface coverage.
  *
- * The SDK has its own config-set handler at sdk/src/query/config-mutation.ts,
- * which validates keys against sdk/src/query/config-schema.ts. That allowlist
- * MUST match the CJS allowlist at get-shit-done/bin/lib/config-schema.cjs or
- * SDK users are told "Unknown config key" for documented keys (regression
- * that #2653 fixes).
- *
- * This test parses the TS file as text (to avoid requiring a TS toolchain
- * in the node:test runner) and asserts:
- *   1. Every key in CJS VALID_CONFIG_KEYS appears in the SDK literal set.
- *   2. Every dynamic pattern source in CJS has an identical counterpart
- *      in the SDK file.
- *   3. The reverse direction — SDK has no keys/patterns the CJS side lacks.
+ * CJS and SDK config-schema files are thin Adapters over sdk/shared/config-schema.json.
+ * These tests assert both Adapters project the same shared Interface instead of
+ * parsing mirrored source text.
  */
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..');
 const {
+  CONFIG_SCHEMA_DATA: CJS_DATA,
   VALID_CONFIG_KEYS: CJS_KEYS,
   RUNTIME_STATE_KEYS: CJS_RUNTIME_KEYS,
   DYNAMIC_KEY_PATTERNS: CJS_PATTERNS,
 } =
   require('../get-shit-done/bin/lib/config-schema.cjs');
 
-const SDK_SCHEMA_PATH = path.join(ROOT, 'sdk', 'src', 'query', 'config-schema.ts');
-const SDK_SRC = fs.readFileSync(SDK_SCHEMA_PATH, 'utf8');
+const SHARED_SCHEMA = require('../sdk/shared/config-schema.json');
+const SDK_SCHEMA_URL = pathToFileURL(path.join(ROOT, 'sdk', 'dist', 'query', 'config-schema.js')).href;
 
-function extractSdkSet(src, setName) {
-  const start = src.indexOf(setName);
-  assert.ok(start > -1, `SDK config-schema.ts must export ${setName}`);
-  const setOpen = src.indexOf('new Set([', start);
-  const setClose = src.indexOf('])', setOpen);
-  assert.ok(setOpen > -1 && setClose > -1, `${setName} must be a new Set([...]) literal`);
-  const body = src.slice(setOpen + 'new Set(['.length, setClose);
-  const keys = new Set();
-  for (const match of body.matchAll(/'([^']+)'/g)) keys.add(match[1]);
-  return keys;
-}
-
-function extractSdkPatternSources(src) {
-  const sources = [];
-  for (const match of src.matchAll(/source:\s*'([^']+)'/g)) {
-    // TS source file stores escape sequences; convert \\ -> \ so the
-    // extracted value matches RegExp.source from the CJS side.
-    sources.push(match[1].replace(/\\\\/g, '\\'));
+test('shared config-schema data has the expected shape', () => {
+  assert.ok(Array.isArray(SHARED_SCHEMA.validConfigKeys), 'validConfigKeys must be an array');
+  assert.ok(Array.isArray(SHARED_SCHEMA.runtimeStateKeys), 'runtimeStateKeys must be an array');
+  assert.ok(Array.isArray(SHARED_SCHEMA.dynamicKeyPatterns), 'dynamicKeyPatterns must be an array');
+  assert.equal(new Set(SHARED_SCHEMA.validConfigKeys).size, SHARED_SCHEMA.validConfigKeys.length, 'validConfigKeys must not contain duplicates');
+  assert.equal(new Set(SHARED_SCHEMA.runtimeStateKeys).size, SHARED_SCHEMA.runtimeStateKeys.length, 'runtimeStateKeys must not contain duplicates');
+  for (const pattern of SHARED_SCHEMA.dynamicKeyPatterns) {
+    assert.equal(typeof pattern.topLevel, 'string');
+    assert.equal(typeof pattern.source, 'string');
+    assert.equal(typeof pattern.description, 'string');
+    assert.doesNotThrow(() => new RegExp(pattern.source), `invalid dynamic pattern source: ${pattern.source}`);
   }
-  return sources;
-}
+});
 
-test('#2653 — SDK VALID_CONFIG_KEYS matches CJS VALID_CONFIG_KEYS', () => {
-  const sdkKeys = extractSdkSet(SDK_SRC, 'VALID_CONFIG_KEYS');
-  const missingInSdk = [...CJS_KEYS].filter((k) => !sdkKeys.has(k));
-  const extraInSdk = [...sdkKeys].filter((k) => !CJS_KEYS.has(k));
+test('CJS Adapter projects the shared Config Schema Module data', () => {
+  assert.deepStrictEqual(CJS_DATA, SHARED_SCHEMA);
+  assert.deepStrictEqual([...CJS_KEYS], SHARED_SCHEMA.validConfigKeys);
+  assert.deepStrictEqual([...CJS_RUNTIME_KEYS], SHARED_SCHEMA.runtimeStateKeys);
   assert.deepStrictEqual(
-    missingInSdk,
-    [],
-    'CJS keys missing from sdk/src/query/config-schema.ts:\n' +
-      missingInSdk.map((k) => '  ' + k).join('\n'),
-  );
-  assert.deepStrictEqual(
-    extraInSdk,
-    [],
-    'SDK keys missing from get-shit-done/bin/lib/config-schema.cjs:\n' +
-      extraInSdk.map((k) => '  ' + k).join('\n'),
+    CJS_PATTERNS.map(({ topLevel, source, description }) => ({ topLevel, source, description })),
+    SHARED_SCHEMA.dynamicKeyPatterns,
   );
 });
 
-test('#3162 — SDK RUNTIME_STATE_KEYS matches CJS RUNTIME_STATE_KEYS', () => {
-  const sdkRuntimeKeys = extractSdkSet(SDK_SRC, 'RUNTIME_STATE_KEYS');
-  const missingInSdk = [...CJS_RUNTIME_KEYS].filter((k) => !sdkRuntimeKeys.has(k));
-  const extraInSdk = [...sdkRuntimeKeys].filter((k) => !CJS_RUNTIME_KEYS.has(k));
+test('SDK Adapter projects the shared Config Schema Module data', async () => {
+  const sdkSchema = await import(SDK_SCHEMA_URL);
+  assert.deepStrictEqual(sdkSchema.CONFIG_SCHEMA_DATA, SHARED_SCHEMA);
+  assert.deepStrictEqual([...sdkSchema.VALID_CONFIG_KEYS], SHARED_SCHEMA.validConfigKeys);
+  assert.deepStrictEqual([...sdkSchema.RUNTIME_STATE_KEYS], SHARED_SCHEMA.runtimeStateKeys);
   assert.deepStrictEqual(
-    missingInSdk,
-    [],
-    'CJS runtime-state keys missing from sdk/src/query/config-schema.ts:\n' +
-      missingInSdk.map((k) => '  ' + k).join('\n'),
+    sdkSchema.DYNAMIC_KEY_PATTERNS.map(({ topLevel, source, description }) => ({ topLevel, source, description })),
+    SHARED_SCHEMA.dynamicKeyPatterns,
   );
-  assert.deepStrictEqual(
-    extraInSdk,
-    [],
-    'SDK runtime-state keys missing from get-shit-done/bin/lib/config-schema.cjs:\n' +
-      extraInSdk.map((k) => '  ' + k).join('\n'),
-  );
-});
-
-test('#2653 — SDK DYNAMIC_KEY_PATTERNS sources match CJS regex .source', () => {
-  const sdkSources = new Set(extractSdkPatternSources(SDK_SRC));
-  const cjsSources = CJS_PATTERNS.map((p) => {
-    // Reconstruct each CJS pattern's .source by probing with a known string
-    // that identifies the regex. CJS stores a `test` arrow only, so derive
-    // `.source` by running against sentinel inputs — instead, inspect function
-    // text as a fallback cross-check.
-    const fnSrc = p.test.toString();
-    const regexMatch = fnSrc.match(/\/(\^[^/]+\$)\//);
-    assert.ok(regexMatch, 'CJS dynamic pattern test function must embed a literal regex: ' + fnSrc);
-    return regexMatch[1];
-  });
-  for (const src of cjsSources) {
-    assert.ok(
-      sdkSources.has(src),
-      `CJS dynamic pattern ${src} not mirrored in SDK config-schema.ts (sources: ${[...sdkSources].join(', ')})`,
-    );
-  }
-  for (const src of sdkSources) {
-    assert.ok(
-      cjsSources.includes(src),
-      `SDK dynamic pattern ${src} not mirrored in CJS config-schema.cjs`,
-    );
-  }
 });

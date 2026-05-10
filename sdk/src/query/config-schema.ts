@@ -1,148 +1,57 @@
+import { readFileSync } from 'node:fs';
+
 /**
- * SDK-side mirror of get-shit-done/bin/lib/config-schema.cjs.
+ * Thin SDK Adapter over the Config Schema Module shared data.
  *
- * Single source of truth for valid config key paths accepted by
- * `config-set`. MUST stay in sync with the CJS schema — enforced
- * by tests/config-schema-sdk-parity.test.cjs (CI drift guard).
- *
- * If you add/remove a key here, make the identical change in
- * get-shit-done/bin/lib/config-schema.cjs (and vice versa). The
- * parity test asserts the two allowlists are set-equal and that
- * DYNAMIC_KEY_PATTERN_SOURCES produce identical regex source strings.
- *
- * See #2653 — CJS/SDK drift caused config-set to reject documented
- * keys. #2479 added CJS↔docs parity; #2653 adds CJS↔SDK parity.
+ * The shared data is shipped with both the root package and standalone SDK.
+ * This file preserves the existing SDK exports while keeping schema ownership
+ * behind one Interface.
  */
 
+/**
+ * Dynamic-pattern validators — keys matching these regexes are also accepted.
+ */
+export interface DynamicKeyPattern {
+  readonly test: (k: string) => boolean;
+  readonly topLevel: string;
+  readonly description: string;
+  readonly source: string;
+}
+
+interface ConfigSchemaData {
+  readonly validConfigKeys: readonly string[];
+  readonly runtimeStateKeys: readonly string[];
+  readonly dynamicKeyPatterns: ReadonlyArray<{
+    readonly topLevel: string;
+    readonly source: string;
+    readonly description: string;
+  }>;
+}
+
+const schemaUrl = new URL('../../shared/config-schema.json', import.meta.url);
+
+export const CONFIG_SCHEMA_DATA = JSON.parse(
+  readFileSync(schemaUrl, 'utf-8'),
+) as ConfigSchemaData;
+
 /** Exact-match config key paths accepted by config-set. */
-export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
-  'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
-  'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
-  'workflow.research', 'workflow.plan_check', 'workflow.verifier',
-  'workflow.nyquist_validation', 'workflow.ai_integration_phase', 'workflow.ui_phase', 'workflow.ui_safety_gate',
-  'workflow.auto_advance', 'workflow.node_repair', 'workflow.node_repair_budget',
-  'workflow.tdd_mode',
-  'workflow.human_verify_mode',
-  'workflow.text_mode',
-  'workflow.research_before_questions',
-  'workflow.discuss_mode',
-  'workflow.skip_discuss',
-  'workflow.auto_prune_state',
-  'workflow.use_worktrees',
-  'workflow.worktree_skip_hooks',
-  'workflow.code_review',
-  'workflow.code_review_depth',
-  'workflow.code_review_command',
-  'workflow.pattern_mapper',
-  'workflow.plan_bounce',
-  'workflow.plan_bounce_script',
-  'workflow.plan_bounce_passes',
-  'workflow.plan_chunked',
-  'workflow.plan_review_convergence',
-  'workflow.post_planning_gaps',
-  'workflow.security_enforcement',
-  'workflow.security_asvs_level',
-  'workflow.security_block_on',
-  'workflow.drift_threshold',
-  'workflow.drift_action',
-  'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
-  'planning.commit_docs', 'planning.search_gitignored', 'planning.sub_repos',
-  'review.ollama_host', 'review.lm_studio_host', 'review.llama_cpp_host',
-  'workflow.cross_ai_execution', 'workflow.cross_ai_command', 'workflow.cross_ai_timeout',
-  'workflow.subagent_timeout',
-  'executor.stall_detect_interval_minutes',
-  'executor.stall_threshold_minutes',
-  'workflow.inline_plan_threshold',
-  'hooks.context_warnings',
-  'hooks.workflow_guard',
-  'workflow.context_coverage_gate',
-  'statusline.show_last_command',
-  'workflow.ui_review',
-  'workflow.max_discuss_passes',
-  'features.thinking_partner',
-  'context',
-  'features.global_learnings',
-  'learnings.max_inject',
-  'project_code', 'phase_naming',
-  'manager.flags.discuss', 'manager.flags.plan', 'manager.flags.execute',
-  'response_language',
-  'context_window',
-  'intel.enabled',
-  'graphify.enabled',
-  'graphify.build_timeout',
-  'claude_md_path',
-  'claude_md_assembly.mode',
-  // #2517 — runtime-aware model profiles
-  'runtime',
-  // #3162 — documented top-level key: controls model ID resolution for non-Claude runtimes
-  'resolve_model_ids',
-]);
+export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set(CONFIG_SCHEMA_DATA.validConfigKeys);
 
 /**
  * Internal runtime-state keys accepted by config-set workflows but not exposed
  * as user-facing config options.
  */
-export const RUNTIME_STATE_KEYS: ReadonlySet<string> = new Set([
-  'workflow._auto_chain_active',
-]);
+export const RUNTIME_STATE_KEYS: ReadonlySet<string> = new Set(CONFIG_SCHEMA_DATA.runtimeStateKeys);
 
-/**
- * Dynamic-pattern validators — keys matching these regexes are also accepted.
- * Each entry's `source` MUST equal the corresponding CJS regex `.source`
- * (the parity test enforces this).
- */
-export interface DynamicKeyPattern {
-  readonly test: (k: string) => boolean;
-  readonly description: string;
-  readonly source: string;
-}
-
-export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = [
-  {
-    source: '^agent_skills\\.[a-zA-Z0-9_-]+$',
-    description: 'agent_skills.<agent-type>',
-    test: (k) => /^agent_skills\.[a-zA-Z0-9_-]+$/.test(k),
-  },
-  {
-    source: '^review\\.models\\.[a-zA-Z0-9_-]+$',
-    description: 'review.models.<cli-name>',
-    test: (k) => /^review\.models\.[a-zA-Z0-9_-]+$/.test(k),
-  },
-  {
-    source: '^features\\.[a-zA-Z0-9_]+$',
-    description: 'features.<feature_name>',
-    test: (k) => /^features\.[a-zA-Z0-9_]+$/.test(k),
-  },
-  {
-    source: '^claude_md_assembly\\.blocks\\.[a-zA-Z0-9_]+$',
-    description: 'claude_md_assembly.blocks.<section>',
-    test: (k) => /^claude_md_assembly\.blocks\.[a-zA-Z0-9_]+$/.test(k),
-  },
-  // #2517 — runtime-aware model profile overrides: model_profile_overrides.<runtime>.<tier>
-  {
-    source: '^model_profile_overrides\\.[a-zA-Z0-9_-]+\\.(opus|sonnet|haiku)$',
-    description: 'model_profile_overrides.<runtime>.<opus|sonnet|haiku>',
-    test: (k) => /^model_profile_overrides\.[a-zA-Z0-9_-]+\.(opus|sonnet|haiku)$/.test(k),
-  },
-  // #3023 — per-phase-type model map: models.<phase_type> = <tier>
-  {
-    source: '^models\\.(planning|discuss|research|execution|verification|completion)$',
-    description: 'models.<planning|discuss|research|execution|verification|completion>',
-    test: (k) => /^models\.(planning|discuss|research|execution|verification|completion)$/.test(k),
-  },
-  // #3024 — dynamic routing with failure-tier escalation
-  {
-    source: '^dynamic_routing\\.(enabled|escalate_on_failure|max_escalations|tier_models\\.(light|standard|heavy))$',
-    description: 'dynamic_routing.<enabled|escalate_on_failure|max_escalations|tier_models.<light|standard|heavy>>',
-    test: (k) => /^dynamic_routing\.(enabled|escalate_on_failure|max_escalations|tier_models\.(light|standard|heavy))$/.test(k),
-  },
-  // #3227 — per-agent model overrides: model_overrides.<agent-id>
-  {
-    source: '^model_overrides\\.[a-zA-Z0-9_-]+$',
-    description: 'model_overrides.<agent-id>',
-    test: (k) => /^model_overrides\.[a-zA-Z0-9_-]+$/.test(k),
-  },
-];
+export const DYNAMIC_KEY_PATTERNS: readonly DynamicKeyPattern[] = CONFIG_SCHEMA_DATA.dynamicKeyPatterns.map((pattern) => {
+  const regex = new RegExp(pattern.source);
+  return {
+    topLevel: pattern.topLevel,
+    source: pattern.source,
+    description: pattern.description,
+    test: (k: string) => regex.test(k),
+  };
+});
 
 /** Returns true if keyPath is a valid config key (exact, runtime-state, or dynamic pattern). */
 export function isValidConfigKeyPath(keyPath: string): boolean {

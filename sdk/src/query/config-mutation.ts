@@ -47,8 +47,8 @@ async function atomicWriteConfig(configPath: string, config: Record<string, unkn
 }
 
 // ─── VALID_CONFIG_KEYS ────────────────────────────────────────────────────
-// Imported from ./config-schema.js — single source of truth, kept in sync
-// with get-shit-done/bin/lib/config-schema.cjs by a CI parity test (#2653).
+// Imported from ./config-schema.js, which is a thin Adapter over the shared
+// Config Schema Module data shipped in sdk/shared/config-schema.json.
 
 // ─── CONFIG_KEY_SUGGESTIONS (D9 — match CJS config.cjs:57-67) ────────────
 
@@ -88,7 +88,7 @@ export function isValidConfigKey(keyPath: string): { valid: boolean; suggestion?
   if (VALID_CONFIG_KEYS.has(keyPath)) return { valid: true };
   if (RUNTIME_STATE_KEYS.has(keyPath)) return { valid: true };
 
-  // Dynamic patterns — all sourced from shared config-schema (#2653).
+  // Dynamic patterns — all sourced from the shared Config Schema Module.
   // Covers agent_skills.*, review.models.*, features.*,
   // claude_md_assembly.blocks.*, and model_profile_overrides.*.<tier>.
   if (DYNAMIC_KEY_PATTERNS.some((p) => p.test(keyPath))) return { valid: true };
@@ -366,7 +366,7 @@ export const configNewProject: QueryHandler = async (args, projectDir, workstrea
   // Build default config
   const defaults: Record<string, unknown> = {
     model_profile: 'balanced',
-    commit_docs: false,
+    commit_docs: true,
     parallelization: 1,
     search_gitignored: false,
     brave_search: hasBraveSearch,
