@@ -613,6 +613,27 @@ function formatManagedHookScriptToken(scriptPath, opts) {
   return JSON.stringify(scriptPath.replace(/\\/g, '/'));
 }
 
+function resolveBashRunner(opts) {
+  const platform = (opts && opts.platform) || process.platform;
+  if (platform !== 'win32') return 'bash';
+
+  const env = (opts && opts.env) || process.env;
+  const exists = (opts && opts.existsSync) || fs.existsSync;
+  const candidates = [];
+  if (env.GSD_BASH_PATH) candidates.push(env.GSD_BASH_PATH);
+  if (env.ProgramFiles) candidates.push(path.join(env.ProgramFiles, 'Git', 'bin', 'bash.exe'));
+  if (env['ProgramFiles(x86)']) candidates.push(path.join(env['ProgramFiles(x86)'], 'Git', 'bin', 'bash.exe'));
+  candidates.push('C:\\Program Files\\Git\\bin\\bash.exe');
+  candidates.push('C:\\Program Files (x86)\\Git\\bin\\bash.exe');
+
+  for (const candidate of candidates) {
+    if (candidate && exists(candidate)) {
+      return JSON.stringify(candidate.replace(/\\/g, '/'));
+    }
+  }
+  return null;
+}
+
 function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
   if (!settings || !settings.hooks || !absoluteRunner) return false;
   if (!opts) opts = {};
@@ -803,21 +824,19 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
-  // .sh hooks run under bare `bash` (PATH-resolved). POSIX guarantees
-  // /bin/sh but not /bin/bash, and distros like NixOS do not ship
-  // /bin/bash by default — so PATH-resolved `bash` is more portable than
-  // an absolute /bin/bash. The wrapping `bash <path>` invocation also
-  // means the script's own shebang (#!/usr/bin/env bash) is read as a
-  // comment in this code path; it only matters when the script is run
-  // directly (e.g. tests or future installer changes). .js hooks still
-  // need the absolute node path because GUI-launched runtimes start with
-  // a minimal PATH that does not include nvm/Homebrew/Volta-installed
-  // node binaries (#2979).
+  // POSIX .sh hooks run under PATH-resolved `bash`: POSIX guarantees /bin/sh
+  // but not /bin/bash, and distros like NixOS do not ship /bin/bash by default.
+  // Windows Codex launches hooks from PowerShell/cmd environments where bare
+  // `bash` may not be on PATH, so resolve Git Bash explicitly or return null so
+  // callers skip registration instead of installing a known-broken hook (#3393).
+  // .js hooks still need the absolute node path because GUI-launched runtimes
+  // start with a minimal PATH that may not include nvm/Homebrew/Volta node
+  // binaries (#2979).
   const nodeRunner = resolveNodeRunner();
-  const runner = hookName.endsWith('.sh') ? 'bash' : nodeRunner;
-  // resolveNodeRunner returns null when process.execPath is unavailable.
+  const runner = hookName.endsWith('.sh') ? resolveBashRunner(opts) : nodeRunner;
+  // Runner resolvers return null when the executable path is unavailable.
   // Fall through with null so callers can skip registration with a warning
-  // instead of emitting bare `node` (which would recreate the #2979 bug).
+  // instead of emitting a command that recreates the original hook failure.
   if (runner === null) return null;
 
   if (opts.portableHooks) {

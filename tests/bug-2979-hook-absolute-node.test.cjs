@@ -129,6 +129,27 @@ describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSI
     const parsed = parseHookCommand(cmd);
     assert.equal(parsed.runner, 'bash');
   });
+
+  test('Windows .sh hook uses resolved Git Bash path instead of bare bash (#3393)', () => {
+    const cmd = buildHookCommand('C:/Users/me/.codex', 'gsd-validate-commit.sh', {
+      platform: 'win32',
+      env: { ProgramFiles: 'C:\\Program Files' },
+      existsSync: (candidate) => candidate === 'C:\\Program Files\\Git\\bin\\bash.exe',
+    });
+    assert.equal(
+      cmd,
+      '& "C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.codex/hooks/gsd-validate-commit.sh"',
+    );
+  });
+
+  test('Windows .sh hook returns null when no supported Bash runner is found (#3393)', () => {
+    const cmd = buildHookCommand('C:/Users/me/.codex', 'gsd-phase-boundary.sh', {
+      platform: 'win32',
+      env: {},
+      existsSync: () => false,
+    });
+    assert.equal(cmd, null);
+  });
 });
 
 // ─── #3002 CR follow-up: legacy-bare-node migration ─────────────────────────
