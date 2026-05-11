@@ -4,13 +4,8 @@ Issues for this repo live in **GitHub Issues** at `gsd-build/get-shit-done`.
 
 ## Auth
 
-Always read the token from `.envrc` — never use the ambient `gh auth` session (it resolves to enterprise credentials that cannot access this repo):
-
-```bash
-export GITHUB_TOKEN=$(grep GITHUB_TOKEN .envrc | cut -d\' -f2)
-# or inline:
-GITHUB_TOKEN=$(grep GITHUB_TOKEN .envrc | cut -d\' -f2) gh issue create ...
-```
+Use the configured GitHub CLI session for this checkout. Do not require a
+repo-local `.envrc` before running `gh`.
 
 ## Conventions
 

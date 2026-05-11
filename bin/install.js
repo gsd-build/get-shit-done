@@ -594,9 +594,14 @@ function resolveNodeRunner() {
  *
  * Returns true if any entry was rewritten.
  */
-function formatHookCommandForShell(command, opts) {
+function shouldUsePowerShellCallOperator(opts) {
   const platform = (opts && opts.platform) || process.platform;
-  return platform === 'win32' ? `& ${command}` : command;
+  const runtime = opts && opts.runtime;
+  return platform === 'win32' && runtime !== 'claude';
+}
+
+function formatHookCommandForShell(command, opts) {
+  return shouldUsePowerShellCallOperator(opts) ? `& ${command}` : command;
 }
 
 function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
@@ -669,7 +674,7 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
 
         // Skip if already using the desired stable runner.
         if (runnerToken !== 'node' && runnerToken === absoluteRunner) {
-          if (platform !== 'win32' || hadPowerShellCallOperator) continue;
+          if (hadPowerShellCallOperator === shouldUsePowerShellCallOperator(opts)) continue;
         }
 
         h.command = formatHookCommandForShell(`${absoluteRunner} ${scriptToken}`, opts);
@@ -850,11 +855,13 @@ function cleanupLegacyCodexHooksJson(targetDir) {
  *
  * @param {string} configDir - Resolved absolute config directory path
  * @param {string} hookName - Hook filename (e.g. 'gsd-statusline.js')
- * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform }} [opts] - Options
+ * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform, runtime?: string }} [opts] - Options
  *   portableHooks: when true, emit $HOME-relative paths instead of absolute paths.
  *   Safe for Linux/macOS global installs and WSL/Docker bind-mount scenarios.
  *   Not suitable for pure Windows (cmd.exe/PowerShell do not expand $HOME).
  *   platform: test injection for shell command formatting. Defaults to process.platform.
+ *   runtime: runtime installing the hook. Claude Code runs Windows hooks through
+ *   bash-compatible shells, while Gemini/Antigravity need PowerShell's & prefix.
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
@@ -8777,12 +8784,13 @@ function install(isGlobal, runtime = 'claude') {
     return;
   }
   const settings = validateHookFields(cleanupOrphanedHooks(rawSettings));
+  const hookOpts = { portableHooks: hasPortableHooks, runtime };
   // #3002 CR: rewrite legacy `node .../gsd-*.js` command strings carried over
   // from pre-#2979 installs to use the absolute node binary path. Without this,
   // existing managed hook entries stay bare-`node`-prefixed across reinstalls
   // and remain broken under GUI/minimal-PATH runtimes.
   const settingsRunner = resolveNodeRunner();
-  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner)) {
+  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner, hookOpts)) {
     console.log(`  ${green}✓${reset} Rewrote legacy bare-node managed-hook commands to absolute path (#2979)`);
   }
   // Local installs anchor hook paths so they resolve regardless of cwd (#1906).
@@ -8792,7 +8800,6 @@ function install(isGlobal, runtime = 'claude') {
   const localPrefix = (runtime === 'gemini' || runtime === 'antigravity')
     ? dirName
     : '"$CLAUDE_PROJECT_DIR"/' + dirName;
-  const hookOpts = { portableHooks: hasPortableHooks };
   // #2979: local-install hook commands also use the absolute node path so
   // GUI/minimal-PATH runtimes can resolve them. Bare `node` fails when the
   // host launches the runtime with a stripped PATH (Finder/Antigravity/etc).
