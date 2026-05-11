@@ -184,14 +184,15 @@ async function getPhaseInfoWithFallback(
 async function getPhaseInfoForVerifyWork(
   phase: string,
   projectDir: string,
+  workstream?: string,
 ): Promise<{ phaseInfo: Record<string, unknown> | null }> {
-  const phaseResult = await findPhase([phase], projectDir);
+  const phaseResult = await findPhase([phase], projectDir, workstream);
   let phaseInfo = phaseResult.data as Record<string, unknown> | null;
   if (phaseInfo && phaseInfo.found === false) {
     phaseInfo = null;
   }
 
-  const roadmapResult = await roadmapGetPhase([phase], projectDir);
+  const roadmapResult = await roadmapGetPhase([phase], projectDir, workstream);
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   if (phaseInfo?.archived && roadmapPhase?.found) {
@@ -205,9 +206,7 @@ async function getPhaseInfoForVerifyWork(
       directory: null,
       phase_number: roadmapPhase.phase_number,
       phase_name: phaseName,
-      phase_slug: phaseName
-        ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-        : null,
+      phase_slug: phaseName ? generateSlugInternal(phaseName) : null,
       plans: [],
       summaries: [],
       incomplete_plans: [],
@@ -623,14 +622,14 @@ export const initResume: QueryHandler = async (_args, projectDir) => {
  * Init handler for verify-work workflow.
  * Port of cmdInitVerifyWork from init.cjs lines 538-586.
  */
-export const initVerifyWork: QueryHandler = async (args, projectDir) => {
+export const initVerifyWork: QueryHandler = async (args, projectDir, workstream) => {
   const phase = args[0];
   if (!phase) {
     return { data: { error: 'phase required for init verify-work' } };
   }
 
-  const config = await loadConfig(projectDir);
-  const { phaseInfo } = await getPhaseInfoForVerifyWork(phase, projectDir);
+  const config = await loadConfig(projectDir, workstream);
+  const { phaseInfo } = await getPhaseInfoForVerifyWork(phase, projectDir, workstream);
 
   const configExists = existsSync(join(projectDir, '.planning', 'config.json'));
   const [plannerModel, checkerModel] = configExists

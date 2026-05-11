@@ -448,6 +448,30 @@ describe('initVerifyWork', () => {
     expect(data.project_root).toBe(tmpDir);
   });
 
+  it('resolves workstream-scoped phases when workstream is provided', async () => {
+    const wsDir = join(tmpDir, '.planning', 'workstreams', 'delivery');
+    await mkdir(join(wsDir, 'phases', '32-shipment-creation-tracking-numbers-print-forms'), { recursive: true });
+    await writeFile(join(wsDir, 'ROADMAP.md'), [
+      '# Roadmap',
+      '',
+      '## v1.0: Delivery',
+      '',
+      '### Phase 32: Shipment Creation Tracking Numbers Print Forms',
+      '',
+      '**Goal:** Ship orders.',
+      '',
+    ].join('\n'));
+
+    const result = await initVerifyWork(['32'], tmpDir, 'delivery');
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('32');
+    expect(data.phase_dir).toBe(
+      '.planning/workstreams/delivery/phases/32-shipment-creation-tracking-numbers-print-forms',
+    );
+  });
+
   it('returns error when phase arg missing', async () => {
     const result = await initVerifyWork([], tmpDir);
     const data = result.data as Record<string, unknown>;
