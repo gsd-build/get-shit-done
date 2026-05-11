@@ -1,8 +1,8 @@
 <purpose>
 Interactive configuration of third-party integrations for GSD — search API keys
-(Brave / Firecrawl / Exa), code-review CLI routing (`review.models.<cli>`), and
-agent-skill injection (`agent_skills.<agent-type>`). Writes to
-`.planning/config.json` via `gsd-sdk`/`gsd-tools` so unrelated keys are
+(Brave / Firecrawl / Exa / Perplexity), code-review CLI routing
+(`review.models.<cli>`), and agent-skill injection (`agent_skills.<agent-type>`).
+Writes to `.planning/config.json` via `gsd-sdk`/`gsd-tools` so unrelated keys are
 preserved, never clobbered.
 
 This command is deliberately separate from `/gsd-settings` (workflow toggles)
@@ -24,7 +24,7 @@ log the plaintext value. The workflow follows these rules:
   tables, or any log line.** It is not written to any file under `.planning/`
   other than `config.json` itself.
 - **`config-set` output is masked** for keys in the secret set
-  (`brave_search`, `firecrawl`, `exa_search`) — see
+  (`brave_search`, `firecrawl`, `exa_search`, `perplexity`) — see
   `get-shit-done/bin/lib/secrets.cjs`.
 - **Agent-type and CLI slug validation.** `agent_skills.<agent-type>` and
   `review.models.<cli>` keys are matched against `^[a-zA-Z0-9_-]+$`. Inputs
@@ -68,12 +68,13 @@ integration field, compute one of:
 BRAVE=$(gsd-sdk query config-get brave_search --default null)
 FIRECRAWL=$(gsd-sdk query config-get firecrawl --default null)
 EXA=$(gsd-sdk query config-get exa_search --default null)
+PERPLEXITY=$(gsd-sdk query config-get perplexity --default null)
 SEARCH_GITIGNORED=$(gsd-sdk query config-get search_gitignored --default false)
 ```
 
-For each secret key (`brave_search`, `firecrawl`, `exa_search`) the displayed
-value is `****<last-4>` when set, never the raw string. Never echo the
-plaintext to stdout, stderr, or any log.
+For each secret key (`brave_search`, `firecrawl`, `exa_search`, `perplexity`)
+the displayed value is `****<last-4>` when set, never the raw string. Never
+echo the plaintext to stdout, stderr, or any log.
 </step>
 
 <step name="section_1_search_integrations">
@@ -115,6 +116,12 @@ AskUserQuestion([
     options: [ /* same Leave/Replace/Clear or Skip/Set */ ]
   },
   {
+    question: "Perplexity API key — used for Search API + Agent API research surfaces",
+    header: "Perplexity",
+    multiSelect: false,
+    options: [ /* same Leave/Replace/Clear or Skip/Set */ ]
+  },
+  {
     question: "Include gitignored files in local code searches?",
     header: "Gitignored",
     multiSelect: false,
@@ -134,6 +141,7 @@ descriptions or confirmation text. Write the value via:
 gsd-sdk query config-set brave_search "<value>"     # masked in output
 gsd-sdk query config-set firecrawl "<value>"        # masked in output
 gsd-sdk query config-set exa_search "<value>"       # masked in output
+gsd-sdk query config-set perplexity "<value>"       # masked in output
 gsd-sdk query config-set search_gitignored true|false
 ```
 
@@ -241,6 +249,7 @@ Search Integrations
 | brave_search       | ****<last-4>      |  (or "(unset)")
 | firecrawl          | ****<last-4>      |
 | exa_search         | ****<last-4>      |
+| perplexity         | ****<last-4>      |
 | search_gitignored  | true | false      |
 
 Code Review CLI Routing

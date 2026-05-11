@@ -6,7 +6,7 @@ import secretsCjs from '../../../get-shit-done/bin/lib/secrets.cjs';
 
 describe('Bug #2997: SDK secrets module', () => {
   it('SECRET_CONFIG_KEYS exposes the documented set (locked)', () => {
-    assert.deepEqual([...SECRET_CONFIG_KEYS].sort(), ['brave_search', 'exa_search', 'firecrawl']);
+    assert.deepEqual([...SECRET_CONFIG_KEYS].sort(), ['brave_search', 'exa_search', 'firecrawl', 'perplexity']);
   });
 
   it('isSecretKey returns true for each registered secret', () => {

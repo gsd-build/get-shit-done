@@ -17,7 +17,7 @@
 /** Exact-match config key paths accepted by config-set. */
 export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'mode', 'granularity', 'parallelization', 'commit_docs', 'model_profile',
-  'search_gitignored', 'brave_search', 'firecrawl', 'exa_search',
+  'search_gitignored', 'brave_search', 'firecrawl', 'exa_search', 'perplexity',
   'workflow.research', 'workflow.plan_check', 'workflow.verifier',
   'workflow.nyquist_validation', 'workflow.ai_integration_phase', 'workflow.ui_phase', 'workflow.ui_safety_gate',
   'workflow.auto_advance', 'workflow.node_repair', 'workflow.node_repair_budget',

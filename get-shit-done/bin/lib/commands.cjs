@@ -479,6 +479,39 @@ function cmdSummaryExtract(cwd, summaryPath, fields, raw) {
   output(fullResult, raw);
 }
 
+async function cmdPerplexitySearch(cwd, query, options, raw) {
+  const perplexity = require('./perplexity.cjs');
+  const result = await perplexity.search(query, {
+    maxResults: options && options.limit != null ? options.limit : undefined,
+    searchRecencyFilter: options && options.recency ? options.recency : undefined,
+    searchDomainFilter: options && options.domainFilter ? options.domainFilter : undefined,
+  }, { cwd });
+  if (!result.available) {
+    output(result, raw, '');
+    return;
+  }
+  const textOut = (result.results || [])
+    .map((r) => `${r.title}\n${r.url}\n${r.snippet}`)
+    .join('\n\n');
+  output(result, raw, textOut);
+}
+
+async function cmdPerplexityAgent(cwd, input, options, raw) {
+  const perplexity = require('./perplexity.cjs');
+  const result = await perplexity.agent(input, {
+    preset: options && options.preset ? options.preset : undefined,
+    model: options && options.model ? options.model : undefined,
+  }, { cwd });
+  if (!result.available) {
+    output(result, raw, '');
+    return;
+  }
+  const textOut = typeof result.output === 'string'
+    ? result.output
+    : JSON.stringify(result.output || result.raw || {});
+  output(result, raw, textOut);
+}
+
 async function cmdWebsearch(query, options, raw) {
   const apiKey = process.env.BRAVE_API_KEY;
 
@@ -1019,6 +1052,8 @@ module.exports = {
   cmdCommitToSubrepo,
   cmdSummaryExtract,
   cmdWebsearch,
+  cmdPerplexitySearch,
+  cmdPerplexityAgent,
   cmdProgressRender,
   cmdTodoComplete,
   cmdTodoMatchPhase,

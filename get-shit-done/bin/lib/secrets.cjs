@@ -17,6 +17,7 @@ const SECRET_CONFIG_KEYS = new Set([
   'brave_search',
   'firecrawl',
   'exa_search',
+  'perplexity',
 ]);
 
 function isSecretKey(keyPath) {

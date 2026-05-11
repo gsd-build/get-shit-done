@@ -37,6 +37,10 @@
  *   phase-plan-index <phase>           Index plans with waves and status
  *   websearch <query>                  Search web via Brave API (if configured)
  *     [--limit N] [--freshness day|week|month]
+ *   perplexity-search <query>          Search web via Perplexity Search API (if configured)
+ *     [--limit N] [--recency hour|day|week|month|year]
+ *   perplexity-agent <input>           Invoke Perplexity Agent API (if configured)
+ *     [--preset pro-search] [--model <id>]
  *
  * Phase Operations:
  *   phase next-decimal <phase>         Calculate next decimal phase number
@@ -371,9 +375,9 @@ async function main() {
     'current-timestamp, detect-custom-files, docs-init, extract-messages, find-phase, ' +
     'from-gsd2, frontmatter, gap-analysis, generate-claude-md, generate-claude-profile, ' +
     'generate-dev-preferences, generate-slug, graphify, history-digest, init, intel, ' +
-    'learnings, list-todos, milestone, phase, phase-plan-index, phases, profile-questionnaire, ' +
+    'learnings, list-todos, milestone, perplexity-agent, perplexity-search, phase, phase-plan-index, phases, profile-questionnaire, ' +
     'profile-sample, progress, requirements, resolve-model, roadmap, scaffold, state, ' +
-    'template, validate, verify, verify-path-exists, verify-summary, workstream, worktree\n\n' +
+    'template, validate, verify, verify-path-exists, verify-summary, websearch, workstream, worktree\n\n' +
     'Global flags:\n' +
     '  --raw              Emit raw output without post-processing\n' +
     '  --pick <field>     Extract a single field from JSON output (dot/bracket notation)\n' +
@@ -863,6 +867,28 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       await commands.cmdWebsearch(query, {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
+      }, raw);
+      break;
+    }
+
+    case 'perplexity-search': {
+      const query = args[1];
+      const limitIdx = args.indexOf('--limit');
+      const recencyIdx = args.indexOf('--recency');
+      await commands.cmdPerplexitySearch(cwd, query, {
+        limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
+        recency: recencyIdx !== -1 ? args[recencyIdx + 1] : null,
+      }, raw);
+      break;
+    }
+
+    case 'perplexity-agent': {
+      const input = args[1];
+      const presetIdx = args.indexOf('--preset');
+      const modelIdx = args.indexOf('--model');
+      await commands.cmdPerplexityAgent(cwd, input, {
+        preset: presetIdx !== -1 ? args[presetIdx + 1] : null,
+        model: modelIdx !== -1 ? args[modelIdx + 1] : null,
       }, raw);
       break;
     }

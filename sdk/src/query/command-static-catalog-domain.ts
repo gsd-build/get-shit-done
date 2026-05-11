@@ -8,6 +8,7 @@ import { commitToSubrepo } from './commit.js';
 import { workstreamGet, workstreamList, workstreamCreate, workstreamSet, workstreamStatus, workstreamComplete, workstreamProgress } from './workstream.js';
 import { docsInit } from './docs-init.js';
 import { websearch } from './websearch.js';
+import { perplexitySearch, perplexityAgent } from './perplexity.js';
 import { learningsCopy, learningsQuery, learningsListHandler, learningsPrune, learningsDelete, extractMessages, scanSessions, profileSample, profileQuestionnaire } from './profile.js';
 import { skillManifest } from './skill-manifest.js';
 import { auditOpen } from './audit-open.js';
@@ -64,6 +65,12 @@ export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler
   ['worktree cleanup-wave', worktreeCleanupWave],
   ['docs-init', docsInit],
   ['websearch', websearch],
+  ['perplexity-search', perplexitySearch],
+  ['perplexity search', perplexitySearch],
+  ['perplexity.search', perplexitySearch],
+  ['perplexity-agent', perplexityAgent],
+  ['perplexity agent', perplexityAgent],
+  ['perplexity.agent', perplexityAgent],
   ['learnings.copy', learningsCopy],
   ['learnings copy', learningsCopy],
   ['learnings.query', learningsQuery],

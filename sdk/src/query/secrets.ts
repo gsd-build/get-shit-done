@@ -17,6 +17,7 @@ export const SECRET_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'brave_search',
   'firecrawl',
   'exa_search',
+  'perplexity',
 ]);
 
 export function isSecretKey(keyPath: string): boolean {

@@ -62,6 +62,8 @@ function buildNewProjectConfig(userChoices) {
   const hasFirecrawl = !!(process.env.FIRECRAWL_API_KEY || fs.existsSync(firecrawlKeyFile));
   const exaKeyFile = path.join(homedir, '.gsd', 'exa_api_key');
   const hasExaSearch = !!(process.env.EXA_API_KEY || fs.existsSync(exaKeyFile));
+  const perplexityKeyFile = path.join(homedir, '.gsd', 'perplexity_api_key');
+  const hasPerplexity = !!(process.env.PERPLEXITY_API_KEY || fs.existsSync(perplexityKeyFile));
 
   // Load user-level defaults from ~/.gsd/defaults.json if available
   const globalDefaultsPath = path.join(homedir, '.gsd', 'defaults.json');
@@ -91,6 +93,7 @@ function buildNewProjectConfig(userChoices) {
     brave_search: hasBraveSearch,
     firecrawl: hasFirecrawl,
     exa_search: hasExaSearch,
+    perplexity: hasPerplexity,
     git: {
       branching_strategy: CONFIG_DEFAULTS.branching_strategy,
       phase_branch_template: CONFIG_DEFAULTS.phase_branch_template,

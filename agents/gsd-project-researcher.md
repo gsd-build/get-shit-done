@@ -164,6 +164,20 @@ mcp__firecrawl__search with query: "your query" (web search + auto-scrape result
 
 If `firecrawl: false` (or not set), fall back to WebFetch.
 
+### Perplexity Search & Agent APIs
+
+Check `perplexity` from orchestrator context. If `true`, the Perplexity API key is configured and two surfaces are available:
+
+```bash
+gsd-sdk query perplexity-search "your query" --limit 10
+gsd-sdk query perplexity-agent "Find recent context on …" --preset pro-search
+```
+
+- **Search API** (`perplexity-search`) — direct ranked web search results (`{title,url,snippet,date}`). Use as a higher-recall alternative when other search providers under-return.
+- **Agent API** (`perplexity-agent`) — research-oriented agent with built-in tools (`web_search`, `fetch_url`). Best for "find me up-to-date context on X" prompts where a single synthesized answer is more useful than a result list. Defaults to the `pro-search` preset.
+
+If `perplexity: false` (or not set), fall back to other configured providers.
+
 ## Verification Protocol
 
 **WebSearch findings must be verified:**
