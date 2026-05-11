@@ -143,7 +143,7 @@ For a lightweight agile PRD trail, use sections that map to the increment being 
 }
 ```
 
-These sections make the PR body act as a release artifact: concise enough for review, but traceable back to requirements and verification.
+These sections make the PR body useful as a release artifact: concise enough for review, but traceable back to requirements and verification.
 
 ## Troubleshooting
 
