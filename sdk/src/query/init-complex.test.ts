@@ -12,8 +12,10 @@ import { tmpdir } from 'node:os';
 import { initNewProject, initProgress, initManager } from './init-complex.js';
 
 let tmpDir: string;
+let previousGsdAgentsDir: string | undefined;
 
 beforeEach(async () => {
+  previousGsdAgentsDir = process.env.GSD_AGENTS_DIR;
   tmpDir = await mkdtemp(join(tmpdir(), 'gsd-init-complex-'));
 
   // Create minimal .planning structure
@@ -83,6 +85,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (previousGsdAgentsDir === undefined) delete process.env.GSD_AGENTS_DIR;
+  else process.env.GSD_AGENTS_DIR = previousGsdAgentsDir;
   await rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -118,6 +122,42 @@ describe('initNewProject', () => {
     const result = await initNewProject([], tmpDir);
     const data = result.data as Record<string, unknown>;
     expect(data.planning_exists).toBe(true);
+  });
+
+  it('separates required agent registration from skill payload availability (#3388)', async () => {
+    const emptyAgentsDir = join(tmpDir, 'empty-agents');
+    await mkdir(emptyAgentsDir, { recursive: true });
+    process.env.GSD_AGENTS_DIR = emptyAgentsDir;
+
+    const requiredAgents = [
+      'gsd-project-researcher',
+      'gsd-research-synthesizer',
+      'gsd-roadmapper',
+    ];
+    for (const agent of requiredAgents) {
+      await mkdir(join(tmpDir, '.claude', 'skills', agent), { recursive: true });
+      await writeFile(join(tmpDir, '.claude', 'skills', agent, 'SKILL.md'), `# ${agent}\n`);
+    }
+    await writeFile(join(tmpDir, '.planning', 'config.json'), JSON.stringify({
+      model_profile: 'balanced',
+      commit_docs: false,
+      agent_skills: {
+        'gsd-project-researcher': ['.claude/skills/gsd-project-researcher'],
+        'gsd-research-synthesizer': ['.claude/skills/gsd-research-synthesizer'],
+        'gsd-roadmapper': ['.claude/skills/gsd-roadmapper'],
+      },
+      workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: true },
+    }));
+
+    const result = await initNewProject([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.agents_installed).toBe(false);
+    expect(data.required_agents).toEqual(requiredAgents);
+    expect(data.required_agents_installed).toBe(false);
+    expect(data.missing_required_agents).toEqual(requiredAgents);
+    expect(data.agent_skill_payloads_available).toBe(true);
+    expect(data.agent_skill_payload_agents).toEqual(requiredAgents);
   });
 });
 

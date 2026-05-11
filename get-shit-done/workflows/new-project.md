@@ -64,15 +64,27 @@ AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-research-synthesizer)
 AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper)
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `agents_installed`, `missing_agents`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `agents_installed`, `missing_agents`, `agent_runtime`, `agents_dir`, `required_agents`, `required_agents_installed`, `missing_required_agents`, `agent_skill_payloads_available`, `agent_skill_payload_agents`.
 
 **If `agents_installed` is false:** Display a warning before proceeding:
 ```
 ⚠ GSD agents not installed. The following agents are missing from your agents directory:
   {missing_agents joined with newline}
 
+Runtime checked: {agent_runtime}
+Agents directory checked: {agents_dir}
+Required new-project agents missing:
+  {missing_required_agents joined with newline, or "none"}
+
+Agent skill payloads available: {agent_skill_payloads_available}
+Agent skill payload agents:
+  {agent_skill_payload_agents joined with newline, or "none"}
+
+Skill payloads only provide prompt context. Named subagent spawns still require agent
+definitions to be installed for this runtime.
+
 Subagent spawns (gsd-project-researcher, gsd-research-synthesizer, gsd-roadmapper) will fail
-with "agent type not found". Run the installer with --global to make agents available:
+with "agent type not found" if `required_agents_installed` is false. Run the installer with --global to make agents available:
 
   npx get-shit-done-cc@latest --global
 
