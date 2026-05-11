@@ -123,6 +123,40 @@ describe('Bug #3362: Windows PowerShell hook commands use the call operator', ()
   });
 });
 
+describe('Bug #3403: Windows Claude Code hooks are bash-compatible', () => {
+  test('global install: .js hook command does not use PowerShell & prefix for Claude Code', () => {
+    const cmd = buildHookCommand('C:/Users/me/.claude', 'gsd-read-injection-scanner.js', {
+      platform: 'win32',
+      runtime: 'claude',
+    });
+    assert.ok(!cmd.startsWith('& '), `Claude Code bash hooks must not use PowerShell call operator: ${cmd}`);
+    assert.ok(cmd.includes('"C:/Users/me/.claude/hooks/gsd-read-injection-scanner.js"'));
+  });
+
+  test('reinstall removes stale PowerShell & prefix from managed Claude Code hooks', () => {
+    const settings = {
+      hooks: {
+        PostToolUse: [{
+          hooks: [{
+            type: 'command',
+            command: '& node "C:/Users/me/.claude/hooks/gsd-read-injection-scanner.js"',
+          }],
+        }],
+      },
+    };
+    const runner = '"C:/nodejs/node.exe"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, {
+      platform: 'win32',
+      runtime: 'claude',
+    });
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.PostToolUse[0].hooks[0].command,
+      '"C:/nodejs/node.exe" "C:/Users/me/.claude/hooks/gsd-read-injection-scanner.js"',
+    );
+  });
+});
+
 describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSIX std PATH always has /bin)', () => {
   test('.sh hook runner is exactly "bash" — bash is in /usr/bin:/bin and resolves under minimal PATH', () => {
     const cmd = buildHookCommand('/tmp/.claude', 'gsd-session-state.sh');
