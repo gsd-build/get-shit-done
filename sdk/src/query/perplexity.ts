@@ -135,7 +135,7 @@ export const perplexitySearch: QueryHandler = async (args, cwd) => {
     return { data: { available: false, reason: 'PERPLEXITY_API_KEY not set' } };
   }
   const query = args[0];
-  if (!query) {
+  if (typeof query !== 'string' || query.trim() === '') {
     return { data: { available: false, error: 'Query required' } };
   }
   const limitIdx = args.indexOf('--limit');
@@ -183,7 +183,7 @@ export const perplexityAgent: QueryHandler = async (args, cwd) => {
     return { data: { available: false, reason: 'PERPLEXITY_API_KEY not set' } };
   }
   const input = args[0];
-  if (!input) {
+  if (typeof input !== 'string' || input.trim() === '') {
     return { data: { available: false, error: 'Input required' } };
   }
   const presetIdx = args.indexOf('--preset');

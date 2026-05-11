@@ -125,6 +125,8 @@ describe('perplexity.resolveApiKey + fallback', () => {
 
 describe('perplexity HTTP request shape', () => {
   test('search() POSTs to /search with X-Pplx-Integration + body mapping', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
+    delete process.env.PERPLEXITY_API_KEY;
     let captured = null;
     const fakeFetch = async (url, init) => {
       captured = { url, init };
@@ -170,13 +172,15 @@ describe('perplexity HTTP request shape', () => {
       assert.equal(r2.results[0].date, '2026-05-10');
       assert.equal(r2.results[1].date, null);
     } finally {
-      delete process.env.PERPLEXITY_API_KEY;
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
     }
     // First call (no env, no cwd) returns fallback — fakeFetch was never called for that branch:
     assert.equal(r.available, false);
   });
 
   test('agent() POSTs to /v1/agent with pro-search preset by default', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
     process.env.PERPLEXITY_API_KEY = 'pplx-agent-key-xxxx';
     try {
       let captured = null;
@@ -196,11 +200,13 @@ describe('perplexity HTTP request shape', () => {
       assert.equal(body.input, 'Find recent context on …');
       assert.equal(body.preset, 'pro-search');
     } finally {
-      delete process.env.PERPLEXITY_API_KEY;
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
     }
   });
 
   test('agent() sends model instead of preset when --model provided', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
     process.env.PERPLEXITY_API_KEY = 'pplx-key-with-model';
     try {
       let captured = null;
@@ -213,11 +219,13 @@ describe('perplexity HTTP request shape', () => {
       assert.equal(body.model, 'sonar-pro');
       assert.equal(body.preset, undefined);
     } finally {
-      delete process.env.PERPLEXITY_API_KEY;
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
     }
   });
 
   test('non-2xx response surfaces as available:false with status error', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
     process.env.PERPLEXITY_API_KEY = 'pplx-error-key-xxx';
     try {
       const fakeFetch = async () => ({ ok: false, status: 429, async json() { return {}; } });
@@ -225,11 +233,13 @@ describe('perplexity HTTP request shape', () => {
       assert.equal(r.available, false);
       assert.equal(r.error, 'API error: 429');
     } finally {
-      delete process.env.PERPLEXITY_API_KEY;
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
     }
   });
 
   test('empty query / input surfaces as available:false with "Query required" / "Input required"', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
     process.env.PERPLEXITY_API_KEY = 'pplx-validation-key';
     try {
       const r1 = await perplexity.search('', {}, {});
@@ -239,7 +249,8 @@ describe('perplexity HTTP request shape', () => {
       assert.equal(r2.available, false);
       assert.equal(r2.error, 'Input required');
     } finally {
-      delete process.env.PERPLEXITY_API_KEY;
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
     }
   });
 });
@@ -329,33 +340,47 @@ describe('perplexity-search / perplexity-agent CLI surface', () => {
   });
 });
 
-// ─── Workflow + docs surface ─────────────────────────────────────────────────
+// ─── Runtime CLI / catalog surface ───────────────────────────────────────────
 
-describe('perplexity surfaced in docs / workflow', () => {
-  test('settings-integrations workflow mentions perplexity key', () => {
-    const wf = fs.readFileSync(
-      path.join(__dirname, '..', 'get-shit-done', 'workflows', 'settings-integrations.md'),
-      'utf-8',
-    );
-    assert.ok(wf.includes('perplexity'), 'workflow must reference perplexity key');
+describe('perplexity surfaced in CLI usage + config schema', () => {
+  test('top-level gsd-tools usage lists perplexity-search and perplexity-agent', () => {
+    const r = runGsdTools(['--help'], process.cwd());
+    assert.ok(r.success, `gsd-tools --help failed: ${r.error}`);
+    const combined = `${r.output || ''}\n${r.error || ''}`;
+    assert.ok(combined.includes('perplexity-search'), 'usage must list perplexity-search');
+    assert.ok(combined.includes('perplexity-agent'), 'usage must list perplexity-agent');
   });
 
-  test('CONFIGURATION.md documents the perplexity key', () => {
-    const docs = fs.readFileSync(
-      path.join(__dirname, '..', 'docs', 'CONFIGURATION.md'),
-      'utf-8',
-    );
-    assert.ok(docs.includes('`perplexity`'), 'CONFIGURATION.md must document perplexity key');
-    assert.ok(docs.includes('PERPLEXITY_API_KEY'), 'CONFIGURATION.md must reference env var');
-    assert.ok(docs.includes('docs.perplexity.ai'), 'CONFIGURATION.md must link official docs');
+  test('config-set/get perplexity round-trips through the schema and masks output', (t) => {
+    const tmp = createTempProject();
+    t.after(() => cleanup(tmp));
+    runGsdTools(['config-ensure-section'], tmp);
+
+    const marker = ['PPLX', 'SURFACE', 'mnop5678'].join('-');
+    const set = runGsdTools(['config-set', 'perplexity', marker], tmp);
+    assert.ok(set.success, `config-set perplexity must succeed: ${set.error}`);
+
+    const get = runGsdTools(['config-get', 'perplexity'], tmp);
+    assert.ok(get.success, `config-get perplexity must succeed: ${get.error}`);
+    const combined = `${get.output || ''}\n${get.error || ''}`;
+    assert.ok(combined.includes('****' + marker.slice(-4)), 'config-get must mask the secret');
+    assert.ok(!combined.includes(marker), 'config-get must not echo plaintext');
   });
 
-  test('researcher agent references perplexity-search / perplexity-agent', () => {
-    const agent = fs.readFileSync(
-      path.join(__dirname, '..', 'agents', 'gsd-project-researcher.md'),
-      'utf-8',
-    );
-    assert.ok(agent.includes('perplexity-search'));
-    assert.ok(agent.includes('perplexity-agent'));
+  test('perplexity-search and perplexity-agent both produce structured JSON output', (t) => {
+    const tmp = createTempProject();
+    t.after(() => cleanup(tmp));
+    const sharedEnv = { HOME: tmp, PERPLEXITY_API_KEY: '' };
+    const search = runGsdTools(['perplexity-search', 'hi'], tmp, sharedEnv);
+    assert.ok(search.success, `perplexity-search must run: ${search.error}`);
+    const parsedSearch = JSON.parse(search.output);
+    assert.equal(parsedSearch.available, false);
+    assert.equal(parsedSearch.reason, 'PERPLEXITY_API_KEY not set');
+
+    const agentRun = runGsdTools(['perplexity-agent', 'hi'], tmp, sharedEnv);
+    assert.ok(agentRun.success, `perplexity-agent must run: ${agentRun.error}`);
+    const parsedAgent = JSON.parse(agentRun.output);
+    assert.equal(parsedAgent.available, false);
+    assert.equal(parsedAgent.reason, 'PERPLEXITY_API_KEY not set');
   });
 });
