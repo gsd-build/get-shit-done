@@ -54,6 +54,23 @@ function generateSlugInternal(text: string): string {
     .substring(0, 60);
 }
 
+function extractPhaseArg(args: string[]): string | undefined {
+  const equalsArg = args.find((arg) => arg.startsWith('--phase='));
+  if (equalsArg) {
+    const value = equalsArg.slice('--phase='.length).trim();
+    return value || undefined;
+  }
+
+  const flagIndex = args.indexOf('--phase');
+  if (flagIndex !== -1) {
+    const value = args[flagIndex + 1];
+    return value && !value.startsWith('--') ? value : undefined;
+  }
+
+  const first = args[0];
+  return first && !first.startsWith('--') ? first : undefined;
+}
+
 /**
  * Check if a path exists on disk.
  */
@@ -293,7 +310,7 @@ export function withProjectRoot(
  * Port of cmdInitExecutePhase from init.cjs lines 50-171.
  */
 export const initExecutePhase: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init execute-phase' } };
   }
@@ -376,7 +393,7 @@ export const initExecutePhase: QueryHandler = async (args, projectDir, workstrea
  * Port of cmdInitPlanPhase from init.cjs lines 173-293.
  */
 export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init plan-phase' } };
   }
@@ -623,7 +640,7 @@ export const initResume: QueryHandler = async (_args, projectDir) => {
  * Port of cmdInitVerifyWork from init.cjs lines 538-586.
  */
 export const initVerifyWork: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init verify-work' } };
   }
@@ -660,7 +677,7 @@ export const initVerifyWork: QueryHandler = async (args, projectDir, workstream)
  * Port of cmdInitPhaseOp from init.cjs lines 588-697.
  */
 export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init phase-op' } };
   }

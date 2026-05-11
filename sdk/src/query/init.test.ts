@@ -325,6 +325,20 @@ describe('initExecutePhase', () => {
     expect(data.milestone_version).toBeDefined();
   });
 
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initExecutePhase(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initExecutePhase(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('returns error when phase arg missing', async () => {
     const result = await initExecutePhase([], tmpDir);
     const data = result.data as Record<string, unknown>;
@@ -358,6 +372,13 @@ describe('initPlanPhase', () => {
     expect(data.has_research).toBe(true);
     expect(data.has_context).toBe(true);
     expect(data.project_root).toBe(tmpDir);
+  });
+
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initPlanPhase(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
   });
 
   it('returns error when phase arg missing', async () => {
@@ -448,6 +469,13 @@ describe('initVerifyWork', () => {
     expect(data.project_root).toBe(tmpDir);
   });
 
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initVerifyWork(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('resolves workstream-scoped phases when workstream is provided', async () => {
     const wsDir = join(tmpDir, '.planning', 'workstreams', 'delivery');
     await mkdir(join(wsDir, 'phases', '32-shipment-creation-tracking-numbers-print-forms'), { recursive: true });
@@ -489,6 +517,13 @@ describe('initPhaseOp', () => {
     expect(data.has_context).toBe(true);
     expect(data.plan_count).toBeGreaterThanOrEqual(1);
     expect(data.project_root).toBe(tmpDir);
+  });
+
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initPhaseOp(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
   });
 });
 
