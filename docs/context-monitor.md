@@ -65,13 +65,15 @@ Both hooks are automatically registered during `npx get-shit-done-cc` installati
 - **Statusline** (writes bridge file): Registered as `statusLine` in settings.json
 - **Context Monitor** (reads bridge file): Registered as `PostToolUse` hook in settings.json (`AfterTool` for Gemini)
 
+Manual registration should use the absolute Node executable path that ran the installer. On Windows PowerShell, prefix the command with `&` when that executable path is quoted.
+
 Manual registration in `~/.claude/settings.json` (Claude Code):
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "node ~/.claude/hooks/gsd-statusline.js"
+    "command": "\"/usr/local/bin/node\" \"/Users/me/.claude/hooks/gsd-statusline.js\""
   },
   "hooks": {
     "PostToolUse": [
@@ -79,7 +81,7 @@ Manual registration in `~/.claude/settings.json` (Claude Code):
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.claude/hooks/gsd-context-monitor.js"
+            "command": "\"/usr/local/bin/node\" \"/Users/me/.claude/hooks/gsd-context-monitor.js\""
           }
         ]
       }
@@ -98,7 +100,7 @@ For Gemini CLI (`~/.gemini/settings.json`), use `AfterTool` instead of `PostTool
         "hooks": [
           {
             "type": "command",
-            "command": "node ~/.gemini/hooks/gsd-context-monitor.js"
+            "command": "& \"C:/Program Files/nodejs/node.exe\" \"C:/Users/me/.gemini/hooks/gsd-context-monitor.js\""
           }
         ]
       }

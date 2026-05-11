@@ -103,11 +103,52 @@ describe('Bug #2979: buildHookCommand for .js hooks emits absolute node runner',
   });
 });
 
+describe('Bug #3362: Windows PowerShell hook commands use the call operator', () => {
+  test('global install: .js hook command starts with & so quoted runners execute in PowerShell', () => {
+    const cmd = buildHookCommand('C:/Program Files/Gemini/.gemini', 'gsd-check-update.js', {
+      platform: 'win32',
+    });
+    assert.ok(cmd.startsWith('& '), `PowerShell commands need call operator, got: ${cmd}`);
+    assert.ok(cmd.includes('"C:/Program Files/Gemini/.gemini/hooks/gsd-check-update.js"'));
+  });
+
+  test('portable install: .js hook command also uses & on Windows PowerShell', () => {
+    const home = require('node:os').homedir().replace(/\\/g, '/');
+    const cmd = buildHookCommand(`${home}/.gemini`, 'gsd-check-update.js', {
+      portableHooks: true,
+      platform: 'win32',
+    });
+    assert.ok(cmd.startsWith('& '), `PowerShell commands need call operator, got: ${cmd}`);
+    assert.equal(parseHookCommand(cmd.slice(2)).hookPath, '$HOME/.gemini/hooks/gsd-check-update.js');
+  });
+});
+
 describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSIX std PATH always has /bin)', () => {
   test('.sh hook runner is exactly "bash" — bash is in /usr/bin:/bin and resolves under minimal PATH', () => {
     const cmd = buildHookCommand('/tmp/.claude', 'gsd-session-state.sh');
     const parsed = parseHookCommand(cmd);
     assert.equal(parsed.runner, 'bash');
+  });
+
+  test('Windows .sh hook uses resolved Git Bash path instead of bare bash (#3393)', () => {
+    const cmd = buildHookCommand('C:/Users/me/.codex', 'gsd-validate-commit.sh', {
+      platform: 'win32',
+      env: { ProgramFiles: 'C:\\Program Files' },
+      existsSync: (candidate) => candidate === 'C:\\Program Files\\Git\\bin\\bash.exe',
+    });
+    assert.equal(
+      cmd,
+      '& "C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.codex/hooks/gsd-validate-commit.sh"',
+    );
+  });
+
+  test('Windows .sh hook returns null when no supported Bash runner is found (#3393)', () => {
+    const cmd = buildHookCommand('C:/Users/me/.codex', 'gsd-phase-boundary.sh', {
+      platform: 'win32',
+      env: {},
+      existsSync: () => false,
+    });
+    assert.equal(cmd, null);
   });
 });
 
@@ -152,6 +193,55 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
     assert.equal(changed, false);
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
+  });
+
+  test('adds PowerShell call operator to existing quoted managed hooks on Windows', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: '"/usr/local/bin/node" "C:/Program Files/Gemini/.gemini/hooks/gsd-check-update.js"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.SessionStart[0].hooks[0].command,
+      '& "/usr/local/bin/node" "C:/Program Files/Gemini/.gemini/hooks/gsd-check-update.js"',
+    );
+  });
+
+  test('does NOT double-prefix managed hooks that already use the PowerShell call operator', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: '& "/usr/local/bin/node" "C:/Program Files/Gemini/.gemini/hooks/gsd-check-update.js"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const before = settings.hooks.SessionStart[0].hooks[0].command;
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    assert.equal(changed, false);
+    assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
+  });
+
+  test('rewrites PowerShell bare-node managed hooks to absolute runner without dropping &', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: '& node "C:/Users/me/.gemini/hooks/gsd-check-update.js"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.SessionStart[0].hooks[0].command,
+      '& "/usr/local/bin/node" "C:/Users/me/.gemini/hooks/gsd-check-update.js"',
+    );
   });
 
   test('does NOT touch user-authored bare-node hooks (filename not in managed allowlist)', () => {
@@ -265,6 +355,26 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     const runner = '"/usr/local/bin/node"';
     const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
     assert.equal(changed, true);
+  });
+
+  test('normalizes single-quoted Windows managed hook paths to double-quoted forward-slash paths (#3392)', () => {
+    const settings = {
+      hooks: {
+        PreToolUse: [{
+          hooks: [{
+            type: 'command',
+            command: "node 'C:\\Users\\me\\.codex\\hooks\\gsd-prompt-guard.js'",
+          }],
+        }],
+      },
+    };
+    const runner = '"C:/nvm4w/nodejs/node.exe"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.PreToolUse[0].hooks[0].command,
+      '& "C:/nvm4w/nodejs/node.exe" "C:/Users/me/.codex/hooks/gsd-prompt-guard.js"',
+    );
   });
 });
 

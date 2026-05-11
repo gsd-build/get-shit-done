@@ -1,0 +1,5 @@
+---
+type: Added
+pr: 3325
+---
+**`workflow.human_verify_mode = end-of-phase` is now the default** — the planner no longer emits `<task type="checkpoint:human-verify">` tasks for new projects; verification details are embedded into `<verify><human-check>` blocks on `auto` tasks and the verifier consolidates them at end-of-phase into the existing HUMAN-UAT.md flow. The previous mid-flight behavior cost a full executor cold-start (CLAUDE.md, MEMORY.md, STATE.md, plan re-read on respawn) per `checkpoint:human-verify` round-trip — measured at "tens of thousands of tokens" per round-trip on real projects. Set `workflow.human_verify_mode = mid-flight` in `.planning/config.json` to restore the pre-#3309 behavior. `checkpoint:decision` and `checkpoint:human-action` are unaffected by either value. **Behavior change for existing projects:** the new default takes effect when `.planning/config.json` is rewritten (e.g. via `gsd config-set` or first run on a new GSD version). Existing in-flight PLAN.md files with `checkpoint:human-verify` tasks continue to work in either mode — the flag only changes what the planner emits next time it runs. (#3309)

@@ -71,6 +71,47 @@ async function setupProject(opts: {
 // ─── planCountPattern regression: **Plans:** on its own line ─────────────
 
 describe('roadmapUpdatePlanProgress', () => {
+  it('updates unpadded ROADMAP phase entries when called with a padded phase argument', async () => {
+    const { roadmapUpdatePlanProgress } = await import('./roadmap-update-plan-progress.js');
+
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v3.0',
+      '',
+      '- [ ] **Phase 3: build** - build it',
+      '',
+      '### Phase 3: build',
+      '',
+      '**Goal:** Build it',
+      '**Plans:** 0 plans',
+      '- [ ] 03-01-PLAN.md',
+      '',
+      '## Progress',
+      '',
+      '| Phase | Plans Complete | Status | Completed |',
+      '|-------|----------------|--------|-----------|',
+      '| 3. build | 0/1 | Planned |  |',
+      '',
+    ].join('\n');
+
+    const { roadmapPath } = await setupProject({
+      roadmap,
+      phaseDir: '03-build',
+      plans: ['03-01-PLAN.md'],
+      summaries: ['03-01-SUMMARY.md'],
+    });
+
+    await roadmapUpdatePlanProgress(['03'], tmpDir, undefined);
+
+    const updated = await readFile(roadmapPath, 'utf-8');
+
+    expect(updated).toMatch(/- \[x\] \*\*Phase 3: build\*\* - build it \(completed \d{4}-\d{2}-\d{2}\)/);
+    expect(updated).toContain('**Plans:** 1/1 plans complete');
+    expect(updated).toMatch(/\| 3\. build \| 1\/1 \| Complete\s+\| \d{4}-\d{2}-\d{2} \|/);
+    expect(updated).toContain('- [x] 03-01-PLAN.md');
+  });
+
   it('does not overwrite plan bullet list when **Plans:** is on its own line (regression #2728 propagation)', async () => {
     const { roadmapUpdatePlanProgress } = await import('./roadmap-update-plan-progress.js');
 

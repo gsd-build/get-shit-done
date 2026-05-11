@@ -16,6 +16,7 @@ import { uatRenderCheckpoint, auditUat } from './uat.js';
 import { intelStatus, intelDiff, intelSnapshot, intelValidate, intelQuery, intelExtractExports, intelPatchMeta, intelUpdate } from './intel.js';
 import { writeProfile, generateClaudeProfile, generateDevPreferences, generateClaudeMd } from './profile-output.js';
 import { phaseMvpMode, taskIsBehaviorAdding, userStoryValidate } from './mvp.js';
+import { worktreeCleanupWave } from './worktree.js';
 
 export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['agent-skills', agentSkills],
@@ -59,6 +60,8 @@ export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler
   ['workstream complete', workstreamComplete],
   ['workstream.progress', workstreamProgress],
   ['workstream progress', workstreamProgress],
+  ['worktree.cleanup-wave', worktreeCleanupWave],
+  ['worktree cleanup-wave', worktreeCleanupWave],
   ['docs-init', docsInit],
   ['websearch', websearch],
   ['learnings.copy', learningsCopy],

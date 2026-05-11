@@ -62,21 +62,36 @@ Use AskUserQuestion:
 
 **If strategy is `worktree`:**
 
+Initialize the failure flag once before iterating repos:
+
+```bash
+REMOVE_FAILED=false
+```
+
 For each repo in the workspace:
 
 ```bash
 cd "$SOURCE_REPO_PATH"
-git worktree remove "$WORKSPACE_PATH/$REPO_NAME" 2>&1 || true
+if ! git worktree remove "$WORKSPACE_PATH/$REPO_NAME" 2>&1; then
+  echo "Warning: Could not remove worktree for $REPO_NAME — source repo may have been moved, deleted, locked, or dirty." >&2
+  REMOVE_FAILED=true
+fi
 ```
 
-If `git worktree remove` fails, warn but continue:
-```
-Warning: Could not remove worktree for $REPO_NAME — source repo may have been moved or deleted.
+If any `git worktree remove` fails, stop before deleting the workspace directory:
+```text
+Refusing to delete "$WORKSPACE_PATH" because one or more git worktrees could not be removed.
+Resolve the failed worktree removal manually, then rerun remove-workspace.
 ```
 
 ## 5. Delete Workspace Directory
 
 ```bash
+if [ "${REMOVE_FAILED:-false}" = "true" ]; then
+  echo "Refusing to delete \"$WORKSPACE_PATH\" because one or more git worktrees could not be removed." >&2
+  exit 1
+fi
+
 rm -rf "$WORKSPACE_PATH"
 ```
 

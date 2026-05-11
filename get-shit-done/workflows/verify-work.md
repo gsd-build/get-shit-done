@@ -30,7 +30,11 @@ No Pass/Fail buttons. No severity questions. Just: "Here's what should happen. D
 If $ARGUMENTS contains a phase number, load context:
 
 ```bash
-INIT=$(gsd-sdk query init.verify-work "${PHASE_ARG}")
+GSD_WS=""
+echo "$ARGUMENTS" | grep -qE -- '--ws[[:space:]]+[^[:space:]]+' && GSD_WS=$(echo "$ARGUMENTS" | grep -oE -- '--ws[[:space:]]+[^[:space:]]+')
+PHASE_ARG=$(echo "$ARGUMENTS" | sed -E 's/--ws[[:space:]]+[^[:space:]]+//g' | xargs)
+
+INIT=$(gsd-sdk query init.verify-work "${PHASE_ARG}" ${GSD_WS})
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
 AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
@@ -42,7 +46,7 @@ Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, 
 # MVP mode detection via the centralized phase.mvp-mode resolver.
 # verify-work has no --mvp CLI flag (mode is inherited from the planned phase),
 # so we omit --cli-flag — the verb falls through roadmap → config → false.
-MVP_MODE=$(gsd-sdk query phase.mvp-mode "${phase_number}" --pick active)
+MVP_MODE=$(gsd-sdk query phase.mvp-mode "${phase_number}" ${GSD_WS} --pick active)
 ```
 </step>
 
@@ -154,7 +158,7 @@ When `MVP_MODE=false` (mode is null, absent, or the phase has no `**Mode:**` lin
 **User-story format guard.** When `MVP_MODE=true`, also verify the phase's goal is in User Story format via the centralized validator:
 
 ```bash
-PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${phase_number}" --pick goal)
+PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${phase_number}" ${GSD_WS} --pick goal)
 USER_STORY_VALID=$(gsd-sdk query user-story.validate --story "$PHASE_GOAL" --pick valid)
 if [ "$USER_STORY_VALID" != "true" ]; then
   echo "Phase ${phase_number} has '**Mode:** mvp' in ROADMAP.md but the **Goal:** is not in user-story format."

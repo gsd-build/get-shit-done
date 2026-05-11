@@ -921,8 +921,13 @@ function cmdValidateHealth(cwd, options, raw) {
           'Worktree health check degraded: git worktree list timed out after 10s — orphan/stale worktrees could not be inspected',
           'Run: git worktree list --porcelain to diagnose; check for .git/index.lock or a hung git process');
       }
-      // Other non-ok reasons (not_a_git_repo, git_list_failed) are silent — not
-      // meaningful for users who have no git repo or whose git is not configured.
+      if (worktreeHealth.reason === 'git_list_failed') {
+        addIssue('warning', 'W020',
+          'Worktree health check degraded: git worktree list failed — orphan/stale worktrees could not be inspected',
+          'Run: git worktree list --porcelain to diagnose; check git repository state and permissions');
+      }
+      // Other non-ok reasons (not_a_git_repo) are silent — not meaningful for
+      // users who have no git repo.
     } else {
       for (const finding of worktreeHealth.findings) {
         if (finding.kind === 'orphan') {

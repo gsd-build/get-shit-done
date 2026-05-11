@@ -663,6 +663,11 @@ fi
 Capture current HEAD before spawning (used for worktree branch check):
 ```bash
 EXPECTED_BASE=$(git rev-parse HEAD)
+if [ "${USE_WORKTREES:-true}" != "false" ]; then
+  QUICK_WORKTREE_MANIFEST=$(mktemp "${TMPDIR:-/tmp}/gsd-quick-worktree-XXXXXX.json")
+  printf '{"worktrees":[]}\n' > "$QUICK_WORKTREE_MANIFEST"
+  export QUICK_WORKTREE_MANIFEST
+fi
 ```
 
 Spawn gsd-executor with plan reference:
@@ -763,10 +768,26 @@ SUMMARY.md and stop — the user must rerun with worktrees disabled.
 
 > **ORCHESTRATOR RULE — CODEX RUNTIME**: After calling Agent() above, stop working on this task immediately. Do not read more files, edit code, or run tests related to this task while the subagent is active. Wait for the subagent to return its result. This prevents duplicate work, conflicting edits, and wasted context. Only resume when the subagent result is available.
 
+If the executor ran with `isolation="worktree"`, append its returned `{agent_id, worktree_path, branch, expected_base}` metadata to `QUICK_WORKTREE_MANIFEST` before cleanup. If any field is unavailable, stop and ask for recovery; do not discover global worktrees.
+
 After executor returns:
 1. **Worktree cleanup:** If the executor ran with `isolation="worktree"`, merge the worktree branch back and clean up:
    ```bash
-   # Find worktrees created by the executor.
+   QUICK_WORKTREE_MANIFEST=${QUICK_WORKTREE_MANIFEST:-$WAVE_WORKTREE_MANIFEST}
+   [ -n "${QUICK_WORKTREE_MANIFEST:-}" ] && [ -f "$QUICK_WORKTREE_MANIFEST" ] || {
+     echo "BLOCKED: missing QUICK_WORKTREE_MANIFEST; refusing broad worktree cleanup (#3384)." >&2
+     exit 1
+   }
+
+   # Prefer the bounded cleanup helper. It verifies branch identity, expected
+   # base, deletion diffs, merge result, and worktree removal before branch
+   # deletion. If it blocks, resolve the reported manifest entry and rerun.
+   if command -v gsd-sdk >/dev/null 2>&1; then
+     gsd-sdk query worktree.cleanup-wave --manifest "$QUICK_WORKTREE_MANIFEST" || exit 1
+   else
+     echo "WARN: gsd-sdk unavailable; using manifest-scoped shell fallback (#3384)." >&2
+
+   # Find worktrees recorded by the executor manifest only.
    # Inclusion-based filter (#2774): match ONLY agent-spawned worktrees under
    # `.claude/worktrees/agent-` (the namespace Claude Code's `isolation="worktree"`
    # uses). The previous exclusion filter (`grep -v "$(pwd)$"`) destroyed the parent
@@ -774,6 +795,8 @@ After executor returns:
    # setups, and the cross-drive Windows case where `git worktree list` reports the
    # registry path on a different drive than `$(pwd)`).
    # Read line-by-line so worktree paths containing whitespace are preserved (#2774).
+   WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
+   node -e 'const fs=require("fs");const p=process.env.QUICK_WORKTREE_MANIFEST||process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("QUICK_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read QUICK_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
    while IFS= read -r WT; do
      [ -z "$WT" ] && continue
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -846,12 +869,19 @@ After executor returns:
          fi
        done < <(find "$WT/.planning" -name "*SUMMARY.md" 2>/dev/null)
 
-       if ! git worktree remove "$WT" --force; then
+       # Remove the worktree before deleting the branch. If removal fails,
+       # leave the branch in place so the worktree remains recoverable (#3384).
+       REMOVE_OK=false
+       if git worktree remove "$WT" --force; then
+         REMOVE_OK=true
+       else
          WT_NAME=$(basename "$WT")
          if [ -f ".git/worktrees/${WT_NAME}/locked" ]; then
            echo "⚠ Worktree $WT is locked — attempting to unlock and retry"
            git worktree unlock "$WT" 2>/dev/null || true
-           if ! git worktree remove "$WT" --force; then
+           if git worktree remove "$WT" --force; then
+             REMOVE_OK=true
+           else
              echo "⚠ Residual worktree at $WT — manual cleanup required after session exits:"
              echo "    git worktree unlock \"$WT\" && git worktree remove \"$WT\" --force && git branch -D \"$WT_BRANCH\""
            fi
@@ -859,9 +889,14 @@ After executor returns:
            echo "⚠ Residual worktree at $WT (remove failed) — investigate manually"
          fi
        fi
-       git branch -D "$WT_BRANCH" 2>/dev/null || true
+       if [ "$REMOVE_OK" = "true" ]; then
+         git branch -D "$WT_BRANCH" 2>/dev/null || true
+       else
+         echo "⚠ Keeping branch $WT_BRANCH because worktree removal failed (#3384)"
+       fi
      fi
-   done < <(git worktree list --porcelain | grep "^worktree " | grep "\.claude/worktrees/agent-" | sed 's/^worktree //')
+   done < "$WT_PATHS_FILE"
+   fi
    ```
    If `workflow.use_worktrees` is `false`, skip this step.
 2. Verify summary exists at `${QUICK_DIR}/${quick_id}-SUMMARY.md`

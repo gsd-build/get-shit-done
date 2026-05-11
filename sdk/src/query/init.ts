@@ -54,6 +54,23 @@ function generateSlugInternal(text: string): string {
     .substring(0, 60);
 }
 
+function extractPhaseArg(args: string[]): string | undefined {
+  const equalsArg = args.find((arg) => arg.startsWith('--phase='));
+  if (equalsArg) {
+    const value = equalsArg.slice('--phase='.length).trim();
+    return value || undefined;
+  }
+
+  const flagIndex = args.indexOf('--phase');
+  if (flagIndex !== -1) {
+    const value = args[flagIndex + 1];
+    return value && !value.startsWith('--') ? value : undefined;
+  }
+
+  const first = args[0];
+  return first && !first.startsWith('--') ? first : undefined;
+}
+
 /**
  * Check if a path exists on disk.
  */
@@ -184,14 +201,15 @@ async function getPhaseInfoWithFallback(
 async function getPhaseInfoForVerifyWork(
   phase: string,
   projectDir: string,
+  workstream?: string,
 ): Promise<{ phaseInfo: Record<string, unknown> | null }> {
-  const phaseResult = await findPhase([phase], projectDir);
+  const phaseResult = await findPhase([phase], projectDir, workstream);
   let phaseInfo = phaseResult.data as Record<string, unknown> | null;
   if (phaseInfo && phaseInfo.found === false) {
     phaseInfo = null;
   }
 
-  const roadmapResult = await roadmapGetPhase([phase], projectDir);
+  const roadmapResult = await roadmapGetPhase([phase], projectDir, workstream);
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   if (phaseInfo?.archived && roadmapPhase?.found) {
@@ -205,9 +223,7 @@ async function getPhaseInfoForVerifyWork(
       directory: null,
       phase_number: roadmapPhase.phase_number,
       phase_name: phaseName,
-      phase_slug: phaseName
-        ? phaseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-        : null,
+      phase_slug: phaseName ? generateSlugInternal(phaseName) : null,
       plans: [],
       summaries: [],
       incomplete_plans: [],
@@ -294,7 +310,7 @@ export function withProjectRoot(
  * Port of cmdInitExecutePhase from init.cjs lines 50-171.
  */
 export const initExecutePhase: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init execute-phase' } };
   }
@@ -377,7 +393,7 @@ export const initExecutePhase: QueryHandler = async (args, projectDir, workstrea
  * Port of cmdInitPlanPhase from init.cjs lines 173-293.
  */
 export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init plan-phase' } };
   }
@@ -623,14 +639,14 @@ export const initResume: QueryHandler = async (_args, projectDir) => {
  * Init handler for verify-work workflow.
  * Port of cmdInitVerifyWork from init.cjs lines 538-586.
  */
-export const initVerifyWork: QueryHandler = async (args, projectDir) => {
-  const phase = args[0];
+export const initVerifyWork: QueryHandler = async (args, projectDir, workstream) => {
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init verify-work' } };
   }
 
-  const config = await loadConfig(projectDir);
-  const { phaseInfo } = await getPhaseInfoForVerifyWork(phase, projectDir);
+  const config = await loadConfig(projectDir, workstream);
+  const { phaseInfo } = await getPhaseInfoForVerifyWork(phase, projectDir, workstream);
 
   const configExists = existsSync(join(projectDir, '.planning', 'config.json'));
   const [plannerModel, checkerModel] = configExists
@@ -661,7 +677,7 @@ export const initVerifyWork: QueryHandler = async (args, projectDir) => {
  * Port of cmdInitPhaseOp from init.cjs lines 588-697.
  */
 export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) => {
-  const phase = args[0];
+  const phase = extractPhaseArg(args);
   if (!phase) {
     return { data: { error: 'phase required for init phase-op' } };
   }

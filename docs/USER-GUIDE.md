@@ -249,6 +249,10 @@ Once a phase is verified, ship it:
 /gsd-ship 1          # Creates a PR with auto-generated body
 ```
 
+The PR body always includes the required GSD sections: `Summary`, `Changes`, `Requirements Addressed`, `Verification`, and `Key Decisions`. During `/gsd-new-project`, you can also enable optional PRD-style sections such as user stories, acceptance criteria, risks, release criteria, and stakeholder approval. These are appended through `ship.pr_body_sections` and do not change the required core sections.
+
+For setup examples, field definitions, and troubleshooting, see [Custom PR Body Sections](ship-pr-body-sections.md).
+
 For multi-phase projects, repeat the loop:
 
 ```

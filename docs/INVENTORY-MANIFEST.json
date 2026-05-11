@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-10",
+  "generated": "2026-05-11",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -223,6 +223,7 @@
       "planner-antipatterns.md",
       "planner-chunked.md",
       "planner-gap-closure.md",
+      "planner-human-verify-mode.md",
       "planner-mvp-mode.md",
       "planner-reviews.md",
       "planner-revision.md",
@@ -276,6 +277,9 @@
       "init-command-router.cjs",
       "init.cjs",
       "install-profiles.cjs",
+      "installer-migration-authoring.cjs",
+      "installer-migration-report.cjs",
+      "installer-migrations.cjs",
       "intel.cjs",
       "learnings.cjs",
       "milestone.cjs",

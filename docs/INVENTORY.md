@@ -261,7 +261,7 @@ Full roster at `get-shit-done/workflows/*.md`. Workflows are thin orchestrators 
 
 ---
 
-## References (59 shipped)
+## References (60 shipped)
 
 Full roster at `get-shit-done/references/*.md`. References are shared knowledge documents that workflows and agents `@-reference`. The groupings below match [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#references-get-shit-donereferencesmd) — core, workflow, thinking-model clusters, and the modular planner decomposition.
 
@@ -350,15 +350,16 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 | `planner-revision.md` | Plan revision patterns for iterative refinement. |
 | `planner-source-audit.md` | Planner source-audit and authority-limit rules. |
 | `planner-mvp-mode.md` | Vertical-slice planning rules for MVP mode. |
+| `planner-human-verify-mode.md` | Rules for `workflow.human_verify_mode = end-of-phase`: suppress `checkpoint:human-verify` task emission and route deferred items via `<verify><human-check>`. |
 | `skeleton-template.md` | SKELETON.md template emitted for new-project Walking Skeleton (Phase 1 + `--mvp`). |
 | `user-story-template.md` | User story format for MVP planning — "As a / I want to / So that" structured fields. |
 | `spidr-splitting.md` | SPIDR splitting decomposition rules for handling large user stories in MVP mode. |
 
-> **Subdirectory:** `get-shit-done/references/few-shot-examples/` contains additional few-shot examples (`plan-checker.md`, `verifier.md`) that are referenced from specific agents. These are not counted in the 59 top-level references.
+> **Subdirectory:** `get-shit-done/references/few-shot-examples/` contains additional few-shot examples (`plan-checker.md`, `verifier.md`) that are referenced from specific agents. These are not counted in the 60 top-level references.
 
 ---
 
-## CLI Modules (51 shipped)
+## CLI Modules (53 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -384,6 +385,9 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `init-command-router.cjs` | Thin CJS subcommand router adapter for `gsd-tools init` |
 | `init.cjs` | Compound context loading for each workflow type |
 | `install-profiles.cjs` | Install profile allowlist + skill staging for `--minimal` install (#2762); single source of truth for which `gsd-*` skills/agents land in runtime config dirs |
+| `installer-migration-authoring.cjs` | Installer migration authoring guardrails for record metadata, explicit scopes, ownership evidence, and runtime contract citations |
+| `installer-migration-report.cjs` | Installer migration report projection and blocked-action guard for install/update integration |
+| `installer-migrations.cjs` | Installer migration planning, artifact classification, install-state persistence, journaled apply, and rollback helpers |
 | `intel.cjs` | Codebase intel store backing `/gsd-map-codebase --query` and `gsd-intel-updater` |
 | `learnings.cjs` | Cross-phase learnings extraction for `/gsd-extract-learnings` |
 | `milestone.cjs` | Milestone archival, requirements marking |

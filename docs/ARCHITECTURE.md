@@ -484,7 +484,8 @@ UI-SPEC.md (per phase) ───────────────────
 
 ```
 ~/.claude/                          # Claude Code (global install)
-├── commands/gsd/*.md               # Slash commands (authoritative roster: docs/INVENTORY.md)
+├── skills/gsd-*/SKILL.md           # Global skills (authoritative roster: docs/INVENTORY.md)
+├── commands/gsd/*.md               # Local Claude installs use slash commands instead of global skills
 ├── get-shit-done/
 │   ├── bin/gsd-tools.cjs           # CLI utility
 │   ├── bin/lib/*.cjs               # Domain modules (authoritative roster: docs/INVENTORY.md)
@@ -500,12 +501,20 @@ UI-SPEC.md (per phase) ───────────────────
 
 Equivalent paths for other runtimes:
 
-- **OpenCode:** `~/.config/opencode/` or `~/.opencode/`
-- **Kilo:** `~/.config/kilo/` or `~/.kilo/`
-- **Gemini CLI:** `~/.gemini/`
-- **Codex:** `~/.codex/` (uses skills instead of commands)
-- **Copilot:** `~/.github/`
-- **Antigravity:** `~/.gemini/antigravity/` (global) or `./.agent/` (local)
+- **OpenCode:** `~/.config/opencode/` global or `./.opencode/` local
+- **Kilo:** `~/.config/kilo/` global or `./.kilo/` local
+- **Gemini CLI:** `~/.gemini/` global or `./.gemini/` local
+- **Codex:** `~/.codex/` global or `./.codex/` local
+- **Copilot:** `~/.copilot/` global or `./.github/` local
+- **Antigravity:** `~/.gemini/antigravity/` global or `./.agent/` local
+- **Cursor:** `~/.cursor/` global or `./.cursor/` local
+- **Windsurf:** `~/.codeium/windsurf/` global or `./.windsurf/` local
+- **Augment Code:** `~/.augment/` global or `./.augment/` local
+- **Trae:** `~/.trae/` global or `./.trae/` local
+- **Qwen Code:** `~/.qwen/` global or `./.qwen/` local
+- **Hermes Agent:** `~/.hermes/` global or `./.hermes/` local
+- **CodeBuddy:** `~/.codebuddy/` global or `./.codebuddy/` local
+- **Cline:** `~/.cline/` global or project-root `.clinerules` local
 
 ### Project Files (`.planning/`)
 
@@ -587,11 +596,11 @@ verification.
 
 ## Installer Architecture
 
-The installer (`bin/install.js`, ~3,000 lines) handles:
+The installer (`bin/install.js`, ~10,700 lines) handles:
 
-1. **Runtime detection** — Interactive prompt or CLI flags (`--claude`, `--opencode`, `--gemini`, `--kilo`, `--codex`, `--copilot`, `--antigravity`, `--cursor`, `--windsurf`, `--trae`, `--cline`, `--augment`, `--all`)
+1. **Runtime detection** — Interactive prompt or CLI flags (`--claude`, `--opencode`, `--gemini`, `--kilo`, `--codex`, `--copilot`, `--antigravity`, `--cursor`, `--windsurf`, `--augment`, `--trae`, `--qwen`, `--hermes`, `--codebuddy`, `--cline`, `--all`)
 2. **Location selection** — Global (`--global`) or local (`--local`)
-3. **File deployment** — Copies commands, workflows, references, templates, agents, hooks
+3. **File deployment** — Copies commands, skills, workflows, references, templates, agents, and hooks
 4. **Runtime adaptation** — Transforms file content per runtime:
   - Claude Code: Uses as-is
   - OpenCode: Converts commands/agents to OpenCode-compatible flat command + subagent format
@@ -600,7 +609,12 @@ The installer (`bin/install.js`, ~3,000 lines) handles:
   - Copilot: Maps tool names (Read→read, Bash→execute, etc.)
   - Gemini: Adjusts hook event names (`AfterTool` instead of `PostToolUse`)
   - Antigravity: Skills-first with Google model equivalents
+  - Cursor: Skills-first with Cursor rule references
+  - Windsurf: Skills-first with Windsurf rule references
   - Trae: Skills-first install to `~/.trae` / `./.trae` with no `settings.json` or hook integration
+  - Qwen Code: Skills-first with Qwen-branded path and prompt rewrites
+  - Hermes Agent: Category-based skills under `skills/gsd/`
+  - CodeBuddy: Skills-first with CodeBuddy path and prompt rewrites
   - Cline: Writes `.clinerules` for rule-based integration
   - Augment Code: Skills-first with full skill conversion and config management
 5. **Path normalization** — Replaces `~/.claude/` paths with runtime-specific paths
@@ -608,6 +622,14 @@ The installer (`bin/install.js`, ~3,000 lines) handles:
 7. **Patch backup** — Since v1.17, backs up locally modified files to `gsd-local-patches/` for `/gsd-update --reapply`
 8. **Manifest tracking** — Writes `gsd-file-manifest.json` for clean uninstall
 9. **Uninstall mode** — `--uninstall` removes all GSD files, hooks, and settings
+
+Install-time file moves, stale-artifact cleanup, config rewrites, and user-data
+preservation are governed by the Installer Migration Module. See
+[Installer Migrations](installer-migrations.md) and
+[ADR 0008](adr/0008-installer-migration-module.md).
+The migration module also owns the gated first-time baseline scan for legacy
+installs, classifying known runtime install surfaces before later migrations
+remove or rewrite anything.
 
 ### Platform Handling
 
@@ -703,20 +725,46 @@ The researcher → planner → executor pipeline includes a supply-chain gate ag
 
 GSD supports multiple AI coding runtimes through a unified command/workflow architecture:
 
+### Runtime Install Contract Matrix
 
-| Runtime      | Command Format | Agent System     | Config Location          |
-| ------------ | -------------- | ---------------- | ------------------------ |
-| Claude Code  | `/gsd-command` | Task spawning    | `~/.claude/`             |
-| OpenCode     | `/gsd-command` | Subagent mode    | `~/.config/opencode/`    |
-| Kilo         | `/gsd-command` | Subagent mode    | `~/.config/kilo/`        |
-| Gemini CLI   | `/gsd-command` | Task spawning    | `~/.gemini/`             |
-| Codex        | `$gsd-command` | Skills           | `~/.codex/`              |
-| Copilot      | `/gsd-command` | Agent delegation | `~/.github/`             |
-| Antigravity  | Skills         | Skills           | `~/.gemini/antigravity/` |
-| Trae         | Skills         | Skills           | `~/.trae/`               |
-| Cline        | Rules          | Rules            | `.clinerules`            |
-| Augment Code | Skills         | Skills           | Augment config           |
+This matrix describes the runtime surfaces the installer materializes today.
+The migration-specific ownership and source snapshots live in
+[Installer Migrations](installer-migrations.md#runtime-configuration-contract-registry).
 
+| Runtime | Global root | Local root | Invocation surface | Agent surface | Config and hooks |
+| --- | --- | --- | --- | --- | --- |
+| Claude Code | `~/.claude` | `./.claude` | Global `skills/gsd-*/SKILL.md`; local `commands/gsd/*.md` | `agents/gsd-*.md` | `settings.json` hook and statusLine entries |
+| OpenCode | `~/.config/opencode` | `./.opencode` | `command/gsd-*.md` | `agents/gsd-*.md` | `opencode.json` or `opencode.jsonc`; no GSD hooks |
+| Kilo | `~/.config/kilo` | `./.kilo` | `command/gsd-*.md` | `agents/gsd-*.md` | `kilo.json` or `kilo.jsonc`; no GSD hooks |
+| Gemini CLI | `~/.gemini` | `./.gemini` | `commands/gsd/*.toml` | `agents/gsd-*.md` | `settings.json` feature flag, hooks, and statusline |
+| Codex | `~/.codex` | `./.codex` | `skills/gsd-*/SKILL.md` | `agents/` source markdown plus per-agent TOML | `config.toml` `[agents.gsd-*]`, `[features].codex_hooks`, and hook tables |
+| GitHub Copilot | `~/.copilot` | `./.github` | `skills/gsd-*/SKILL.md` and `copilot-instructions.md` | `.agent.md` files | No GSD hooks or statusline |
+| Antigravity | `~/.gemini/antigravity` | `./.agent` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | Gemini-style `settings.json` hook entries when installed by GSD |
+| Cursor | `~/.cursor` | `./.cursor` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | Rule references under `rules/`; no GSD hooks |
+| Windsurf | `~/.codeium/windsurf` | `./.windsurf` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | Rule references under `rules/`; no GSD hooks |
+| Augment Code | `~/.augment` | `./.augment` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | No GSD hooks or statusline |
+| Trae | `~/.trae` | `./.trae` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | Rule references under `rules/`; no GSD hooks |
+| Qwen Code | `~/.qwen` | `./.qwen` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | Common GSD settings and hook entries where supported |
+| Hermes Agent | `~/.hermes` | `./.hermes` | `skills/gsd/DESCRIPTION.md` plus `skills/gsd/gsd-*/SKILL.md` | `agents/gsd-*.md` | Common GSD settings and hook entries where supported |
+| CodeBuddy | `~/.codebuddy` | `./.codebuddy` | `skills/gsd-*/SKILL.md` | `agents/gsd-*.md` | Common GSD settings and hook entries where supported |
+| Cline | `~/.cline` | project root | `.clinerules` | Rules only | No GSD hooks or statusline |
+
+### Upstream Contract Sources
+
+Runtime install expectations are checked against primary documentation where
+available. The current source snapshot is 2026-05-11:
+
+- Claude Code: Anthropic slash commands, settings, hooks, and subagents docs.
+- OpenCode and Kilo: OpenCode config docs and Kilo custom subagent docs.
+- Gemini CLI and Qwen Code: command/config docs; Qwen command docs were last
+  updated 2026-05-06.
+- Codex: OpenAI Codex docs and `config-schema.json`; the installer also carries
+  Codex 0.124.0 compatibility for agent table shape.
+- Copilot, Cursor, Cline, Augment, Hermes, and CodeBuddy: vendor docs for
+  custom instructions, rules, skills, or config.
+- Antigravity, Windsurf, and Trae: source-limited rows. The installer documents
+  current compatibility shims, and migrations must refresh those sources before
+  rewriting their config.
 
 ### Abstraction Points
 

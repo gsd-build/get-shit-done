@@ -74,4 +74,38 @@ describe('checkShipReady', () => {
     // Per spec: gh_authenticated is advisory — skip actual auth check to avoid slow network call
     expect(d.gh_authenticated).toBe(false);
   });
+
+  it('blocks shipping when VERIFICATION.md is missing', async () => {
+    await mkdir(join(projectDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+
+    const { data } = await checkShipReady(['1'], projectDir);
+    const d = data as Record<string, unknown>;
+
+    expect(d.verification_passed).toBe(false);
+    expect(d.ready).toBe(false);
+    expect(d.blockers).toContain('verification status is not passed');
+  });
+
+  it('blocks shipping when verification status is human_needed', async () => {
+    const phaseDir = join(projectDir, '.planning', 'phases', '02-core');
+    await mkdir(phaseDir, { recursive: true });
+    await writeFile(
+      join(phaseDir, 'VERIFICATION.md'),
+      [
+        '---',
+        'status: human_needed',
+        '---',
+        '',
+        '# Verification',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { data } = await checkShipReady(['2'], projectDir);
+    const d = data as Record<string, unknown>;
+
+    expect(d.verification_passed).toBe(false);
+    expect(d.ready).toBe(false);
+    expect(d.blockers).toContain('verification status is not passed');
+  });
 });

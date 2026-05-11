@@ -422,8 +422,10 @@ grep -E "^\- \`" "$PHASE_DIR"/*-SUMMARY.md | sed 's/.*`\([^`]*\)`.*/\1/' | sort 
 Run anti-pattern detection on each file:
 
 ```bash
-# TODO/FIXME/placeholder comments
-grep -n -E "TODO|FIXME|XXX|HACK|PLACEHOLDER" "$file" 2>/dev/null
+# Debt-marker comments
+grep -n -E "TBD|FIXME|XXX" "$file" 2>/dev/null
+# Warning-level cleanup comments
+grep -n -E "TODO|HACK|PLACEHOLDER" "$file" 2>/dev/null
 grep -n -E "placeholder|coming soon|will be here|not yet implemented|not available" "$file" -i 2>/dev/null
 # Empty implementations
 grep -n -E "return null|return \{\}|return \[\]|=> \{\}" "$file" 2>/dev/null
@@ -437,7 +439,9 @@ grep -n -B 2 -A 2 "console\.log" "$file" 2>/dev/null | grep -E "^\s*(const|funct
 
 **Stub classification:** A grep match is a STUB only when the value flows to rendering or user-visible output AND no other code path populates it with real data. A test helper, type default, or initial state that gets overwritten by a fetch/store is NOT a stub. Check for data-fetching (useEffect, fetch, query, useSWR, useQuery, subscribe) that writes to the same variable before flagging.
 
-Categorize: 🛑 Blocker (prevents goal) | ⚠️ Warning (incomplete) | ℹ️ Info (notable)
+**Debt marker gate:** Any `TBD`, `FIXME`, or `XXX` marker in a file modified by this phase is a 🛑 BLOCKER unless the same line references formal follow-up work (`issue #123`, `PR #123`, `#123`, or `DEF-*`). Unreferenced markers mean completion is not auditable; set `status: gaps_found` and list each marker under `gaps`.
+
+Categorize: 🛑 Blocker (prevents goal or unresolved debt marker) | ⚠️ Warning (incomplete) | ℹ️ Info (notable)
 
 ## Step 7b: Behavioral Spot-Checks
 
@@ -485,11 +489,62 @@ npm test -- --grep "$PHASE_TEST_PATTERN" 2>&1 | grep -q "passing"
 - Do not modify state (no writes, no mutations, no side effects)
 - If the project has no runnable entry points yet, skip with: "Step 7b: SKIPPED (no runnable entry points)"
 
+## Step 7c: Probe Execution
+
+SUMMARY.md probe pass claims are not evidence. If a phase declares or implies probe-based verification, the verifier must run the probe in its own process and record the command result.
+
+**When to run:** For migration phases, CLI/tooling phases, or any phase whose PLAN/SUMMARY/verification criteria mention probes, PASS markers, stage markers, runnable checks, or `scripts/*/tests/probe-*.sh`.
+
+**Probe discovery:**
+
+```bash
+# Conventional project probes
+find scripts -path '*/tests/probe-*.sh' -type f 2>/dev/null | sort
+
+# Phase-declared probes
+grep -R -n -E 'probe-[^[:space:]]+\.sh|scripts/.*/tests/probe-.*\.sh' "$PHASE_DIR"/*-PLAN.md "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
+```
+
+**Execution contract:**
+
+1. Build the `PROBES` list from explicit PLAN declarations first; include conventional `scripts/*/tests/probe-*.sh` when the phase is a migration/tooling phase or the success criteria mention probes.
+2. For every documented probe path, if the file is missing or unreadable, mark `MISSING_PROBE` and set `status: gaps_found`. Do not require the executable bit because probes run through `bash "$probe"`.
+3. Run each probe from the built `PROBES` list (declared + conventional) from the repository root:
+
+```bash
+for probe in "${PROBES[@]}"; do
+  timeout 30s bash "$probe"
+done
+```
+
+4. Exit code 0 is PASS. Any non-zero exit is FAILED and must include stdout/stderr evidence in VERIFICATION.md.
+5. Do not substitute executor narration, SUMMARY.md PASS-marker counts, or a different dry-run driver command for the probe result.
+
+**Probe status:**
+
+| Probe | Command | Result | Status |
+| ----- | ------- | ------ | ------ |
+| `scripts/.../probe-name.sh` | `bash "$probe"` | exit code/output | PASS / FAILED / MISSING_PROBE |
+
 ## Step 8: Identify Human Verification Needs
 
 **Always needs human:** Visual appearance, user flow completion, real-time behavior, external service integration, performance feel, error message clarity.
 
 **Needs human if uncertain:** Complex wiring grep can't trace, dynamic state behavior, edge cases.
+
+**Harvest deferred items from PLAN.md (#3309 / `workflow.human_verify_mode = end-of-phase`):** Scan every PLAN file in the phase for `<verify><human-check>` blocks on `auto` tasks. These are verification items the planner deliberately deferred from `checkpoint:human-verify` to end-of-phase to avoid the executor cold-start cost. Each block has the same shape used by the planner:
+
+```xml
+<verify>
+  <human-check>
+    <test>What to do</test>
+    <expected>What should happen</expected>
+    <why_human>Why grep can't verify</why_human>
+  </human-check>
+</verify>
+```
+
+Merge those harvested items into the same human verification list as your own analysis. Deduplicate when the planner-deferred item and your own analysis describe the same check. The downstream `human_needed` → HUMAN-UAT.md path in `workflows/execute-phase.md` is the single sink — no separate file is created.
 
 **Format:**
 
@@ -705,6 +760,11 @@ Only include this section if deferred items exist (from Step 9b).
 
 | Behavior | Command | Result | Status |
 | -------- | ------- | ------ | ------ |
+
+### Probe Execution
+
+| Probe | Command | Result | Status |
+| ----- | ------- | ------ | ------ |
 
 ### Requirements Coverage
 

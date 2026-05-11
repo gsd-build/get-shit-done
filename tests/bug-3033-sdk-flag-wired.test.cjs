@@ -150,6 +150,21 @@ describe('bug #3033: --sdk flag (opts.forceSdk) must be wired into installSdkIfN
     );
   });
 
+  test('throwOnFailure=true converts missing SDK dist into catchable error', () => {
+    fs.mkdirSync(sdkDir, { recursive: true });
+
+    assert.throws(
+      () => captureConsole(() => {
+        installSdkIfNeeded({ sdkDir, isLocal: true, forceSdk: true, throwOnFailure: true });
+      }),
+      (error) => {
+        assert.equal(error.code, 'GSD_SDK_MISSING_DIST');
+        assert.equal(error.exitCode, 1);
+        return true;
+      }
+    );
+  });
+
   test('forceSdk=false (default) + isLocal=true + dist missing: retains #2678 soft-skip', () => {
     // Verify the #2678 contract is not broken for the default (no --sdk) path.
     fs.mkdirSync(sdkDir, { recursive: true });

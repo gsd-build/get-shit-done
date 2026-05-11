@@ -20,9 +20,21 @@ const path = require('node:path');
 const { parseFragment, FRAGMENT_ERROR } = require('./parse.cjs');
 const { renderChangelog } = require('./render.cjs');
 const { serializeChangelog } = require('./serialize.cjs');
+const { renderGithubReleaseNotes } = require('./github-release-notes.cjs');
 
 function parseArgs(argv) {
-  const opts = { cmd: null, repo: process.cwd(), version: null, date: null, json: false };
+  const opts = {
+    cmd: null,
+    repo: process.cwd(),
+    version: null,
+    date: null,
+    fromRef: null,
+    toRef: null,
+    output: null,
+    repoSlug: 'gsd-build/get-shit-done',
+    installCommand: 'npx get-shit-done-cc@latest',
+    json: false,
+  };
   if (argv.length === 0) return { ok: true, opts };
   opts.cmd = argv[0];
 
@@ -41,12 +53,26 @@ function parseArgs(argv) {
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') { opts.json = true; continue; }
-    if (a === '--repo' || a === '--version' || a === '--date') {
+    if (
+      a === '--repo' ||
+      a === '--version' ||
+      a === '--date' ||
+      a === '--from' ||
+      a === '--to' ||
+      a === '--output' ||
+      a === '--repo-slug' ||
+      a === '--install-command'
+    ) {
       const r = requireValue(a, i);
       if (!r.ok) return { ok: false, error: r.error };
       if (a === '--repo') opts.repo = r.value;
       else if (a === '--version') opts.version = r.value;
       else if (a === '--date') opts.date = r.value;
+      else if (a === '--from') opts.fromRef = r.value;
+      else if (a === '--to') opts.toRef = r.value;
+      else if (a === '--output') opts.output = r.value;
+      else if (a === '--repo-slug') opts.repoSlug = r.value;
+      else if (a === '--install-command') opts.installCommand = r.value;
       i++;
       continue;
     }
@@ -154,26 +180,78 @@ function cmdRender(opts) {
   };
 }
 
+function cmdGithubReleaseNotes(opts) {
+  const repo = path.resolve(opts.repo);
+  const report = renderGithubReleaseNotes({
+    repo,
+    fromRef: opts.fromRef,
+    toRef: opts.toRef,
+    repoSlug: opts.repoSlug,
+    installCommand: opts.installCommand,
+  });
+
+  if (!report.ok) {
+    return {
+      exitCode: 1,
+      report: {
+        consumed: 0,
+        failures: report.failures,
+        release: { from: opts.fromRef, to: opts.toRef },
+      },
+    };
+  }
+
+  if (opts.output) {
+    fs.writeFileSync(path.resolve(opts.output), report.body);
+  }
+
+  return {
+    exitCode: 0,
+    report: {
+      consumed: report.fragments.length,
+      failures: [],
+      release: { from: opts.fromRef, to: opts.toRef },
+      output: opts.output || null,
+      body: opts.output ? null : report.body,
+    },
+  };
+}
+
+function usage() {
+  return [
+    'usage:',
+    '  changeset/cli.cjs render --repo <dir> --version V --date D [--json]',
+    '  changeset/cli.cjs github-release-notes --repo <dir> --from REF --to REF [--output FILE] [--repo-slug OWNER/REPO] [--install-command CMD] [--json]',
+    '',
+  ].join('\n');
+}
+
 function main() {
   const parsed = parseArgs(process.argv.slice(2));
   if (!parsed.ok) {
     process.stderr.write(`${parsed.error}\n`);
-    process.stderr.write('usage: changeset/cli.cjs render --repo <dir> --version V --date D [--json]\n');
+    process.stderr.write(usage());
     process.exit(2);
   }
   const { opts } = parsed;
-  if (opts.cmd !== 'render') {
-    process.stderr.write('usage: changeset/cli.cjs render --repo <dir> --version V --date D [--json]\n');
+  if (opts.cmd !== 'render' && opts.cmd !== 'github-release-notes') {
+    process.stderr.write(usage());
     process.exit(2);
   }
-  if (!opts.version || !opts.date) {
+  if (opts.cmd === 'render' && (!opts.version || !opts.date)) {
     process.stderr.write('--version and --date are required for render\n');
     process.exit(2);
   }
+  if (opts.cmd === 'github-release-notes' && (!opts.fromRef || !opts.toRef)) {
+    process.stderr.write('--from and --to are required for github-release-notes\n');
+    process.exit(2);
+  }
 
-  const { exitCode, report } = cmdRender(opts);
+  const { exitCode, report } = opts.cmd === 'render' ? cmdRender(opts) : cmdGithubReleaseNotes(opts);
   if (opts.json) {
     process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+  } else if (opts.cmd === 'github-release-notes' && report.body) {
+    process.stdout.write(report.body);
   } else {
     process.stdout.write(`Consumed: ${report.consumed} fragment(s)\n`);
     if (report.failures.length > 0) {
@@ -188,4 +266,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { cmdRender, parseArgs, splitChangelog, listFragmentFiles };
+module.exports = { cmdRender, cmdGithubReleaseNotes, parseArgs, splitChangelog, listFragmentFiles, usage };

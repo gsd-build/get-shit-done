@@ -115,6 +115,18 @@ For each phase that should be complete:
 - SUMMARY.md missing → phase was not properly closed
 - VERIFICATION.md missing → quality check was skipped
 
+### Partial-plan Drift Detection
+
+**Signal:** commits exist but SUMMARY.md is missing for the current or recently
+active plan.
+
+Run the same comparison as the execute-phase safe-resume verifier: identify the
+active plan from STATE.md/phase artifacts, search git history for that plan id,
+then compare against the expected SUMMARY.md path. If production commits exist
+but SUMMARY.md is missing, flag a high-confidence partial-plan drift anomaly.
+This usually means an executor was interrupted after implementation commits but
+before atomic close-out.
+
 ### Abandoned Work Detection
 
 **Signal:** Large gap between last commit and current time, with STATE.md showing mid-execution.

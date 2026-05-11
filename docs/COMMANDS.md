@@ -291,6 +291,9 @@ Create PR from completed phase work with auto-generated body.
 - Requirements addressed (REQ-IDs)
 - Verification status
 - Key decisions
+- Optional configured PRD-style sections from `ship.pr_body_sections`
+
+See [Custom PR Body Sections](ship-pr-body-sections.md) for onboarding, examples, and validation rules.
 
 ---
 

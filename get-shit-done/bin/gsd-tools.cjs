@@ -373,7 +373,7 @@ async function main() {
     'generate-dev-preferences, generate-slug, graphify, history-digest, init, intel, ' +
     'learnings, list-todos, milestone, phase, phase-plan-index, phases, profile-questionnaire, ' +
     'profile-sample, progress, requirements, resolve-model, roadmap, scaffold, state, ' +
-    'template, validate, verify, verify-path-exists, verify-summary, workstream\n\n' +
+    'template, validate, verify, verify-path-exists, verify-summary, workstream, worktree\n\n' +
     'Global flags:\n' +
     '  --raw              Emit raw output without post-processing\n' +
     '  --pick <field>     Extract a single field from JSON output (dot/bracket notation)\n' +
@@ -418,6 +418,7 @@ async function main() {
   const SKIP_ROOT_RESOLUTION = new Set([
     'generate-slug', 'current-timestamp', 'verify-path-exists',
     'verify-summary', 'template', 'frontmatter', 'detect-custom-files',
+    'worktree',
   ]);
   if (!SKIP_ROOT_RESOLUTION.has(command)) {
     cwd = findProjectRoot(cwd);
@@ -977,6 +978,17 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         workstream.cmdWorkstreamProgress(cwd, raw);
       } else {
         error('Unknown workstream subcommand. Available: create, list, status, complete, set, get, progress', ERROR_REASON.SDK_UNKNOWN_COMMAND);
+      }
+      break;
+    }
+
+    case 'worktree': {
+      const subcommand = args[1];
+      const worktreeSafety = require('./lib/worktree-safety.cjs');
+      if (subcommand === 'cleanup-wave') {
+        worktreeSafety.cmdWorktreeCleanupWave(cwd, args.slice(2));
+      } else {
+        error('Unknown worktree subcommand. Available: cleanup-wave', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }
