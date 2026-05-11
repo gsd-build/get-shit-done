@@ -58,6 +58,10 @@ export function resolveLegacyWorkflowsDir(homeDir: string = homedir()): string {
   return join(resolveLegacyInstallDir(homeDir), 'workflows');
 }
 
+export function resolveLegacyUserProfilePath(homeDir: string = homedir()): string {
+  return join(resolveLegacyInstallDir(homeDir), 'USER-PROFILE.md');
+}
+
 export function resolveLegacySkillsDir(homeDir: string = homedir()): string {
   return join(resolveLegacyInstallDir(homeDir), 'skills');
 }
