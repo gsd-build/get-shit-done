@@ -14,10 +14,21 @@ describe('bug #3381: verify-work forwards workstream context', () => {
       'utf8',
     );
 
+    assert.match(workflow, /GSD_WS=""/, 'verify-work must initialize GSD_WS');
     assert.match(
       workflow,
-      /GSD_WS=""[\s\S]{0,260}grep -qE -- '--ws\[\[:space:\]\]\+\[\^\[:space:\]\]\+'[\s\S]{0,160}grep -oE -- '--ws\[\[:space:\]\]\+\[\^\[:space:\]\]\+'/,
-      'verify-work must extract --ws from $ARGUMENTS into GSD_WS',
+      /grep -qE -- '--ws\[\[:space:\]\]\+\[\^\[:space:\]\]\+'/,
+      'verify-work must detect --ws in $ARGUMENTS',
+    );
+    assert.match(
+      workflow,
+      /grep -oE -- '--ws\[\[:space:\]\]\+\[\^\[:space:\]\]\+'/,
+      'verify-work must extract the --ws flag pair from $ARGUMENTS',
+    );
+    assert.match(
+      workflow,
+      /PHASE_ARG=\$\(echo "\$ARGUMENTS" \| sed -E 's\/--ws\[\[:space:\]\]\+\[\^\[:space:\]\]\+\/\/g' \| xargs\)/,
+      'verify-work must derive PHASE_ARG after removing --ws',
     );
     assert.match(
       workflow,
