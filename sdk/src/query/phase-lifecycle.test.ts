@@ -1010,6 +1010,19 @@ describe('phaseRemove', () => {
     await expect(phaseRemove([], tmpDir)).rejects.toThrow('phase number required');
   });
 
+  it('throws GSDError when target phase does not exist and does not mutate STATE.md', async () => {
+    const { phaseRemove } = await import('./phase-lifecycle.js');
+    await setupTestProject(tmpDir, {
+      roadmap: ROADMAP_FOR_REMOVE,
+      state: STATE_FOR_REMOVE,
+      phases: ['05-auth', '06-dashboard', '07-api'],
+    });
+
+    await expect(phaseRemove(['99'], tmpDir)).rejects.toThrow('Phase 99 not found');
+    const stateContent = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(stateContent).toMatch(/total_phases:\s*7/);
+  });
+
   it('updates ROADMAP.md by removing phase section and renumbering', async () => {
     const { phaseRemove } = await import('./phase-lifecycle.js');
     await setupTestProject(tmpDir, {
