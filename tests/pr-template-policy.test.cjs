@@ -154,4 +154,21 @@ describe('pr-template-policy', () => {
     assert.equal(result.action, 'close');
     assert.deepEqual(result.missingHeadings, ['What was broken']);
   });
+
+  test('closes first-time PRs with empty body', () => {
+    const result = evaluatePrTemplate('', 'FIRST_TIMER');
+
+    assert.equal(result.valid, false);
+    assert.equal(result.action, 'close');
+    assert.match(result.reason, /PR body is empty; a typed pull request template is required\./);
+  });
+
+  test('warns trusted contributors with empty body', () => {
+    const result = evaluatePrTemplate('', 'CONTRIBUTOR');
+
+    assert.equal(result.valid, false);
+    assert.equal(result.action, 'warn');
+    assert.equal(result.trusted, true);
+    assert.match(result.reason, /PR body is empty; a typed pull request template is required\./);
+  });
 });
