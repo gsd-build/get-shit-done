@@ -244,7 +244,7 @@ Each entry supports:
 |-------|------|---------|-------------|
 | `heading` | string | required | Markdown section heading rendered as `## {heading}`. Must be a single line. |
 | `enabled` | boolean | `true` | When `false`, onboarding can keep a candidate section in config without rendering it in generated PR bodies. |
-| `source` | string | (none) | Optional fallback chain of planning artifact headings, such as `PLAN.md ## Risks || VERIFICATION.md ## Manual Checks`. Allowed artifacts are `ROADMAP.md`, `PLAN.md`, `SUMMARY.md`, `VERIFICATION.md`, `STATE.md`, `REQUIREMENTS.md`, and `CONTEXT.md`. |
+| `source` | string | (none) | Optional fallback chain of planning artifact headings, such as `PLAN.md ## Risks \|\| VERIFICATION.md ## Manual Checks`. Allowed artifacts are `ROADMAP.md`, `PLAN.md`, `SUMMARY.md`, `VERIFICATION.md`, `STATE.md`, `REQUIREMENTS.md`, and `CONTEXT.md`. |
 | `template` | string | (none) | Literal Markdown with closed tokens: `{phase_number}`, `{phase_name}`, `{phase_dir}`, `{base_branch}`, `{padded_phase}`. |
 | `fallback` | string | (none) | Literal Markdown used when `source` yields no content and no `template` is provided. |
 
