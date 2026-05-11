@@ -599,6 +599,12 @@ function formatHookCommandForShell(command, opts) {
   return platform === 'win32' ? `& ${command}` : command;
 }
 
+function formatManagedHookScriptToken(scriptPath, opts) {
+  const platform = (opts && opts.platform) || process.platform;
+  if (platform !== 'win32') return null;
+  return JSON.stringify(scriptPath.replace(/\\/g, '/'));
+}
+
 function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
   if (!settings || !settings.hooks || !absoluteRunner) return false;
   if (!opts) opts = {};
@@ -672,7 +678,8 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
           if (platform !== 'win32' || hadPowerShellCallOperator) continue;
         }
 
-        h.command = formatHookCommandForShell(`${absoluteRunner} ${scriptToken}`, opts);
+        const safeScriptToken = formatManagedHookScriptToken(scriptPath, opts) || scriptToken;
+        h.command = formatHookCommandForShell(`${absoluteRunner} ${safeScriptToken}`, opts);
         changed = true;
       }
     }

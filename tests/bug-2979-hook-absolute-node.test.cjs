@@ -335,6 +335,26 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     const changed = rewriteLegacyManagedNodeHookCommands(settings, runner);
     assert.equal(changed, true);
   });
+
+  test('normalizes single-quoted Windows managed hook paths to double-quoted forward-slash paths (#3392)', () => {
+    const settings = {
+      hooks: {
+        PreToolUse: [{
+          hooks: [{
+            type: 'command',
+            command: "node 'C:\\Users\\me\\.codex\\hooks\\gsd-prompt-guard.js'",
+          }],
+        }],
+      },
+    };
+    const runner = '"C:/nvm4w/nodejs/node.exe"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.PreToolUse[0].hooks[0].command,
+      '& "C:/nvm4w/nodejs/node.exe" "C:/Users/me/.codex/hooks/gsd-prompt-guard.js"',
+    );
+  });
 });
 
 describe('Bug #2979 (#3002 CR): resolveNodeRunner returns null when execPath unavailable', () => {
