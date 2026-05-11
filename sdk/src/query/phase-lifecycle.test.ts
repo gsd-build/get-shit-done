@@ -972,6 +972,22 @@ describe('phaseRemove', () => {
     expect(data.directory_deleted).toBeTruthy();
   });
 
+  it('bug-3409: accepts --force before phase id', async () => {
+    const { phaseRemove } = await import('./phase-lifecycle.js');
+    const phasesDir = join(tmpDir, '.planning', 'phases');
+    await setupTestProject(tmpDir, {
+      roadmap: ROADMAP_FOR_REMOVE,
+      state: STATE_FOR_REMOVE,
+      phases: ['05-auth', '06-dashboard', '07-api'],
+    });
+    await writeFile(join(phasesDir, '06-dashboard', '06-01-SUMMARY.md'), 'summary', 'utf-8');
+
+    const result = await phaseRemove(['--force', '6'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.removed).toBe('6');
+    expect(data.directory_deleted).toBeTruthy();
+  });
+
   it('throws GSDError when ROADMAP.md is missing', async () => {
     const { phaseRemove } = await import('./phase-lifecycle.js');
     // Set up without ROADMAP.md
