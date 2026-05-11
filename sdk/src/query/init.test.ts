@@ -381,6 +381,13 @@ describe('initPlanPhase', () => {
     expect(data.phase_number).toBe('09');
   });
 
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initPlanPhase(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('returns error when phase arg missing', async () => {
     const result = await initPlanPhase([], tmpDir);
     const data = result.data as Record<string, unknown>;
@@ -476,6 +483,13 @@ describe('initVerifyWork', () => {
     expect(data.phase_number).toBe('09');
   });
 
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initVerifyWork(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('resolves workstream-scoped phases when workstream is provided', async () => {
     const wsDir = join(tmpDir, '.planning', 'workstreams', 'delivery');
     await mkdir(join(wsDir, 'phases', '32-shipment-creation-tracking-numbers-print-forms'), { recursive: true });
@@ -521,6 +535,13 @@ describe('initPhaseOp', () => {
 
   it('accepts --phase flag form for existing phase (#3387)', async () => {
     const result = await initPhaseOp(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initPhaseOp(['--phase=9'], tmpDir);
     const data = result.data as Record<string, unknown>;
     expect(data.phase_found).toBe(true);
     expect(data.phase_number).toBe('09');
