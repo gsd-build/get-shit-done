@@ -621,10 +621,12 @@ function resolveBashRunner(opts) {
   const exists = (opts && opts.existsSync) || fs.existsSync;
   const candidates = [];
   if (env.GSD_BASH_PATH) candidates.push(env.GSD_BASH_PATH);
-  if (env.ProgramFiles) candidates.push(path.join(env.ProgramFiles, 'Git', 'bin', 'bash.exe'));
-  if (env['ProgramFiles(x86)']) candidates.push(path.join(env['ProgramFiles(x86)'], 'Git', 'bin', 'bash.exe'));
-  candidates.push('C:\\Program Files\\Git\\bin\\bash.exe');
-  candidates.push('C:\\Program Files (x86)\\Git\\bin\\bash.exe');
+  if (env.ProgramFiles) candidates.push(path.win32.join(env.ProgramFiles, 'Git', 'bin', 'bash.exe'));
+  if (env['ProgramFiles(x86)']) candidates.push(path.win32.join(env['ProgramFiles(x86)'], 'Git', 'bin', 'bash.exe'));
+  if (env.SystemDrive) {
+    candidates.push(path.win32.join(env.SystemDrive, 'Program Files', 'Git', 'bin', 'bash.exe'));
+    candidates.push(path.win32.join(env.SystemDrive, 'Program Files (x86)', 'Git', 'bin', 'bash.exe'));
+  }
 
   for (const candidate of candidates) {
     if (candidate && exists(candidate)) {
