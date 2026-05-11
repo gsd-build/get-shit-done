@@ -124,7 +124,7 @@ async function search(query, options, ctx) {
   if (!apiKey) {
     return { available: false, reason: 'PERPLEXITY_API_KEY not set' };
   }
-  if (!query || (typeof query === 'string' && query.trim() === '')) {
+  if (typeof query !== 'string' || query.trim() === '') {
     return { available: false, error: 'Query required' };
   }
   const body = { query };
@@ -149,7 +149,7 @@ async function search(query, options, ctx) {
     })) : [];
     return {
       available: true,
-      query: typeof query === 'string' ? query : query[0],
+      query,
       count: results.length,
       results,
     };
@@ -171,7 +171,7 @@ async function agent(input, options, ctx) {
   if (!apiKey) {
     return { available: false, reason: 'PERPLEXITY_API_KEY not set' };
   }
-  if (!input || (typeof input === 'string' && input.trim() === '')) {
+  if (typeof input !== 'string' || input.trim() === '') {
     return { available: false, error: 'Input required' };
   }
   const body = { input };

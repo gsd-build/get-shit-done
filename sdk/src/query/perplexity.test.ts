@@ -10,14 +10,35 @@
  *  - non-2xx + network failure surfaces as available:false
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { perplexitySearch, perplexityAgent, integrationHeader } from './perplexity.js';
 
 const tmpDir = '/tmp';
 
+// Sandbox HOME / USERPROFILE so a real `~/.gsd/perplexity_api_key` on the
+// developer or CI machine cannot accidentally satisfy a no-key test.
+// `os.homedir()` consults HOME on POSIX and USERPROFILE on Windows.
+let sandboxedHome: string;
+let prevHome: string | undefined;
+let prevUserProfile: string | undefined;
+
+beforeEach(() => {
+  sandboxedHome = mkdtempSync(join(tmpdir(), 'pplx-test-home-'));
+  prevHome = process.env.HOME;
+  prevUserProfile = process.env.USERPROFILE;
+  process.env.HOME = sandboxedHome;
+  process.env.USERPROFILE = sandboxedHome;
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.PERPLEXITY_API_KEY;
+  if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
+  if (prevUserProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prevUserProfile;
+  try { rmSync(sandboxedHome, { recursive: true, force: true }); } catch { /* best-effort */ }
 });
 
 describe('integrationHeader', () => {

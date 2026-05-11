@@ -66,8 +66,27 @@ describe('perplexity registered as config key + secret', () => {
 
 describe('perplexity.resolveApiKey + fallback', () => {
   let prevEnv;
-  beforeEach(() => { prevEnv = process.env.PERPLEXITY_API_KEY; delete process.env.PERPLEXITY_API_KEY; });
-  afterEach(() => { if (prevEnv !== undefined) process.env.PERPLEXITY_API_KEY = prevEnv; else delete process.env.PERPLEXITY_API_KEY; });
+  let prevHome;
+  let prevUserProfile;
+  let sandboxedHome;
+
+  beforeEach(() => {
+    prevEnv = process.env.PERPLEXITY_API_KEY;
+    prevHome = process.env.HOME;
+    prevUserProfile = process.env.USERPROFILE;
+    delete process.env.PERPLEXITY_API_KEY;
+    // Sandbox HOME / USERPROFILE so a real `~/.gsd/perplexity_api_key`
+    // on the developer or CI machine cannot satisfy these no-key tests.
+    sandboxedHome = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'pplx-test-home-'));
+    process.env.HOME = sandboxedHome;
+    process.env.USERPROFILE = sandboxedHome;
+  });
+  afterEach(() => {
+    if (prevEnv !== undefined) process.env.PERPLEXITY_API_KEY = prevEnv; else delete process.env.PERPLEXITY_API_KEY;
+    if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prevUserProfile;
+    try { fs.rmSync(sandboxedHome, { recursive: true, force: true }); } catch { /* best-effort */ }
+  });
 
   test('search() returns available:false with reason when no key is set', async () => {
     const r = await perplexity.search('hello', {}, { cwd: '/tmp/nope' });
