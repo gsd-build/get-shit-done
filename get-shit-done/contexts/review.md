@@ -16,6 +16,7 @@ Agent output guidance for review mode. Loaded when `context: review` is set in c
 - Performance — unnecessary allocations, O(n^2) patterns, missing caching
 - Style and consistency — naming, formatting, import order
 - Test coverage — untested branches, missing assertions, flaky patterns
+- Structural Findings (fallow) — treat machine-reported cross-module findings as a distinct section in REVIEW.md and keep them separate from narrative reviewer findings
 
 ## Verbosity
 

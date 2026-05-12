@@ -1,0 +1,33 @@
+{
+  "unusedExports": [
+    {
+      "file": "sdk/src/query/commit.ts",
+      "symbol": "commitToSubrepo",
+      "line": 289
+    }
+  ],
+  "duplicates": [
+    {
+      "left": {
+        "file": "get-shit-done/bin/lib/config-schema.cjs",
+        "start": 14,
+        "end": 22
+      },
+      "right": {
+        "file": "sdk/src/query/config-schema.ts",
+        "start": 9,
+        "end": 17
+      },
+      "similarity": 0.98
+    }
+  ],
+  "circularDependencies": [
+    {
+      "cycle": [
+        "src/a.ts",
+        "src/b.ts",
+        "src/a.ts"
+      ]
+    }
+  ]
+}

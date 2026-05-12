@@ -318,6 +318,64 @@ No source files changed in phase ${PHASE_ARG}. Skipping review.
 Exit workflow. Do NOT spawn agent or create REVIEW.md.
 </step>
 
+<step name="structural_pre_pass">
+Optional structural cross-module pass powered by fallow.
+
+Read fallow config gates:
+```bash
+FALLOW_ENABLED=$(gsd-sdk query config-get code_quality.fallow.enabled 2>/dev/null || echo "false")
+FALLOW_SCOPE=$(gsd-sdk query config-get code_quality.fallow.scope 2>/dev/null || echo "phase")
+FALLOW_PROFILE=$(gsd-sdk query config-get code_quality.fallow.profile 2>/dev/null || echo "standard")
+FALLOW_MCP=$(gsd-sdk query config-get code_quality.fallow.mcp 2>/dev/null || echo "false")
+```
+
+Defaults are fail-closed and opt-in:
+- `enabled=false` (skip entirely)
+- `scope=phase`
+- `profile=standard`
+- `mcp=false`
+
+When `FALLOW_ENABLED=true`:
+
+1) Resolve binary via PATH first, then `node_modules/.bin/fallow`.
+```bash
+FALLOW_BIN=$(FALLOW_CWD="$(pwd)" node -e "
+const { resolveFallowBinary } = require('./get-shit-done/bin/lib/fallow-runner.cjs');
+const resolved = resolveFallowBinary({ cwd: process.env.FALLOW_CWD });
+if (resolved) process.stdout.write(resolved);
+")
+```
+
+2) If binary is missing, fail with actionable message:
+```bash
+if [ -z \"$FALLOW_BIN\" ]; then
+  echo \"Error: fallow is enabled but no binary was found.\"
+  echo \"Install fallow via \`npm install -D fallow\` or \`cargo install fallow\`.\"
+  # Exit workflow
+fi
+```
+
+3) Execute structural pass and persist JSON:
+```bash
+FALLOW_JSON_PATH="${PHASE_DIR}/FALLOW.json"
+if [ \"$FALLOW_SCOPE\" = \"repo\" ]; then
+  \"$FALLOW_BIN\" audit --json --profile \"$FALLOW_PROFILE\" > \"$FALLOW_JSON_PATH\"
+else
+  # phase scope: pass the already-computed review file set
+  printf '%s\n' \"${REVIEW_FILES[@]}\" | \"$FALLOW_BIN\" audit --json --profile \"$FALLOW_PROFILE\" --stdin-files > \"$FALLOW_JSON_PATH\"
+fi
+```
+
+4) Optional MCP bridge path (runtime-dependent):
+- If `FALLOW_MCP=true`, set reviewer input mode to MCP-backed structural findings.
+- Otherwise pass static JSON findings from `FALLOW.json`.
+
+When disabled, set:
+```bash
+FALLOW_JSON_PATH=""
+```
+</step>
+
 <step name="spawn_reviewer">
 Compute the review output path:
 ```bash
@@ -350,6 +408,14 @@ for file in "${REVIEW_FILES[@]}"; do
 done
 ```
 
+Build structural findings block for agent:
+```bash
+STRUCTURAL_FINDINGS_BLOCK=""
+if [ -n "$FALLOW_JSON_PATH" ] && [ -f "$FALLOW_JSON_PATH" ]; then
+  STRUCTURAL_FINDINGS_BLOCK="<structural_findings>\n$(cat "$FALLOW_JSON_PATH")\n</structural_findings>\n"
+fi
+```
+
 Spawn the gsd-code-reviewer agent:
 
 ```
@@ -357,6 +423,8 @@ Agent(subagent_type="gsd-code-reviewer", prompt="
 <files_to_read>
 ${FILES_TO_READ}
 </files_to_read>
+
+${STRUCTURAL_FINDINGS_BLOCK}
 
 <config>
 depth: ${REVIEW_DEPTH}

@@ -54,6 +54,9 @@
   "devDependencies": {
     "c8": "^11.0.0"
   },
+  "optionalDependencies": {
+    "fallow": "^2.66.1"
+  },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
     "build:sdk": "cd sdk && npm ci && npm run build",

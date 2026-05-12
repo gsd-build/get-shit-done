@@ -271,6 +271,7 @@
       "decisions.cjs",
       "docs.cjs",
       "drift.cjs",
+      "fallow-runner.cjs",
       "frontmatter.cjs",
       "gap-checker.cjs",
       "graphify.cjs",
