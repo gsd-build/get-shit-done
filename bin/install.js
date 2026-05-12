@@ -9,6 +9,7 @@ const {
   buildWindowsShimTriple: buildWindowsShimTripleFromProjection,
   formatSdkPathDiagnostic: formatSdkPathDiagnosticFromProjection,
   isManagedHookBasename,
+  isManagedHookCommand,
   projectLocalHookPrefix,
   projectLegacySettingsHookCommand,
   projectManagedHookCommand,
@@ -3277,14 +3278,6 @@ function stripLeakedGsdCodexSections(content) {
  * Pure function, exported for test coverage. Returns the input unchanged
  * if no GSD-managed hook section is present.
  */
-// Legacy hook command basenames to detect during strip. Template-literal
-// form so install-hooks-copy.test.cjs's quoted-literal guard continues to
-// catch accidental regressions where someone *registers* the inverted
-// `gsd-update-check.js` filename in a Codex hook command.
-const STALE_HOOK_BASENAMES = new Set([
-  `gsd-update-check.js`,
-  `gsd-check-update.js`,
-]);
 function stripStaleGsdHookBlocks(configContent) {
   const sections = getTomlTableSections(configContent);
   const lineRecords = getTomlLineRecords(configContent);
@@ -3320,10 +3313,10 @@ function stripStaleGsdHookBlocks(configContent) {
         continue;
       }
       if (typeof parsed.value !== 'string') continue;
-      // Match the basename — Codex configs reference these files by absolute
-      // path under the user's `.codex/hooks/` directory.
-      const basename = parsed.value.split(/[\\/]/).pop() || '';
-      if (STALE_HOOK_BASENAMES.has(basename)) {
+      if (isManagedHookCommand(parsed.value, {
+        surface: 'codex-toml',
+        includeLegacyAliases: true,
+      })) {
         return true;
       }
     }
@@ -6719,14 +6712,6 @@ function uninstall(isGlobal, runtime = 'claude') {
 
     // Remove GSD hooks from settings — per-hook granularity to preserve
     // user hooks that share an entry with a GSD hook (#1755 followup)
-    const isGsdHookCommand = (cmd) =>
-      cmd && (cmd.includes('gsd-check-update') || cmd.includes('gsd-statusline') ||
-        cmd.includes('gsd-session-state') || cmd.includes('gsd-context-monitor') ||
-        cmd.includes('gsd-phase-boundary') || cmd.includes('gsd-prompt-guard') ||
-        cmd.includes('gsd-read-guard') || cmd.includes('gsd-read-injection-scanner') ||
-        cmd.includes('gsd-update-banner') ||
-        cmd.includes('gsd-validate-commit') || cmd.includes('gsd-workflow-guard'));
-
     for (const eventName of ['SessionStart', 'PostToolUse', 'AfterTool', 'PreToolUse', 'BeforeTool']) {
       if (settings.hooks && settings.hooks[eventName]) {
         const before = JSON.stringify(settings.hooks[eventName]);
@@ -6734,7 +6719,9 @@ function uninstall(isGlobal, runtime = 'claude') {
           .map(entry => {
             if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
             // Filter out individual GSD hooks, keep user hooks
-            entry.hooks = entry.hooks.filter(h => !isGsdHookCommand(h.command));
+            entry.hooks = entry.hooks.filter(h => !isManagedHookCommand(h.command, {
+              surface: 'settings-json',
+            }));
             return entry.hooks.length > 0 ? entry : null;
           })
           .filter(Boolean);

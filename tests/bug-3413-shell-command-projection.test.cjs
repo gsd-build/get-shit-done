@@ -13,6 +13,7 @@ const {
   hookCommandNeedsPowerShellCallOperator,
   formatHookCommandForRuntime,
   isManagedHookBasename,
+  isManagedHookCommand,
   projectLocalHookPrefix,
   projectLegacySettingsHookCommand,
   projectPortableHookBaseDir,
@@ -139,6 +140,50 @@ describe('bug #3439: shell projection module owns managed-hook policy and legacy
         homeDir: '/Users/me',
       }),
       '/opt/custom/.claude',
+    );
+  });
+
+  test('isManagedHookCommand classifies managed settings hooks and leaves user commands untouched', () => {
+    assert.equal(
+      isManagedHookCommand('"/usr/local/bin/node" "/Users/me/.claude/hooks/gsd-statusline.js"', {
+        surface: 'settings-json',
+      }),
+      true,
+    );
+    assert.equal(
+      isManagedHookCommand('"C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.claude/hooks/gsd-session-state.sh"', {
+        surface: 'settings-json',
+      }),
+      true,
+    );
+    assert.equal(
+      isManagedHookCommand('bash /Users/me/.claude/hooks/custom-lint.sh', {
+        surface: 'settings-json',
+      }),
+      false,
+    );
+  });
+
+  test('isManagedHookCommand supports codex surfaces and optional legacy alias matching', () => {
+    const command = '"/usr/local/bin/node" "/Users/me/.codex/hooks/gsd-check-update.js"';
+    assert.equal(
+      isManagedHookCommand(command, {
+        surface: 'codex-toml',
+      }),
+      true,
+    );
+    assert.equal(
+      isManagedHookCommand('"/usr/local/bin/node" "/Users/me/.codex/hooks/gsd-update-check.js"', {
+        surface: 'codex-toml',
+      }),
+      false,
+    );
+    assert.equal(
+      isManagedHookCommand('"/usr/local/bin/node" "/Users/me/.codex/hooks/gsd-update-check.js"', {
+        surface: 'codex-toml',
+        includeLegacyAliases: true,
+      }),
+      true,
     );
   });
 });

@@ -1,5 +1,7 @@
 'use strict';
 
+const path = require('path');
+
 /**
  * Shell Command Projection Module
  *
@@ -99,6 +101,37 @@ const MANAGED_HOOK_BASENAMES_BY_SURFACE = {
   ]),
 };
 
+const MANAGED_HOOK_COMMAND_BASENAMES_BY_SURFACE = {
+  'settings-json': new Set([
+    'gsd-check-update.js',
+    'gsd-statusline.js',
+    'gsd-context-monitor.js',
+    'gsd-prompt-guard.js',
+    'gsd-read-guard.js',
+    'gsd-read-injection-scanner.js',
+    'gsd-update-banner.js',
+    'gsd-workflow-guard.js',
+    'gsd-session-state.sh',
+    'gsd-validate-commit.sh',
+    'gsd-phase-boundary.sh',
+  ]),
+  'codex-toml': new Set([
+    'gsd-check-update.js',
+  ]),
+  'codex-hooks-json': new Set([
+    'gsd-check-update.js',
+  ]),
+};
+
+const LEGACY_MANAGED_HOOK_ALIASES_BY_SURFACE = {
+  'codex-toml': new Set([
+    'gsd-update-check.js',
+  ]),
+  'codex-hooks-json': new Set([
+    'gsd-update-check.js',
+  ]),
+};
+
 function managedHookSurfaceSet(surface = 'settings-json') {
   return MANAGED_HOOK_BASENAMES_BY_SURFACE[surface] || MANAGED_HOOK_BASENAMES_BY_SURFACE['settings-json'];
 }
@@ -108,6 +141,36 @@ function isManagedHookBasename(scriptPathOrBasename, opts = {}) {
   const surface = opts.surface || 'settings-json';
   const basename = String(scriptPathOrBasename).split(/[\\/]/).pop() || '';
   return managedHookSurfaceSet(surface).has(basename);
+}
+
+function managedHookCommandSurfaceSet(surface = 'settings-json', includeLegacyAliases = false) {
+  const base = MANAGED_HOOK_COMMAND_BASENAMES_BY_SURFACE[surface]
+    || MANAGED_HOOK_COMMAND_BASENAMES_BY_SURFACE['settings-json'];
+  if (!includeLegacyAliases) return base;
+  const aliases = LEGACY_MANAGED_HOOK_ALIASES_BY_SURFACE[surface];
+  if (!aliases || aliases.size === 0) return base;
+  return new Set([...base, ...aliases]);
+}
+
+function isManagedHookCommand(commandText, opts = {}) {
+  if (typeof commandText !== 'string') return false;
+  const surface = opts.surface || 'settings-json';
+  const includeLegacyAliases = opts.includeLegacyAliases === true;
+  const managedBasenames = managedHookCommandSurfaceSet(surface, includeLegacyAliases);
+  if (!managedBasenames || managedBasenames.size === 0) return false;
+  const normalizedCommand = commandText.replace(/\\/g, '/');
+
+  if (typeof opts.configDir === 'string' && opts.configDir.length > 0) {
+    const normalizedHooksDir = `${path.join(opts.configDir, 'hooks').replace(/\\/g, '/')}/`;
+    if (!normalizedCommand.includes(normalizedHooksDir)) return false;
+  }
+
+  for (const basename of managedBasenames) {
+    const escapedBasename = basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(^|[\\\\/\\s"'` + '`' + `])${escapedBasename}(?=$|[\\s"'` + '`' + `])`);
+    if (pattern.test(normalizedCommand)) return true;
+  }
+  return false;
 }
 
 /**
@@ -239,7 +302,6 @@ function projectPersistentPathExportActions({ targetDir, platform = process.plat
 }
 
 function buildWindowsShimTriple(shimSrc) {
-  const path = require('path');
   const shimAbs = path.resolve(shimSrc);
   const shimQuoted = JSON.stringify(shimAbs);
   const invocation = {
@@ -299,6 +361,7 @@ module.exports = {
   projectShellCommandText,
   projectManagedHookCommand,
   isManagedHookBasename,
+  isManagedHookCommand,
   projectLegacySettingsHookCommand,
   escapeTomlDoubleQuotedString,
   projectCodexHookTomlCommand,

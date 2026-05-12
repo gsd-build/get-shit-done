@@ -1,6 +1,6 @@
 'use strict';
 
-const path = require('path');
+const { isManagedHookCommand } = require('../shell-command-projection.cjs');
 
 function isStructurallyEmpty(value) {
   if (value === null || value === undefined) return true;
@@ -11,12 +11,11 @@ function isStructurallyEmpty(value) {
 }
 
 function isManagedCodexHookCommand(command, configDir) {
-  if (typeof command !== 'string') return false;
-  if (typeof configDir !== 'string' || configDir.length === 0) return false;
-  const normalizedCommand = command.replace(/\\/g, '/');
-  const managedHooksDir = `${path.join(configDir, 'hooks').replace(/\\/g, '/')}/`;
-  if (!normalizedCommand.includes(managedHooksDir)) return false;
-  return /(^|[\\/\s"'])(gsd-check-update\.js|gsd-update-check\.js)(?=$|[\s"'])/.test(normalizedCommand);
+  return isManagedHookCommand(command, {
+    surface: 'codex-hooks-json',
+    includeLegacyAliases: true,
+    configDir,
+  });
 }
 
 function pruneLegacyCodexHooksJsonValue(value, configDir) {
