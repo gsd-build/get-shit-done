@@ -747,6 +747,23 @@ increases monotonically across waves. `{status}` is `complete` (success),
      exit 1
    }
 
+   # Defense: pin orchestrator CWD to the primary worktree and verify the
+   # orchestrator branch before any cleanup merge/removal. Claude Code can
+   # leak a returned isolation="worktree" agent's cwd back into the
+   # orchestrator bash session (#3174-class drift). Without this guard, the
+   # helper call or shell fallback below can target a disposable worktree
+   # branch instead of the orchestrator branch.
+   PRIMARY_WT=$(git worktree list --porcelain | awk '/^worktree /{print substr($0,10); exit}')
+   if [ -n "$PRIMARY_WT" ] && [ "$(pwd -P 2>/dev/null)" != "$(cd "$PRIMARY_WT" 2>/dev/null && pwd -P)" ]; then
+     echo "⚠ Orchestrator CWD drifted to $(pwd) — pinning to $PRIMARY_WT before worktree cleanup (#3174)"
+     cd "$PRIMARY_WT" || { echo "FATAL: cannot cd to primary worktree $PRIMARY_WT" >&2; exit 1; }
+   fi
+   ORCH_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+   if [ -n "${EXPECTED_BRANCH:-}" ] && [ "$ORCH_BRANCH" != "$EXPECTED_BRANCH" ]; then
+     echo "FATAL: orchestrator on '$ORCH_BRANCH' but expected '$EXPECTED_BRANCH' before worktree cleanup — refusing to merge (#3174-class drift)" >&2
+     exit 1
+   fi
+
    if command -v gsd-sdk >/dev/null 2>&1; then
      gsd-sdk query worktree.cleanup-wave --manifest "$WAVE_WORKTREE_MANIFEST" || exit 1
    else
@@ -863,6 +880,14 @@ increases monotonically across waves. `{status}` is `complete` (success),
    If the orchestrator deviated from the standard wave merge path (e.g., custom inter-worktree base-update merges with `merge: bring …` style messages), run this snippet after the custom merges are complete. It reads only `WAVE_WORKTREE_MANIFEST`; do not discover unrelated `worktree-agent-*` worktrees.
 
    ```bash
+   # Cleanup-tail: pin orchestrator CWD to primary worktree before cleanup-tail (#3174).
+   # Same drift guard as the main cleanup path above — fail closed before removal.
+   PRIMARY_WT=$(git worktree list --porcelain | awk '/^worktree /{print substr($0,10); exit}')
+   if [ -n "$PRIMARY_WT" ] && [ "$(pwd -P 2>/dev/null)" != "$(cd "$PRIMARY_WT" 2>/dev/null && pwd -P)" ]; then
+     echo "⚠ Orchestrator CWD drifted to $(pwd) — pinning to $PRIMARY_WT before cleanup-tail (#3174)"
+     cd "$PRIMARY_WT" || { echo "FATAL: cannot cd to primary worktree $PRIMARY_WT" >&2; exit 1; }
+   fi
+
    # Cleanup-tail: remove residual agent worktrees after a cross-wave-dependency deviation.
    # Uses only the current wave manifest to avoid touching unrelated active agents (#3384).
    WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
