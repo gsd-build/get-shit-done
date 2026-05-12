@@ -60,10 +60,13 @@ describe('feat-3210: fallow integration module', () => {
 
   test('throws actionable error when fallow is enabled but binary is unavailable', () => {
     const { requireFallowBinary } = require('../get-shit-done/bin/lib/fallow-runner.cjs');
+    const baseTmp = fs.existsSync('/private/tmp') ? '/private/tmp' : os.tmpdir();
+    const tmp = fs.mkdtempSync(path.join(baseTmp, 'gsd-fallow-missing-'));
     assert.throws(
-      () => requireFallowBinary({ cwd: ROOT, envPath: '' }),
+      () => requireFallowBinary({ cwd: tmp, envPath: '' }),
       /install fallow via `npm install -D fallow` or `cargo install fallow`/,
     );
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 });
 
@@ -90,7 +93,16 @@ describe('feat-3210: workflow and config contracts', () => {
 
   test('config-set accepts code_quality.fallow keys', () => {
     const originalTmpDir = process.env.TMPDIR;
-    process.env.TMPDIR = '/private/tmp';
+    const tmpCandidates = ['/private/tmp', '/tmp', os.tmpdir()];
+    const writableTmp = tmpCandidates.find((dir) => {
+      try {
+        fs.accessSync(dir, fs.constants.W_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (writableTmp) process.env.TMPDIR = writableTmp;
     const tmpDir = createTempProject('gsd-fallow-config-');
     try {
       const cases = [
