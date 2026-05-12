@@ -1326,7 +1326,7 @@ If GSD subagents call Anthropic models and you're paying through OpenRouter or a
 
 ### Working on a Sensitive/Private Project
 
-Set `commit_docs: false` during `/gsd-new-project` or via `/gsd-settings`. Add `.planning/` to your `.gitignore`. Planning artifacts stay local and never touch git.
+Fresh project configs commit planning artifacts by default with `commit_docs: true`. To keep them local, choose No for Git Tracking during `/gsd-new-project` or run `gsd-sdk query config-set planning.commit_docs false`, then add `.planning/` to your `.gitignore`.
 
 ### GSD Update Overwrote My Local Changes
 
