@@ -8,15 +8,12 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const YAML = require('yaml');
+const { parseFrontmatter } = require('./helpers.cjs');
 
 const DEBUG_COMMAND_PATH = path.join(__dirname, '..', 'commands', 'gsd', 'debug.md');
 
 function readFrontmatter(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  assert.ok(match, 'command must start with YAML frontmatter');
-  return YAML.parse(match[1]);
+  return parseFrontmatter(fs.readFileSync(filePath, 'utf8'));
 }
 
 test('#3431: commands/gsd/debug.md frontmatter parses as YAML and preserves argument-hint', () => {
