@@ -91,6 +91,7 @@ const hasGlobal = args.includes('--global') || args.includes('-g');
 const hasLocal = args.includes('--local') || args.includes('-l');
 const hasOpencode = args.includes('--opencode');
 const hasClaude = args.includes('--claude');
+const hasClaudePlugin = args.includes('--claude-plugin');
 const hasGemini = args.includes('--gemini');
 const hasKilo = args.includes('--kilo');
 const hasCodex = args.includes('--codex');
@@ -127,6 +128,11 @@ if (hasAll) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
   if (hasClaude) selectedRuntimes.push('claude');
+  // --claude-plugin emits a Claude Code plugin directory instead of mutating
+  // the user's settings.json. It implies the Claude runtime; the
+  // pluginMode flag is consumed by install()/finishInstall() to branch the
+  // layout and skip writeSettings(). See feat/claude-plugin-install.
+  if (hasClaudePlugin && !hasClaude) selectedRuntimes.push('claude');
   if (hasOpencode) selectedRuntimes.push('opencode');
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasKilo) selectedRuntimes.push('kilo');
@@ -7555,14 +7561,26 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
+  // --claude-plugin emits a Claude Code plugin directory:
+  //   <plugins-root>/gsd/   where plugins-root is:
+  //     $HOME/.claude/plugins/   for --global
+  //     <project>/.claude/plugins/   for --local
+  // pluginMode is Claude-only; the flag-parsing logic above forces runtime
+  // to 'claude' when --claude-plugin is set.
+  const pluginMode = hasClaudePlugin && runtime === 'claude';
+
   // Get the target directory based on runtime and install type.
   // Cline local installs write to the project root (like Claude Code) — .clinerules
   // lives at the root, not inside a .cline/ subdirectory.
-  const targetDir = isGlobal
-    ? getGlobalDir(runtime, explicitConfigDir)
-    : isCline
-      ? process.cwd()
-      : path.join(process.cwd(), dirName);
+  const targetDir = pluginMode
+    ? (isGlobal
+        ? path.join(os.homedir(), '.claude', 'plugins', 'gsd')
+        : path.join(process.cwd(), '.claude', 'plugins', 'gsd'))
+    : isGlobal
+      ? getGlobalDir(runtime, explicitConfigDir)
+      : isCline
+        ? process.cwd()
+        : path.join(process.cwd(), dirName);
 
   const locationLabel = isGlobal
     ? targetDir.replace(os.homedir(), '~')
@@ -7580,13 +7598,20 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const resolvedTarget = path.resolve(targetDir).replace(/\\/g, '/');
   const homeDir = os.homedir().replace(/\\/g, '/');
   const isWindowsHost = process.platform === 'win32';
-  const pathPrefix = computePathPrefix({
-    isGlobal,
-    isOpencode,
-    isWindowsHost,
-    resolvedTarget,
-    homeDir,
-  });
+  // Plugin mode: always use the absolute on-disk plugin root as the path
+  // prefix (no `$HOME` substitution) so `@~/.claude/get-shit-done/...`
+  // references in command/workflow markdown rewrite to absolute paths inside
+  // the plugin tree. This is the same machinery that already powers --local;
+  // we just point it at the plugin's directory.
+  const pathPrefix = pluginMode
+    ? `${resolvedTarget}/`
+    : computePathPrefix({
+        isGlobal,
+        isOpencode,
+        isWindowsHost,
+        resolvedTarget,
+        homeDir,
+      });
 
   let runtimeLabel = 'Claude Code';
   if (isOpencode) runtimeLabel = 'OpenCode';
@@ -8057,6 +8082,21 @@ function install(isGlobal, runtime = 'claude', options = {}) {
         failures.push('commands/gsd');
       }
     }
+  } else if (pluginMode) {
+    // Claude Code plugin: flattened commands/*.md layout. The plugin manifest
+    // name is `gsd`, so Claude Code namespaces these commands as `/gsd:foo`,
+    // matching the repo's `commands/gsd/foo.md` source layout. The existing
+    // copyWithPathReplacement rewrites `@~/.claude/...` → `@<pathPrefix>...`
+    // so command @-includes still resolve inside the plugin tree.
+    const commandsDir = path.join(targetDir, 'commands');
+    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    copyWithPathReplacement(gsdSrc, commandsDir, pathPrefix, runtime, true, isGlobal);
+    if (verifyInstalled(commandsDir, 'commands')) {
+      const count = fs.readdirSync(commandsDir).filter(f => f.endsWith('.md')).length;
+      console.log(`  ${green}✓${reset} Installed ${count} commands to commands/ (plugin layout)`);
+    } else {
+      failures.push('commands');
+    }
   } else if (isGlobal) {
     // Claude Code global: skills/ format (2.1.88+ compatibility)
     const skillsDir = path.join(targetDir, 'skills');
@@ -8312,7 +8352,13 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // Template paths for the target runtime (replaces '.claude' with correct config dir)
     const hooksSrc = path.join(src, 'hooks', 'dist');
     if (fs.existsSync(hooksSrc)) {
-      const hooksDest = path.join(targetDir, 'hooks');
+      // Plugin mode places hook scripts under <plugin>/bin/ so that
+      // <plugin>/hooks/hooks.json can carry the manifest in the Claude Code
+      // plugin convention. Non-plugin Claude installs keep the legacy hooks/
+      // path.
+      const hooksDest = pluginMode
+        ? path.join(targetDir, 'bin')
+        : path.join(targetDir, 'hooks');
       fs.mkdirSync(hooksDest, { recursive: true });
       const hookEntries = fs.readdirSync(hooksSrc);
       const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
@@ -8818,6 +8864,114 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
+  if (pluginMode) {
+    // Claude Code plugin mode: emit <plugin>/.claude-plugin/plugin.json,
+    // <plugin>/hooks/hooks.json (the auto-loaded plugin hook manifest),
+    // and <plugin>/VERSION marker. The user's ~/.claude/settings.json is
+    // NEVER touched — that is the structural fix for #3426 and #2303.
+    //
+    // hook script commands inside hooks.json use ${CLAUDE_PLUGIN_ROOT},
+    // which Claude Code expands at hook-evaluation time (the upstream bug
+    // that prevented ${CLAUDE_PLUGIN_ROOT} expansion in COMMAND markdown
+    // does NOT apply to hooks.json — see PR description).
+    const manifestDir = path.join(targetDir, '.claude-plugin');
+    fs.mkdirSync(manifestDir, { recursive: true });
+    const manifest = {
+      name: 'gsd',
+      description: 'GSD (Get Shit Done) — phase-based AI dev workflow',
+      version: pkg.version,
+      author: { name: 'gsd-build' },
+      repository: 'https://github.com/gsd-build/get-shit-done',
+    };
+    fs.writeFileSync(
+      path.join(manifestDir, 'plugin.json'),
+      JSON.stringify(manifest, null, 2) + '\n'
+    );
+    console.log(`  ${green}✓${reset} Wrote .claude-plugin/plugin.json`);
+
+    // VERSION marker at plugin root — /gsd-update probes this to detect
+    // a plugin-format install and re-invoke with --claude-plugin.
+    fs.writeFileSync(path.join(targetDir, 'VERSION'), pkg.version + '\n');
+    console.log(`  ${green}✓${reset} Wrote VERSION (${pkg.version})`);
+
+    // Build the hook manifest. Mirrors the entry shapes that writeSettings()
+    // would have written into ~/.claude/settings.json's hooks block — same
+    // matchers, same timeouts, same triggering events. The command paths
+    // resolve under ${CLAUDE_PLUGIN_ROOT}/bin/ where the install loop placed
+    // them above.
+    const pluginNodeRunner = resolveNodeRunner();
+    const pluginBinRoot = '${CLAUDE_PLUGIN_ROOT}/bin';
+    const pluginHookCmd = (hookFile) => pluginNodeRunner === null
+      ? null
+      : formatHookCommandForShell(`${pluginNodeRunner} "${pluginBinRoot}/${hookFile}"`, { portableHooks: hasPortableHooks });
+    const pluginShCmd = (hookFile) => `bash "${pluginBinRoot}/${hookFile}"`;
+    const pluginBinDir = path.join(targetDir, 'bin');
+    const pluginHooks = { SessionStart: [], PreToolUse: [], PostToolUse: [] };
+    const pushHook = (event, entry) => { if (entry) pluginHooks[event].push(entry); };
+    const mk = (cmd, opts) => {
+      if (!cmd) return null;
+      const hook = { type: 'command', command: cmd };
+      if (opts && opts.timeout !== undefined) hook.timeout = opts.timeout;
+      const wrap = { hooks: [hook] };
+      if (opts && opts.matcher) wrap.matcher = opts.matcher;
+      return wrap;
+    };
+    // SessionStart: update check
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-check-update.js'))) {
+      pushHook('SessionStart', mk(pluginHookCmd('gsd-check-update.js')));
+    }
+    // PostToolUse: context monitor, read-injection scanner, phase boundary
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-context-monitor.js'))) {
+      pushHook('PostToolUse', mk(pluginHookCmd('gsd-context-monitor.js'), { matcher: 'Bash|Edit|Write|MultiEdit|Agent|Task', timeout: 10 }));
+    }
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-read-injection-scanner.js'))) {
+      pushHook('PostToolUse', mk(pluginHookCmd('gsd-read-injection-scanner.js'), { matcher: 'Read', timeout: 5 }));
+    }
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-phase-boundary.sh'))) {
+      pushHook('PostToolUse', mk(pluginShCmd('gsd-phase-boundary.sh'), { matcher: 'Write|Edit', timeout: 5 }));
+    }
+    // PreToolUse: prompt guard, read guard, workflow guard, validate commit
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-prompt-guard.js'))) {
+      pushHook('PreToolUse', mk(pluginHookCmd('gsd-prompt-guard.js'), { matcher: 'Write|Edit', timeout: 5 }));
+    }
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-read-guard.js'))) {
+      pushHook('PreToolUse', mk(pluginHookCmd('gsd-read-guard.js'), { matcher: 'Write|Edit', timeout: 5 }));
+    }
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-workflow-guard.js'))) {
+      pushHook('PreToolUse', mk(pluginHookCmd('gsd-workflow-guard.js'), { matcher: 'Write|Edit', timeout: 5 }));
+    }
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-validate-commit.sh'))) {
+      pushHook('PreToolUse', mk(pluginShCmd('gsd-validate-commit.sh'), { matcher: 'Bash', timeout: 5 }));
+    }
+    // SessionStart: session state orientation
+    if (fs.existsSync(path.join(pluginBinDir, 'gsd-session-state.sh'))) {
+      pushHook('SessionStart', mk(pluginShCmd('gsd-session-state.sh')));
+    }
+    // Drop empty buckets so the manifest matches Claude Code's expected shape.
+    for (const evt of Object.keys(pluginHooks)) {
+      if (pluginHooks[evt].length === 0) delete pluginHooks[evt];
+    }
+    const hooksDir = path.join(targetDir, 'hooks');
+    fs.mkdirSync(hooksDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(hooksDir, 'hooks.json'),
+      JSON.stringify({ hooks: pluginHooks }, null, 2) + '\n'
+    );
+    console.log(`  ${green}✓${reset} Wrote hooks/hooks.json`);
+
+    // No settings.json mutation — that is the whole point of plugin mode.
+    return {
+      settingsPath: null,
+      settings: null,
+      statuslineCommand: null,
+      updateBannerCommand: null,
+      runtime,
+      configDir: targetDir,
+      rollbackInstallerMigrations,
+      pluginMode: true,
+    };
+  }
+
   // Configure statusline and hooks in settings.json
   // Gemini and Antigravity use AfterTool instead of PostToolUse for post-tool hooks
   const postToolEvent = (runtime === 'gemini' || runtime === 'antigravity') ? 'AfterTool' : 'PostToolUse';
@@ -9200,7 +9354,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isTrae = runtime === 'trae';
   const isCline = runtime === 'cline';
 
-  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae) {
+  // Plugin mode never writes statusline (or anything else) into settings.json.
+  const isPluginFinish = !settingsPath || !settings;
+  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isPluginFinish) {
     if (!isGlobal && !forceStatusline) {
       // Local installs skip statusLine by default: repo settings.json takes precedence over
       // profile-level settings.json in Claude Code, so writing here would silently clobber
@@ -9258,7 +9414,11 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   // {type: 'command', command: null} items that the runtime hook schema
   // rejects at parse time. validateHookFields filters those out so the file
   // we write is always schema-valid.
-  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline) {
+  // Plugin mode owns its own hook manifest (<plugin>/hooks/hooks.json) and
+  // MUST NOT touch the user's settings.json. install() returns
+  // settingsPath/settings null in plugin mode; isPluginFinish (computed
+  // above) gates every write site in this function.
+  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline && !isPluginFinish) {
     writeSettings(settingsPath, validateHookFields(settings));
   }
 
@@ -10684,7 +10844,10 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
   }
 
   const statuslineRuntimes = ['claude', 'gemini'];
-  const primaryStatuslineResult = results.find(r => statuslineRuntimes.includes(r.runtime));
+  // Plugin mode never owns a settings.json statusline — its install() result
+  // returns settings: null. Exclude those from the statusline-prompt path so
+  // handleStatusline doesn't dereference null.
+  const primaryStatuslineResult = results.find(r => statuslineRuntimes.includes(r.runtime) && r.settings && !r.pluginMode);
 
   const finalize = (shouldInstallStatusline, shouldInstallBanner) => {
     try {

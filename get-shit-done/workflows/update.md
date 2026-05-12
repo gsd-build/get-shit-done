@@ -36,7 +36,14 @@ expand_home() {
 # Using an array instead of a space-separated string ensures correct
 # iteration in both bash and zsh (zsh does not word-split unquoted
 # variables by default). Fixes #1173.
-RUNTIME_DIRS=( "claude:.claude" "opencode:.config/opencode" "opencode:.opencode" "gemini:.gemini" "kilo:.config/kilo" "kilo:.kilo" "codex:.codex" )
+#
+# claude-plugin is probed BEFORE the flat claude install path: a plugin
+# install lives at $HOME/.claude/plugins/gsd/ (global) or
+# ./.claude/plugins/gsd/ (local). Detecting the plugin layout first means
+# /gsd-update re-invokes the installer with --claude-plugin instead of
+# rewriting the user's settings.json (which would re-introduce the #3426 /
+# #2303 breakage that plugin mode was added to avoid).
+RUNTIME_DIRS=( "claude-plugin:.claude/plugins/gsd" "claude:.claude" "opencode:.config/opencode" "opencode:.opencode" "gemini:.gemini" "kilo:.config/kilo" "kilo:.kilo" "codex:.codex" )
 ENV_RUNTIME_DIRS=()
 
 # PREFERRED_CONFIG_DIR / PREFERRED_RUNTIME should be set from execution_context
@@ -95,7 +102,7 @@ if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done
     printf '%s' "$p"
   }
   normalized_preferred="$(normalize_path "$PREFERRED_CONFIG_DIR")"
-  for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
+  for dir in .claude/plugins/gsd .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
     resolved_local="$(cd "./$dir" 2>/dev/null && pwd)"
     normalized_local="$(normalize_path "$resolved_local")"
     if [ -n "$normalized_local" ] && [ "$normalized_local" = "$normalized_preferred" ]; then
