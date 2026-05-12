@@ -198,15 +198,19 @@ describe('Bug #3017: rewriteLegacyCodexHookBlock migrates bare-node on reinstall
     const runner = '"/usr/local/bin/node"';
     const result = rewriteLegacyCodexHookBlock(before, runner, { platform: 'win32' });
     assert.equal(result.changed, true);
+    const parsed = parseCodexHookBlock(result.content);
+    assert.equal(parsed.ok, true, 'hook block must parse correctly');
     const expected = projectCodexHookTomlCommand({
       absoluteRunner: runner,
       scriptPath: 'C:\\Users\\x\\.codex\\hooks\\gsd-check-update.js',
       platform: 'win32',
     });
-    assert.ok(
-      result.content.includes(`command = "${expected}"`),
-      'rewritten command must project from decoded Windows path (not TOML-escaped token text)'
-    );
+    assert.equal(parsed.command, expected,
+      'rewritten command must project from decoded Windows path (not TOML-escaped token text)');
+    assert.equal(unescapeRunner(parsed.runner), '/usr/local/bin/node',
+      'runner must equal supplied absolute path');
+    assert.equal(parsed.hookPath, 'C:/Users/x/.codex/hooks/gsd-check-update.js',
+      'hook path must equal decoded Windows path after projection normalization');
   });
 
   test('does NOT touch a managed-hook entry that already uses an absolute runner', () => {
