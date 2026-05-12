@@ -602,9 +602,14 @@ function resolveNodeRunner() {
  *
  * Returns true if any entry was rewritten.
  */
-function formatHookCommandForShell(command, opts) {
+function hookCommandNeedsPowerShellCallOperator(opts) {
   const platform = (opts && opts.platform) || process.platform;
-  return platform === 'win32' ? `& ${command}` : command;
+  const runtime = opts && opts.runtime;
+  return platform === 'win32' && runtime === 'gemini';
+}
+
+function formatHookCommandForShell(command, opts) {
+  return hookCommandNeedsPowerShellCallOperator(opts) ? `& ${command}` : command;
 }
 
 function formatManagedHookScriptToken(scriptPath, opts) {
@@ -657,7 +662,8 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
       if (!entry || !Array.isArray(entry.hooks)) continue;
       for (const h of entry.hooks) {
         if (!h || typeof h.command !== 'string') continue;
-        let trimmed = h.command.trim();
+        const originalTrimmed = h.command.trim();
+        let trimmed = originalTrimmed;
         const hadPowerShellCallOperator = platform === 'win32' && /^&\s+/.test(trimmed);
         if (hadPowerShellCallOperator) {
           trimmed = trimmed.replace(/^&\s+/, '').trim();
@@ -704,13 +710,15 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
         const scriptBase = scriptPath.split(/[\\/]/).pop() || '';
         if (!MANAGED_HOOK_FILES.has(scriptBase)) continue;
 
-        // Skip if already using the desired stable runner.
-        if (runnerToken !== 'node' && runnerToken === absoluteRunner) {
-          if (platform !== 'win32' || hadPowerShellCallOperator) continue;
+        const safeScriptToken = formatManagedHookScriptToken(scriptPath, opts) || scriptToken;
+        const desiredCommand = formatHookCommandForShell(`${absoluteRunner} ${safeScriptToken}`, opts);
+
+        // Skip if already at the desired runtime-specific command shape.
+        if (runnerToken !== 'node' && originalTrimmed === desiredCommand) {
+          continue;
         }
 
-        const safeScriptToken = formatManagedHookScriptToken(scriptPath, opts) || scriptToken;
-        h.command = formatHookCommandForShell(`${absoluteRunner} ${safeScriptToken}`, opts);
+        h.command = desiredCommand;
         changed = true;
       }
     }
@@ -8833,7 +8841,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // existing managed hook entries stay bare-`node`-prefixed across reinstalls
   // and remain broken under GUI/minimal-PATH runtimes.
   const settingsRunner = resolveNodeRunner();
-  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner)) {
+  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner, { runtime })) {
     console.log(`  ${green}✓${reset} Rewrote legacy bare-node managed-hook commands to absolute path (#2979)`);
   }
   // Local installs anchor hook paths so they resolve regardless of cwd (#1906).
@@ -8843,7 +8851,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const localPrefix = (runtime === 'gemini' || runtime === 'antigravity')
     ? dirName
     : '"$CLAUDE_PROJECT_DIR"/' + dirName;
-  const hookOpts = { portableHooks: hasPortableHooks };
+  const hookOpts = { portableHooks: hasPortableHooks, runtime };
   // #2979: local-install hook commands also use the absolute node path so
   // GUI/minimal-PATH runtimes can resolve them. Bare `node` fails when the
   // host launches the runtime with a stripped PATH (Finder/Antigravity/etc).

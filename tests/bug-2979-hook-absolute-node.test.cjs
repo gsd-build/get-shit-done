@@ -144,12 +144,13 @@ describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSI
   test('Windows .sh hook uses resolved Git Bash path instead of bare bash (#3393)', () => {
     const cmd = buildHookCommand('C:/Users/me/.codex', 'gsd-validate-commit.sh', {
       platform: 'win32',
+      runtime: 'claude',
       env: { ProgramFiles: 'C:\\Program Files' },
       existsSync: (candidate) => candidate === 'C:\\Program Files\\Git\\bin\\bash.exe',
     });
     assert.equal(
       cmd,
-      '& "C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.codex/hooks/gsd-validate-commit.sh"',
+      '"C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.codex/hooks/gsd-validate-commit.sh"',
     );
   });
 
