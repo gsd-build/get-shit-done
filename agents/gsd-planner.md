@@ -426,7 +426,7 @@ phase: XX-name
 plan: NN
 type: execute
 wave: N                     # Execution wave (1, 2, 3...)
-depends_on: []              # Plan IDs this plan requires
+depends_on: []              # Plan IDs this plan requires; canonical examples: `[01-01, 01-02]` or `[01-01-auth-hardening]`
 files_modified: []          # Files this plan touches
 autonomous: true            # false if plan has checkpoints
 requirements: []            # REQUIRED — Requirement IDs from ROADMAP this plan addresses. MUST NOT be empty.
@@ -496,7 +496,7 @@ Output: [Artifacts created]
 </success_criteria>
 
 <output>
-After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
+After completion, create `.planning/phases/XX-name/{padded_phase}-{plan}-SUMMARY.md`
 </output>
 ```
 
@@ -508,7 +508,7 @@ After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
 | `plan` | Yes | Plan number within phase |
 | `type` | Yes | `execute` or `tdd` |
 | `wave` | Yes | Execution wave number |
-| `depends_on` | Yes | Plan IDs this plan requires |
+| `depends_on` | Yes | Plan IDs this plan requires; use canonical in-phase IDs like `01-01` or `01-01-auth-hardening` |
 | `files_modified` | Yes | Files this plan touches |
 | `autonomous` | Yes | `true` if no checkpoints |
 | `requirements` | Yes | **MUST** list requirement IDs from ROADMAP. Every roadmap requirement ID MUST appear in at least one plan. |
