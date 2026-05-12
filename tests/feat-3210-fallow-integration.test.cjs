@@ -36,9 +36,27 @@ describe('feat-3210: fallow integration module', () => {
     fs.mkdirSync(binDir, { recursive: true });
     const fallowPath = path.join(binDir, 'fallow');
     fs.writeFileSync(fallowPath, '#!/usr/bin/env sh\n');
+    if (process.platform !== 'win32') fs.chmodSync(fallowPath, 0o755);
 
     const resolved = resolveFallowBinary({ cwd: tmp, envPath: '' });
     assert.strictEqual(resolved, fallowPath);
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test('ignores non-executable PATH candidate on non-Windows platforms', () => {
+    if (process.platform === 'win32') return;
+    const { resolveFallowBinary } = require('../get-shit-done/bin/lib/fallow-runner.cjs');
+    const baseTmp = fs.existsSync('/private/tmp') ? '/private/tmp' : os.tmpdir();
+    const tmp = fs.mkdtempSync(path.join(baseTmp, 'gsd-fallow-nonexec-'));
+    const pathDir = path.join(tmp, 'bin');
+    fs.mkdirSync(pathDir, { recursive: true });
+    const nonExec = path.join(pathDir, 'fallow');
+    fs.writeFileSync(nonExec, '#!/usr/bin/env sh\n');
+    fs.chmodSync(nonExec, 0o644);
+
+    const resolved = resolveFallowBinary({ cwd: tmp, envPath: pathDir });
+    assert.strictEqual(resolved, null);
 
     fs.rmSync(tmp, { recursive: true, force: true });
   });

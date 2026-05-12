@@ -9,6 +9,18 @@ function candidateNames() {
     : ['fallow'];
 }
 
+function isExecutableFile(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) return false;
+    if (process.platform === 'win32') return true;
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function findInPath(envPath) {
   if (!envPath) return null;
   const names = candidateNames();
@@ -16,7 +28,7 @@ function findInPath(envPath) {
   for (const segment of segments) {
     for (const name of names) {
       const candidate = path.join(segment, name);
-      if (fs.existsSync(candidate)) return candidate;
+      if (isExecutableFile(candidate)) return candidate;
     }
   }
   return null;
@@ -27,7 +39,7 @@ function findInNodeModules(cwd) {
   const binDir = path.join(cwd, 'node_modules', '.bin');
   for (const name of names) {
     const candidate = path.join(binDir, name);
-    if (fs.existsSync(candidate)) return candidate;
+    if (isExecutableFile(candidate)) return candidate;
   }
   return null;
 }
