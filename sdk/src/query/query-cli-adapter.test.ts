@@ -65,8 +65,9 @@ describe('query-cli-adapter', () => {
 
   it('wires resolveGsdToolsPath from the query seam module', async () => {
     runQueryDispatchSpy.mockImplementationOnce(async (input: any) => {
-      expect(input.resolveGsdToolsPath).toBe(resolveGsdToolsPathSeamSpy);
+      expect(typeof input.resolveGsdToolsPath).toBe('function');
       expect(input.resolveGsdToolsPath('/tmp/project')).toBe('/mock/gsd-tools.cjs');
+      expect(resolveGsdToolsPathSeamSpy).toHaveBeenCalledWith('/tmp/project');
       return { ok: true, exit_code: 0, stdout: '', stderr: [] };
     });
 
