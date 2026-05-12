@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-11",
+  "generated": "2026-05-12",
   "families": {
     "agents": [
       "gsd-advisor-researcher",
@@ -258,6 +258,7 @@
     ],
     "cli_modules": [
       "active-workstream-store.cjs",
+      "adr-parser.cjs",
       "artifacts.cjs",
       "audit.cjs",
       "cjs-command-router-adapter.cjs",
