@@ -12,6 +12,7 @@ const {
   projectLocalHookPrefix,
   projectLegacySettingsHookCommand,
   projectManagedHookCommand,
+  projectPathActionProjection,
   projectPortableHookBaseDir,
   projectShellCommandText,
   projectCodexHookTomlCommand,
@@ -9785,8 +9786,15 @@ function maybeSuggestPathExport(globalBin, homeDir) {
   console.log('');
   console.log(`  ${yellow}⚠${reset} ${bold}${globalBin}${reset} is not on your PATH.`);
   console.log(`    Add it with one of:`);
-  console.log(`      ${cyan}echo 'export PATH="${globalBin}:$PATH"' >> ~/.zshrc${reset}`);
-  console.log(`      ${cyan}echo 'export PATH="${globalBin}:$PATH"' >> ~/.bashrc${reset}`);
+  const projected = projectPathActionProjection({
+    mode: 'persist',
+    targetDir: globalBin,
+    platform: process.platform,
+  });
+  for (const action of projected.shellActions) {
+    const label = action.label ? `${action.label}: ` : '';
+    console.log(`      ${cyan}${label}${action.command}${reset}`);
+  }
   console.log('');
 }
 

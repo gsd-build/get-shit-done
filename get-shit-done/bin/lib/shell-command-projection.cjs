@@ -151,6 +151,86 @@ function projectCodexHookTomlCommand({ absoluteRunner, scriptPath, platform = pr
   return command === null ? null : escapeTomlDoubleQuotedString(command);
 }
 
+function escapePowerShellSingleQuoted(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+function escapePosixDoubleQuoted(value) {
+  return String(value).replace(/[\\$"`]/g, '\\$&');
+}
+
+function escapeSingleQuotedShellLiteral(value) {
+  return String(value).replace(/'/g, "'\\''");
+}
+
+function renderShellActionLines(shellActions = []) {
+  return shellActions.map((action) => {
+    if (!action || !action.command) return '';
+    return action.label ? `${action.label}: ${action.command}` : action.command;
+  }).filter(Boolean);
+}
+
+function projectPathActionProjection({
+  mode = 'repair',
+  targetDir,
+  platform = process.platform,
+}) {
+  if (!targetDir) return { shellActions: [], actionLines: [] };
+
+  const isWin32 = platform === 'win32';
+
+  let shellActions;
+  if (isWin32) {
+    const psTargetDir = escapePowerShellSingleQuoted(targetDir);
+    const bashTargetDir = escapeSingleQuotedShellLiteral(String(targetDir).replace(/\\/g, '/'));
+    shellActions = [
+      {
+        label: 'PowerShell',
+        shell: 'powershell',
+        command: `[Environment]::SetEnvironmentVariable('PATH', '${psTargetDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`,
+      },
+      {
+        label: 'cmd.exe',
+        shell: 'cmd',
+        command: `powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${psTargetDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`,
+      },
+      {
+        label: 'Git Bash',
+        shell: 'bash',
+        command: `echo 'export PATH="${bashTargetDir}:$PATH"' >> ~/.bashrc`,
+      },
+    ];
+  } else if (mode === 'persist') {
+    const bashTargetDir = escapeSingleQuotedShellLiteral(String(targetDir));
+    shellActions = [
+      {
+        label: 'zsh',
+        shell: 'zsh',
+        command: `echo 'export PATH="${bashTargetDir}:$PATH"' >> ~/.zshrc`,
+      },
+      {
+        label: 'bash',
+        shell: 'bash',
+        command: `echo 'export PATH="${bashTargetDir}:$PATH"' >> ~/.bashrc`,
+      },
+    ];
+  } else {
+    const posixTargetDir = escapePosixDoubleQuoted(targetDir);
+    shellActions = [
+      {
+        label: null,
+        shell: 'posix',
+        command: `export PATH="${posixTargetDir}:$PATH"`,
+      },
+    ];
+  }
+
+  return {
+    shellActions,
+    actionLines: renderShellActionLines(shellActions),
+  };
+}
+
 function buildWindowsShimTriple(shimSrc) {
   const path = require('path');
   const shimAbs = path.resolve(shimSrc);
@@ -179,18 +259,16 @@ function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
     (runDir.includes('/_npx/') || runDir.includes('\\_npx\\'));
   const shimLocationLine = shimDir ? `Shim written to: ${shimDir}` : '';
   const actionLines = [];
+  let shellActions = [];
   if (shimDir) {
-    const psShimDir = shimDir.replace(/'/g, "''");
-    const bashShimDir = shimDir.replace(/\\/g, '/').replace(/'/g, "'\\''");
-    const posixShimDir = shimDir.replace(/[\\$"`]/g, '\\$&');
+    const projected = projectPathActionProjection({
+      mode: 'repair',
+      targetDir: shimDir,
+      platform,
+    });
+    shellActions = projected.shellActions;
     actionLines.push('Add that directory to your PATH and restart your shell.');
-    if (isWin32) {
-      actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
-      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
-      actionLines.push(`Git Bash  : echo 'export PATH="${bashShimDir}:$PATH"' >> ~/.bashrc`);
-    } else {
-      actionLines.push(`export PATH="${posixShimDir}:$PATH"`);
-    }
+    actionLines.push(...projected.actionLines);
   } else {
     actionLines.push('Could not locate a writable PATH directory to install the shim.');
     actionLines.push('Install globally to materialize the bin symlink:');
@@ -202,7 +280,7 @@ function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
         'install globally instead: npm install -g get-shit-done-cc',
       ]
     : [];
-  return { shimLocationLine, actionLines, npxNoteLines, isNpx, isWin32 };
+  return { shimLocationLine, actionLines, shellActions, npxNoteLines, isNpx, isWin32 };
 }
 
 module.exports = {
@@ -217,6 +295,8 @@ module.exports = {
   projectLegacySettingsHookCommand,
   escapeTomlDoubleQuotedString,
   projectCodexHookTomlCommand,
+  projectPathActionProjection,
+  renderShellActionLines,
   buildWindowsShimTriple,
   formatSdkPathDiagnostic,
 };
