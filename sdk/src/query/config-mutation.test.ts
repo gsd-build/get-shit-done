@@ -475,6 +475,7 @@ describe('configNewProject', () => {
 
     const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
     expect(raw.model_profile).toBe('balanced');
+    // New projects use the documented default; existing configs are left untouched.
     expect(raw.commit_docs).toBe(true);
   });
 
