@@ -16,7 +16,7 @@ We propose introducing a Shell Command Projection Module that owns projection fr
   - generated shim / wrapper script text written to disk
 - Keep internal subprocess execution (`spawnSync`, `execFileSync`, SDK query dispatch) outside this seam. The module does **not** become a generic command runner.
 - Make runtime-specific wrappers explicit policy at the seam (for example, emit PowerShell call-operator prefixes only for shells/runtimes that require them).
-- Make path-style projection explicit policy at the seam (`native Windows`, `POSIX slash`, `$HOME`-relative`, project-dir-relative`, etc.).
+- Make path-style projection explicit policy at the seam (`native Windows`, `POSIX slash`, `$HOME`-relative, `project-dir-relative`, etc.).
 - Prefer typed IR outputs that tests can assert against directly, then render text at the final Adapter.
 
 ## Initial Scope
