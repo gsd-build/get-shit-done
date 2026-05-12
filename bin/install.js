@@ -5,6 +5,10 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 const crypto = require('crypto');
+const {
+  formatHookCommandForRuntime: formatHookCommandForShell,
+  formatManagedHookScriptToken,
+} = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
 // Colors
 const cyan = '\x1b[36m';
@@ -602,22 +606,6 @@ function resolveNodeRunner() {
  *
  * Returns true if any entry was rewritten.
  */
-function hookCommandNeedsPowerShellCallOperator(opts) {
-  const platform = (opts && opts.platform) || process.platform;
-  const runtime = opts && opts.runtime;
-  return platform === 'win32' && runtime === 'gemini';
-}
-
-function formatHookCommandForShell(command, opts) {
-  return hookCommandNeedsPowerShellCallOperator(opts) ? `& ${command}` : command;
-}
-
-function formatManagedHookScriptToken(scriptPath, opts) {
-  const platform = (opts && opts.platform) || process.platform;
-  if (platform !== 'win32') return null;
-  return JSON.stringify(scriptPath.replace(/\\/g, '/'));
-}
-
 function resolveBashRunner(opts) {
   const platform = (opts && opts.platform) || process.platform;
   if (platform !== 'win32') return 'bash';
@@ -662,8 +650,7 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
       if (!entry || !Array.isArray(entry.hooks)) continue;
       for (const h of entry.hooks) {
         if (!h || typeof h.command !== 'string') continue;
-        const originalTrimmed = h.command.trim();
-        let trimmed = originalTrimmed;
+        let trimmed = h.command.trim();
         const hadPowerShellCallOperator = platform === 'win32' && /^&\s+/.test(trimmed);
         if (hadPowerShellCallOperator) {
           trimmed = trimmed.replace(/^&\s+/, '').trim();
@@ -697,8 +684,9 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
           const runnerPath = (m[2] || m[3] || m[4] || '').replace(/\\/g, '/');
           const stableRunner = normalizeNodePath(runnerPath);
           // Process Cellar paths so they normalize to a stable symlink. On
-          // Windows, also process already-absolute runners so PowerShell gets
-          // the call operator needed to invoke a quoted executable path (#3362).
+          // Windows, already-absolute runners still flow through the projection
+          // seam because some runtimes need additional wrapper policy while
+          // others must stay shell-neutral (#3362, #3413).
           if (stableRunner === runnerPath && platform !== 'win32') continue;
           scriptToken = m[5];
           scriptPath = m[6] || m[7] || m[8] || '';
@@ -711,14 +699,15 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
         if (!MANAGED_HOOK_FILES.has(scriptBase)) continue;
 
         const safeScriptToken = formatManagedHookScriptToken(scriptPath, opts) || scriptToken;
-        const desiredCommand = formatHookCommandForShell(`${absoluteRunner} ${safeScriptToken}`, opts);
+        const projectedCommand = formatHookCommandForShell(`${absoluteRunner} ${safeScriptToken}`, opts);
 
-        // Skip if already at the desired runtime-specific command shape.
-        if (runnerToken !== 'node' && originalTrimmed === desiredCommand) {
-          continue;
-        }
+        // Skip only when the existing managed command already matches the
+        // desired runtime-aware projected shape. This preserves Gemini's
+        // required PowerShell prefix while still letting Claude strip stale
+        // prefixes on reinstall (#3413).
+        if (h.command === projectedCommand) continue;
 
-        h.command = desiredCommand;
+        h.command = projectedCommand;
         changed = true;
       }
     }
@@ -826,11 +815,12 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
  *
  * @param {string} configDir - Resolved absolute config directory path
  * @param {string} hookName - Hook filename (e.g. 'gsd-statusline.js')
- * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform }} [opts] - Options
+ * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform, runtime?: string }} [opts] - Options
  *   portableHooks: when true, emit $HOME-relative paths instead of absolute paths.
  *   Safe for Linux/macOS global installs and WSL/Docker bind-mount scenarios.
  *   Not suitable for pure Windows (cmd.exe/PowerShell do not expand $HOME).
  *   platform: test injection for shell command formatting. Defaults to process.platform.
+ *   runtime: target runtime name for shell projection policy.
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
@@ -8841,7 +8831,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // existing managed hook entries stay bare-`node`-prefixed across reinstalls
   // and remain broken under GUI/minimal-PATH runtimes.
   const settingsRunner = resolveNodeRunner();
-  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner, { runtime })) {
+  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner, { platform: process.platform, runtime })) {
     console.log(`  ${green}✓${reset} Rewrote legacy bare-node managed-hook commands to absolute path (#2979)`);
   }
   // Local installs anchor hook paths so they resolve regardless of cwd (#1906).
