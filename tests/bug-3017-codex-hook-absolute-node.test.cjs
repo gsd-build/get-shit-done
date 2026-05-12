@@ -185,6 +185,30 @@ describe('Bug #3017: rewriteLegacyCodexHookBlock migrates bare-node on reinstall
     assert.ok(result.content.includes('name = "o3"'));
   });
 
+  test('decodes TOML-escaped quoted script paths before projection', () => {
+    const before = [
+      '# GSD Hooks',
+      '[[hooks.SessionStart]]',
+      '',
+      '[[hooks.SessionStart.hooks]]',
+      'type = "command"',
+      'command = "node \\"C:\\\\Users\\\\x\\\\.codex\\\\hooks\\\\gsd-check-update.js\\""',
+      '',
+    ].join('\n');
+    const runner = '"/usr/local/bin/node"';
+    const result = rewriteLegacyCodexHookBlock(before, runner, { platform: 'win32' });
+    assert.equal(result.changed, true);
+    const expected = projectCodexHookTomlCommand({
+      absoluteRunner: runner,
+      scriptPath: 'C:\\Users\\x\\.codex\\hooks\\gsd-check-update.js',
+      platform: 'win32',
+    });
+    assert.ok(
+      result.content.includes(`command = "${expected}"`),
+      'rewritten command must project from decoded Windows path (not TOML-escaped token text)'
+    );
+  });
+
   test('does NOT touch a managed-hook entry that already uses an absolute runner', () => {
     const already = [
       '# GSD Hooks',

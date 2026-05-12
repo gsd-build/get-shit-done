@@ -796,9 +796,16 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner, opts) {
     /^(command\s*=\s*")node\s+((?:\\"[^"]+\\"|\S+))("\s*)$/gm,
     (full, prefix, scriptToken, suffix) => {
       // Extract the underlying script path from the captured token —
-      // either the bare token or the inner content of \"...\".
-      const quoted = scriptToken.match(/^\\"(.+)\\"$/);
-      const scriptPath = quoted ? quoted[1] : scriptToken;
+      // either the bare token or the decoded inner content of \"...\".
+      const quoted = scriptToken.match(/^\\"([\s\S]+)\\"$/);
+      let scriptPath = scriptToken;
+      if (quoted) {
+        try {
+          scriptPath = String(parseTomlValue(`"${quoted[1]}"`, 0).value);
+        } catch {
+          scriptPath = quoted[1];
+        }
+      }
       const base = scriptPath.split(/[\\/]/).pop() || '';
       if (!CODEX_MANAGED_HOOK_BASENAMES.has(base)) return full;
       const desiredCommand = projectCodexHookTomlCommand({
