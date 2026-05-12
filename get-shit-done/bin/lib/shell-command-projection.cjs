@@ -45,8 +45,34 @@ function formatManagedHookScriptToken(scriptPath, opts = {}) {
   return JSON.stringify(scriptPath.replace(/\\/g, '/'));
 }
 
+function projectManagedHookCommand({ absoluteRunner, scriptPath, runtime = 'generic', platform = process.platform }) {
+  if (!absoluteRunner || !scriptPath) return null;
+  const normalizedScriptPath = platform === 'win32' ? scriptPath.replace(/\\/g, '/') : scriptPath;
+  return formatHookCommandForRuntime(`${absoluteRunner} ${JSON.stringify(normalizedScriptPath)}`, {
+    platform,
+    runtime,
+  });
+}
+
+function escapeTomlDoubleQuotedString(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function projectCodexHookTomlCommand({ absoluteRunner, scriptPath, platform = process.platform }) {
+  const command = projectManagedHookCommand({
+    absoluteRunner,
+    scriptPath,
+    runtime: 'codex',
+    platform,
+  });
+  return command === null ? null : escapeTomlDoubleQuotedString(command);
+}
+
 module.exports = {
   hookCommandNeedsPowerShellCallOperator,
   formatHookCommandForRuntime,
   formatManagedHookScriptToken,
+  projectManagedHookCommand,
+  escapeTomlDoubleQuotedString,
+  projectCodexHookTomlCommand,
 };

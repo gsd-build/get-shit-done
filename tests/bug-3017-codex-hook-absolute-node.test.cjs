@@ -37,7 +37,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const INSTALL = require(path.join(__dirname, '..', 'bin', 'install.js'));
+const projection = require(path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'shell-command-projection.cjs'));
 const { buildCodexHookBlock, rewriteLegacyCodexHookBlock, resolveNodeRunner } = INSTALL;
+const { projectCodexHookTomlCommand } = projection;
 
 /**
  * Parse the toml hook block into a typed record so tests can assert on
@@ -85,6 +87,20 @@ function unescapeRunner(token) {
   if (t.startsWith('"') && t.endsWith('"')) t = t.slice(1, -1);
   return t;
 }
+
+describe('Bug #3017 / #3440: Codex hook projection seam', () => {
+  test('projectCodexHookTomlCommand renders escaped command value from shared projection module', () => {
+    const commandValue = projectCodexHookTomlCommand({
+      absoluteRunner: '"/usr/local/bin/node"',
+      scriptPath: '/tmp/codex-test/.codex/hooks/gsd-check-update.js',
+      platform: 'linux',
+    });
+    assert.equal(
+      commandValue,
+      '\\"/usr/local/bin/node\\" \\"/tmp/codex-test/.codex/hooks/gsd-check-update.js\\"',
+    );
+  });
+});
 
 describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
   test('exported as a function', () => {

@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const {
   formatHookCommandForRuntime: formatHookCommandForShell,
   formatManagedHookScriptToken,
+  projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
 // Colors
@@ -750,19 +751,19 @@ function buildCodexHookBlock(targetDir, opts) {
   const absoluteRunner = opts && opts.absoluteRunner;
   if (!absoluteRunner) return null;
   const eol = (opts && opts.eol) || '\n';
-  const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-  // toml requires escaped interior quotes (\"). The runner is already a
-  // JSON-stringified token (with literal " around the absolute path); we
-  // need to escape those quotes so the toml parser sees them as part of
-  // the string value, not as the closing quote of the command field.
-  const runnerEscaped = absoluteRunner.replace(/"/g, '\\"');
-  const hookPathEscaped = updateCheckScript.replace(/"/g, '\\"');
+  const platform = (opts && opts.platform) || process.platform;
+  const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js');
+  const commandValue = projectCodexHookTomlCommand({
+    absoluteRunner,
+    scriptPath: updateCheckScript,
+    platform,
+  });
   return `${eol}# GSD Hooks${eol}` +
     `[[hooks.SessionStart]]${eol}` +
     `${eol}` +
     `[[hooks.SessionStart.hooks]]${eol}` +
     `type = "command"${eol}` +
-    `command = "${runnerEscaped} \\"${hookPathEscaped}\\""${eol}`;
+    `command = "${commandValue}"${eol}`;
 }
 
 /**
@@ -778,8 +779,9 @@ function buildCodexHookBlock(targetDir, opts) {
  * @param {string|null} absoluteRunner - Result of resolveNodeRunner().
  * @returns {{ content: string, changed: boolean }}
  */
-function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
+function rewriteLegacyCodexHookBlock(content, absoluteRunner, opts) {
   if (!content || !absoluteRunner) return { content, changed: false };
+  const platform = (opts && opts.platform) || process.platform;
   let changed = false;
   // Match `command = "node <scriptToken>"` lines where scriptToken is
   // either an unquoted path (no spaces) or a toml-escaped quoted path.
@@ -799,11 +801,15 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
       const scriptPath = quoted ? quoted[1] : scriptToken;
       const base = scriptPath.split(/[\\/]/).pop() || '';
       if (!CODEX_MANAGED_HOOK_BASENAMES.has(base)) return full;
+      const desiredCommand = projectCodexHookTomlCommand({
+        absoluteRunner,
+        scriptPath,
+        platform,
+      });
+      const currentCommand = `${prefix}${scriptToken}${suffix}`.replace(/^(command\s*=\s*")|("\s*)$/g, '');
+      if (currentCommand === desiredCommand) return full;
       changed = true;
-      const runnerEscaped = absoluteRunner.replace(/"/g, '\\"');
-      // Always re-quote the path on output for consistency with the new
-      // builder's shape.
-      return `${prefix}${runnerEscaped} \\"${scriptPath}\\"${suffix}`;
+      return `${prefix}${desiredCommand}${suffix}`;
     },
   );
   return { content: updated, changed };
