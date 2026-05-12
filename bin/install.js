@@ -6,12 +6,13 @@ const os = require('os');
 const readline = require('readline');
 const crypto = require('crypto');
 const {
-  formatHookCommandForRuntime: formatHookCommandForShell,
   buildWindowsShimTriple: buildWindowsShimTripleFromProjection,
   formatSdkPathDiagnostic: formatSdkPathDiagnosticFromProjection,
   isManagedHookBasename,
+  projectLocalHookPrefix,
   projectLegacySettingsHookCommand,
   projectManagedHookCommand,
+  projectPortableHookBaseDir,
   projectShellCommandText,
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
@@ -843,14 +844,16 @@ function buildHookCommand(configDir, hookName, opts) {
   if (runner === null) return null;
 
   if (opts.portableHooks) {
-    // Replace the home directory prefix with $HOME so the path works when
-    // ~/.claude is bind-mounted into a container at a different absolute path.
-    const home = os.homedir().replace(/\\/g, '/');
-    const normalized = configDir.replace(/\\/g, '/');
-    const relative = normalized.startsWith(home)
-      ? '$HOME' + normalized.slice(home.length)
-      : normalized;
-    return formatHookCommandForShell(`${runner} "${relative}/hooks/${hookName}"`, opts);
+    const portableBaseDir = projectPortableHookBaseDir({
+      configDir,
+      homeDir: os.homedir(),
+    });
+    return projectManagedHookCommand({
+      absoluteRunner: runner,
+      scriptPath: `${portableBaseDir}/hooks/${hookName}`,
+      runtime: opts.runtime || 'generic',
+      platform: opts.platform || process.platform,
+    });
   }
 
   // Default: absolute path with forward slashes (Windows-safe, fixes #2045/#2046).
@@ -8846,9 +8849,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // Claude Code sets $CLAUDE_PROJECT_DIR; Gemini/Antigravity do not — and on
   // Windows their own substitution logic doubles the path (#2557). Those runtimes
   // run project hooks with the project dir as cwd, so bare relative paths work.
-  const localPrefix = (runtime === 'gemini' || runtime === 'antigravity')
-    ? dirName
-    : '"$CLAUDE_PROJECT_DIR"/' + dirName;
+  const localPrefix = projectLocalHookPrefix({ runtime, dirName });
   const hookOpts = { portableHooks: hasPortableHooks, runtime };
   // #2979: local-install hook commands also use the absolute node path so
   // GUI/minimal-PATH runtimes can resolve them. Bare `node` fails when the

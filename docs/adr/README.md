@@ -25,3 +25,6 @@ ADR 0005 is the top-level SDK seam index. It references per-seam ADRs and states
 ADR 0006 documents how SDK query handlers project planning paths (`cwd → effectiveRoot → .planning/<project>/...`). Cross-reference with the Planning Workspace Module (ADR 0004) for workstream pointer policy.
 
 ADR 0008 documents the Installer Migration Module for safe install-time moves, removals, config rewrites, and user-data preservation.
+
+ADR 0009 documents the Shell Command Projection Module seam for runtime-aware
+projection of installer-owned command text and projection IR.

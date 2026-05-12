@@ -45,6 +45,22 @@ function formatManagedHookScriptToken(scriptPath, opts = {}) {
   return JSON.stringify(scriptPath.replace(/\\/g, '/'));
 }
 
+function projectLocalHookPrefix({ runtime = 'claude', dirName }) {
+  if (!dirName) return dirName;
+  return (runtime === 'gemini' || runtime === 'antigravity')
+    ? dirName
+    : `"$CLAUDE_PROJECT_DIR"/${dirName}`;
+}
+
+function projectPortableHookBaseDir({ configDir, homeDir }) {
+  const normalizedConfigDir = String(configDir || '').replace(/\\/g, '/');
+  const normalizedHome = String(homeDir || '').replace(/\\/g, '/');
+  if (!normalizedConfigDir || !normalizedHome) return normalizedConfigDir;
+  return normalizedConfigDir.startsWith(normalizedHome)
+    ? '$HOME' + normalizedConfigDir.slice(normalizedHome.length)
+    : normalizedConfigDir;
+}
+
 function projectShellCommandText({
   runnerToken,
   argTokens = [],
@@ -193,6 +209,8 @@ module.exports = {
   hookCommandNeedsPowerShellCallOperator,
   formatHookCommandForRuntime,
   formatManagedHookScriptToken,
+  projectLocalHookPrefix,
+  projectPortableHookBaseDir,
   projectShellCommandText,
   projectManagedHookCommand,
   isManagedHookBasename,

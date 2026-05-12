@@ -13,7 +13,9 @@ const {
   hookCommandNeedsPowerShellCallOperator,
   formatHookCommandForRuntime,
   isManagedHookBasename,
+  projectLocalHookPrefix,
   projectLegacySettingsHookCommand,
+  projectPortableHookBaseDir,
 } = projection;
 const { buildHookCommand, rewriteLegacyManagedNodeHookCommands } = install;
 
@@ -105,5 +107,38 @@ describe('bug #3439: shell projection module owns managed-hook policy and legacy
       runtime: 'gemini',
     });
     assert.equal(command, '& "C:/nvm4w/nodejs/node.exe" "C:/Users/me/.gemini/hooks/gsd-prompt-guard.js"');
+  });
+
+  test('projectLocalHookPrefix centralizes runtime-specific project-dir interpolation policy', () => {
+    assert.equal(projectLocalHookPrefix({ runtime: 'gemini', dirName: '.gemini' }), '.gemini');
+    assert.equal(projectLocalHookPrefix({ runtime: 'antigravity', dirName: '.agent' }), '.agent');
+    assert.equal(
+      projectLocalHookPrefix({ runtime: 'claude', dirName: '.claude' }),
+      '"$CLAUDE_PROJECT_DIR"/.claude',
+    );
+  });
+
+  test('projectPortableHookBaseDir centralizes $HOME interpolation policy', () => {
+    assert.equal(
+      projectPortableHookBaseDir({
+        configDir: '/Users/me/.claude',
+        homeDir: '/Users/me',
+      }),
+      '$HOME/.claude',
+    );
+    assert.equal(
+      projectPortableHookBaseDir({
+        configDir: 'C:\\Users\\me\\.claude',
+        homeDir: 'C:\\Users\\me',
+      }),
+      '$HOME/.claude',
+    );
+    assert.equal(
+      projectPortableHookBaseDir({
+        configDir: '/opt/custom/.claude',
+        homeDir: '/Users/me',
+      }),
+      '/opt/custom/.claude',
+    );
   });
 });
