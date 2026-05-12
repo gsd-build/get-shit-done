@@ -132,6 +132,23 @@ describe('Bug #3362 / #3413: Windows hook commands are runtime-aware', () => {
     assert.ok(!cmd.startsWith('& '), `Claude hook command must not use PowerShell call operator: ${cmd}`);
     assert.equal(parseHookCommand(cmd).hookPath, 'C:/Users/me/.claude/hooks/gsd-check-update.js');
   });
+
+  test('Windows .js hook with no runtime stays shell-neutral', () => {
+    const cmd = buildHookCommand('C:/Users/me/.claude', 'gsd-check-update.js', {
+      platform: 'win32',
+    });
+    assert.ok(!cmd.startsWith('& '), `Missing runtime must not imply PowerShell syntax: ${cmd}`);
+    assert.equal(parseHookCommand(cmd).hookPath, 'C:/Users/me/.claude/hooks/gsd-check-update.js');
+  });
+
+  test('Gemini runtime on non-Windows platform does not get PowerShell syntax', () => {
+    const cmd = buildHookCommand('/home/me/.claude', 'gsd-check-update.js', {
+      platform: 'linux',
+      runtime: 'gemini',
+    });
+    assert.ok(!cmd.startsWith('& '), `Non-Windows Gemini hook must stay shell-neutral: ${cmd}`);
+    assert.equal(parseHookCommand(cmd).hookPath, '/home/me/.claude/hooks/gsd-check-update.js');
+  });
 });
 
 describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSIX std PATH always has /bin)', () => {
