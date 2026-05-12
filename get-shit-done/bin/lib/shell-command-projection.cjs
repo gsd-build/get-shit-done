@@ -158,11 +158,9 @@ function escapePowerShellSingleQuoted(value) {
 function escapePosixDoubleQuoted(value) {
   return String(value).replace(/[\\$"`]/g, '\\$&');
 }
-
 function escapeSingleQuotedShellLiteral(value) {
   return String(value).replace(/'/g, "'\\''");
 }
-
 function renderShellActionLines(shellActions = []) {
   return shellActions.map((action) => {
     if (!action || !action.command) return '';
@@ -231,6 +229,15 @@ function projectPathActionProjection({
   };
 }
 
+function projectPersistentPathExportActions({ targetDir, platform = process.platform }) {
+  const projected = projectPathActionProjection({
+    mode: 'persist',
+    targetDir,
+    platform,
+  });
+  return { shellActions: projected.shellActions };
+}
+
 function buildWindowsShimTriple(shimSrc) {
   const path = require('path');
   const shimAbs = path.resolve(shimSrc);
@@ -297,6 +304,7 @@ module.exports = {
   projectCodexHookTomlCommand,
   projectPathActionProjection,
   renderShellActionLines,
+  projectPersistentPathExportActions,
   buildWindowsShimTriple,
   formatSdkPathDiagnostic,
 };

@@ -14,6 +14,7 @@ const {
   projectManagedHookCommand,
   projectPathActionProjection,
   projectPortableHookBaseDir,
+  projectPersistentPathExportActions,
   projectShellCommandText,
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
@@ -9757,7 +9758,8 @@ function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
  *   - a diagnostic "already covered via rc file" note, if an rc file has
  *     `export PATH="$HOME/…/bin:$PATH"` (or equivalent) and the user just
  *     needs to reopen their shell
- *   - the absolute `echo 'export PATH="…:$PATH"' >> ~/.zshrc` suggestion,
+ *   - projected shell actions that append `export PATH="…:$PATH"` to
+ *     `~/.zshrc` / `~/.bashrc` when neither PATH nor rc files cover globalBin
  *     if neither PATH nor any rc file covers globalBin
  *
  * Exported for tests; the installer calls this from finishInstall.
@@ -9786,14 +9788,13 @@ function maybeSuggestPathExport(globalBin, homeDir) {
   console.log('');
   console.log(`  ${yellow}⚠${reset} ${bold}${globalBin}${reset} is not on your PATH.`);
   console.log(`    Add it with one of:`);
-  const projected = projectPathActionProjection({
-    mode: 'persist',
+  const projected = projectPersistentPathExportActions({
     targetDir: globalBin,
     platform: process.platform,
   });
   for (const action of projected.shellActions) {
-    const label = action.label ? `${action.label}: ` : '';
-    console.log(`      ${cyan}${label}${action.command}${reset}`);
+    const labelPrefix = action.label ? `${action.label}: ` : '';
+    console.log(`      ${cyan}${labelPrefix}${action.command}${reset}`);
   }
   console.log('');
 }
