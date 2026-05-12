@@ -1,18 +1,8 @@
 ## GitHub access
 
-**Always** set `GITHUB_TOKEN` from `.envrc` before any `gh` CLI call:
-
-```bash
-export GITHUB_TOKEN=$(grep GITHUB_TOKEN .envrc | cut -d\' -f2)
-```
-
-Or prefix every `gh` command:
-
-```bash
-GITHUB_TOKEN=$(grep GITHUB_TOKEN .envrc | cut -d\' -f2) gh issue create ...
-```
-
-**Never** use the ambient `gh auth` session — it resolves to enterprise credentials that cannot access this repo. The `.envrc` token is the only credential authorised for `gsd-build/get-shit-done`.
+Use the configured GitHub CLI session for this checkout. Always pass
+`--repo gsd-build/get-shit-done` on `gh` commands so issue and PR operations
+stay scoped to the canonical repository.
 
 ---
 
@@ -20,7 +10,7 @@ GITHUB_TOKEN=$(grep GITHUB_TOKEN .envrc | cut -d\' -f2) gh issue create ...
 
 ### Issue tracker
 
-Issues live in GitHub Issues (`gsd-build/get-shit-done`). Always use the `.envrc` token — never the ambient `gh auth` session. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues (`gsd-build/get-shit-done`). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

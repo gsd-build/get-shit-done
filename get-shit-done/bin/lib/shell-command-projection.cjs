@@ -45,12 +45,79 @@ function formatManagedHookScriptToken(scriptPath, opts = {}) {
   return JSON.stringify(scriptPath.replace(/\\/g, '/'));
 }
 
+function projectShellCommandText({
+  runnerToken,
+  argTokens = [],
+  runtime = 'generic',
+  platform = process.platform,
+}) {
+  if (!runnerToken) return null;
+  const parts = [runnerToken, ...argTokens.filter(Boolean)];
+  return formatHookCommandForRuntime(parts.join(' '), { platform, runtime });
+}
+
 function projectManagedHookCommand({ absoluteRunner, scriptPath, runtime = 'generic', platform = process.platform }) {
   if (!absoluteRunner || !scriptPath) return null;
   const normalizedScriptPath = platform === 'win32' ? scriptPath.replace(/\\/g, '/') : scriptPath;
-  return formatHookCommandForRuntime(`${absoluteRunner} ${JSON.stringify(normalizedScriptPath)}`, {
-    platform,
+  return projectShellCommandText({
+    runnerToken: absoluteRunner,
+    argTokens: [JSON.stringify(normalizedScriptPath)],
     runtime,
+    platform,
+  });
+}
+
+const MANAGED_HOOK_BASENAMES_BY_SURFACE = {
+  'settings-json': new Set([
+    'gsd-check-update.js',
+    'gsd-statusline.js',
+    'gsd-context-monitor.js',
+    'gsd-prompt-guard.js',
+    'gsd-read-guard.js',
+    'gsd-read-injection-scanner.js',
+    'gsd-update-banner.js',
+    'gsd-workflow-guard.js',
+  ]),
+  'codex-toml': new Set([
+    'gsd-check-update.js',
+  ]),
+};
+
+function managedHookSurfaceSet(surface = 'settings-json') {
+  return MANAGED_HOOK_BASENAMES_BY_SURFACE[surface] || MANAGED_HOOK_BASENAMES_BY_SURFACE['settings-json'];
+}
+
+function isManagedHookBasename(scriptPathOrBasename, opts = {}) {
+  if (!scriptPathOrBasename) return false;
+  const surface = opts.surface || 'settings-json';
+  const basename = String(scriptPathOrBasename).split(/[\\/]/).pop() || '';
+  return managedHookSurfaceSet(surface).has(basename);
+}
+
+/**
+ * Projection helper for legacy settings.json hook rewrites.
+ *
+ * Non-Windows keeps the original script token shape when provided (single
+ * quote / bareword / quoted), while Windows normalizes to double-quoted
+ * forward-slash path tokens for stable cross-shell behavior.
+ */
+function projectLegacySettingsHookCommand({
+  absoluteRunner,
+  scriptPath,
+  scriptToken,
+  runtime = 'generic',
+  platform = process.platform,
+}) {
+  if (!absoluteRunner || !scriptPath) return null;
+  const normalizedScriptPath = platform === 'win32' ? scriptPath.replace(/\\/g, '/') : scriptPath;
+  const commandScriptToken = platform === 'win32'
+    ? JSON.stringify(normalizedScriptPath)
+    : (scriptToken || JSON.stringify(normalizedScriptPath));
+  return projectShellCommandText({
+    runnerToken: absoluteRunner,
+    argTokens: [commandScriptToken],
+    runtime,
+    platform,
   });
 }
 
@@ -68,11 +135,70 @@ function projectCodexHookTomlCommand({ absoluteRunner, scriptPath, platform = pr
   return command === null ? null : escapeTomlDoubleQuotedString(command);
 }
 
+function buildWindowsShimTriple(shimSrc) {
+  const path = require('path');
+  const shimAbs = path.resolve(shimSrc);
+  const shimQuoted = JSON.stringify(shimAbs);
+  const invocation = {
+    interpreter: 'node',
+    target: shimAbs,
+  };
+  const renderCmd = () =>
+    '@ECHO OFF\r\n@SETLOCAL\r\n@node ' + shimQuoted + ' %*\r\n';
+  const renderPs1 = () =>
+    '#!/usr/bin/env pwsh\n& node ' + shimQuoted + ' $args\nexit $LASTEXITCODE\n';
+  const renderSh = () =>
+    '#!/usr/bin/env sh\nexec node ' + shimQuoted + ' "$@"\n';
+  return {
+    invocation,
+    eol: { cmd: '\r\n', ps1: '\n', sh: '\n' },
+    fileNames: { cmd: 'gsd-sdk.cmd', ps1: 'gsd-sdk.ps1', sh: 'gsd-sdk' },
+    render: { cmd: renderCmd, ps1: renderPs1, sh: renderSh },
+  };
+}
+
+function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
+  const isWin32 = platform === 'win32';
+  const isNpx = typeof runDir === 'string' &&
+    (runDir.includes('/_npx/') || runDir.includes('\\_npx\\'));
+  const shimLocationLine = shimDir ? `Shim written to: ${shimDir}` : '';
+  const actionLines = [];
+  if (shimDir) {
+    const psShimDir = shimDir.replace(/'/g, "''");
+    const bashShimDir = shimDir.replace(/\\/g, '/').replace(/'/g, "'\\''");
+    const posixShimDir = shimDir.replace(/[\\$"`]/g, '\\$&');
+    actionLines.push('Add that directory to your PATH and restart your shell.');
+    if (isWin32) {
+      actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
+      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
+      actionLines.push(`Git Bash  : echo 'export PATH="${bashShimDir}:$PATH"' >> ~/.bashrc`);
+    } else {
+      actionLines.push(`export PATH="${posixShimDir}:$PATH"`);
+    }
+  } else {
+    actionLines.push('Could not locate a writable PATH directory to install the shim.');
+    actionLines.push('Install globally to materialize the bin symlink:');
+    actionLines.push('npm install -g get-shit-done-cc');
+  }
+  const npxNoteLines = isNpx
+    ? [
+        "Note: you're running via npx. For a persistent shim,",
+        'install globally instead: npm install -g get-shit-done-cc',
+      ]
+    : [];
+  return { shimLocationLine, actionLines, npxNoteLines, isNpx, isWin32 };
+}
+
 module.exports = {
   hookCommandNeedsPowerShellCallOperator,
   formatHookCommandForRuntime,
   formatManagedHookScriptToken,
+  projectShellCommandText,
   projectManagedHookCommand,
+  isManagedHookBasename,
+  projectLegacySettingsHookCommand,
   escapeTomlDoubleQuotedString,
   projectCodexHookTomlCommand,
+  buildWindowsShimTriple,
+  formatSdkPathDiagnostic,
 };
