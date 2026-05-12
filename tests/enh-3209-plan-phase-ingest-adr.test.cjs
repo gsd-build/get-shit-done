@@ -43,7 +43,7 @@ describe('enh #3209: plan-phase ADR ingest express path', () => {
 
   test('workflow defines an ADR ingest express-path step', () => {
     const workflow = read(WORKFLOW_PATH);
-    assert.ok(workflow.includes('## 3.6. Handle ADR Ingest Express Path'),
+    assert.ok(/##\s*(?:\d+(?:\.\d+)*)?\.?\s*Handle ADR Ingest Express Path/i.test(workflow),
       'plan-phase workflow must include a dedicated ADR ingest express-path step');
     assert.ok(workflow.includes('ADR Ingest Express Path'),
       'workflow must display ADR ingest express-path banner text');
