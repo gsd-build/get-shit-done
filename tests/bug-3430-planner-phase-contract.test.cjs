@@ -19,7 +19,7 @@ test('#3430: planner SUMMARY instruction uses canonical padded phase/plan form',
   const content = readPlanner();
   assert.match(
     content,
-    /After completion, create `\.planning\/phases\/XX-name\/\{padded_phase\}-\{plan\}-SUMMARY\.md`/,
+    /Create `\.planning\/phases\/XX-name\/\{padded_phase\}-\{plan\}-SUMMARY\.md` when done/,
     'planner must instruct executors to write SUMMARY files in canonical padded-phase form'
   );
   assert.doesNotMatch(
@@ -33,7 +33,7 @@ test('#3430: planner depends_on docs show canonical in-phase plan ids', () => {
   const content = readPlanner();
   assert.match(
     content,
-    /depends_on:[^\n]*canonical examples: `\[01-01, 01-02\]` or `\[01-01-auth-hardening\]`/,
+    /depends_on:[^\n]*Use `01-01`\/`01-01-auth-hardening`/,
     'planner must document canonical depends_on examples that phase-plan-index resolves'
   );
   assert.doesNotMatch(
