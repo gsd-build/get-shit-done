@@ -99,6 +99,24 @@ describe('pr-template-policy', () => {
     assert.equal(result.template, 'enhancement');
   });
 
+  test('does not flag default-template marker phrase inside a valid enhancement template', () => {
+    const body = enhancementBody.replace(
+      '## Linked Issue',
+      [
+        '> **Using the wrong template?**',
+        '> - Bug fix: use [fix.md](?template=fix.md)',
+        '> - New feature: use [feature.md](?template=feature.md)',
+        '',
+        '## Linked Issue',
+      ].join('\n'),
+    );
+    const result = evaluatePrTemplate(body, 'COLLABORATOR');
+
+    assert.equal(result.valid, true);
+    assert.equal(result.action, 'pass');
+    assert.equal(result.template, 'enhancement');
+  });
+
   test('passes PR bodies that use the feature template', () => {
     const result = evaluatePrTemplate(featureBody, 'FIRST_TIME_CONTRIBUTOR');
 

@@ -112,19 +112,21 @@ function evaluatePrTemplate(body, authorAssociation) {
   if (!normalizedBody) {
     valid = false;
     reason = 'PR body is empty; a typed pull request template is required.';
-  } else if (includesDefaultTemplate(normalizedBody)) {
-    valid = false;
-    reason = 'PR body still contains the default wrong-template guidance.';
   } else {
     const match = matchingTemplate(normalizedBody);
     template = match.template;
     missingHeadings = match.missingHeadings;
-    if (!template) {
-      valid = false;
-      reason = 'PR body does not match the fix, enhancement, or feature template.';
-    } else if (missingHeadings.length > 0) {
+    if (template && missingHeadings.length === 0) {
+      valid = true;
+    } else if (template && missingHeadings.length > 0) {
       valid = false;
       reason = `PR body appears to use the ${template} template but is missing required headings.`;
+    } else if (includesDefaultTemplate(normalizedBody)) {
+      valid = false;
+      reason = 'PR body still contains the default wrong-template guidance.';
+    } else {
+      valid = false;
+      reason = 'PR body does not match the fix, enhancement, or feature template.';
     }
   }
 

@@ -359,13 +359,14 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (53 shipped)
+## CLI Modules (54 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
 | Module | Responsibility |
 |--------|----------------|
 | `active-workstream-store.cjs` | Workstream source precedence and selection (CLI `--ws` > `GSD_WORKSTREAM` env > stored pointer); name validation and environment propagation |
+| `adr-parser.cjs` | ADR decision parser for plan-phase ingest express path; normalizes section synonyms, parses status/decision/scope fences, and enforces status rejection gates |
 | `artifacts.cjs` | Canonical artifact registry — known `.planning/` root file names; used by `gsd-health` W019 lint |
 | `audit.cjs` | Audit dispatch, audit open sessions, audit storage helpers |
 | `cjs-command-router-adapter.cjs` | Shared compatibility adapter for manifest-backed CJS command-family routers |

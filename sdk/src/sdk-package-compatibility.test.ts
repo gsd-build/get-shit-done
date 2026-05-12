@@ -12,6 +12,7 @@ import {
   resolveBundledTemplatesDir,
   resolveGsdToolsPath,
   resolveLegacyInstallDir,
+  resolveLegacyUserProfilePath,
   resolveLegacyTemplatesDir,
   resolveLegacyWorkflowsDir,
 } from './sdk-package-compatibility.js';
@@ -25,6 +26,7 @@ describe('SDK Package Seam Module', () => {
     expect(resolveLegacyInstallDir(homeDir)).toBe(join(homeDir, '.claude', 'get-shit-done'));
     expect(resolveLegacyTemplatesDir(homeDir)).toBe(join(homeDir, '.claude', 'get-shit-done', 'templates'));
     expect(resolveLegacyWorkflowsDir(homeDir)).toBe(join(homeDir, '.claude', 'get-shit-done', 'workflows'));
+    expect(resolveLegacyUserProfilePath(homeDir)).toBe(join(homeDir, '.claude', 'get-shit-done', 'USER-PROFILE.md'));
     expect(resolveBundledTemplatesDir()).toBe(BUNDLED_GSD_TEMPLATES_DIR);
     expect(resolveBundledAgentsDir()).toBe(BUNDLED_GSD_AGENTS_DIR);
   });

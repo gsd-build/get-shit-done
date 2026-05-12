@@ -842,7 +842,24 @@ async function updateRoadmapAfterPhaseRemoval(
  * @returns QueryResult with { removed, directory_deleted, renamed_directories, renamed_files, roadmap_updated, state_updated }
  */
 export const phaseRemove: QueryHandler = async (args, projectDir, workstream) => {
-  const targetPhase = args[0];
+  let force = false;
+  const positional: string[] = [];
+  for (const token of args) {
+    if (token === '--force') {
+      force = true;
+      continue;
+    }
+    if (token.startsWith('--')) {
+      throw new GSDError(`phase remove does not support ${token}`, ErrorClassification.Validation);
+    }
+    positional.push(token);
+  }
+
+  if (positional.length > 1) {
+    throw new GSDError('phase remove accepts exactly one phase number', ErrorClassification.Validation);
+  }
+
+  const targetPhase = positional[0];
   if (!targetPhase) {
     throw new GSDError('phase number required for phase remove', ErrorClassification.Validation);
   }
@@ -857,15 +874,17 @@ export const phaseRemove: QueryHandler = async (args, projectDir, workstream) =>
 
   const normalized = normalizePhaseName(targetPhase);
   const isDecimal = targetPhase.includes('.');
-  const force = args[1] === '--force';
 
   // Find target directory
   const entries = await readdir(phasesDir, { withFileTypes: true });
   const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
   const targetDir = dirs.find(d => phaseTokenMatches(d, normalized)) ?? null;
+  if (!targetDir) {
+    throw new GSDError(`Phase ${targetPhase} not found`, ErrorClassification.Validation);
+  }
 
   // Guard against removing executed work
-  if (targetDir && !force) {
+  if (!force) {
     const files = await readdir(join(phasesDir, targetDir));
     const summaries = files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
     if (summaries.length > 0) {
@@ -877,9 +896,7 @@ export const phaseRemove: QueryHandler = async (args, projectDir, workstream) =>
   }
 
   // Delete directory
-  if (targetDir) {
-    await rm(join(phasesDir, targetDir), { recursive: true, force: true });
-  }
+  await rm(join(phasesDir, targetDir), { recursive: true, force: true });
 
   // Renumber subsequent phases on disk
   let renamedDirs: Array<{ from: string; to: string }> = [];

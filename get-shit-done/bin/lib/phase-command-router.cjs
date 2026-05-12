@@ -66,7 +66,25 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
         }
         phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
       },
-      remove: () => phase.cmdPhaseRemove(cwd, args[2], { force: args.includes('--force') }, raw),
+      remove: () => {
+        const removeArgs = args.slice(2).filter(token => token !== '--raw');
+        let forceFlag = false;
+        const positional = [];
+        for (const token of removeArgs) {
+          if (token === '--force') {
+            forceFlag = true;
+            continue;
+          }
+          if (token.startsWith('--')) {
+            error(`phase remove does not support ${token}`);
+          }
+          positional.push(token);
+        }
+        if (positional.length > 1) {
+          error('phase remove accepts exactly one phase number');
+        }
+        phase.cmdPhaseRemove(cwd, positional[0], { force: forceFlag }, raw);
+      },
       complete: () => phase.cmdPhaseComplete(cwd, args[2], raw),
     },
   });
