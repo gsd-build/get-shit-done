@@ -299,6 +299,7 @@
       "schema-detect.cjs",
       "secrets.cjs",
       "security.cjs",
+      "shell-command-projection.cjs",
       "state-command-router.cjs",
       "state-document.cjs",
       "state.cjs",
