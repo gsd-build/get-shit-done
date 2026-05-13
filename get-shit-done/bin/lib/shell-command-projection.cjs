@@ -358,12 +358,14 @@ function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
 
 function _spawnResult(result, program) {
   if (result.error && result.error.code === 'ENOENT') {
-    return { exitCode: 127, stdout: '', stderr: `${program}: not found` };
+    return { exitCode: 127, stdout: '', stderr: `${program}: not found`, signal: null, error: result.error };
   }
   return {
     exitCode: result.status ?? 1,
     stdout: (result.stdout ?? '').toString().trim(),
     stderr: (result.stderr ?? '').toString().trim(),
+    signal: result.signal ?? null,
+    error: result.error ?? null,
   };
 }
 

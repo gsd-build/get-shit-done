@@ -5,7 +5,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execSync, execFileSync, spawnSync } = require('child_process');
+const { execGit: execGitSeam } = require('./shell-command-projection.cjs');
 const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES, AGENT_DEFAULT_TIERS, VALID_AGENT_TIERS, nextTier } = require('./model-profiles.cjs');
 const { MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT } = require('./model-catalog.cjs');
 const {
@@ -593,23 +593,16 @@ const _gitIgnoredCache = new Map();
 function isGitIgnored(cwd, targetPath) {
   const key = cwd + '::' + targetPath;
   if (_gitIgnoredCache.has(key)) return _gitIgnoredCache.get(key);
-  try {
-    // --no-index checks .gitignore rules regardless of whether the file is tracked.
-    // Without it, git check-ignore returns "not ignored" for tracked files even when
-    // .gitignore explicitly lists them — a common source of confusion when .planning/
-    // was committed before being added to .gitignore.
-    // Use execFileSync (array args) to prevent shell interpretation of special characters
-    // in file paths — avoids command injection via crafted path names.
-    execFileSync('git', ['check-ignore', '-q', '--no-index', '--', targetPath], {
-      cwd,
-      stdio: 'pipe',
-    });
-    _gitIgnoredCache.set(key, true);
-    return true;
-  } catch {
-    _gitIgnoredCache.set(key, false);
-    return false;
-  }
+  // --no-index checks .gitignore rules regardless of whether the file is tracked.
+  // Without it, git check-ignore returns "not ignored" for tracked files even when
+  // .gitignore explicitly lists them — a common source of confusion when .planning/
+  // was committed before being added to .gitignore.
+  // Array args (via the seam) prevent shell interpretation of special characters in
+  // file paths — avoids command injection via crafted path names.
+  const result = execGitSeam(['check-ignore', '-q', '--no-index', '--', targetPath], { cwd });
+  const ignored = result.exitCode === 0;
+  _gitIgnoredCache.set(key, ignored);
+  return ignored;
 }
 
 // ─── Markdown normalization ─────────────────────────────────────────────────
@@ -731,30 +724,17 @@ const DEFAULT_GIT_TIMEOUT_MS = 10000;
 /**
  * Execute a git command with a bounded timeout.
  *
- * Return shape: { exitCode, stdout, stderr, timedOut, error }
- *   - timedOut: true when spawnSync reports SIGTERM + ETIMEDOUT — callers must
- *               branch on this to surface a structured warning (PRED.k302).
- *   - error:    spawnSync error object or null
+ * Thin adapter over the shell-projection seam's execGit. Adds the legacy
+ * `(cwd, args)` positional signature plus derived `timedOut` field that
+ * consumers (verify.cjs, worktree-safety.cjs) branch on for PRED.k302.
  *
- * Backward-compatible: existing callers that only read exitCode/stdout/stderr
- * continue to work unchanged.
+ * Return shape: { exitCode, stdout, stderr, timedOut, error, signal }
  */
 function execGit(cwd, args, options = {}) {
   const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
-  const result = spawnSync('git', args, {
-    cwd,
-    stdio: 'pipe',
-    encoding: 'utf-8',
-    timeout,
-  });
+  const result = execGitSeam(args, { cwd, timeout });
   const timedOut = result.signal === 'SIGTERM' && result.error?.code === 'ETIMEDOUT';
-  return {
-    exitCode: result.status ?? 1,
-    stdout: (result.stdout ?? '').toString().trim(),
-    stderr: (result.stderr ?? '').toString().trim(),
-    timedOut,
-    error: result.error ?? null,
-  };
+  return { ...result, timedOut };
 }
 
 // ─── Common path helpers ──────────────────────────────────────────────────────
