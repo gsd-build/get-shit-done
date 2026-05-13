@@ -77,7 +77,7 @@ function updateCurrentPositionFields(content: string, fields: Record<string, str
     posBody = posBody.replace(/^Plan:.*$/m, `Plan: ${fields.plan}`);
   }
 
-  return content.replace(posPattern, `${posMatch[1]}${posBody}`);
+  return content.replace(posPattern, () => `${posMatch[1]}${posBody}`);
 }
 
 /** Port of `readTextArgOrFile` from `state.cjs` — inline text or file path under project root. */
@@ -508,7 +508,7 @@ export const stateBeginPhase: QueryHandler = async (args, projectDir, workstream
         posBody = posBody.replace(/^Last activity:.*$/im, newActivity);
       }
 
-      content = content.replace(positionPattern, `${header}${posBody}`);
+      content = content.replace(positionPattern, () => `${header}${posBody}`);
       updated.push('Current Position');
     }
 

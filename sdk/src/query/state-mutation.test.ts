@@ -533,6 +533,21 @@ describe('stateBeginPhase', () => {
     const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     expect(content).toContain('Plan: 1 of 3');
   });
+
+  it('preserves literal dollar amounts in Current Position body', async () => {
+    const { stateBeginPhase } = await import('./state-mutation.js');
+    const withBudget = MINIMAL_STATE.replace(
+      'Last activity: 2026-04-08 -- Phase 10 execution started',
+      'Last activity: 2026-04-08 -- Phase 10 execution started\nBudget: $2,500 max test',
+    );
+    await setupTestProject(tmpDir, withBudget);
+
+    await stateBeginPhase(['11', 'State Mutations', '3'], tmpDir);
+
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(content).toContain('Budget: $2,500 max test');
+    expect((content.match(/^Budget:/gm) || []).length).toBe(1);
+  });
 });
 
 // ─── stateAdvancePlan ───────────────────────────────────────────────────────
@@ -556,6 +571,23 @@ describe('stateAdvancePlan', () => {
     const data = result.data as Record<string, unknown>;
     expect(data.advanced).toBe(true);
     expect(data.current_plan).toBe(3);
+  });
+
+  it('keeps literal dollar amounts stable after multiple updates', async () => {
+    const { stateAdvancePlan } = await import('./state-mutation.js');
+    const withBudget = MINIMAL_STATE.replace(
+      'Last activity: 2026-04-08 -- Phase 10 execution started',
+      'Last activity: 2026-04-08 -- Phase 10 execution started\nBudget: $2,500 max test',
+    ).replace('Plan: 2 of 3', 'Plan: 1 of 20');
+    await setupTestProject(tmpDir, withBudget);
+
+    for (let i = 0; i < 8; i += 1) {
+      await stateAdvancePlan([], tmpDir);
+    }
+
+    const content = await readFile(join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    expect(content).toContain('Budget: $2,500 max test');
+    expect((content.match(/^Budget:/gm) || []).length).toBe(1);
   });
 });
 

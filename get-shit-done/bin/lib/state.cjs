@@ -264,7 +264,7 @@ function updateCurrentPositionFields(content, fields) {
     posBody = posBody.replace(/^Plan:.*$/m, `Plan: ${fields.plan}`);
   }
 
-  return content.replace(posPattern, `${posMatch[1]}${posBody}`);
+  return content.replace(posPattern, () => `${posMatch[1]}${posBody}`);
 }
 
 function cmdStateAdvancePlan(cwd, raw) {
@@ -1171,7 +1171,7 @@ function cmdStateBeginPhase(cwd, phaseNumber, phaseName, planCount, raw) {
           posBody = posBody.replace(/^Last activity:.*$/im, newActivity);
         }
 
-        content = content.replace(positionPattern, `${header}${posBody}`);
+        content = content.replace(positionPattern, () => `${header}${posBody}`);
         updated.push('Current Position');
       }
     } else {
@@ -1185,7 +1185,7 @@ function cmdStateBeginPhase(cwd, phaseNumber, phaseName, planCount, raw) {
         const resumeActivity = `Last activity: ${today} -- Phase ${phaseNumber} execution resumed (wave continue)`;
         if (/^Last activity:/im.test(posBody)) {
           posBody = posBody.replace(/^Last activity:.*$/im, resumeActivity);
-          content = content.replace(positionPattern, `${header}${posBody}`);
+          content = content.replace(positionPattern, () => `${header}${posBody}`);
           updated.push('Last activity (resume)');
         }
       }
@@ -1278,7 +1278,7 @@ function updatePerformanceMetricsSection(content, cwd, phaseNum, planCount, summ
       tableBody = tableBody ? tableBody + '\n' + newRow : newRow;
     }
 
-    content = content.replace(byPhaseTablePattern, `$1${tableBody}\n`);
+    content = content.replace(byPhaseTablePattern, (_match, tableHeader) => `${tableHeader}${tableBody}\n`);
   }
 
   return content;
@@ -1852,7 +1852,7 @@ function cmdStateCompletePhase(cwd, raw, overridePhase) {
         posBody = posBody.replace(/^Last activity:.*$/im, newActivity);
       }
 
-      content = content.replace(positionPattern, `${header}${posBody}`);
+      content = content.replace(positionPattern, () => `${header}${posBody}`);
       updated.push('Current Position');
     }
 
