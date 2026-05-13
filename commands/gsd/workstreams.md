@@ -4,7 +4,7 @@ description: Manage parallel workstreams — list, create, switch, status, progr
 allowed-tools:
   - Read
   - Bash
-requires: [phase, progress]
+requires: [new-milestone, phase, progress, resume-work]
 ---
 
 # /gsd:workstreams

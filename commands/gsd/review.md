@@ -8,7 +8,7 @@ allowed-tools:
   - Bash
   - Glob
   - Grep
-requires: [config, phase]
+requires: [config, phase, plan-phase]
 ---
 
 <objective>

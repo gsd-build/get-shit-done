@@ -14,6 +14,7 @@ allowed-tools:
   - WebFetch
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
+requires: [new-project]
 ---
 <objective>
 Spike an idea through experiential exploration — build focused experiments to feel the pieces

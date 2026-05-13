@@ -9,7 +9,7 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
-requires: [config]
+requires: [config, quick]
 ---
 
 <objective>

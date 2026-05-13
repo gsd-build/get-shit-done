@@ -7,7 +7,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
-requires: [phase, stats, update]
+requires: [audit-milestone, discuss-phase, execute-phase, new-milestone, phase, plan-phase, stats, update]
 ---
 
 <objective>
