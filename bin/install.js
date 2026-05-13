@@ -6717,7 +6717,7 @@ function uninstall(isGlobal, runtime = 'claude') {
         const before = JSON.stringify(settings.hooks[eventName]);
         settings.hooks[eventName] = settings.hooks[eventName]
           .map(entry => {
-            if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
+            if (!entry || typeof entry !== 'object' || !Array.isArray(entry.hooks)) return entry;
             // Filter out individual GSD hooks, keep user hooks
             entry.hooks = entry.hooks.filter((h) => {
               if (!h || typeof h.command !== 'string') return true;

@@ -21,7 +21,7 @@ This ADR also captures where Shell Command Projection Module policy should be co
 1. Unify managed-hook ownership classification used by install/uninstall/migration hook config rewrites.
 2. Unify atomic write behavior currently duplicated in installer/core/migration paths.
 3. Unify lock-file lifecycle policy used by planning workspace and installer migration journal flows.
-4. Expose typed file mutation plan IR for tests (`write-json`, `rewrite-toml`, `delete-file`, `backup-file`, `restore-file`, `ensure-dir`).
+4. Expose typed file mutation plan IR for tests (`rewrite-json`, `rewrite-text` with format (`toml`/`markdown`/`plain`), `delete-file`, `backup-file`, `restore-file`, `ensure-dir`).
 
 ## Migration Inventory
 
