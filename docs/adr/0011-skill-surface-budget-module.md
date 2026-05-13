@@ -49,7 +49,13 @@ Phase 1 artifacts landed on `feat/3408-skills-description-dropped-due-to-size`:
 - `bin/install.js` — `--profile=<name>` flag (composable); `--minimal`/`--core-only` as aliases; `.gsd-profile` marker write on install; `gsd update` re-reads marker
 - Tests: `tests/install-profiles-manifest.test.cjs`, `tests/install-profiles-marker.test.cjs`, `tests/install-profiles-resolve.test.cjs`, `tests/install-profiles-stage.test.cjs`, `tests/lint-skill-deps.test.cjs`
 
-Phase 2 in progress: `/gsd:surface` command, `get-shit-done/bin/lib/surface.cjs` engine, `get-shit-done/bin/lib/clusters.cjs`, runtime surface state, `tests/surface-*.test.cjs`.
+Phase 2 shipped on the same branch:
+
+- `commands/gsd/surface.md` — `/gsd:surface` slash command runbook (sub-commands: `list`, `status`, `profile <name>`, `disable <cluster>`, `enable <cluster>`, `reset`)
+- `get-shit-done/bin/lib/surface.cjs` — runtime engine (`readSurface`, `writeSurface`, `resolveSurface`, `applySurface`, `listSurface`); reuses `stageSkillsForProfile` / `stageAgentsForProfile` from Phase 1
+- `get-shit-done/bin/lib/clusters.cjs` — 10-cluster taxonomy covering all installed skill stems
+- Tests: `tests/surface-state.test.cjs`, `tests/surface-clusters.test.cjs`, `tests/surface-resolve.test.cjs`, `tests/surface-apply.test.cjs`, `tests/surface-list.test.cjs`
+- Persistent surface state: `<runtimeConfigDir>/.gsd-surface.json` (independent from `.gsd-profile`)
 
 ## Open questions
 

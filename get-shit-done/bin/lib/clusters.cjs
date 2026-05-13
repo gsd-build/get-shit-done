@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Skill cluster definitions for the runtime surface module (ADR-0010 Phase 2).
+ * Skill cluster definitions for the runtime surface module (ADR-0011 Phase 2).
  *
  * Each cluster is a named group of skill stems. Clusters are used by /gsd:surface
  * to enable/disable a cohesive group of skills without reinstall.

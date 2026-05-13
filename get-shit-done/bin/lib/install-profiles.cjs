@@ -543,7 +543,7 @@ function stageSkillsForMode(srcDir, mode) {
 // ---------------------------------------------------------------------------
 
 module.exports = {
-  // New profile API (ADR-0010)
+  // New profile API (ADR-0011)
   PROFILES,
   PROFILE_RANK,
   loadSkillsManifest,

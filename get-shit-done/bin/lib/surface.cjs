@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Runtime surface module — ADR-0010 Phase 2 (Option B).
+ * Runtime surface module — ADR-0011 Phase 2 (Option B).
  *
  * Manages the runtime enable/disable surface state (`~/.claude/skills/.gsd-surface.json`)
  * independently of the install-time profile marker (`.gsd-profile`).
