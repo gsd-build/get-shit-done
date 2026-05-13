@@ -3,8 +3,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { execGit } = require('./shell-command-projection.cjs');
-const { safeReadFile, loadConfig, isGitIgnored, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
+const { execGit, platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
+const { loadConfig, isGitIgnored, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
 const { planningDir, planningPaths } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { MODEL_PROFILES } = require('./model-profiles.cjs');
@@ -23,7 +23,7 @@ function determinePhaseStatus(plans, summaries, phaseDir, defaultPending) {
     const files = fs.readdirSync(phaseDir);
     const verificationFile = files.find(f => f === 'VERIFICATION.md' || f.endsWith('-VERIFICATION.md'));
     if (verificationFile) {
-      const content = fs.readFileSync(path.join(phaseDir, verificationFile), 'utf-8');
+      const content = platformReadSync(path.join(phaseDir, verificationFile)) || '';
       if (/status:\s*passed/i.test(content)) return 'Complete';
       if (/status:\s*human_needed/i.test(content)) return 'Needs Review';
       if (/status:\s*gaps_found/i.test(content)) return 'Executed';
@@ -81,26 +81,25 @@ function cmdListTodos(cwd, area, raw) {
     const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
 
     for (const file of files) {
-      try {
-        const content = fs.readFileSync(path.join(pendingDir, file), 'utf-8');
-        const createdMatch = content.match(/^created:\s*(.+)$/m);
-        const titleMatch = content.match(/^title:\s*(.+)$/m);
-        const areaMatch = content.match(/^area:\s*(.+)$/m);
+      const content = platformReadSync(path.join(pendingDir, file));
+      if (content === null) continue;
+      const createdMatch = content.match(/^created:\s*(.+)$/m);
+      const titleMatch = content.match(/^title:\s*(.+)$/m);
+      const areaMatch = content.match(/^area:\s*(.+)$/m);
 
-        const todoArea = areaMatch ? areaMatch[1].trim() : 'general';
+      const todoArea = areaMatch ? areaMatch[1].trim() : 'general';
 
-        // Apply area filter if specified
-        if (area && todoArea !== area) continue;
+      // Apply area filter if specified
+      if (area && todoArea !== area) continue;
 
-        count++;
-        todos.push({
-          file,
-          created: createdMatch ? createdMatch[1].trim() : 'unknown',
-          title: titleMatch ? titleMatch[1].trim() : 'Untitled',
-          area: todoArea,
-          path: toPosixPath(path.relative(cwd, path.join(pendingDir, file))),
-        });
-      } catch { /* intentionally empty */ }
+      count++;
+      todos.push({
+        file,
+        created: createdMatch ? createdMatch[1].trim() : 'unknown',
+        title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+        area: todoArea,
+        path: toPosixPath(path.relative(cwd, path.join(pendingDir, file))),
+      });
     }
   } catch { /* intentionally empty */ }
 
@@ -168,8 +167,9 @@ function cmdHistoryDigest(cwd, raw) {
       const summaries = fs.readdirSync(dirPath).filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
 
       for (const summary of summaries) {
+        const content = platformReadSync(path.join(dirPath, summary));
+        if (content === null) continue;
         try {
-          const content = fs.readFileSync(path.join(dirPath, summary), 'utf-8');
           const fm = extractFrontmatter(content);
 
           const phaseNum = fm.phase || dir.split('-')[0];
@@ -625,21 +625,20 @@ function cmdTodoMatchPhase(cwd, phase, raw) {
   try {
     const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
     for (const file of files) {
-      try {
-        const content = fs.readFileSync(path.join(pendingDir, file), 'utf-8');
-        const titleMatch = content.match(/^title:\s*(.+)$/m);
-        const areaMatch = content.match(/^area:\s*(.+)$/m);
-        const filesMatch = content.match(/^files:\s*(.+)$/m);
-        const body = content.replace(/^(title|area|files|created|priority):.*$/gm, '').trim();
+      const content = platformReadSync(path.join(pendingDir, file));
+      if (content === null) continue;
+      const titleMatch = content.match(/^title:\s*(.+)$/m);
+      const areaMatch = content.match(/^area:\s*(.+)$/m);
+      const filesMatch = content.match(/^files:\s*(.+)$/m);
+      const body = content.replace(/^(title|area|files|created|priority):.*$/gm, '').trim();
 
-        todos.push({
-          file,
-          title: titleMatch ? titleMatch[1].trim() : 'Untitled',
-          area: areaMatch ? areaMatch[1].trim() : 'general',
-          files: filesMatch ? filesMatch[1].trim().split(/[,\s]+/).filter(Boolean) : [],
-          body: body.slice(0, 200), // first 200 chars for context
-        });
-      } catch {}
+      todos.push({
+        file,
+        title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+        area: areaMatch ? areaMatch[1].trim() : 'general',
+        files: filesMatch ? filesMatch[1].trim().split(/[,\s]+/).filter(Boolean) : [],
+        body: body.slice(0, 200), // first 200 chars for context
+      });
     }
   } catch {}
 
@@ -671,13 +670,12 @@ function cmdTodoMatchPhase(cwd, phase, raw) {
       const phaseDir = path.join(cwd, phaseInfoDisk.directory);
       const planFiles = fs.readdirSync(phaseDir).filter(f => f.endsWith('-PLAN.md'));
       for (const pf of planFiles) {
-        try {
-          const planContent = fs.readFileSync(path.join(phaseDir, pf), 'utf-8');
-          const fmFiles = planContent.match(/files_modified:\s*\[([^\]]*)\]/);
-          if (fmFiles) {
-            phasePlans.push(...fmFiles[1].split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean));
-          }
-        } catch {}
+        const planContent = platformReadSync(path.join(phaseDir, pf));
+        if (planContent === null) continue;
+        const fmFiles = planContent.match(/files_modified:\s*\[([^\]]*)\]/);
+        if (fmFiles) {
+          phasePlans.push(...fmFiles[1].split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean));
+        }
       }
     } catch {}
   }
@@ -748,14 +746,14 @@ function cmdTodoComplete(cwd, filename, raw) {
   }
 
   // Ensure completed directory exists
-  fs.mkdirSync(completedDir, { recursive: true });
+  platformEnsureDir(completedDir);
 
   // Read, add completion timestamp, move
   let content = fs.readFileSync(sourcePath, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
   content = `completed: ${today}\n` + content;
 
-  fs.writeFileSync(path.join(completedDir, filename), content, 'utf-8');
+  platformWriteSync(path.join(completedDir, filename), content);
   fs.unlinkSync(sourcePath);
 
   output({ completed: true, file: filename, date: today }, raw, 'completed');
@@ -803,9 +801,9 @@ function cmdScaffold(cwd, type, options, raw) {
       const scaffoldPrefix = scaffoldProjectCode ? `${scaffoldProjectCode}-` : '';
       const dirName = `${scaffoldPrefix}${padded}-${slug}`;
       const phasesParent = planningPaths(cwd).phases;
-      fs.mkdirSync(phasesParent, { recursive: true });
+      platformEnsureDir(phasesParent);
       const dirPath = path.join(phasesParent, dirName);
-      fs.mkdirSync(dirPath, { recursive: true });
+      platformEnsureDir(dirPath);
       output({ created: true, directory: toPosixPath(path.relative(cwd, dirPath)), path: dirPath }, raw, dirPath);
       return;
     }
@@ -818,7 +816,7 @@ function cmdScaffold(cwd, type, options, raw) {
     return;
   }
 
-  fs.writeFileSync(filePath, content, 'utf-8');
+  platformWriteSync(filePath, content);
   const relPath = toPosixPath(path.relative(cwd, filePath));
   output({ created: true, path: relPath }, raw, relPath);
 }
@@ -837,7 +835,9 @@ function cmdStats(cwd, format, raw) {
   let totalSummaries = 0;
 
   try {
-    const roadmapContent = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
+    const roadmapRaw = platformReadSync(roadmapPath);
+    if (roadmapRaw === null) throw new Error('roadmap missing');
+    const roadmapContent = extractCurrentMilestone(roadmapRaw, cwd);
     const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
     let match;
     while ((match = headingPattern.exec(roadmapContent)) !== null) {
@@ -893,28 +893,24 @@ function cmdStats(cwd, format, raw) {
   // Requirements stats
   let requirementsTotal = 0;
   let requirementsComplete = 0;
-  try {
-    if (fs.existsSync(reqPath)) {
-      const reqContent = fs.readFileSync(reqPath, 'utf-8');
-      const checked = reqContent.match(/^- \[x\] \*\*/gm);
-      const unchecked = reqContent.match(/^- \[ \] \*\*/gm);
-      requirementsComplete = checked ? checked.length : 0;
-      requirementsTotal = requirementsComplete + (unchecked ? unchecked.length : 0);
-    }
-  } catch { /* intentionally empty */ }
+  const reqContent = platformReadSync(reqPath);
+  if (reqContent !== null) {
+    const checked = reqContent.match(/^- \[x\] \*\*/gm);
+    const unchecked = reqContent.match(/^- \[ \] \*\*/gm);
+    requirementsComplete = checked ? checked.length : 0;
+    requirementsTotal = requirementsComplete + (unchecked ? unchecked.length : 0);
+  }
 
   // Last activity from STATE.md
   let lastActivity = null;
-  try {
-    if (fs.existsSync(statePath)) {
-      const stateContent = fs.readFileSync(statePath, 'utf-8');
-      const activityMatch = stateContent.match(/^last_activity:\s*(.+)$/im)
-        || stateContent.match(/\*\*Last Activity:\*\*\s*(.+)/i)
-        || stateContent.match(/^Last Activity:\s*(.+)$/im)
-        || stateContent.match(/^Last activity:\s*(.+)$/im);
-      if (activityMatch) lastActivity = activityMatch[1].trim();
-    }
-  } catch { /* intentionally empty */ }
+  const stateContent = platformReadSync(statePath);
+  if (stateContent !== null) {
+    const activityMatch = stateContent.match(/^last_activity:\s*(.+)$/im)
+      || stateContent.match(/\*\*Last Activity:\*\*\s*(.+)/i)
+      || stateContent.match(/^Last Activity:\s*(.+)$/im)
+      || stateContent.match(/^Last activity:\s*(.+)$/im);
+    if (activityMatch) lastActivity = activityMatch[1].trim();
+  }
 
   // Git stats
   let gitCommits = 0;
