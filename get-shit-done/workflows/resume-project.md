@@ -66,8 +66,13 @@ Look for incomplete work that needs attention:
 # Check for structured handoff (preferred — machine-readable)
 cat .planning/HANDOFF.json 2>/dev/null || true
 
-# Check for continue-here files (mid-plan resumption)
-ls .planning/phases/*/.continue-here*.md 2>/dev/null || true
+# Check for continue-here files (phase + non-phase + legacy fallback)
+ls .planning/phases/*/.continue-here*.md \
+   .planning/spikes/*/.continue-here*.md \
+   .planning/sketches/*/.continue-here*.md \
+   .planning/deliberations/.continue-here*.md \
+   .planning/.continue-here*.md \
+   .continue-here*.md 2>/dev/null || true
 
 # Check for plans without summaries (incomplete execution)
 for plan in .planning/phases/*/*-PLAN.md; do
@@ -93,7 +98,7 @@ fi
 - Flag: "Found structured handoff — resuming from task {task}/{total_tasks}"
 - **After successful resumption, delete HANDOFF.json** (it's a one-shot artifact)
 
-**If .continue-here file exists (fallback):**
+**If .continue-here file exists (phase/non-phase/legacy fallback):**
 
 - This is a mid-plan resumption point
 - Read the file for specific resumption context
