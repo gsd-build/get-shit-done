@@ -1,6 +1,6 @@
 /**
  * Skill Surface Budget Module — single source of truth for which skills/agents
- * are written to the runtime config dirs (ADR-0010).
+ * are written to the runtime config dirs (ADR-0011).
  *
  * Background: every installed `gsd-*` skill costs eager system-prompt tokens
  * because runtimes (Claude Code, opencode, etc.) enumerate skill descriptions
@@ -8,12 +8,26 @@
  * consumes ~60% of the default 1%-of-context skill-listing budget, causing
  * dropped skills when users stack multiple plugins (#3408).
  *
+ * Profile model: three named profiles replace the old minimal/full binary:
+ *  - core     — six skills covering the main project loop
+ *  - standard — core + phase management and workspace skills
+ *  - full     — all skills (previous default, '*' sentinel)
+ * Profiles compose: --profile=core,audit resolves to union(closure(core), closure(audit)).
+ * Back-compat aliases: --minimal / --core-only both map to --profile=core.
+ *
  * This module owns:
  *  - PROFILES map: named profile → base skill set (or '*' sentinel for full)
  *  - loadSkillsManifest: parse requires: frontmatter from commands/gsd/*.md
  *  - resolveProfile: compute transitive closure of profile base over manifest
  *  - stageSkillsForProfile / stageAgentsForProfile: filesystem staging
- *  - readActiveProfile / writeActiveProfile: profile marker persistence
+ *  - readActiveProfile / writeActiveProfile: .gsd-profile marker persistence
+ *  - resolveEffectiveProfile: explicit flag > .gsd-profile marker > full
+ *  - mostRestrictiveProfile: resolve multi-runtime disagreement to smallest set
+ *
+ * Companion module (Phase 2): get-shit-done/bin/lib/surface.cjs owns the
+ * runtime /gsd:surface command. It reuses stageSkillsForProfile and
+ * stageAgentsForProfile from this module for cluster-level enable/disable
+ * without reinstall, persisting state in <runtimeConfigDir>/.gsd-surface.json.
  *
  * Legacy back-compat exports (deprecated, kept for existing callers):
  *  - MINIMAL_SKILL_ALLOWLIST — derived from PROFILES.core
