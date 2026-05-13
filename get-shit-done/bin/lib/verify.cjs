@@ -70,7 +70,7 @@ function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   if (hashes.length > 0) {
     for (const hash of hashes.slice(0, 3)) {
       const result = execGit(['cat-file', '-t', hash], { cwd });
-      if (result.exitCode === 0 && result.stdout === 'commit') {
+      if (result.exitCode === 0 && result.stdout.trim() === 'commit') {
         commitsExist = true;
         break;
       }

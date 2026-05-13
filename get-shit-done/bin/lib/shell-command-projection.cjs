@@ -376,10 +376,11 @@ function execGit(args, opts = {}) {
   // Non-interactive defaults: a hung credential prompt or terminal-input
   // probe must surface as a timeout, not block the tool forever. Callers
   // can override via opts.env.
-  const env = opts.env ?? {
+  const env = {
     ...process.env,
     GIT_TERMINAL_PROMPT: '0',
     GCM_INTERACTIVE: 'never',
+    ...(opts.env || {}),
   };
   const result = childProcess.spawnSync('git', args, {
     cwd: opts.cwd,
@@ -405,7 +406,7 @@ function execNpm(args, opts = {}) {
 function execTool(program, args, opts = {}) {
   const result = childProcess.spawnSync(program, args, {
     cwd: opts.cwd,
-    env: opts.env,
+    env: opts.env ? { ...process.env, ...opts.env } : undefined,
     encoding: 'utf-8',
     stdio: 'pipe',
     timeout: opts.timeout ?? 30_000,

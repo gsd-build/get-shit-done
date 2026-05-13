@@ -412,7 +412,7 @@ function executeWorktreeWaveCleanupPlan(plan, deps = {}) {
     };
 
     const branchCheck = execGit(['-C', entry.worktree_path, 'rev-parse', '--abbrev-ref', 'HEAD'], { cwd: plan.repoRoot });
-    if (!gitResultOk(branchCheck) || branchCheck.stdout !== entry.branch) {
+    if (!gitResultOk(branchCheck) || branchCheck.stdout.trim() !== entry.branch) {
       result.status = 'blocked';
       result.reason = 'branch_mismatch';
       result.stderr = branchCheck?.stderr || '';
@@ -423,7 +423,7 @@ function executeWorktreeWaveCleanupPlan(plan, deps = {}) {
     }
 
     const mergeBase = execGit(['merge-base', 'HEAD', entry.branch], { cwd: plan.repoRoot });
-    if (!gitResultOk(mergeBase) || mergeBase.stdout !== entry.expected_base) {
+    if (!gitResultOk(mergeBase) || mergeBase.stdout.trim() !== entry.expected_base) {
       result.status = 'blocked';
       result.reason = 'base_mismatch';
       result.stderr = mergeBase?.stderr || '';

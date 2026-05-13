@@ -46,7 +46,13 @@ function checkLatestVersion(opts = {}) {
   // Bounded at 15s so a hung registry doesn't block /gsd-update (#2993 CR).
   const defaultSpawn = () => {
     const r = execNpm(['view', PACKAGE_NAME, 'version'], { timeout: 15_000 });
-    return { status: r.exitCode, stdout: r.stdout, stderr: r.stderr };
+    return {
+      status: r.exitCode,
+      stdout: r.stdout,
+      stderr: r.stderr,
+      signal: r.signal,
+      error: r.error,
+    };
   };
   const spawn = opts.spawn || defaultSpawn;
 

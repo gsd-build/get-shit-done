@@ -343,8 +343,13 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
       output(result, raw, 'nothing');
       return;
     }
-    const result = { committed: false, hash: null, reason: 'nothing_to_commit', error: commitResult.stderr };
-    output(result, raw, 'nothing');
+    const result = {
+      committed: false,
+      hash: null,
+      reason: 'commit_failed',
+      error: commitResult.stderr || commitResult.stdout,
+    };
+    output(result, raw, 'failed');
     return;
   }
 
