@@ -145,8 +145,8 @@ const _profileArgRaw = (() => {
 // 3. neither → 'full' (default, back-compat)
 // Note: when re-running as `gsd update` the marker is read later (after
 // configDir is resolved) and may override 'full' — see writeActiveProfile call below.
-const _requestedProfileName = hasMinimal ? 'core' : (_profileArgRaw || null);
-const installMode = hasMinimal ? 'minimal' : 'full';
+const _profileIsCore = _profileArgRaw === 'core';
+const _requestedProfileName = (hasMinimal || _profileIsCore) ? 'core' : (_profileArgRaw || null);
 const hasSdk = args.includes('--sdk');
 const hasNoSdk = args.includes('--no-sdk');
 
@@ -7630,11 +7630,13 @@ function install(isGlobal, runtime = 'claude', options = {}) {
         requestedProfileName: _requestedProfileName,
         targetDir,
       });
+  const _isCoreProfileAlias = _activeProfileName === 'core';
+  const _effectiveInstallMode = _isCoreProfileAlias ? 'minimal' : 'full';
   // Load the manifest and compute resolved profile for named profiles.
   // --minimal keeps its own staging path via _stageSkillsFn (see below).
   const _commandsDir = path.join(src, 'commands', 'gsd');
-  const _skillsManifest = hasMinimal ? new Map() : loadSkillsManifest(_commandsDir);
-  const _resolvedProfile = hasMinimal
+  const _skillsManifest = _isCoreProfileAlias ? new Map() : loadSkillsManifest(_commandsDir);
+  const _resolvedProfile = _isCoreProfileAlias
     ? null  // --minimal uses stageSkillsForMode at dispatch sites
     : resolveProfile({
         modes: [_activeProfileName],
@@ -7643,13 +7645,20 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // Unified staging function: for --minimal uses stageSkillsForMode (back-compat);
   // for named profiles uses stageSkillsForProfile (new API with transitive closure).
   function _stageSkills(commandsGsdDir) {
-    if (hasMinimal) return stageSkillsForMode(commandsGsdDir, installMode);
+    if (_isCoreProfileAlias) return stageSkillsForMode(commandsGsdDir, _effectiveInstallMode);
     return stageSkillsForProfile(commandsGsdDir, _resolvedProfile);
   }
   function _stageAgents(agentsDir) {
-    if (hasMinimal) return agentsDir;
+    if (_isCoreProfileAlias) return agentsDir;
     return stageAgentsForProfile(agentsDir, _resolvedProfile);
   }
+  const persistActiveProfileMarker = () => {
+    try {
+      writeActiveProfile(targetDir, _activeProfileName);
+    } catch {
+      // Non-fatal: marker persistence failure doesn't break the install.
+    }
+  };
 
   const resolvedTarget = path.resolve(targetDir).replace(/\\/g, '/');
   const homeDir = os.homedir().replace(/\\/g, '/');
@@ -7734,7 +7743,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // Map<filename, Buffer> — content snapshot of each pre-existing gsd-* agent file.
   const codexPreInstallAgentContents = new Map();
   let codexPreInstallVersionBytes = null;
-  if (isCodex && !isMinimalMode(installMode)) {
+  if (isCodex && !isMinimalMode(_effectiveInstallMode)) {
     const _preSkillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(_preSkillsDir)) {
       for (const entry of fs.readdirSync(_preSkillsDir, { withFileTypes: true })) {
@@ -7788,7 +7797,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // atomic-write temp files. It is safe to call before any writes have happened.
   // The full restoreCodexSnapshot() (defined inside the config block) additionally
   // handles config.toml, which is not yet touched at this point in the pipeline.
-  const _codexPreConfigRollback = !isCodex || isMinimalMode(installMode) ? null : () => {
+  const _codexPreConfigRollback = !isCodex || isMinimalMode(_effectiveInstallMode) ? null : () => {
     rollbackInstallerMigrations();
     // skills/gsd-* — pass 1: restore snapshot entries (may be absent if deleted mid-install).
     const _earlySkillsDir = path.join(targetDir, 'skills');
@@ -8252,7 +8261,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   }
 
-  if (isMinimalMode(installMode)) {
+  if (isMinimalMode(_effectiveInstallMode)) {
     // Codex registers agents in `config.toml` via `[agents.gsd-*]` sections.
     // Without stripping them here, a full → minimal reinstall would leave the
     // runtime advertising the old full agent surface even though the agent
@@ -8453,17 +8462,8 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   }
 
   // Write file manifest for future modification detection
-  writeManifest(targetDir, runtime, { mode: installMode });
+  writeManifest(targetDir, runtime, { mode: _effectiveInstallMode });
   console.log(`  ${green}✓${reset} Wrote file manifest (${MANIFEST_NAME})`);
-
-  // Persist the active profile marker so `gsd update` can re-apply it.
-  // _activeProfileName is already computed above via resolveEffectiveProfile():
-  //   explicit --profile= flag > existing marker > 'full' default.
-  try {
-    writeActiveProfile(targetDir, _activeProfileName);
-  } catch {
-    // Non-fatal: marker persistence failure doesn't break the install.
-  }
 
   // Report any backed-up local patches
   reportLocalPatches(targetDir, runtime);
@@ -8534,7 +8534,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     throw _earlyInstallErr;
   }
 
-  if (isCodex && !isMinimalMode(installMode)) {
+  if (isCodex && !isMinimalMode(_effectiveInstallMode)) {
     // Capture pre-install snapshot of config.toml before ANY GSD mutation
     // (#2760 fix 3). On post-write schema-validation failure OR any throw
     // during the mutation sequence (write failure, merge throw, etc.) we
@@ -8674,7 +8674,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     };
 
     let agentCount = 0;
-    if (!isMinimalMode(installMode)) {
+    if (!isMinimalMode(_effectiveInstallMode)) {
       try {
         // Generate Codex config.toml and per-agent .toml files.
         agentCount = installCodexConfig(targetDir, agentsSrc);
@@ -8853,6 +8853,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       throw wrapped;
     }
 
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
@@ -8866,21 +8867,25 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       console.log(`  ${green}✓${reset} Generated copilot-instructions.md`);
     }
     // Copilot: no settings.json, no hooks, no statusline (like Codex)
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isCursor) {
     // Cursor uses skills — no config.toml, no settings.json hooks needed
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isWindsurf) {
     // Windsurf uses skills — no config.toml, no settings.json hooks needed
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isTrae) {
     // Trae uses skills — no settings.json hooks needed
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
@@ -8901,6 +8906,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     ].join('\n') + '\n';
     fs.writeFileSync(clinerulesDest, clinerules);
     console.log(`  ${green}✓${reset} Wrote .clinerules`);
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
@@ -8911,6 +8917,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const rawSettings = readSettings(settingsPath);
   if (rawSettings === null) {
     console.log('  ' + yellow + 'i' + reset + '  Skipping settings.json configuration — file could not be parsed (comments or malformed JSON). Your existing settings are preserved.');
+    persistActiveProfileMarker();
     return;
   }
   const settings = validateHookFields(cleanupOrphanedHooks(rawSettings));
@@ -9274,6 +9281,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       ? buildHookCommand(targetDir, 'gsd-update-banner.js', hookOpts)
       : localCmd('gsd-update-banner.js'));
 
+  persistActiveProfileMarker();
   return {
     settingsPath,
     settings,
