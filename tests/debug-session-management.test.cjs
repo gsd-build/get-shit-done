@@ -161,8 +161,10 @@ describe('debug skill dispatch and sub-orchestrator (#2148, #2151)', () => {
 
   test('gsd-debug-session-manager agent exists with correct tools', () => {
     const content = fs.readFileSync(path.join(process.cwd(), 'agents', 'gsd-debug-session-manager.md'), 'utf8');
-    assert.ok(content.includes('Task'), 'gsd-debug-session-manager missing Task tool');
+    assert.ok(content.includes('Agent'), 'gsd-debug-session-manager missing Agent tool');
     assert.ok(content.includes('AskUserQuestion'), 'gsd-debug-session-manager missing AskUserQuestion tool');
+    assert.ok(content.includes('Agent('), 'gsd-debug-session-manager must dispatch with Agent(');
+    assert.ok(!content.includes('\nTask('), 'gsd-debug-session-manager must not dispatch with Task(');
   });
 
   test('gsd-debug-session-manager uses DATA_START/DATA_END for checkpoint responses', () => {

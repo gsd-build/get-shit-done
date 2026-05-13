@@ -2621,5 +2621,120 @@ describe('state complete-phase: decorated Phase fallback (#2761 nitpick)', () =>
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bug #3454 — literal $N in Current Position body must not trigger backrefs
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug #3454: state Current Position replacement preserves literal dollar amounts', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  function currentPositionBody(content) {
+    const m = content.match(/## Current Position\s*\n([\s\S]*?)(?=\n##|$)/i);
+    assert.ok(m, 'Current Position section should exist');
+    return m[1];
+  }
+
+  function assertLiteralDollarLinePreserved(posBody) {
+    const matches = posBody.match(/Budget: \$2,500 max test/g) || [];
+    assert.strictEqual(matches.length, 1, `Budget line should appear exactly once:\n${posBody}`);
+    assert.ok(!posBody.includes('Budget: Phase:'), `Budget line must not embed the whole section:\n${posBody}`);
+    assert.ok(!posBody.includes('\n,500 max test'), `Backreference artifact must not appear:\n${posBody}`);
+  }
+
+  test('advance-plan preserves literal "$2,500" line in Current Position', () => {
+    const stateMd = [
+      '# Project State',
+      '',
+      '**Current Plan:** 1',
+      '**Total Plans in Phase:** 3',
+      '**Status:** Executing',
+      '**Last Activity:** 2024-01-10',
+      '',
+      '## Current Position',
+      'Phase: 1 of 5 (setup)',
+      'Plan: 1 of 3 in current phase',
+      'Status: Executing',
+      'Budget: $2,500 max test',
+      'Last activity: 2026-03-20 -- Something',
+      'Progress: [..........] 0%',
+      '',
+      '## Session Continuity',
+      '',
+      'Last session: 2026-03-20',
+    ].join('\n') + '\n';
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assertLiteralDollarLinePreserved(currentPositionBody(updated));
+  });
+
+  test('begin-phase preserves literal "$2,500" line in Current Position', () => {
+    const stateMd = [
+      '# Project State',
+      '',
+      '**Current Phase:** 1',
+      '**Current Phase Name:** setup',
+      '**Total Phases:** 5',
+      '**Current Plan:** 0',
+      '**Total Plans in Phase:** 0',
+      '**Status:** Ready to plan',
+      '**Last Activity:** 2026-03-20',
+      '',
+      '## Current Position',
+      'Phase: 1 of 5 (setup)',
+      'Plan: 0 of ? in current phase',
+      'Status: Ready to plan',
+      'Budget: $2,500 max test',
+      'Last activity: 2026-03-20 -- Roadmap created',
+      'Progress: [..........] 0%',
+      '',
+    ].join('\n') + '\n';
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools(['state', 'begin-phase', '--phase', '1', '--name', 'setup', '--plans', '4'], tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assertLiteralDollarLinePreserved(currentPositionBody(updated));
+  });
+
+  test('complete-phase preserves literal "$2,500" line in Current Position', () => {
+    const stateMd = [
+      '# State',
+      '',
+      '**Status:** Executing',
+      '**Current Phase:** 03',
+      '**Last Activity:** 2024-01-15',
+      '',
+      '## Current Position',
+      '',
+      'Phase: 03 — EXECUTING',
+      'Plan: 03-01',
+      'Status: Executing',
+      'Budget: $2,500 max test',
+      'Last activity: 2024-01-15 -- Running phase',
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), stateMd);
+
+    const result = runGsdTools('state complete-phase', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assertLiteralDollarLinePreserved(currentPositionBody(updated));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // summary-extract command
 // ─────────────────────────────────────────────────────────────────────────────
