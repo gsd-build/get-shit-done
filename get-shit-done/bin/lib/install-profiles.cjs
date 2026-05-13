@@ -1,45 +1,200 @@
 /**
- * Install profiles — single source of truth for which skills/agents
- * are written to the runtime config dirs.
+ * Skill Surface Budget Module — single source of truth for which skills/agents
+ * are written to the runtime config dirs (ADR-0010).
  *
- * Background: every installed `gsd-*` skill costs eager system-prompt
- * tokens because runtimes (Claude Code, opencode, etc.) enumerate
- * skill descriptions in `<available_skills>` on every turn. With 86
- * skills + 33 agents the floor is ~12k tokens per turn, which is a
- * meaningful tax for local LLMs with 32K–128K context. Frontier
- * models (Sonnet 4.6 / Opus 4.7 with 200K–1M ctx) don't feel it.
+ * Background: every installed `gsd-*` skill costs eager system-prompt tokens
+ * because runtimes (Claude Code, opencode, etc.) enumerate skill descriptions
+ * in `<available_skills>` on every turn. With 66 skills + 33 agents GSD alone
+ * consumes ~60% of the default 1%-of-context skill-listing budget, causing
+ * dropped skills when users stack multiple plugins (#3408).
  *
- * The `minimal` profile installs the main GSD loop only:
- *   new-project → discuss-phase → plan-phase → execute-phase
- * plus `help` (discoverability) and `update` (upgrade path).
+ * This module owns:
+ *  - PROFILES map: named profile → base skill set (or '*' sentinel for full)
+ *  - loadSkillsManifest: parse requires: frontmatter from commands/gsd/*.md
+ *  - resolveProfile: compute transitive closure of profile base over manifest
+ *  - stageSkillsForProfile / stageAgentsForProfile: filesystem staging
+ *  - readActiveProfile / writeActiveProfile: profile marker persistence
  *
- * Users opt into minimal via `--minimal` on the install CLI.
- * Default install (`full`) is unchanged — back-compat preserved.
+ * Legacy back-compat exports (deprecated, kept for existing callers):
+ *  - MINIMAL_SKILL_ALLOWLIST — derived from PROFILES.core
+ *  - isMinimalMode(mode) — returns true for 'minimal'
+ *  - shouldInstallSkill(name, mode|resolvedProfile) — overloaded
+ *  - stageSkillsForMode(srcDir, mode) — wraps stageSkillsForProfile
  */
+
+'use strict';
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const MINIMAL_SKILL_ALLOWLIST = Object.freeze([
-  'new-project',
-  'discuss-phase',
-  'plan-phase',
-  'execute-phase',
-  'help',
-  'update',
-]);
+// ---------------------------------------------------------------------------
+// Profile definitions
+// ---------------------------------------------------------------------------
 
-const MINIMAL_ALLOWLIST_SET = new Set(MINIMAL_SKILL_ALLOWLIST);
+/**
+ * PROFILES maps profile name → base skill set (array) or '*' sentinel (full).
+ *
+ * The effective set for any profile is CLOSURE(base, requires: manifest).
+ * standard is a superset of core; full is the identity (all skills).
+ *
+ * Composition: --profile=core,audit resolves to union(closure(core), closure(audit)).
+ */
+const PROFILES = Object.freeze({
+  core: Object.freeze([
+    'new-project',
+    'discuss-phase',
+    'plan-phase',
+    'execute-phase',
+    'help',
+    'update',
+  ]),
+  standard: Object.freeze([
+    // Core loop
+    'new-project',
+    'discuss-phase',
+    'plan-phase',
+    'execute-phase',
+    'help',
+    'update',
+    // Phase management (hot nodes from audit — required by 38+ skills)
+    'phase',
+    'review',
+    'config',
+    'progress',
+    // Workspace / state
+    'resume-work',
+    'pause-work',
+    'workspace',
+  ]),
+  full: '*',
+});
 
-function isMinimalMode(mode) {
-  return mode === 'minimal';
+// ---------------------------------------------------------------------------
+// Manifest parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the requires: field from YAML frontmatter.
+ * Handles: "requires: [a, b, c]" (flow style) and absent field.
+ * Returns string[] — empty array if no requires: field.
+ *
+ * No external YAML parser dependency — hand-parse the single line
+ * since GSD enforces flow-style arrays for requires:.
+ *
+ * @param {string} content full file content
+ * @returns {string[]}
+ */
+function parseRequires(content) {
+  const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/m);
+  if (!fmMatch) return [];
+  const fm = fmMatch[1];
+  const line = fm.match(/^requires:\s*(.+)$/m);
+  if (!line) return [];
+  const val = line[1].trim();
+  // Flow-style: [a, b, c]
+  if (val.startsWith('[') && val.endsWith(']')) {
+    const inner = val.slice(1, -1).trim();
+    if (!inner) return [];
+    return inner.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  // Single bare value (not currently used, but defensive)
+  return val ? [val] : [];
 }
 
-function shouldInstallSkill(skillBaseName, mode) {
-  if (!isMinimalMode(mode)) return true;
-  return MINIMAL_ALLOWLIST_SET.has(skillBaseName);
+/**
+ * Load the requires: dependency graph from a commands/gsd directory.
+ *
+ * @param {string} commandsDir absolute path to commands/gsd/
+ * @returns {Map<string, string[]>} stem → [required stem, ...]
+ */
+function loadSkillsManifest(commandsDir) {
+  const manifest = new Map();
+  if (!fs.existsSync(commandsDir)) return manifest;
+  const entries = fs.readdirSync(commandsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith('.md')) continue;
+    const stem = entry.name.slice(0, -3);
+    try {
+      const content = fs.readFileSync(path.join(commandsDir, entry.name), 'utf8');
+      manifest.set(stem, parseRequires(content));
+    } catch {
+      manifest.set(stem, []);
+    }
+  }
+  return manifest;
 }
+
+// ---------------------------------------------------------------------------
+// Profile resolution (transitive closure)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the transitive closure of a set of skill stems over the manifest.
+ *
+ * @param {Iterable<string>} base initial set of stems
+ * @param {Map<string, string[]>} manifest skill → [required stems]
+ * @returns {Set<string>}
+ */
+function computeClosure(base, manifest) {
+  const closed = new Set(base);
+  const queue = [...closed];
+  while (queue.length > 0) {
+    const stem = queue.pop();
+    const deps = manifest.get(stem) || [];
+    for (const dep of deps) {
+      if (!closed.has(dep)) {
+        closed.add(dep);
+        queue.push(dep);
+      }
+    }
+  }
+  return closed;
+}
+
+/**
+ * Resolve a profile (or composed profiles) to a typed result object.
+ *
+ * @param {object} opts
+ * @param {string[]} [opts.modes=['full']] profile names to resolve and union
+ * @param {Map<string, string[]>} [opts.manifest] parsed requires: graph
+ * @param {object} [opts._profilesOverride] for testing — override PROFILES
+ * @returns {{ name: string, skills: Set<string>|'*', agents: Set<string> }}
+ */
+function resolveProfile({ modes, manifest, _profilesOverride } = {}) {
+  const profiles = _profilesOverride || PROFILES;
+  const activeModes = (modes && modes.length > 0) ? modes : ['full'];
+
+  // If any mode is 'full', the result is the full sentinel
+  if (activeModes.includes('full')) {
+    return { name: 'full', skills: '*', agents: new Set() };
+  }
+
+  const man = manifest || new Map();
+  const unionSkills = new Set();
+
+  for (const mode of activeModes) {
+    const base = profiles[mode];
+    if (!base) {
+      // Unknown profile — treat as no-op (don't crash)
+      continue;
+    }
+    if (base === '*') {
+      // This profile is full — sentinel short-circuit
+      return { name: activeModes.join(','), skills: '*', agents: new Set() };
+    }
+    const closure = computeClosure(base, man);
+    for (const s of closure) unionSkills.add(s);
+  }
+
+  const name = activeModes.length === 1 ? activeModes[0] : activeModes.join(',');
+  return { name, skills: unionSkills, agents: new Set() };
+}
+
+// ---------------------------------------------------------------------------
+// Staging — skills
+// ---------------------------------------------------------------------------
 
 // Stage dirs created during this process — cleaned up on exit.
 // 13 runtime dispatch sites in install.js can each call stageSkillsForMode,
@@ -82,17 +237,162 @@ function ensureExitCleanup() {
 }
 
 /**
- * Stage a filtered copy of the source commands/gsd directory when in
- * minimal mode. All runtime-specific copy fns recurse a source dir,
- * so filtering at the source point lets every copy fn stay unchanged
- * (DRY: one filter, not 12).
+ * Stage a filtered copy of commands/gsd for a resolved profile.
+ * In full mode (skills === '*') returns srcDir unchanged (no-op).
  *
- * In full mode this is a no-op — the original srcDir is returned.
+ * @param {string} srcDir absolute path to commands/gsd
+ * @param {{ skills: Set<string>|'*' }} resolvedProfile
+ * @returns {string} path to staged dir (or srcDir for full)
+ */
+function stageSkillsForProfile(srcDir, resolvedProfile) {
+  if (resolvedProfile.skills === '*') return srcDir;
+  if (!fs.existsSync(srcDir)) return srcDir;
+
+  const stageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-profile-skills-'));
+  try {
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.md')) continue;
+      const stem = entry.name.slice(0, -3);
+      if (!resolvedProfile.skills.has(stem)) continue;
+      fs.copyFileSync(
+        path.join(srcDir, entry.name),
+        path.join(stageDir, entry.name),
+      );
+    }
+  } catch (err) {
+    try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch {}
+    throw err;
+  }
+  STAGED_DIRS.add(stageDir);
+  ensureExitCleanup();
+  return stageDir;
+}
+
+/**
+ * Stage a filtered copy of the agents directory for a resolved profile.
+ * For 'full', returns srcAgentsDir unchanged.
+ * For tiered profiles, copies only agents whose stem is in resolvedProfile.agents.
  *
- * Cleanup: the staged dir is automatically removed on process exit.
- * If the copy loop throws mid-flight, the partially-populated dir is
- * removed and the error re-raised, so callers never see an orphan.
+ * Note: agents Set is currently always empty for non-full profiles —
+ * agent filtering will be wired in a subsequent pass when agent-to-skill
+ * mapping is added to the manifest. For now, non-full profiles get no agents
+ * (matching current --minimal behavior).
  *
+ * @param {string} srcAgentsDir absolute path to agents/
+ * @param {{ agents: Set<string>|'*', skills: Set<string>|'*' }} resolvedProfile
+ * @returns {string} path to staged dir (or srcAgentsDir for full)
+ */
+function stageAgentsForProfile(srcAgentsDir, resolvedProfile) {
+  if (resolvedProfile.skills === '*') return srcAgentsDir;
+  if (!fs.existsSync(srcAgentsDir)) return srcAgentsDir;
+
+  const stageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-profile-agents-'));
+  try {
+    if (resolvedProfile.agents instanceof Set && resolvedProfile.agents.size > 0) {
+      const entries = fs.readdirSync(srcAgentsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        if (!entry.name.endsWith('.md')) continue;
+        // Agent stems are like "gsd-planner" — strip "gsd-" prefix for lookup
+        const stem = entry.name.slice(0, -3);
+        if (!resolvedProfile.agents.has(stem)) continue;
+        fs.copyFileSync(
+          path.join(srcAgentsDir, entry.name),
+          path.join(stageDir, entry.name),
+        );
+      }
+    }
+    // If agents is empty Set, we produce an empty stageDir (no agents for this profile)
+  } catch (err) {
+    try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch {}
+    throw err;
+  }
+  STAGED_DIRS.add(stageDir);
+  ensureExitCleanup();
+  return stageDir;
+}
+
+// ---------------------------------------------------------------------------
+// Profile marker persistence
+// ---------------------------------------------------------------------------
+
+const PROFILE_MARKER_NAME = '.gsd-profile';
+
+/**
+ * Read the active profile from a runtime config directory.
+ *
+ * @param {string} runtimeConfigDir absolute path (e.g. ~/.claude/skills)
+ * @returns {string|null} profile name (e.g. 'core', 'standard', 'core,audit') or null
+ */
+function readActiveProfile(runtimeConfigDir) {
+  const markerPath = path.join(runtimeConfigDir, PROFILE_MARKER_NAME);
+  try {
+    const raw = fs.readFileSync(markerPath, 'utf8').trim();
+    if (!raw) return null;
+    // Validate that it looks like a profile name (alphanumeric + hyphens + commas)
+    if (!/^[a-z0-9,_-]+$/i.test(raw)) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist the active profile to a runtime config directory.
+ *
+ * @param {string} runtimeConfigDir absolute path (e.g. ~/.claude/skills)
+ * @param {string} profileName e.g. 'core', 'standard', 'full'
+ */
+function writeActiveProfile(runtimeConfigDir, profileName) {
+  fs.mkdirSync(runtimeConfigDir, { recursive: true });
+  fs.writeFileSync(path.join(runtimeConfigDir, PROFILE_MARKER_NAME), profileName + '\n', 'utf8');
+}
+
+// ---------------------------------------------------------------------------
+// Back-compat shims (deprecated — use profile-based API instead)
+// ---------------------------------------------------------------------------
+
+/**
+ * @deprecated Use PROFILES.core instead.
+ * Preserved for callers in install.js and existing tests.
+ */
+const MINIMAL_SKILL_ALLOWLIST = Object.freeze([...PROFILES.core]);
+
+const MINIMAL_ALLOWLIST_SET = new Set(MINIMAL_SKILL_ALLOWLIST);
+
+/**
+ * @deprecated Use resolveProfile({ modes: ['core'] }) instead.
+ */
+function isMinimalMode(mode) {
+  return mode === 'minimal' || mode === 'core-only';
+}
+
+/**
+ * Overloaded for back-compat.
+ * - If resolvedProfileOrMode is a string: legacy mode check (full/minimal)
+ * - If resolvedProfileOrMode is an object with .skills: new profile API
+ *
+ * @deprecated String-mode form; use resolvedProfile object form instead.
+ */
+function shouldInstallSkill(skillBaseName, resolvedProfileOrMode) {
+  if (typeof resolvedProfileOrMode === 'object' && resolvedProfileOrMode !== null) {
+    const { skills } = resolvedProfileOrMode;
+    if (skills === '*') return true;
+    return skills instanceof Set && skills.has(skillBaseName);
+  }
+  // Legacy string mode
+  const mode = resolvedProfileOrMode;
+  if (!isMinimalMode(mode)) return true;
+  return MINIMAL_ALLOWLIST_SET.has(skillBaseName);
+}
+
+/**
+ * Stage a filtered copy of the source commands/gsd directory.
+ * Back-compat wrapper: maps 'minimal' → core profile, 'full' → full.
+ *
+ * @deprecated Use stageSkillsForProfile with a resolved profile instead.
  * @param {string} srcDir absolute path to commands/gsd
  * @param {string} mode 'full' | 'minimal'
  * @returns {string} path to use (original or staged tmp)
@@ -123,10 +423,24 @@ function stageSkillsForMode(srcDir, mode) {
   return stageDir;
 }
 
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
 module.exports = {
+  // New profile API (ADR-0010)
+  PROFILES,
+  loadSkillsManifest,
+  resolveProfile,
+  stageSkillsForProfile,
+  stageAgentsForProfile,
+  readActiveProfile,
+  writeActiveProfile,
+  // Shared internals
+  cleanupStagedSkills,
+  // Back-compat / deprecated
   MINIMAL_SKILL_ALLOWLIST,
   isMinimalMode,
   shouldInstallSkill,
   stageSkillsForMode,
-  cleanupStagedSkills,
 };
