@@ -103,10 +103,34 @@ function parseRequires(content) {
 }
 
 /**
+ * Parse agent references from a skill file's body text.
+ * Scans the full content for `gsd-<stem>` patterns that correspond to
+ * real agent files. Returns all unique `gsd-*` stems found in the body.
+ *
+ * The caller is responsible for filtering by which agents actually exist —
+ * this function returns all syntactically valid `gsd-*` matches.
+ *
+ * @param {string} content full file content
+ * @returns {string[]} deduplicated agent stems like ['gsd-planner', 'gsd-executor']
+ */
+function parseCallsAgents(content) {
+  // Match word-boundary gsd-<stem> patterns; stems are lowercase letters and hyphens.
+  // We use a regex that matches `gsd-` followed by one or more lowercase-alpha-or-hyphen chars.
+  // This catches `gsd-planner`, `gsd-plan-checker`, etc. in prose and code.
+  const matches = content.match(/\bgsd-[a-z][a-z-]*/g);
+  if (!matches) return [];
+  // Deduplicate
+  return [...new Set(matches)];
+}
+
+/**
  * Load the requires: dependency graph from a commands/gsd directory.
+ * Also derives calls_agents for each skill by scanning the body text for
+ * `gsd-*` agent name references. Agent stems are stored under the special
+ * key `_calls_agents_<stem>` so they don't conflict with skill stems.
  *
  * @param {string} commandsDir absolute path to commands/gsd/
- * @returns {Map<string, string[]>} stem → [required stem, ...]
+ * @returns {Map<string, string[]>} stem → [required stem, ...] plus _calls_agents_<stem> entries
  */
 function loadSkillsManifest(commandsDir) {
   const manifest = new Map();
@@ -119,8 +143,12 @@ function loadSkillsManifest(commandsDir) {
     try {
       const content = fs.readFileSync(path.join(commandsDir, entry.name), 'utf8');
       manifest.set(stem, parseRequires(content));
+      // Derive agent references from body text
+      const agentRefs = parseCallsAgents(content);
+      manifest.set(`_calls_agents_${stem}`, agentRefs);
     } catch {
       manifest.set(stem, []);
+      manifest.set(`_calls_agents_${stem}`, []);
     }
   }
   return manifest;
@@ -188,8 +216,19 @@ function resolveProfile({ modes, manifest, _profilesOverride } = {}) {
     for (const s of closure) unionSkills.add(s);
   }
 
+  // Derive agents: union of all agent names referenced in the body text of
+  // every skill in unionSkills. Agent names are stored in the manifest under
+  // _calls_agents_<stem> keys (populated by loadSkillsManifest).
+  const unionAgents = new Set();
+  for (const skillStem of unionSkills) {
+    const agentRefs = man.get(`_calls_agents_${skillStem}`) || [];
+    for (const agentStem of agentRefs) {
+      unionAgents.add(agentStem);
+    }
+  }
+
   const name = activeModes.length === 1 ? activeModes[0] : activeModes.join(',');
-  return { name, skills: unionSkills, agents: new Set() };
+  return { name, skills: unionSkills, agents: unionAgents };
 }
 
 // ---------------------------------------------------------------------------
@@ -273,15 +312,12 @@ function stageSkillsForProfile(srcDir, resolvedProfile) {
 /**
  * Stage a filtered copy of the agents directory for a resolved profile.
  * For 'full', returns srcAgentsDir unchanged.
- * For tiered profiles, copies only agents whose stem is in resolvedProfile.agents.
- *
- * Note: agents Set is currently always empty for non-full profiles —
- * agent filtering will be wired in a subsequent pass when agent-to-skill
- * mapping is added to the manifest. For now, non-full profiles get no agents
- * (matching current --minimal behavior).
+ * For tiered profiles, copies only agents whose full stem (e.g. 'gsd-planner')
+ * is in resolvedProfile.agents — which is populated by resolveProfile() from
+ * the _calls_agents_* entries in the manifest.
  *
  * @param {string} srcAgentsDir absolute path to agents/
- * @param {{ agents: Set<string>|'*', skills: Set<string>|'*' }} resolvedProfile
+ * @param {{ agents: Set<string>, skills: Set<string>|'*' }} resolvedProfile
  * @returns {string} path to staged dir (or srcAgentsDir for full)
  */
 function stageAgentsForProfile(srcAgentsDir, resolvedProfile) {
@@ -295,7 +331,7 @@ function stageAgentsForProfile(srcAgentsDir, resolvedProfile) {
       for (const entry of entries) {
         if (!entry.isFile()) continue;
         if (!entry.name.endsWith('.md')) continue;
-        // Agent stems are like "gsd-planner" — strip "gsd-" prefix for lookup
+        // Agent stem is the full filename without extension, e.g. "gsd-planner"
         const stem = entry.name.slice(0, -3);
         if (!resolvedProfile.agents.has(stem)) continue;
         fs.copyFileSync(

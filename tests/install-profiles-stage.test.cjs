@@ -13,7 +13,12 @@ const {
   stageSkillsForProfile,
   stageAgentsForProfile,
   cleanupStagedSkills,
+  resolveProfile,
+  loadSkillsManifest,
 } = require('../get-shit-done/bin/lib/install-profiles.cjs');
+
+const REAL_COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
+const REAL_AGENTS_DIR = path.join(__dirname, '..', 'agents');
 
 function createFixtureSkillsDir() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-stage-profile-'));
@@ -135,5 +140,42 @@ describe('stageAgentsForProfile', () => {
     const ghost = path.join(os.tmpdir(), 'gsd-agents-no-exist-' + Date.now());
     const result = stageAgentsForProfile(ghost, { skills: new Set(), agents: new Set() });
     assert.strictEqual(result, ghost);
+  });
+
+  test('standard profile — stageAgentsForProfile copies exactly the agents in resolvedProfile.agents', () => {
+    // Uses the real agents dir and commands dir
+    if (!fs.existsSync(REAL_AGENTS_DIR) || !fs.existsSync(REAL_COMMANDS_DIR)) return;
+    const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    const resolved = resolveProfile({ modes: ['standard'], manifest });
+    assert.ok(resolved.agents instanceof Set && resolved.agents.size > 0,
+      'standard profile must have >0 agents (plan-phase calls gsd-planner etc)');
+    let staged;
+    try {
+      staged = stageAgentsForProfile(REAL_AGENTS_DIR, resolved);
+      const stagedFiles = new Set(
+        fs.readdirSync(staged).filter(f => f.endsWith('.md')).map(f => f.slice(0, -3))
+      );
+      // Every file staged must be in resolved.agents
+      for (const stem of stagedFiles) {
+        assert.ok(resolved.agents.has(stem), `staged agent ${stem} not in resolved.agents`);
+      }
+      // Every agent in resolved.agents that exists in the real dir must be staged
+      for (const agentStem of resolved.agents) {
+        const exists = fs.existsSync(path.join(REAL_AGENTS_DIR, `${agentStem}.md`));
+        if (exists) {
+          assert.ok(stagedFiles.has(agentStem), `resolved agent ${agentStem} missing from staged dir`);
+        }
+      }
+    } finally {
+      if (staged) cleanupStagedSkills();
+    }
+  });
+
+  test('full profile staging returns real agents dir unchanged', () => {
+    if (!fs.existsSync(REAL_AGENTS_DIR)) return;
+    const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    const resolved = resolveProfile({ modes: ['full'], manifest });
+    const result = stageAgentsForProfile(REAL_AGENTS_DIR, resolved);
+    assert.strictEqual(result, REAL_AGENTS_DIR);
   });
 });

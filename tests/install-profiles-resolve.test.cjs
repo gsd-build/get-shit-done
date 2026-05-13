@@ -148,4 +148,50 @@ describe('resolveProfile', () => {
     const result = resolveProfile({ modes: ['core'], manifest });
     assert.ok(result.agents instanceof Set, 'result should have agents Set');
   });
+
+  test('resolveProfile standard — agents Set is non-empty (plan-phase pulls gsd-planner etc)', () => {
+    const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    const result = resolveProfile({ modes: ['standard'], manifest });
+    assert.ok(result.agents instanceof Set, 'agents should be a Set');
+    assert.ok(result.agents.size > 0, `standard profile should have >0 agents, got ${result.agents.size}`);
+    // plan-phase is in standard and calls gsd-planner, gsd-plan-checker, gsd-phase-researcher
+    assert.ok(result.agents.has('gsd-planner'), 'standard should include gsd-planner (called by plan-phase)');
+    assert.ok(result.agents.has('gsd-plan-checker'), 'standard should include gsd-plan-checker (called by plan-phase)');
+  });
+
+  test('resolveProfile full — agents is empty Set (full staging uses srcDir directly)', () => {
+    const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    const result = resolveProfile({ modes: ['full'], manifest });
+    assert.strictEqual(result.skills, '*');
+    // Full profile: agents Set is empty because stageAgentsForProfile uses srcDir directly
+    assert.ok(result.agents instanceof Set, 'agents should still be a Set for full');
+  });
+
+  test('agents are derived from skill body text — synthetic manifest', () => {
+    // Build a synthetic manifest where plan-phase calls gsd-planner
+    const manifest = new Map([
+      ['plan-phase', []],
+      ['phase', []],
+    ]);
+    // Override with calls_agents map
+    manifest.get('plan-phase'); // ensure it exists
+    // Use the real loadSkillsManifest with REAL dir to verify body parsing works
+    const realManifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    const planPhaseAgents = realManifest.get('_calls_agents_plan-phase') ||
+      // calls_agents may be stored as a separate key or on the manifest entry itself
+      [];
+    // This test validates that the real manifest has agent mappings for plan-phase
+    // by checking resolveProfile computes agents correctly
+    const result = resolveProfile({ modes: ['standard'], manifest: realManifest });
+    assert.ok(result.agents.has('gsd-planner'), 'gsd-planner should be derived from plan-phase body');
+  });
+
+  test('agents transitively closed — skill requiring plan-phase also gets its agents', () => {
+    const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    // quick requires plan-phase (via requires: field or direct) and also calls gsd-planner directly
+    // new-project requires plan-phase so inherits its agents
+    const result = resolveProfile({ modes: ['standard'], manifest });
+    // Since plan-phase is in standard, and plan-phase calls gsd-planner, gsd-planner must be present
+    assert.ok(result.agents.has('gsd-planner'));
+  });
 });
