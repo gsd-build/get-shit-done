@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, ERROR_REASON, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, ERROR_REASON, CONFIG_DEFAULTS } = require('./core.cjs');
+const { platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const {
   VALID_PROFILES,
@@ -144,7 +145,7 @@ function buildNewProjectConfig(userChoices) {
         userDefaults.granularity = depthToGranularity[userDefaults.depth] || userDefaults.depth;
         delete userDefaults.depth;
         try {
-          fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8');
+          platformWriteSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2));
         } catch { /* intentionally empty */ }
       }
     }
@@ -275,9 +276,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
 
   // Ensure .planning directory exists
   try {
-    if (!fs.existsSync(planningBase)) {
-      fs.mkdirSync(planningBase, { recursive: true });
-    }
+    platformEnsureDir(planningBase);
   } catch (err) {
     error('Failed to create .planning directory: ' + err.message);
   }
@@ -285,7 +284,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
   const config = buildNewProjectConfig(userChoices);
 
   try {
-    atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    platformWriteSync(configPath, JSON.stringify(config, null, 2));
     output({ created: true, path: '.planning/config.json' }, raw, 'created');
   } catch (err) {
     error('Failed to write config.json: ' + err.message);
@@ -304,9 +303,7 @@ function ensureConfigFile(cwd) {
 
   // Ensure .planning directory exists
   try {
-    if (!fs.existsSync(planningBase)) {
-      fs.mkdirSync(planningBase, { recursive: true });
-    }
+    platformEnsureDir(planningBase);
   } catch (err) {
     error('Failed to create .planning directory: ' + err.message);
   }
@@ -319,7 +316,7 @@ function ensureConfigFile(cwd) {
   const config = buildNewProjectConfig({});
 
   try {
-    atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    platformWriteSync(configPath, JSON.stringify(config, null, 2));
     return { created: true, path: '.planning/config.json' };
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
@@ -377,7 +374,7 @@ function setConfigValue(cwd, keyPath, parsedValue) {
 
     // Write back
     try {
-      atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      platformWriteSync(configPath, JSON.stringify(config, null, 2));
       return { updated: true, key: keyPath, value: parsedValue, previousValue };
     } catch (err) {
       error('Failed to write config.json: ' + err.message);
