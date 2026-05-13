@@ -55,6 +55,7 @@
     "review.ollama_host",
     "review.lm_studio_host",
     "review.llama_cpp_host",
+    "review.default_reviewers",
     "workflow.cross_ai_execution",
     "workflow.cross_ai_command",
     "workflow.cross_ai_timeout",

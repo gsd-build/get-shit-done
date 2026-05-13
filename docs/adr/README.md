@@ -19,6 +19,7 @@ Each ADR documents one architectural decision: what was decided, why, and what c
 | [0009-shell-command-projection-module.md](0009-shell-command-projection-module.md) | Shell Command Projection Module owns runtime-aware OS command rendering | Accepted |
 | [0010-file-operation-engine-module.md](0010-file-operation-engine-module.md) | File Operation Engine Module owns safe runtime/config file mutations | Proposed |
 | [0011-skill-surface-budget-module.md](0011-skill-surface-budget-module.md) | Skill Surface Budget Module owns install-time profile staging and runtime surface control | Accepted |
+| [0012-config-schema-module.md](0012-config-schema-module.md) | Config Schema Module as shared schema data | Accepted |
 
 ## Seam map
 
@@ -39,3 +40,6 @@ ADR 0011 documents the Skill Surface Budget Module for install-time skill/agent
 profile staging (`--profile=<name>`, `.gsd-profile` marker, `requires:` closure)
 and the Phase 2 runtime `/gsd:surface` command for cluster-level enable/disable
 without reinstall.
+
+ADR 0012 documents the Config Schema Module for shared config-key schema data
+projected by the CJS and SDK config-schema adapters.
