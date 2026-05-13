@@ -1177,7 +1177,7 @@ When verification returns `human_needed`, items are persisted as a trackable HUM
 
 ### 42. Cross-AI Peer Review
 
-**Command:** `/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--all]`
+**Command:** `/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--ollama] [--lm-studio] [--llama-cpp] [--all]`
 
 **Purpose:** Invoke external AI CLIs (Gemini, Claude, Codex, CodeRabbit, OpenCode, Qwen Code, Cursor) to independently review phase plans. Produces structured REVIEWS.md with per-reviewer feedback.
 
@@ -1187,8 +1187,14 @@ When verification returns `human_needed`, items are persisted as a trackable HUM
 - REQ-REVIEW-03: System MUST invoke each selected CLI independently
 - REQ-REVIEW-04: System MUST collect responses and produce `REVIEWS.md`
 - REQ-REVIEW-05: Reviews MUST be consumable by `/gsd-plan-phase --reviews`
+- REQ-REVIEW-06: System MUST support project-level no-flag defaults via `review.default_reviewers`
+- REQ-REVIEW-07: Reviewer precedence MUST be explicit flags > `--all` > `review.default_reviewers` > all detected reviewers
 
 **Produces:** `{phase}-REVIEWS.md` — Per-reviewer structured feedback
+
+**User configuration note:**
+- Set `review.default_reviewers` in `.planning/config.json` (or via `gsd config-set`) to control no-flag `/gsd-review` fan-out.
+- Use `--all` for a full pre-merge sweep without changing project defaults.
 
 ---
 

@@ -1177,13 +1177,27 @@ Cross-AI peer review of phase plans from external AI CLIs.
 | `--opencode` | Include OpenCode review (via GitHub Copilot) |
 | `--qwen` | Include Qwen Code review (Alibaba Qwen models) |
 | `--cursor` | Include Cursor agent review |
-| `--all` | Include all available CLIs |
+| `--ollama` | Include Ollama server review |
+| `--lm-studio` | Include LM Studio server review |
+| `--llama-cpp` | Include llama.cpp server review |
+| `--all` | Include all available reviewers (CLI + local model servers) |
+
+**Default reviewer behavior (no flags):**
+- If `review.default_reviewers` is **unset**, `/gsd-review` runs all detected reviewers (current default behavior).
+- If `review.default_reviewers` is **set**, `/gsd-review` runs only that subset (for example `["gemini","codex"]`).
+- `--all` always overrides config and runs the full detected set.
+- Explicit flags (for example `--cursor`) override both `--all` and config defaults for that run.
 
 **Produces:** `{phase}-REVIEWS.md` — consumable by `/gsd-plan-phase --reviews`
 
 ```bash
+# set project default reviewers for no-flag /gsd-review runs
+gsd config-set review.default_reviewers '["gemini","codex"]'
+
+/gsd-review --phase 2             # runs gemini+codex from config
 /gsd-review --phase 3 --all
 /gsd-review --phase 2 --gemini
+/gsd-review --phase 2 --cursor    # one-off override
 ```
 
 ---
