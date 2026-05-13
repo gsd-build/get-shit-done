@@ -140,7 +140,7 @@ git diff --name-only ${DIFF_BASE}..HEAD -- . ':!.planning/' ':!ROADMAP.md' ':!ST
 ```xml
 <structural_findings>...</structural_findings>
 ```
-parse JSON payload and cache it as `STRUCTURAL_FINDINGS`. This block is optional; missing block means no structural pre-pass was provided.
+parse JSON payload and cache it as `STRUCTURAL_FINDINGS`. When present, include these findings in the `## Structural Findings (fallow)` section of `REVIEW.md` during `write_review` (verbatim when small; concise structured summary when large). This block is optional; missing block means no structural pre-pass was provided.
 
 **5. Load project context:** Read `./CLAUDE.md` and check for `.claude/skills/` or `.agents/skills/` (as described in `<project_context>`).
 </step>

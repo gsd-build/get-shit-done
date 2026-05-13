@@ -411,8 +411,14 @@ done
 Build structural findings block for agent:
 ```bash
 STRUCTURAL_FINDINGS_BLOCK=""
+MAX_FINDINGS_SIZE=50000
 if [ -n "$FALLOW_JSON_PATH" ] && [ -f "$FALLOW_JSON_PATH" ]; then
-  STRUCTURAL_FINDINGS_BLOCK="<structural_findings>\n$(cat "$FALLOW_JSON_PATH")\n</structural_findings>\n"
+  FALLOW_JSON_SIZE=$(wc -c < "$FALLOW_JSON_PATH" | tr -d '[:space:]')
+  if [ "$FALLOW_JSON_SIZE" -le "$MAX_FINDINGS_SIZE" ]; then
+    STRUCTURAL_FINDINGS_BLOCK="<structural_findings>\n$(cat "$FALLOW_JSON_PATH")\n</structural_findings>\n"
+  else
+    echo "Warning: skipping structural findings embed (${FALLOW_JSON_SIZE} bytes > ${MAX_FINDINGS_SIZE} bytes). Re-run with narrower scope/profile if needed."
+  fi
 fi
 ```
 
