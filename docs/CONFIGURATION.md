@@ -66,6 +66,10 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
     "context_warnings": true,
     "workflow_guard": false
   },
+  "review": {
+    "default_reviewers": null,
+    "models": {}
+  },
   "parallelization": {
     "enabled": true,
     "plan_level": true,
@@ -172,6 +176,24 @@ API key fields accept a string value (the key itself). They can also be set to t
 | `review.models.opencode` | string | `null` | Command for OpenCode review, e.g. `"opencode run --model claude-sonnet-4"` |
 
 The `<cli>` slug is validated against `[a-zA-Z0-9_-]+`. Empty or path-containing slugs are rejected by `config-set`.
+
+### Reviewer defaults for `/gsd-review`
+
+Use `review.default_reviewers` to scope the no-flag `/gsd-review` run to a subset of detected reviewers.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `review.default_reviewers` | string[] \| null | `null` (all detected reviewers) | Optional default subset for no-flag `/gsd-review`, e.g. `["gemini","codex"]`. Precedence is: explicit reviewer flags > `--all` > `review.default_reviewers` > all detected. Unknown slugs are ignored with a warning; known-but-undetected slugs are ignored with an info note; empty arrays are rejected by `config-set`. |
+
+Example:
+
+```json
+{
+  "review": {
+    "default_reviewers": ["gemini", "codex"]
+  }
+}
+```
 
 ### Agent-skill injection (dynamic)
 
@@ -650,6 +672,7 @@ Configure per-CLI model selection for `/gsd-review`. When set, overrides the CLI
 | `review.models.ollama` | string | (server default) | Model name passed to Ollama when `--ollama` reviewer is invoked. If unset, the first available model reported by the server is used (e.g. `llama3`). Set to a specific tag: `gsd config-set review.models.ollama codellama` |
 | `review.models.lm_studio` | string | (server default) | Model name passed to LM Studio when `--lm-studio` reviewer is invoked. If unset, the first available model reported by the server is used. |
 | `review.models.llama_cpp` | string | (server default) | Model name passed to llama.cpp when `--llama-cpp` reviewer is invoked. If unset, the first model reported by `/v1/models` is used. |
+| `review.default_reviewers` | string[] \| null | (all detected reviewers) | Default reviewer subset for no-flag `/gsd-review`. Example: `["gemini","codex"]`. Explicit flags and `--all` override this setting. |
 | `review.ollama_host` | string | `http://localhost:11434` | Base URL of the Ollama server. Override when running Ollama on a non-default port or remote host: `gsd config-set review.ollama_host http://192.168.1.10:11434` |
 | `review.lm_studio_host` | string | `http://localhost:1234` | Base URL of the LM Studio local server. Override when using a non-default port. |
 | `review.llama_cpp_host` | string | `http://localhost:8080` | Base URL of the llama.cpp server (`llama-server`). Override when using a non-default port. |

@@ -47,6 +47,7 @@ const VALID_CONFIG_KEYS = new Set([
   'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
   'planning.commit_docs', 'planning.search_gitignored', 'planning.sub_repos',
   'review.ollama_host', 'review.lm_studio_host', 'review.llama_cpp_host',
+  'review.default_reviewers',
   'workflow.cross_ai_execution', 'workflow.cross_ai_command', 'workflow.cross_ai_timeout',
   'workflow.subagent_timeout',
   'executor.stall_detect_interval_minutes',
