@@ -37,5 +37,12 @@ describe('review workflow default reviewer selection contract (#3079)', () => {
       'review workflow must document unknown and undetected slug handling'
     );
   });
-});
 
+  test('documents failure behavior when all configured reviewers unavailable', () => {
+    assert.ok(
+      workflow.includes('all configured reviewers are unavailable') &&
+      workflow.includes('fail'),
+      'review workflow must document failure path when configured reviewers are unavailable'
+    );
+  });
+});
