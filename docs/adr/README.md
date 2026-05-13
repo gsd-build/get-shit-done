@@ -38,5 +38,5 @@ to ADR 0009 hook-command ownership policy.
 
 ADR 0011 documents the Skill Surface Budget Module for install-time skill/agent
 profile staging (`--profile=<name>`, `.gsd-profile` marker, `requires:` closure)
-and the Phase 2 runtime `/gsd:surface` command for cluster-level enable/disable
+and the Phase 2 runtime surface-control command for cluster-level enable/disable
 without reinstall.
