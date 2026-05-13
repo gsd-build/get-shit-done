@@ -1,0 +1,1018 @@
+{
+  "summary": {
+    "skill_count": 66,
+    "agent_count": 33,
+    "total_description_chars": 4787,
+    "estimated_description_tokens": 1196
+  },
+  "skills": [
+    {
+      "stem": "add-tests",
+      "name": "gsd:add-tests",
+      "desc": "Generate tests for a completed phase based on UAT criteria and implementation",
+      "desc_chars": 77,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ai-integration-phase",
+      "name": "gsd:ai-integration-phase",
+      "desc": "Generate an AI-SPEC.md design contract for phases that involve building AI systems.",
+      "desc_chars": 83,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [
+        "gsd-ai-researcher",
+        "gsd-domain-researcher",
+        "gsd-eval-planner",
+        "gsd-framework-selector"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "audit-fix",
+      "name": "gsd:audit-fix",
+      "desc": "Autonomous audit-to-fix pipeline \u2014 find issues, classify, fix, test, commit",
+      "desc_chars": 75,
+      "calls_skills": [
+        "audit-uat"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "audit-milestone",
+      "name": "gsd:audit-milestone",
+      "desc": "Audit milestone completion against original intent before archiving",
+      "desc_chars": 67,
+      "calls_skills": [
+        "execute-phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "audit-uat",
+      "name": "gsd:audit-uat",
+      "desc": "Cross-phase audit of all outstanding UAT and verification items",
+      "desc_chars": 63,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": [
+        "audit-fix"
+      ]
+    },
+    {
+      "stem": "autonomous",
+      "name": "gsd:autonomous",
+      "desc": "Run all remaining phases autonomously \u2014 discuss\u2192plan\u2192execute per phase",
+      "desc_chars": 70,
+      "calls_skills": [
+        "cleanup",
+        "phase",
+        "progress"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "capture",
+      "name": "gsd:capture",
+      "desc": "Capture ideas, tasks, notes, and seeds to their destination",
+      "desc_chars": 59,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": [
+        "ns-ideate"
+      ]
+    },
+    {
+      "stem": "cleanup",
+      "name": "gsd:cleanup",
+      "desc": "Archive accumulated phase directories from completed milestones",
+      "desc_chars": 63,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "autonomous"
+      ]
+    },
+    {
+      "stem": "code-review",
+      "name": "gsd:code-review",
+      "desc": "Review source files changed during a phase for bugs, security issues, and code quality problems",
+      "desc_chars": 95,
+      "calls_skills": [
+        "config",
+        "import",
+        "phase",
+        "quick",
+        "review"
+      ],
+      "calls_agents": [
+        "gsd-code-fixer",
+        "gsd-code-reviewer"
+      ],
+      "called_by": [
+        "config"
+      ]
+    },
+    {
+      "stem": "complete-milestone",
+      "name": "gsd:complete-milestone",
+      "desc": "Archive completed milestone and prepare for next version",
+      "desc_chars": 56,
+      "calls_skills": [
+        "phase",
+        "stats",
+        "update"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "config",
+      "name": "gsd:config",
+      "desc": "Configure GSD settings \u2014 workflow toggles, advanced knobs, integrations, and model profile",
+      "desc_chars": 90,
+      "calls_skills": [
+        "code-review",
+        "review",
+        "settings"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "code-review",
+        "discuss-phase",
+        "fast",
+        "graphify",
+        "map-codebase",
+        "new-project",
+        "review"
+      ]
+    },
+    {
+      "stem": "debug",
+      "name": "gsd:debug",
+      "desc": "Systematic debugging with persistent state across context resets",
+      "desc_chars": 64,
+      "calls_skills": [],
+      "calls_agents": [
+        "gsd-debug-session-manager",
+        "gsd-debugger"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "discuss-phase",
+      "name": "gsd:discuss-phase",
+      "desc": "Gather phase context through adaptive questioning before planning.",
+      "desc_chars": 66,
+      "calls_skills": [
+        "config",
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "plan-phase",
+        "spec-phase"
+      ]
+    },
+    {
+      "stem": "docs-update",
+      "name": "gsd:docs-update",
+      "desc": "Generate or update project documentation verified against the codebase",
+      "desc_chars": 70,
+      "calls_skills": [
+        "update"
+      ],
+      "calls_agents": [
+        "gsd-doc-verifier",
+        "gsd-doc-writer"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "eval-review",
+      "name": "gsd:eval-review",
+      "desc": "Audit an executed AI phase's evaluation coverage and produce an EVAL-REVIEW.md remediation plan.",
+      "desc_chars": 96,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "execute-phase",
+      "name": "gsd:execute-phase",
+      "desc": "Execute all plans in a phase with wave-based parallelization",
+      "desc_chars": 60,
+      "calls_skills": [
+        "phase",
+        "verify-work"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "audit-milestone",
+        "spec-phase"
+      ]
+    },
+    {
+      "stem": "explore",
+      "name": "gsd:explore",
+      "desc": "Socratic ideation and idea routing \u2014 think through ideas before committing to plans",
+      "desc_chars": 83,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "extract-learnings",
+      "name": "gsd:extract-learnings",
+      "desc": "Extract decisions, lessons, patterns, and surprises from completed phase artifacts",
+      "desc_chars": 82,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "fast",
+      "name": "gsd:fast",
+      "desc": "Execute a trivial task inline \u2014 no subagents, no planning overhead",
+      "desc_chars": 66,
+      "calls_skills": [
+        "config"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "graphify"
+      ]
+    },
+    {
+      "stem": "forensics",
+      "name": "gsd:forensics",
+      "desc": "Post-mortem investigation for failed GSD workflows \u2014 diagnoses what went wrong.",
+      "desc_chars": 79,
+      "calls_skills": [
+        "phase",
+        "progress",
+        "update"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "graphify",
+      "name": "gsd:graphify",
+      "desc": "Build, query, and inspect the project knowledge graph in .planning/graphs/",
+      "desc_chars": 74,
+      "calls_skills": [
+        "config",
+        "fast",
+        "phase",
+        "update"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "health",
+      "name": "gsd:health",
+      "desc": "Diagnose planning directory health and optionally repair issues",
+      "desc_chars": 63,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "help",
+      "name": "gsd:help",
+      "desc": "Show available GSD commands and usage guide",
+      "desc_chars": 43,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "import",
+      "name": "gsd:import",
+      "desc": "Ingest external plans with conflict detection against project decisions before writing anything.",
+      "desc_chars": 96,
+      "calls_skills": [],
+      "calls_agents": [
+        "gsd-plan-checker"
+      ],
+      "called_by": [
+        "code-review",
+        "ultraplan-phase"
+      ]
+    },
+    {
+      "stem": "inbox",
+      "name": "gsd:inbox",
+      "desc": "Triage and review open GitHub issues and PRs against project templates and contribution guidelines.",
+      "desc_chars": 99,
+      "calls_skills": [
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "ns-manage"
+      ]
+    },
+    {
+      "stem": "ingest-docs",
+      "name": "gsd:ingest-docs",
+      "desc": "Bootstrap or merge a .planning/ setup from existing ADRs, PRDs, SPECs, and docs in a repo.",
+      "desc_chars": 90,
+      "calls_skills": [],
+      "calls_agents": [
+        "gsd-roadmapper"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "manager",
+      "name": "gsd:manager",
+      "desc": "Interactive command center for managing multiple phases from one terminal",
+      "desc_chars": 73,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "map-codebase",
+      "name": "gsd:map-codebase",
+      "desc": "Analyze codebase with parallel mapper agents to produce .planning/codebase/ documents",
+      "desc_chars": 85,
+      "calls_skills": [
+        "config"
+      ],
+      "calls_agents": [
+        "gsd-codebase-mapper"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "milestone-summary",
+      "name": "gsd:milestone-summary",
+      "desc": "Generate a comprehensive project summary from milestone artifacts for team onboarding and review",
+      "desc_chars": 96,
+      "calls_skills": [
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "mvp-phase",
+      "name": "gsd:mvp-phase",
+      "desc": "Plan a phase as a vertical MVP slice \u2014 user story, SPIDR splitting, then plan-phase",
+      "desc_chars": 83,
+      "calls_skills": [
+        "new-project",
+        "phase",
+        "plan-phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "new-milestone",
+      "name": "gsd:new-milestone",
+      "desc": "Start a new milestone cycle \u2014 update PROJECT.md and route to requirements",
+      "desc_chars": 73,
+      "calls_skills": [
+        "new-project",
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "new-project",
+      "name": "gsd:new-project",
+      "desc": "Initialize a new project with deep context gathering and PROJECT.md",
+      "desc_chars": 67,
+      "calls_skills": [
+        "config",
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "mvp-phase",
+        "new-milestone"
+      ]
+    },
+    {
+      "stem": "ns-context",
+      "name": "gsd-context",
+      "desc": "codebase intelligence | map graphify docs learnings",
+      "desc_chars": 51,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ns-ideate",
+      "name": "gsd-ideate",
+      "desc": "exploration capture | explore sketch spike spec capture",
+      "desc_chars": 55,
+      "calls_skills": [
+        "capture",
+        "phase",
+        "spike"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ns-manage",
+      "name": "gsd-manage",
+      "desc": "config workspace | workstreams thread update ship inbox",
+      "desc_chars": 55,
+      "calls_skills": [
+        "inbox",
+        "settings",
+        "thread",
+        "workstreams"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ns-project",
+      "name": "gsd-project",
+      "desc": "project lifecycle | milestones audits summary",
+      "desc_chars": 45,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ns-review",
+      "name": "gsd-quality",
+      "desc": "quality gates | code review debug audit security eval ui",
+      "desc_chars": 56,
+      "calls_skills": [
+        "phase",
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ns-workflow",
+      "name": "gsd-workflow",
+      "desc": "workflow | discuss plan execute verify phase progress",
+      "desc_chars": 53,
+      "calls_skills": [
+        "phase",
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "pause-work",
+      "name": "gsd:pause-work",
+      "desc": "Create context handoff when pausing work mid-phase",
+      "desc_chars": 50,
+      "calls_skills": [
+        "phase",
+        "progress"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "phase",
+      "name": "gsd:phase",
+      "desc": "CRUD for phases in ROADMAP.md \u2014 add, insert, remove, or edit phases",
+      "desc_chars": 67,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": [
+        "add-tests",
+        "ai-integration-phase",
+        "autonomous",
+        "cleanup",
+        "code-review",
+        "complete-milestone",
+        "discuss-phase",
+        "eval-review",
+        "execute-phase",
+        "extract-learnings",
+        "forensics",
+        "graphify",
+        "manager",
+        "mvp-phase",
+        "new-milestone",
+        "new-project",
+        "ns-context",
+        "ns-ideate",
+        "ns-review",
+        "ns-workflow",
+        "pause-work",
+        "plan-phase",
+        "plan-review-convergence",
+        "progress",
+        "quick",
+        "review",
+        "review-backlog",
+        "secure-phase",
+        "spec-phase",
+        "stats",
+        "thread",
+        "ui-phase",
+        "ui-review",
+        "ultraplan-phase",
+        "undo",
+        "validate-phase",
+        "verify-work",
+        "workstreams"
+      ]
+    },
+    {
+      "stem": "plan-phase",
+      "name": "gsd:plan-phase",
+      "desc": "Create detailed phase plan (PLAN.md) with verification loop",
+      "desc_chars": 59,
+      "calls_skills": [
+        "discuss-phase",
+        "phase",
+        "review",
+        "update"
+      ],
+      "calls_agents": [
+        "gsd-phase-researcher",
+        "gsd-plan-checker",
+        "gsd-planner"
+      ],
+      "called_by": [
+        "mvp-phase",
+        "spec-phase"
+      ]
+    },
+    {
+      "stem": "plan-review-convergence",
+      "name": "gsd:plan-review-convergence",
+      "desc": "Cross-AI plan convergence loop \u2014 replan with review feedback until no HIGH concerns remain.",
+      "desc_chars": 91,
+      "calls_skills": [
+        "phase",
+        "review"
+      ],
+      "calls_agents": [
+        "gsd-plan-checker",
+        "gsd-planner"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "pr-branch",
+      "name": "gsd:pr-branch",
+      "desc": "Create a clean PR branch by filtering out .planning/ commits \u2014 ready for code review",
+      "desc_chars": 84,
+      "calls_skills": [
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "profile-user",
+      "name": "gsd:profile-user",
+      "desc": "Generate developer behavioral profile and create Claude-discoverable artifacts",
+      "desc_chars": 78,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "progress",
+      "name": "gsd:progress",
+      "desc": "Check progress, advance workflow, or dispatch freeform intent \u2014 the unified GSD situational command",
+      "desc_chars": 99,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "autonomous",
+        "forensics",
+        "pause-work",
+        "stats",
+        "workstreams"
+      ]
+    },
+    {
+      "stem": "quick",
+      "name": "gsd:quick",
+      "desc": "Execute a quick task with GSD guarantees (atomic commits, state tracking) but skip optional agents",
+      "desc_chars": 98,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [
+        "gsd-executor",
+        "gsd-planner"
+      ],
+      "called_by": [
+        "code-review",
+        "settings"
+      ]
+    },
+    {
+      "stem": "resume-work",
+      "name": "gsd:resume-work",
+      "desc": "Resume work from previous session with full context restoration",
+      "desc_chars": 63,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "review-backlog",
+      "name": "gsd:review-backlog",
+      "desc": "Review and promote backlog items to active milestone",
+      "desc_chars": 52,
+      "calls_skills": [
+        "phase",
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "review",
+      "name": "gsd:review",
+      "desc": "Request cross-AI peer review of phase plans from external AI CLIs",
+      "desc_chars": 65,
+      "calls_skills": [
+        "config",
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "code-review",
+        "config",
+        "inbox",
+        "milestone-summary",
+        "ns-review",
+        "ns-workflow",
+        "plan-phase",
+        "plan-review-convergence",
+        "pr-branch",
+        "review-backlog",
+        "ship"
+      ]
+    },
+    {
+      "stem": "secure-phase",
+      "name": "gsd:secure-phase",
+      "desc": "Retroactively verify threat mitigations for a completed phase",
+      "desc_chars": 61,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "settings",
+      "name": "gsd:settings",
+      "desc": "Configure GSD workflow toggles and model profile",
+      "desc_chars": 48,
+      "calls_skills": [
+        "quick"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "config",
+        "ns-manage"
+      ]
+    },
+    {
+      "stem": "ship",
+      "name": "gsd:ship",
+      "desc": "Create PR, run review, and prepare for merge after verification passes",
+      "desc_chars": 70,
+      "calls_skills": [
+        "review"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "sketch",
+      "name": "gsd:sketch",
+      "desc": "Sketch UI/design ideas with throwaway HTML mockups, or propose what to sketch next (frontier mode)",
+      "desc_chars": 98,
+      "calls_skills": [
+        "spike"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "spec-phase",
+      "name": "gsd:spec-phase",
+      "desc": "Clarify WHAT a phase delivers with ambiguity scoring; produces a SPEC.md before discuss-phase.",
+      "desc_chars": 94,
+      "calls_skills": [
+        "discuss-phase",
+        "execute-phase",
+        "phase",
+        "plan-phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "spike",
+      "name": "gsd:spike",
+      "desc": "Spike an idea through experiential exploration, or propose what to spike next (frontier mode)",
+      "desc_chars": 93,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": [
+        "ns-ideate",
+        "sketch"
+      ]
+    },
+    {
+      "stem": "stats",
+      "name": "gsd:stats",
+      "desc": "Display project statistics \u2014 phases, plans, requirements, git metrics, and timeline",
+      "desc_chars": 83,
+      "calls_skills": [
+        "phase",
+        "progress"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "complete-milestone"
+      ]
+    },
+    {
+      "stem": "thread",
+      "name": "gsd:thread",
+      "desc": "Manage persistent context threads for cross-session work",
+      "desc_chars": 56,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "ns-manage"
+      ]
+    },
+    {
+      "stem": "ui-phase",
+      "name": "gsd:ui-phase",
+      "desc": "Generate UI design contract (UI-SPEC.md) for frontend phases",
+      "desc_chars": 60,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [
+        "gsd-ui-checker",
+        "gsd-ui-researcher"
+      ],
+      "called_by": []
+    },
+    {
+      "stem": "ui-review",
+      "name": "gsd:ui-review",
+      "desc": "Retroactive 6-pillar visual audit of implemented frontend code",
+      "desc_chars": 62,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "ultraplan-phase",
+      "name": "gsd:ultraplan-phase",
+      "desc": "[BETA] Offload plan phase to Claude Code's ultraplan cloud; review in browser and import back.",
+      "desc_chars": 94,
+      "calls_skills": [
+        "import",
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "undo",
+      "name": "gsd:undo",
+      "desc": "Safe git revert. Roll back phase or plan commits using the phase manifest with dependency checks.",
+      "desc_chars": 97,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "update",
+      "name": "gsd:update",
+      "desc": "Update GSD to latest version with changelog display",
+      "desc_chars": 51,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": [
+        "complete-milestone",
+        "docs-update",
+        "forensics",
+        "graphify",
+        "plan-phase"
+      ]
+    },
+    {
+      "stem": "validate-phase",
+      "name": "gsd:validate-phase",
+      "desc": "Retroactively audit and fill Nyquist validation gaps for a completed phase",
+      "desc_chars": 74,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "verify-work",
+      "name": "gsd:verify-work",
+      "desc": "Validate built features through conversational UAT",
+      "desc_chars": 50,
+      "calls_skills": [
+        "phase"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "execute-phase"
+      ]
+    },
+    {
+      "stem": "workspace",
+      "name": "gsd:workspace",
+      "desc": "Manage GSD workspaces \u2014 create, list, or remove isolated workspace environments",
+      "desc_chars": 79,
+      "calls_skills": [],
+      "calls_agents": [],
+      "called_by": []
+    },
+    {
+      "stem": "workstreams",
+      "name": "gsd:workstreams",
+      "desc": "Manage parallel workstreams \u2014 list, create, switch, status, progress, complete, and resume",
+      "desc_chars": 90,
+      "calls_skills": [
+        "phase",
+        "progress"
+      ],
+      "calls_agents": [],
+      "called_by": [
+        "ns-manage"
+      ]
+    }
+  ],
+  "clusters": {
+    "core_loop": [
+      "discuss-phase",
+      "execute-phase",
+      "help",
+      "new-project",
+      "plan-phase",
+      "update"
+    ],
+    "phase_variants": [
+      "ai-integration-phase",
+      "discuss-phase",
+      "execute-phase",
+      "mvp-phase",
+      "plan-phase",
+      "secure-phase",
+      "spec-phase",
+      "ui-phase",
+      "ultraplan-phase",
+      "validate-phase"
+    ],
+    "audit_review": [
+      "audit-fix",
+      "audit-milestone",
+      "audit-uat",
+      "code-review",
+      "eval-review",
+      "ns-review",
+      "plan-review-convergence",
+      "review",
+      "review-backlog",
+      "ui-review",
+      "verify-work"
+    ],
+    "milestone": [
+      "audit-milestone",
+      "complete-milestone",
+      "milestone-summary",
+      "new-milestone"
+    ],
+    "research_ideate": [
+      "explore",
+      "forensics",
+      "graphify",
+      "ns-ideate",
+      "sketch",
+      "spike"
+    ],
+    "workspace_state": [
+      "capture",
+      "inbox",
+      "pause-work",
+      "resume-work",
+      "thread",
+      "workspace",
+      "workstreams"
+    ],
+    "docs": [
+      "docs-update",
+      "ingest-docs"
+    ],
+    "ui": [
+      "ui-phase",
+      "ui-review"
+    ],
+    "ai_eval": [
+      "ai-integration-phase",
+      "eval-review"
+    ],
+    "ns_meta": [
+      "ns-context",
+      "ns-ideate",
+      "ns-manage",
+      "ns-project",
+      "ns-review",
+      "ns-workflow"
+    ],
+    "utility": [
+      "add-tests",
+      "cleanup",
+      "config",
+      "debug",
+      "extract-learnings",
+      "fast",
+      "health",
+      "help",
+      "import",
+      "manager",
+      "map-codebase",
+      "plan-review-convergence",
+      "pr-branch",
+      "profile-user",
+      "progress",
+      "quick",
+      "review-backlog",
+      "secure-phase",
+      "settings",
+      "ship",
+      "stats",
+      "undo",
+      "update"
+    ]
+  },
+  "agent_usage": {
+    "gsd-ai-researcher": 1,
+    "gsd-domain-researcher": 1,
+    "gsd-eval-planner": 1,
+    "gsd-framework-selector": 1,
+    "gsd-code-fixer": 1,
+    "gsd-code-reviewer": 1,
+    "gsd-debug-session-manager": 1,
+    "gsd-debugger": 1,
+    "gsd-doc-verifier": 1,
+    "gsd-doc-writer": 1,
+    "gsd-plan-checker": 3,
+    "gsd-roadmapper": 1,
+    "gsd-codebase-mapper": 1,
+    "gsd-phase-researcher": 1,
+    "gsd-planner": 3,
+    "gsd-executor": 1,
+    "gsd-ui-checker": 1,
+    "gsd-ui-researcher": 1
+  }
+}
