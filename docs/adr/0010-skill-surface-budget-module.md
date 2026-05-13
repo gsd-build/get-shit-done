@@ -72,7 +72,7 @@ These call sites should migrate behind the Skill Surface Budget Module:
 
 ### Tests expected to move with the seam
 
-- `tests/install-profiles-*.test.cjs` (any existing) — extend to assert profile resolution, transitive closure, and `--profile=core,audit` composition.
+- `tests/install-profiles-*.test.cjs` (any existing) — extend to assert profile resolution, transitive closure, and `--profile=core,standard` composition.
 - New `tests/skill-surface-budget-*.test.cjs` covering:
   - profile closure: a profile that lists `discuss-phase` must transitively include `phase` if `discuss-phase` requires it
   - lint failures: a skill body that references an un-required skill makes `lint:skill-deps` fail
@@ -86,13 +86,13 @@ The module should accept typed profile intent and return a typed resolved profil
 ```js
 // install-profiles.cjs (extended)
 resolveProfile({
-  modes: ['core' | 'standard' | 'audit' | 'research' | 'milestone' | 'workspace' | 'docs' | 'ui' | 'full'],
+  modes: ['core' | 'standard' | 'full'],
   skillsManifest: ManifestMap,   // parsed `requires:` graph
 })
 // → { name: 'standard', skills: Set<string>, agents: Set<string> }
 ```
 
-Profile composition: `--profile=core,audit` resolves to `union(closure(core), closure(audit))`. `--profile=full` is the identity profile (every skill).
+Profile composition: `--profile=core,standard` resolves to `union(closure(core), closure(standard))`. `--profile=full` is the identity profile (every skill).
 
 ```js
 stageSkillsForProfile(srcDir, resolvedProfile)  // returns staged dir path
@@ -102,7 +102,7 @@ stageAgentsForProfile(srcAgentsDir, resolvedProfile)  // new
 Profile marker IO is typed too, not stringly:
 
 ```js
-readActiveProfile(runtimeConfigDir) // → 'core' | 'standard' | 'audit,research' | 'full' | null
+readActiveProfile(runtimeConfigDir) // → 'core' | 'standard' | 'full' | null
 writeActiveProfile(runtimeConfigDir, profileName)
 ```
 
