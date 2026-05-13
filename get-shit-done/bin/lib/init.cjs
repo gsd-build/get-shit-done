@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execGit } = require('./shell-command-projection.cjs');
 const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, normalizePhaseName, toPosixPath, output, error, checkAgentsInstalled, phaseTokenMatches } = require('./core.cjs');
 const { planningPaths, planningDir, planningRoot } = require('./planning-workspace.cjs');
 const { maskIfSecret } = require('./secrets.cjs');
@@ -1511,11 +1511,8 @@ function detectChildRepos(dir) {
     const fullPath = path.join(dir, entry.name);
     const gitDir = path.join(fullPath, '.git');
     if (fs.existsSync(gitDir)) {
-      let hasUncommitted = false;
-      try {
-        const status = execSync('git status --porcelain', { cwd: fullPath, encoding: 'utf8', timeout: 5000 });
-        hasUncommitted = status.trim().length > 0;
-      } catch { /* best-effort */ }
+      const statusResult = execGit(['status', '--porcelain'], { cwd: fullPath, timeout: 5000 });
+      const hasUncommitted = statusResult.exitCode === 0 && statusResult.stdout.length > 0;
       repos.push({ name: entry.name, path: fullPath, has_uncommitted: hasUncommitted });
     }
   }
@@ -1530,11 +1527,8 @@ function cmdInitNewWorkspace(cwd, raw) {
   const childRepos = detectChildRepos(cwd);
 
   // Check if git worktree is available
-  let worktreeAvailable = false;
-  try {
-    execSync('git --version', { encoding: 'utf8', timeout: 5000, stdio: 'pipe' });
-    worktreeAvailable = true;
-  } catch { /* no git at all */ }
+  const gitVersion = execGit(['--version'], { timeout: 5000 });
+  const worktreeAvailable = gitVersion.exitCode === 0;
 
   const result = {
     default_workspace_base: defaultBase,
@@ -1634,12 +1628,10 @@ function cmdInitRemoveWorkspace(cwd, name, raw) {
   for (const repo of repos) {
     const repoPath = path.join(wsPath, repo.name);
     if (!fs.existsSync(repoPath)) continue;
-    try {
-      const status = execSync('git status --porcelain', { cwd: repoPath, encoding: 'utf8', timeout: 5000, stdio: 'pipe' });
-      if (status.trim().length > 0) {
-        dirtyRepos.push(repo.name);
-      }
-    } catch { /* best-effort */ }
+    const statusResult = execGit(['status', '--porcelain'], { cwd: repoPath, timeout: 5000 });
+    if (statusResult.exitCode === 0 && statusResult.stdout.length > 0) {
+      dirtyRepos.push(repo.name);
+    }
   }
 
   const result = {
