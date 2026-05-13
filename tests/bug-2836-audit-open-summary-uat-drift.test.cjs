@@ -160,8 +160,9 @@ describe('bug #2836: audit-open quick-task summary filename + UAT terminal statu
 
 describe('bug #2836: workflows/help.md one-liner reconciliation', () => {
   test('help.md quick-task one-liner uses ${quick_id}-SUMMARY.md pattern', () => {
+    // After #3039, help content moved into help/modes/full.md.
     const helpPath = path.resolve(
-      __dirname, '..', 'get-shit-done', 'workflows', 'help.md'
+      __dirname, '..', 'get-shit-done', 'workflows', 'help', 'modes', 'full.md'
     );
     const content = fs.readFileSync(helpPath, 'utf-8');
 

@@ -548,11 +548,17 @@ Configure per-step flags in `.planning/config.json` under `manager.flags`. These
 
 ### `/gsd-help`
 
-Show all commands and usage guide.
+Show GSD commands at the tier you ask for. Default fits one screen; `--full` is the complete reference; `<topic>` jumps directly to one section.
 
 ```bash
-/gsd-help                           # Quick reference
+/gsd-help                           # One-page tour (default)
+/gsd-help --brief                   # ~10-line one-liner refresher of top commands
+/gsd-help --full                    # Complete reference (every command, every flag)
+/gsd-help <topic>                   # One section only (e.g. /gsd-help debug)
+/gsd-help --brief <topic>           # Compact scoped lookup — signature + one-line summary
 ```
+
+See `get-shit-done/workflows/help/modes/topic.md` for the full alias table. Unknown topics print the recognized list.
 
 ---
 
