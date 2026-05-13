@@ -105,7 +105,7 @@ async function shouldDropArchivedPhaseMatch(
   projectDir: string,
   workstream?: string,
 ): Promise<boolean> {
-  if (!phaseInfo?.archived || !roadmapPhase?.found) return false;
+  if (!phaseInfo?.archived || !roadmapPhase || !roadmapPhase.found) return false;
   const archivedTag = String(phaseInfo.archived ?? '');
   const milestone = await getMilestoneInfo(projectDir, workstream);
   if (milestone?.version && archivedTag === milestone.version) return false;
