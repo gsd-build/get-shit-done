@@ -603,6 +603,71 @@ describe('validateHealth', () => {
     expect(warnings.some(w => w.code === 'W005')).toBe(true);
   });
 
+  it('does not emit W005 for 999.X backlog phase directory naming (#3473)', async () => {
+    await createHealthyPlanning();
+    await mkdir(join(tmpDir, '.planning', 'phases', '999.1-backlog-sweep'), { recursive: true });
+
+    const result = await validateHealth([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const warnings = data.warnings as Array<Record<string, unknown>>;
+    const w005ForBacklog = warnings.find(
+      w => w.code === 'W005' && String(w.message).includes('999.1-backlog-sweep'),
+    );
+    expect(w005ForBacklog).toBeUndefined();
+  });
+
+  it('does not emit W006 when roadmap phase exists in milestones archive dir (#3473)', async () => {
+    await createHealthyPlanning();
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), [
+      '# Roadmap',
+      '',
+      '## v1.0: Shipped ✅ SHIPPED',
+      '',
+      '### Phase 7: Old shipped phase',
+      '',
+      '## v1.1: Current',
+      '',
+      '### Phase 1: Foundation',
+      '',
+    ].join('\n'));
+    await mkdir(join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '07-old-shipped-phase'), { recursive: true });
+    await writeFile(
+      join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '07-old-shipped-phase', '07-01-PLAN.md'),
+      '# Plan\n',
+    );
+
+    const result = await validateHealth([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const warnings = data.warnings as Array<Record<string, unknown>>;
+    const w006s = warnings.filter(w => w.code === 'W006');
+    expect(w006s.some(w => String(w.message).includes('Phase 7'))).toBe(false);
+  });
+
+  it('does not emit I001 when plan file has descriptor but summary uses canonical stem (#3473)', async () => {
+    await createHealthyPlanning();
+    await mkdir(join(tmpDir, '.planning', 'phases', '68-bug-surface'), { recursive: true });
+    await writeFile(join(tmpDir, '.planning', 'phases', '68-bug-surface', '68-01-scaffolding-PLAN.md'), [
+      '---',
+      'phase: 68',
+      'plan: 01',
+      'wave: 1',
+      'depends_on: []',
+      'files_modified: []',
+      'autonomous: true',
+      '---',
+      '# Plan',
+    ].join('\n'));
+    await writeFile(join(tmpDir, '.planning', 'phases', '68-bug-surface', '68-01-SUMMARY.md'), '# Summary\n');
+
+    const result = await validateHealth([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const info = data.info as Array<Record<string, unknown>>;
+    const i001ForPhase = info.find(
+      i => i.code === 'I001' && String(i.message).includes('68-bug-surface/68-01-scaffolding-PLAN.md'),
+    );
+    expect(i001ForPhase).toBeUndefined();
+  });
+
   it('returns early with E010 when CWD equals home directory', async () => {
     const result = await validateHealth([], homedir());
     const data = result.data as Record<string, unknown>;
