@@ -96,7 +96,7 @@ describe('lint-skill-deps: frontmatter ↔ body consistency', () => {
     }
   });
 
-  test('exits 0 when skill has requires: but referenced skill not in dir (dep exists elsewhere)', () => {
+  test('exits non-zero when body references unknown skill stem', () => {
     const dir = createFixtureDir();
     try {
       writeSkillFile(dir, 'discuss-phase', {
@@ -104,9 +104,9 @@ describe('lint-skill-deps: frontmatter ↔ body consistency', () => {
         requires: ['phase'],
         body: 'Use /gsd:phase.',
       });
-      // 'phase' not in fixture dir — lint should not fail for this (body matches requires)
+      // Unknown skill reference should fail even if declared in requires.
       const result = runLint(['--dir', dir]);
-      assert.strictEqual(result.status, 0, 'Missing dep in dir is not a lint error (that is for profile closure check)');
+      assert.notStrictEqual(result.status, 0, 'Unknown skill references must fail lint');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

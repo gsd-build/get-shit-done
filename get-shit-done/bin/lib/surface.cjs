@@ -315,6 +315,19 @@ function _findInstallSource(runtimeConfigDir) {
  * @returns {string|null}
  */
 function _findAgentsSource(runtimeConfigDir) {
+  // Prefer .gsd-source sibling marker (commands/gsd) and derive agents from it.
+  const sourceMarker = path.join(runtimeConfigDir, '.gsd-source');
+  if (fs.existsSync(sourceMarker)) {
+    try {
+      const commandsSrc = fs.readFileSync(sourceMarker, 'utf8').trim();
+      if (commandsSrc && fs.existsSync(commandsSrc)) {
+        const commandsParent = path.dirname(commandsSrc); // .../commands
+        const candidate = path.resolve(commandsParent, '..', 'agents');
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    } catch {}
+  }
+
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
     const candidate = path.join(dir, 'agents');

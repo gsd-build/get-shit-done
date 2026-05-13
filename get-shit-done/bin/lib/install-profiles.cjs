@@ -207,24 +207,31 @@ function computeClosure(base, manifest) {
 function resolveProfile({ modes, manifest, _profilesOverride } = {}) {
   const profiles = _profilesOverride || PROFILES;
   const activeModes = (modes && modes.length > 0) ? modes : ['full'];
+  const normalizedModes = activeModes
+    .flatMap((mode) => String(mode).split(','))
+    .map((mode) => mode.trim())
+    .filter(Boolean);
+  const modesToResolve = normalizedModes.length > 0 ? normalizedModes : ['full'];
 
   // If any mode is 'full', the result is the full sentinel
-  if (activeModes.includes('full')) {
+  if (modesToResolve.includes('full')) {
+    return { name: 'full', skills: '*', agents: new Set() };
+  }
+
+  const validModes = modesToResolve.filter((mode) => Object.prototype.hasOwnProperty.call(profiles, mode));
+  if (validModes.length === 0) {
+    // Invalid/corrupt marker fallback: avoid empty installs by defaulting to full.
     return { name: 'full', skills: '*', agents: new Set() };
   }
 
   const man = manifest || new Map();
   const unionSkills = new Set();
 
-  for (const mode of activeModes) {
+  for (const mode of validModes) {
     const base = profiles[mode];
-    if (!base) {
-      // Unknown profile — treat as no-op (don't crash)
-      continue;
-    }
     if (base === '*') {
       // This profile is full — sentinel short-circuit
-      return { name: activeModes.join(','), skills: '*', agents: new Set() };
+      return { name: 'full', skills: '*', agents: new Set() };
     }
     const closure = computeClosure(base, man);
     for (const s of closure) unionSkills.add(s);
@@ -241,7 +248,7 @@ function resolveProfile({ modes, manifest, _profilesOverride } = {}) {
     }
   }
 
-  const name = activeModes.length === 1 ? activeModes[0] : activeModes.join(',');
+  const name = validModes.length === 1 ? validModes[0] : validModes.join(',');
   return { name, skills: unionSkills, agents: unionAgents };
 }
 
@@ -415,8 +422,8 @@ const PROFILE_RANK = Object.freeze(['core', 'standard', 'full']);
  * profile — i.e. the one with the smallest effective skill set.
  *
  * Ordering (most to least restrictive): core < standard < full.
- * Composed profiles (e.g. 'core,audit') are not currently ranked; they are
- * treated as equivalent to 'standard' for the purposes of this comparison.
+ * Composed profiles (e.g. 'core,audit') and unknown profiles are treated as
+ * 'full' for this comparison.
  *
  * @param {string[]} profileNames
  * @returns {string}
@@ -428,11 +435,11 @@ function mostRestrictiveProfile(profileNames) {
   let bestName = 'full';
   for (const name of profileNames) {
     const rank = PROFILE_RANK.indexOf(name);
-    // Unknown/composed profiles are treated as 'standard' rank for comparison
-    const effectiveRank = rank === -1 ? PROFILE_RANK.indexOf('standard') : rank;
+    // Unknown/composed profiles are treated as the permissive 'full' rank.
+    const effectiveRank = rank === -1 ? PROFILE_RANK.indexOf('full') : rank;
     if (effectiveRank < bestRank) {
       bestRank = effectiveRank;
-      bestName = name;
+      bestName = rank === -1 ? 'full' : name;
     }
   }
   return bestName;

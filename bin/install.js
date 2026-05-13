@@ -96,6 +96,7 @@ const {
   resolveProfile,
   loadSkillsManifest,
   stageSkillsForProfile,
+  stageAgentsForProfile,
 } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
 const {
   discoverInstallerMigrations,
@@ -148,6 +149,11 @@ const _requestedProfileName = hasMinimal ? 'core' : (_profileArgRaw || null);
 const installMode = hasMinimal ? 'minimal' : 'full';
 const hasSdk = args.includes('--sdk');
 const hasNoSdk = args.includes('--no-sdk');
+
+if (hasMinimal && _profileArgRaw) {
+  console.error(`  ${yellow}Cannot specify both --minimal/--core-only and --profile${reset}`);
+  process.exit(1);
+}
 
 if (hasSdk && hasNoSdk) {
   console.error(`  ${yellow}Cannot specify both --sdk and --no-sdk${reset}`);
@@ -6357,6 +6363,12 @@ function uninstall(isGlobal, runtime = 'claude') {
 
   let removedCount = 0;
 
+  // Remove profile marker so a clean reinstall defaults to full surface.
+  try {
+    fs.unlinkSync(path.join(targetDir, '.gsd-profile'));
+    removedCount++;
+  } catch {}
+
   // 1. Remove GSD commands/skills
   if (isOpencode || isKilo) {
     // OpenCode/Kilo: remove command/gsd-*.md files
@@ -7634,6 +7646,10 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     if (hasMinimal) return stageSkillsForMode(commandsGsdDir, installMode);
     return stageSkillsForProfile(commandsGsdDir, _resolvedProfile);
   }
+  function _stageAgents(agentsDir) {
+    if (hasMinimal) return agentsDir;
+    return stageAgentsForProfile(agentsDir, _resolvedProfile);
+  }
 
   const resolvedTarget = path.resolve(targetDir).replace(/\\/g, '/');
   const homeDir = os.homedir().replace(/\\/g, '/');
@@ -8218,7 +8234,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // when no GSD workflow is active. See gsd-build/get-shit-done#2762.
   // Note: agentsSrc is declared as let before the enclosing try block so it
   // is accessible by installCodexConfig() in the Codex config section below.
-  agentsSrc = path.join(src, 'agents');
+  agentsSrc = _stageAgents(path.join(src, 'agents'));
   const agentsDest = path.join(targetDir, 'agents');
 
   // Always remove stale gsd-* agents first so re-installing with
@@ -8657,17 +8673,20 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       _cleanTmpFiles(targetDir);
     };
 
-    let agentCount;
-    try {
-      // Generate Codex config.toml and per-agent .toml files.
-      // Skipped under --minimal — same rationale as filesystem agents above.
-      agentCount = installCodexConfig(targetDir, agentsSrc);
-    } catch (e) {
-      restoreCodexSnapshot();
-      throw e;
+    let agentCount = 0;
+    if (!isMinimalMode(installMode)) {
+      try {
+        // Generate Codex config.toml and per-agent .toml files.
+        agentCount = installCodexConfig(targetDir, agentsSrc);
+      } catch (e) {
+        restoreCodexSnapshot();
+        throw e;
+      }
+      console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
+      console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
+    } else {
+      console.log(`  ${dim}↳${reset} Skipping Codex agent config generation (minimal install)`);
     }
-    console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
-    console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
     // Copy hook files that are referenced in config.toml (#2153)
     // The main hook-copy block is gated to non-Codex runtimes, but Codex registers

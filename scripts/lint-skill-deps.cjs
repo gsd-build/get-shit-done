@@ -46,15 +46,12 @@ for (let i = 0; i < args.length; i++) {
 // Reference extraction from skill body
 // ---------------------------------------------------------------------------
 
-function extractBodyReferences(body, knownStems) {
+function extractBodyReferences(body) {
   const refs = new Set();
   const re = /(?:\/?)gsd:([a-z0-9_-]+)/g;
   let m;
   while ((m = re.exec(body)) !== null) {
-    const stem = m[1];
-    if (knownStems.has(stem)) {
-      refs.add(stem);
-    }
+    refs.add(m[1]);
   }
   return refs;
 }
@@ -73,6 +70,7 @@ function checkFrontmatterBodyConsistency(manifest, allStems) {
   const violations = [];
 
   for (const [stem, declared] of manifest) {
+    if (stem.startsWith('_calls_agents_')) continue;
     const filePath = path.join(commandsDir, stem + '.md');
     let content;
     try {
@@ -81,10 +79,19 @@ function checkFrontmatterBodyConsistency(manifest, allStems) {
       continue;
     }
     const body = extractBody(content);
-    const referenced = extractBodyReferences(body, allStems);
+    const referenced = extractBodyReferences(body);
     const declaredSet = new Set(declared);
     for (const ref of referenced) {
       if (ref === stem) continue;
+      if (!allStems.has(ref)) {
+        violations.push({
+          stem,
+          filePath,
+          undeclared: ref,
+          message: 'body references unknown skill gsd:' + ref,
+        });
+        continue;
+      }
       if (!declaredSet.has(ref)) {
         violations.push({
           stem,
@@ -136,7 +143,9 @@ function checkProfileClosure(manifest) {
 // ---------------------------------------------------------------------------
 
 const manifest = loadSkillsManifest(commandsDir);
-const allStems = new Set(manifest.keys());
+const allStems = new Set(
+  [...manifest.keys()].filter((k) => !k.startsWith('_calls_agents_'))
+);
 
 const consistencyViolations = checkFrontmatterBodyConsistency(manifest, allStems);
 const closureViolations = checkProfileClosure(manifest);
