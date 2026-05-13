@@ -1135,3 +1135,64 @@ Last activity: 2026-04-20 -- v1.0 shipped
     expect(data.error).toBeDefined();
   });
 });
+
+describe('statePrune current phase extraction (#3471)', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'gsd-sdk-stateprune-'));
+  });
+
+  afterEach(async () => {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('uses frontmatter progress.completed_phases when body Current Phase field is absent', async () => {
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v1.1
+status: executing
+progress:
+  total_phases: 21
+  completed_phases: 12
+  total_plans: 79
+  completed_plans: 75
+  percent: 95
+---
+
+# Session State
+
+## Current Position
+
+Phase 12 execution in progress.
+`;
+    await setupTestProject(tmpDir, stateContent);
+    const { statePrune } = await import('./state-mutation.js');
+    const result = await statePrune(['--keep-recent', '3', '--dry-run'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.pruned).toBe(false);
+    expect(data.dry_run).toBe(true);
+    expect(data.cutoff_phase).toBe(9);
+    expect(data.reason).toBeUndefined();
+  });
+
+  it('returns a targeted reason when no current phase source can be parsed', async () => {
+    const stateContent = `---
+gsd_state_version: 1.0
+milestone: v1.1
+status: executing
+---
+
+# Session State
+`;
+    await setupTestProject(tmpDir, stateContent);
+    const { statePrune } = await import('./state-mutation.js');
+    const result = await statePrune(['--keep-recent', '3', '--dry-run'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.pruned).toBe(false);
+    expect(typeof data.reason).toBe('string');
+    expect(String(data.reason)).toContain('Could not determine current phase');
+  });
+});
