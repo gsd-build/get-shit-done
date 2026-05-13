@@ -45,6 +45,7 @@ describe('install-profiles: MINIMAL_SKILL_ALLOWLIST', () => {
         'execute-phase',
         'help',
         'new-project',
+        'phase',
         'plan-phase',
         'update',
       ],
@@ -108,6 +109,7 @@ describe('install-profiles: stageSkillsForMode', () => {
     fs.writeFileSync(path.join(tmp, 'do.md'), '# do\n');
     fs.writeFileSync(path.join(tmp, 'help.md'), '# help\n');
     fs.writeFileSync(path.join(tmp, 'new-project.md'), '# new-project\n');
+    fs.writeFileSync(path.join(tmp, 'phase.md'), '# phase\n');
     fs.writeFileSync(path.join(tmp, 'discuss-phase.md'), '# discuss-phase\n');
     fs.writeFileSync(path.join(tmp, 'update.md'), '# update\n');
     fs.writeFileSync(path.join(tmp, 'progress.md'), '# progress\n');
@@ -136,6 +138,7 @@ describe('install-profiles: stageSkillsForMode', () => {
         'execute-phase.md',
         'help.md',
         'new-project.md',
+        'phase.md',
         'plan-phase.md',
         'update.md',
       ]);
@@ -539,21 +542,21 @@ describe('install: manifest records mode for both profiles', () => {
   test('default install records mode: "full" with the full skill+agent count', () => {
     const r = manifestModeAfterInstall([]);
     assert.strictEqual(r.mode, 'full');
-    assert.ok(r.skillCount > 6, `full install should have >6 skills, got ${r.skillCount}`);
+    assert.ok(r.skillCount > 7, `full install should have >7 skills, got ${r.skillCount}`);
     assert.ok(r.agentCount > 0, `full install should have agents, got ${r.agentCount}`);
   });
 
-  test('--minimal records mode: "minimal" with exactly 6 skills and 0 agents', () => {
+  test('--minimal records mode: "minimal" with exactly 7 skills and 0 agents', () => {
     const r = manifestModeAfterInstall(['--minimal']);
     assert.strictEqual(r.mode, 'minimal');
-    assert.strictEqual(r.skillCount, 6);
+    assert.strictEqual(r.skillCount, 7);
     assert.strictEqual(r.agentCount, 0);
   });
 
   test('--core-only is an alias for --minimal', () => {
     const r = manifestModeAfterInstall(['--core-only']);
     assert.strictEqual(r.mode, 'minimal');
-    assert.strictEqual(r.skillCount, 6);
+    assert.strictEqual(r.skillCount, 7);
     assert.strictEqual(r.agentCount, 0);
   });
 });

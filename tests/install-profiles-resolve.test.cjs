@@ -26,7 +26,7 @@ describe('PROFILES map', () => {
     assert.ok('full' in PROFILES, 'PROFILES.full missing');
   });
 
-  test('PROFILES.core contains the 6 main-loop skills', () => {
+  test('PROFILES.core contains the 7 main-loop skills (including phase)', () => {
     const core = PROFILES.core;
     assert.ok(Array.isArray(core), 'core should be an array');
     const sorted = [...core].sort();
@@ -35,6 +35,7 @@ describe('PROFILES map', () => {
       'execute-phase',
       'help',
       'new-project',
+      'phase',
       'plan-phase',
       'update',
     ]);
@@ -66,20 +67,18 @@ describe('resolveProfile', () => {
     assert.strictEqual(result.skills, '*');
   });
 
-  test('resolves core profile — returns 6+ skills (closure adds phase)', () => {
+  test('resolves core profile — returns 7+ skills', () => {
     const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
     const result = resolveProfile({ modes: ['core'], manifest });
     assert.strictEqual(result.name, 'core');
     assert.ok(result.skills instanceof Set, 'skills should be a Set');
-    // core has 6 base; closure adds phase (referenced by discuss/plan/execute/new-project)
-    // and config (referenced by discuss-phase, new-project), and more
-    assert.ok(result.skills.size >= 6, `core closure should have >=6 skills, got ${result.skills.size}`);
-    // All 6 base skills must be present
+    // core has 7 base skills.
+    assert.ok(result.skills.size >= 7, `core closure should have >=7 skills, got ${result.skills.size}`);
+    // All base skills must be present
     for (const s of PROFILES.core) {
       assert.ok(result.skills.has(s), `core closure should include ${s}`);
     }
-    // phase must be included via closure (discuss-phase, plan-phase, etc. require it)
-    assert.ok(result.skills.has('phase'), 'core closure must include phase (required by discuss/plan/execute-phase)');
+    assert.ok(result.skills.has('phase'), 'core closure must include phase');
   });
 
   test('resolves standard profile — returns superset of core', () => {

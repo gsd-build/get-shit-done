@@ -379,6 +379,7 @@ function execGit(args, opts = {}) {
 
 function execNpm(args, opts = {}) {
   const result = spawnSync('npm', args, {
+    cwd: opts.cwd,
     shell: process.platform === 'win32',
     encoding: 'utf-8',
     stdio: ['ignore', 'pipe', 'pipe'],

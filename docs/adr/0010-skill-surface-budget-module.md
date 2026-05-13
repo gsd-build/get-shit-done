@@ -21,9 +21,9 @@ We propose extending the existing install profile seam (`get-shit-done/bin/lib/i
 
 First migration slice should land the profile model and one new tier above `core`:
 
-1. Profile map (typed): `core` (current minimal, 6 skills), `standard` (~14 skills covering the audit + main-loop + utility floor), `full` (current default, 66 skills).
+1. Profile map (typed): `core` (current minimal, 7 skills including `phase`), `standard` (~13 skills covering the audit + main-loop + utility floor), `full` (current default, 66 skills).
 2. `requires:` frontmatter added to the **hot nodes** of the dependency graph first: `phase` (38 callers), `review` (11), `config` (7), `progress` (5), `update` (5). These are the skills whose absence silently breaks others, so they need explicit `required_by` audit before any profile narrows them out.
-3. Confirm-or-fix the latent bug surfaced by the audit: **`phase` is referenced by 38 skills but is not in the current `MINIMAL_SKILL_ALLOWLIST`.** Either add `phase` to `core` (Phase 1 of this ADR) or document why minimal works without it. Track separately if a behavioral repro is needed.
+3. Confirm-and-lock the latent bug fix surfaced by the audit: **`phase` is referenced by 38 skills and now belongs in `MINIMAL_SKILL_ALLOWLIST` / `PROFILES.core`.** Keep explicit coverage in minimal/core tests so this cannot regress.
 4. CLI surface: `--profile=`, comma-composed profiles, `--profile=help` listing each profile's contents and token cost.
 5. Profile marker persistence + `gsd update` re-application.
 
@@ -48,7 +48,7 @@ It should **not** in the first pass:
 These call sites should migrate behind the Skill Surface Budget Module:
 
 - `--minimal` / `--core-only` flag parsing — `bin/install.js:123-124`
-- `installMode` plumbing — `bin/install.js:7231` (already passes through to per-runtime copy fns)
+- `_effectiveInstallMode` plumbing + `isMinimalMode()` checks — `bin/install.js:7634-8465` (passes through to per-runtime copy fns)
 - minimal-agent skip block — `bin/install.js:8167-8207` (becomes "skip agents not in profile")
 - runtime-specific copy entry points that consume `stageSkillsForMode` — 13 sites per the existing comment in `install-profiles.cjs`
 - usage help block — `bin/install.js:508` (add `--profile=` documentation)
@@ -60,7 +60,7 @@ These call sites should migrate behind the Skill Surface Budget Module:
 
 ### New: `scripts/lint-skill-deps.cjs`
 
-- Walks `commands/gsd/*.md`, parses `requires:`, walks the body for `gsd:<name>` or `\b<stem>\b` references to other skills (same regex as the audit script in `audit/extract2.py`).
+- Walks `commands/gsd/*.md`, parses `requires:`, walks the body for `gsd:<name>` or `\b<stem>\b` references to other skills (same matching rules documented in `docs/research/2026-05-12-skill-surface-budget.md` §3.1).
 - Fails CI if `requires:` set ≠ actual references (modulo ignore-list for prose mentions that aren't actual dispatches).
 - Walks `PROFILES` from `install-profiles.cjs`, fails if any profile's transitive closure references a skill not in the profile.
 - Wires into `npm run lint:descriptions` (or as a sibling `lint:skill-deps`) and `pretest`.
@@ -133,7 +133,7 @@ requires: [phase, discuss-phase]   # GSD skills only; not Claude Code primitives
 - Whether the Phase-2 runtime `/gsd:surface` command (research memo §4 Option B) should be its own ADR or an amendment to this one. Leaning **separate ADR** because it introduces persistent runtime state outside the install pipeline.
 - Profile naming bikeshed. `core / standard / full` is the working proposal. Alternatives surveyed: `minimal / recommended / everything`, functional names (`planning, audit, research`). Settle in the implementation PR after a contributor poll.
 - Whether the `requires:` field should also be consumed by `/gsd:help` to render a "skills you have installed and what depends on what" graph. Likely yes, but out of scope for this ADR.
-- Whether `core` should include `phase` explicitly. The audit shows it's referenced by 38 skills and would be pulled in by closure as soon as any phase-typed skill is in the base set, so the answer probably falls out of Phase 1 implementation — flag if it doesn't.
+- Whether to keep `phase` explicitly listed in `core` forever vs relying purely on closure semantics. Current recommendation: keep explicit listing because minimal mode has a back-compat allowlist path.
 - Whether telemetry (opt-in) is worth proposing to inform where the `standard` profile line goes. Without it, the cut points are author-intuition. Track separately; not a blocker.
 - Whether the Anthropic platform asks (research memo §6 — lazy descriptions, per-plugin budgets, dependency-aware listing, `.disabled` toggles) should be filed before or after this ADR ships. Recommendation: file as a feedback bundle when ADR is accepted, so we ship Phase 1 unilaterally and platform improvements compose on top.
 

@@ -22,7 +22,7 @@ const INSTALL_SCRIPT = path.join(__dirname, '..', 'bin', 'install.js');
 const MANIFEST_NAME = 'gsd-file-manifest.json';
 
 describe('install-minimal-backcompat: PROFILES.core matches MINIMAL_SKILL_ALLOWLIST', () => {
-  test('PROFILES.core contains the same 6 skills as MINIMAL_SKILL_ALLOWLIST', () => {
+  test('PROFILES.core contains the same 7 skills as MINIMAL_SKILL_ALLOWLIST', () => {
     assert.deepStrictEqual(
       [...PROFILES.core].sort(),
       [...MINIMAL_SKILL_ALLOWLIST].sort(),
@@ -59,10 +59,10 @@ describe('install-minimal-backcompat: --minimal and --profile=core produce the s
     }
   }
 
-  test('--minimal produces mode "minimal" with exactly 6 skills', () => {
+  test('--minimal produces mode "minimal" with exactly 7 skills', () => {
     const r = installAndGetManifest(['--minimal']);
     assert.strictEqual(r.mode, 'minimal');
-    assert.strictEqual(r.skillCount, 6);
+    assert.strictEqual(r.skillCount, 7);
   });
 
   test('--minimal writes .gsd-profile marker with "core"', () => {
