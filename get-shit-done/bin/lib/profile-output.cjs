@@ -12,7 +12,8 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { output, error, safeReadFile, loadConfig } = require('./core.cjs');
+const { output, error, loadConfig } = require('./core.cjs');
+const { platformReadSync: safeReadFile, platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { getGlobalSkillDir } = require('./runtime-homes.cjs');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -485,8 +486,10 @@ function cmdWriteProfile(cwd, options, raw) {
   if (!fs.existsSync(analysisPath)) error(`Analysis file not found: ${analysisPath}`);
 
   let analysis;
+  const analysisRaw = safeReadFile(analysisPath);
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf-8'));
+    if (analysisRaw === null) throw new Error(`analysis file not found: ${analysisPath}`);
+    analysis = JSON.parse(analysisRaw);
   } catch (err) {
     error(`Failed to parse analysis JSON: ${err.message}`);
   }
@@ -631,8 +634,8 @@ function cmdWriteProfile(cwd, options, raw) {
     outputPath = path.join(cwd, outputPath);
   }
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, template, 'utf-8');
+  platformEnsureDir(path.dirname(outputPath));
+  platformWriteSync(outputPath, template);
 
   const result = {
     profile_path: outputPath,
@@ -716,8 +719,10 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
   if (!fs.existsSync(analysisPath)) error(`Analysis file not found: ${analysisPath}`);
 
   let analysis;
+  const analysisRaw = safeReadFile(analysisPath);
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf-8'));
+    if (analysisRaw === null) throw new Error(`analysis file not found: ${analysisPath}`);
+    analysis = JSON.parse(analysisRaw);
   } catch (err) {
     error(`Failed to parse analysis JSON: ${err.message}`);
   }
@@ -803,8 +808,8 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
     outputPath = path.join(cwd, outputPath);
   }
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, template, 'utf-8');
+  platformEnsureDir(path.dirname(outputPath));
+  platformWriteSync(outputPath, template);
 
   const result = {
     command_path: outputPath,
@@ -824,8 +829,10 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
   if (!fs.existsSync(analysisPath)) error(`Analysis file not found: ${analysisPath}`);
 
   let analysis;
+  const analysisRaw = safeReadFile(analysisPath);
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf-8'));
+    if (analysisRaw === null) throw new Error(`analysis file not found: ${analysisPath}`);
+    analysis = JSON.parse(analysisRaw);
   } catch (err) {
     error(`Failed to parse analysis JSON: ${err.message}`);
   }
@@ -904,8 +911,8 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
 
   let action;
 
-  if (fs.existsSync(targetPath)) {
-    let existingContent = fs.readFileSync(targetPath, 'utf-8');
+  let existingContent = safeReadFile(targetPath);
+  if (existingContent !== null) {
     const startMarker = '<!-- GSD:profile-start -->';
     const endMarker = '<!-- GSD:profile-end -->';
     const startIdx = existingContent.indexOf(startMarker);
@@ -920,10 +927,10 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
       existingContent = existingContent.trimEnd() + '\n\n' + sectionContent + '\n';
       action = 'appended';
     }
-    fs.writeFileSync(targetPath, existingContent, 'utf-8');
+    platformWriteSync(targetPath, existingContent);
   } else {
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, sectionContent + '\n', 'utf-8');
+    platformEnsureDir(path.dirname(targetPath));
+    platformWriteSync(targetPath, sectionContent + '\n');
     action = 'created';
   }
 
@@ -1021,8 +1028,8 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
     sections.push(CLAUDE_MD_PROFILE_PLACEHOLDER);
     existingContent = sections.join('\n\n') + '\n';
     action = 'created';
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, existingContent, 'utf-8');
+    platformEnsureDir(path.dirname(outputPath));
+    platformWriteSync(outputPath, existingContent);
   } else {
     action = 'updated';
     let fileContent = existingContent;
@@ -1060,7 +1067,7 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
       fileContent = fileContent.trimEnd() + '\n\n' + CLAUDE_MD_PROFILE_PLACEHOLDER + '\n';
     }
 
-    fs.writeFileSync(outputPath, fileContent, 'utf-8');
+    platformWriteSync(outputPath, fileContent);
   }
 
   const finalContent = safeReadFile(outputPath);
