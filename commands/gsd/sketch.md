@@ -14,6 +14,7 @@ allowed-tools:
   - WebFetch
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
+requires: [spike]
 ---
 <objective>
 Explore design directions through throwaway HTML mockups before committing to implementation.

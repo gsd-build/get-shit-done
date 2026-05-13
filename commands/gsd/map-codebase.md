@@ -9,6 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Agent
+requires: [config]
 ---
 
 <objective>

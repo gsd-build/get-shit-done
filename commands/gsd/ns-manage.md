@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [inbox, settings, thread, workstreams]
 ---
 
 Route to the appropriate management skill based on the user's intent.

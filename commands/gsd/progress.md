@@ -9,6 +9,7 @@ allowed-tools:
   - Glob
   - SlashCommand
   - AskUserQuestion
+requires: [phase]
 ---
 <objective>
 Check project progress, summarize recent work and what's ahead, then intelligently route to the next action.

@@ -11,6 +11,7 @@ allowed-tools:
   - Bash
   - Agent
   - AskUserQuestion
+requires: [phase]
 ---
 <objective>
 Execute small, ad-hoc tasks with GSD guarantees (atomic commits, STATE.md tracking).

@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [capture, phase, spike]
 ---
 
 Route to the appropriate exploration / capture skill based on the user's intent.

@@ -8,6 +8,7 @@ allowed-tools:
   - Bash
   - Agent
   - AskUserQuestion
+requires: [new-project, phase]
 ---
 <objective>
 Start a new milestone: questioning → research (optional) → requirements → roadmap.

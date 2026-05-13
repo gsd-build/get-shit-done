@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [phase, review]
 ---
 
 Route to the appropriate phase-pipeline skill based on the user's intent.

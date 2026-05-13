@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [phase, review]
 ---
 
 Route to the appropriate quality / review skill based on the user's intent.

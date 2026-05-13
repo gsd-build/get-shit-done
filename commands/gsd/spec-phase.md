@@ -9,6 +9,7 @@ allowed-tools:
   - Glob
   - Grep
   - AskUserQuestion
+requires: [discuss-phase, execute-phase, phase, plan-phase]
 ---
 
 <objective>

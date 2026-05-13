@@ -7,6 +7,7 @@ allowed-tools:
   - Write
   - Bash
   - AskUserQuestion
+requires: [code-review, review, settings]
 ---
 
 <objective>

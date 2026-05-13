@@ -5,6 +5,7 @@ argument-hint: "[build|query <term>|status|diff]"
 allowed-tools:
   - Read
   - Bash
+requires: [config, fast, phase, update]
 ---
 
 **STOP -- DO NOT READ THIS FILE. You are already reading it. This prompt was injected into your context by Claude Code's command system. Using the Read tool on this file wastes tokens. Begin executing Step 0 immediately.**

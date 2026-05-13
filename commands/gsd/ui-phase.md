@@ -12,6 +12,7 @@ allowed-tools:
   - WebFetch
   - AskUserQuestion
   - mcp__context7__*
+requires: [phase]
 ---
 <objective>
 Create a UI design contract (UI-SPEC.md) for a frontend phase.

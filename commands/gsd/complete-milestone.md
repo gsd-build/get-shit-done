@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
+requires: [phase, stats, update]
 ---
 
 <objective>

@@ -6,6 +6,7 @@ allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
+requires: [review]
 ---
 
 <objective>

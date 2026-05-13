@@ -12,6 +12,7 @@ allowed-tools:
   - Glob
   - Agent
   - AskUserQuestion
+requires: [audit-uat]
 ---
 <objective>
 Run an audit, classify findings as auto-fixable vs manual-only, then autonomously fix

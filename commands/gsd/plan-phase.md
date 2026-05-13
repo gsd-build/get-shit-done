@@ -12,6 +12,7 @@ allowed-tools:
   - AskUserQuestion
   - WebFetch
   - mcp__context7__*
+requires: [discuss-phase, phase, review, update]
 ---
 <objective>
 Create executable phase prompts (PLAN.md files) for a roadmap phase with integrated research and verification.

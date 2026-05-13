@@ -9,6 +9,7 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
+requires: [review]
 ---
 <objective>
 One-command triage of the project's GitHub inbox. Fetches all open issues and PRs,
