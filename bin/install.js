@@ -91,6 +91,11 @@ const {
   stageSkillsForMode,
   readActiveProfile,
   writeActiveProfile,
+  resolveEffectiveProfile,
+  mostRestrictiveProfile,
+  resolveProfile,
+  loadSkillsManifest,
+  stageSkillsForProfile,
 } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
 const {
   discoverInstallerMigrations,
@@ -7594,20 +7599,40 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // `@$HOME/...` is treated as a literal path relative to the config dir, producing
   // `command/$HOME/...` (file not found). Use the absolute path for OpenCode so
   // @-references resolve correctly (#2376 Windows, #2831 macOS/Linux).
-  // gsd update marker re-application: if no --profile= or --minimal flag was
-  // given explicitly, check whether a .gsd-profile marker already exists in
-  // targetDir. If it does, respect it instead of silently expanding to full.
-  // This prevents the foot-gun described in ADR-0010's Consequences section.
-  if (!_requestedProfileName && !hasMinimal) {
-    const _existingProfile = readActiveProfile(targetDir);
-    if (_existingProfile && _existingProfile !== 'full') {
-      // A non-full profile was previously recorded. For now we log it — the
-      // full installMode pipeline still runs (back-compat). In a future pass
-      // this will drive stageSkillsForProfile. The marker is preserved.
-      // (The effective install is still 'full' here — non-interactive update
-      // narrowing is a Phase 1b item; this wires the read path.)
-      process.env.GSD_ACTIVE_PROFILE = _existingProfile;
-    }
+  // gsd update marker re-application (ADR-0010 Deviation 2):
+  // Resolve which profile to use for this runtime's install:
+  //   1. --minimal / --core-only → back-compat path (stageSkillsForMode keeps strict 6-skill list)
+  //   2. Explicit --profile=<name> → use it (overrides any marker)
+  //   3. Marker exists in targetDir → honor it (prevents silent expansion on update)
+  //   4. Else → 'full' (back-compat for fresh non-interactive installs)
+  //
+  // Multi-runtime disagreement: if installing across runtimes and their markers
+  // differ, the caller may use mostRestrictiveProfile() across the per-runtime
+  // results — here we resolve each runtime independently.
+  //
+  // Note: --minimal uses stageSkillsForMode (back-compat: strictly 6 skills, no closure).
+  // Named profiles (--profile=X or marker-driven) use resolveProfile() for transitive closure.
+  const _activeProfileName = hasMinimal
+    ? 'core'  // --minimal is a back-compat alias for the core profile; marker records 'core'
+    : resolveEffectiveProfile({
+        requestedProfileName: _requestedProfileName,
+        targetDir,
+      });
+  // Load the manifest and compute resolved profile for named profiles.
+  // --minimal keeps its own staging path via _stageSkillsFn (see below).
+  const _commandsDir = path.join(src, 'commands', 'gsd');
+  const _skillsManifest = hasMinimal ? new Map() : loadSkillsManifest(_commandsDir);
+  const _resolvedProfile = hasMinimal
+    ? null  // --minimal uses stageSkillsForMode at dispatch sites
+    : resolveProfile({
+        modes: [_activeProfileName],
+        manifest: _skillsManifest,
+      });
+  // Unified staging function: for --minimal uses stageSkillsForMode (back-compat);
+  // for named profiles uses stageSkillsForProfile (new API with transitive closure).
+  function _stageSkills(commandsGsdDir) {
+    if (hasMinimal) return stageSkillsForMode(commandsGsdDir, installMode);
+    return stageSkillsForProfile(commandsGsdDir, _resolvedProfile);
   }
 
   const resolvedTarget = path.resolve(targetDir).replace(/\\/g, '/');
@@ -7858,7 +7883,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     fs.mkdirSync(commandDir, { recursive: true });
 
     // Copy commands/gsd/*.md as command/gsd-*.md (flatten structure)
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyFlattenedCommands(gsdSrc, commandDir, 'gsd', pathPrefix, runtime);
     if (verifyInstalled(commandDir, 'command/gsd-*')) {
       const count = fs.readdirSync(commandDir).filter(f => f.startsWith('gsd-')).length;
@@ -7868,7 +7893,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCodex) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCodexSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -7878,7 +7903,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCopilot) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCopilotSkills(gsdSrc, skillsDir, 'gsd', isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -7893,7 +7918,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isAntigravity) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsAntigravitySkills(gsdSrc, skillsDir, 'gsd', isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -7908,7 +7933,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCursor) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCursorSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
     if (installedSkillNames.length > 0) {
@@ -7918,7 +7943,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isWindsurf) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsWindsurfSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
     if (installedSkillNames.length > 0) {
@@ -7928,7 +7953,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isAugment) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsAugmentSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -7938,7 +7963,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isTrae) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsTraeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -7948,7 +7973,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isQwen) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -7984,7 +8009,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // gsd/ category dir, alongside a DESCRIPTION.md that Hermes uses as the
     // category summary.
     const hermesSkillsDir = path.join(targetDir, 'skills', 'gsd');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsClaudeSkills(gsdSrc, hermesSkillsDir, 'gsd', pathPrefix, runtime, isGlobal);
     writeHermesCategoryDescription(hermesSkillsDir);
     if (fs.existsSync(hermesSkillsDir)) {
@@ -8027,7 +8052,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCodebuddy) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCodebuddySkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -8081,7 +8106,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     } else {
       const commandsDir = path.join(targetDir, 'commands');
       fs.mkdirSync(commandsDir, { recursive: true });
-      const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+      const gsdSrc = _stageSkills(_commandsDir);
       const gsdDest = path.join(commandsDir, 'gsd');
       copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
       if (verifyInstalled(gsdDest, 'commands/gsd')) {
@@ -8093,7 +8118,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   } else if (isGlobal) {
     // Claude Code global: skills/ format (2.1.88+ compatibility)
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -8128,7 +8153,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // commands from .claude/commands/gsd/, not .claude/skills/
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     const gsdDest = path.join(commandsDir, 'gsd');
     copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
     if (verifyInstalled(gsdDest, 'commands/gsd')) {
@@ -8416,14 +8441,10 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   console.log(`  ${green}✓${reset} Wrote file manifest (${MANIFEST_NAME})`);
 
   // Persist the active profile marker so `gsd update` can re-apply it.
-  // When --profile= was given, record that name. When --minimal/--core-only
-  // was given, record 'core'. Otherwise record 'full'.
-  // For update runs (no explicit profile flag and marker already exists),
-  // the existing marker is preserved — it was already read and
-  // _requestedProfileName may have been set from it (see code below).
+  // _activeProfileName is already computed above via resolveEffectiveProfile():
+  //   explicit --profile= flag > existing marker > 'full' default.
   try {
-    const _effectiveProfileName = _requestedProfileName || 'full';
-    writeActiveProfile(targetDir, _effectiveProfileName);
+    writeActiveProfile(targetDir, _activeProfileName);
   } catch {
     // Non-fatal: marker persistence failure doesn't break the install.
   }

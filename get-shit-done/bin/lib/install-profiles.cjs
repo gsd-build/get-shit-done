@@ -387,6 +387,71 @@ function writeActiveProfile(runtimeConfigDir, profileName) {
 }
 
 // ---------------------------------------------------------------------------
+// Profile resolution helpers for install / update flows
+// ---------------------------------------------------------------------------
+
+/**
+ * Rank ordering for profiles (lower index = more restrictive / smaller skill set).
+ * Unknown profiles default to the permissive end (treated as 'full').
+ */
+const PROFILE_RANK = Object.freeze(['core', 'standard', 'full']);
+
+/**
+ * Given an array of profile names (one per runtime), return the most-restrictive
+ * profile — i.e. the one with the smallest effective skill set.
+ *
+ * Ordering (most to least restrictive): core < standard < full.
+ * Composed profiles (e.g. 'core,audit') are not currently ranked; they are
+ * treated as equivalent to 'standard' for the purposes of this comparison.
+ *
+ * @param {string[]} profileNames
+ * @returns {string}
+ */
+function mostRestrictiveProfile(profileNames) {
+  if (!profileNames || profileNames.length === 0) return 'full';
+  // Initialize with the least-restrictive rank (one past the end of PROFILE_RANK)
+  let bestRank = PROFILE_RANK.length;
+  let bestName = 'full';
+  for (const name of profileNames) {
+    const rank = PROFILE_RANK.indexOf(name);
+    // Unknown/composed profiles are treated as 'standard' rank for comparison
+    const effectiveRank = rank === -1 ? PROFILE_RANK.indexOf('standard') : rank;
+    if (effectiveRank < bestRank) {
+      bestRank = effectiveRank;
+      bestName = name;
+    }
+  }
+  return bestName;
+}
+
+/**
+ * Resolve the effective profile name for an install() run.
+ *
+ * Priority:
+ *   1. Explicit flag (requestedProfileName != null) → use it as-is.
+ *   2. Marker exists in targetDir and is not 'full' → use marker.
+ *   3. Else → 'full' (back-compat for fresh non-interactive installs).
+ *
+ * This is the single source-of-truth for the "which profile should this
+ * install() invocation use?" question. Extracted so it can be unit-tested
+ * independently of the bin/install.js megafile.
+ *
+ * @param {object} opts
+ * @param {string|null} opts.requestedProfileName explicit flag value (or null)
+ * @param {string} opts.targetDir runtime config dir (e.g. ~/.claude)
+ * @returns {string} profile name, e.g. 'core', 'standard', 'full'
+ */
+function resolveEffectiveProfile({ requestedProfileName, targetDir }) {
+  // 1. Explicit flag overrides everything
+  if (requestedProfileName != null) return requestedProfileName;
+  // 2. Marker-driven (gsd update path)
+  const marker = readActiveProfile(targetDir);
+  if (marker && marker !== 'full') return marker;
+  // 3. Default
+  return 'full';
+}
+
+// ---------------------------------------------------------------------------
 // Back-compat shims (deprecated — use profile-based API instead)
 // ---------------------------------------------------------------------------
 
@@ -466,8 +531,11 @@ function stageSkillsForMode(srcDir, mode) {
 module.exports = {
   // New profile API (ADR-0010)
   PROFILES,
+  PROFILE_RANK,
   loadSkillsManifest,
   resolveProfile,
+  resolveEffectiveProfile,
+  mostRestrictiveProfile,
   stageSkillsForProfile,
   stageAgentsForProfile,
   readActiveProfile,
