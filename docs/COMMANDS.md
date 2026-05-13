@@ -966,6 +966,26 @@ All answers merge via `gsd-sdk query config-set`, preserving unrelated keys. API
 
 See [CONFIGURATION.md](CONFIGURATION.md) for the full schema and defaults.
 
+### `/gsd-surface`
+
+Toggle which skills are surfaced — apply a profile, list, or disable a cluster without reinstall.
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | Show enabled and disabled clusters and skills |
+| `status` | Alias for `list` plus token cost summary |
+| `profile <name>` | Write `baseProfile` and re-stage skills |
+| `disable <cluster>` | Add cluster to disabled list and re-stage |
+| `enable <cluster>` | Remove cluster from disabled list and re-stage |
+| `reset` | Delete surface delta; return to install-time profile |
+
+```bash
+/gsd-surface list                   # Show current surface
+/gsd-surface profile standard       # Switch to standard profile
+/gsd-surface disable utility        # Disable the utility cluster
+/gsd-surface reset                  # Restore install-time profile
+```
+
 ---
 
 ## Brownfield Commands

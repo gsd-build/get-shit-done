@@ -522,6 +522,19 @@ Configure GSD beyond the basic settings: model profile, advanced tuning, and thi
 
 Usage: `/gsd:config --profile budget`
 
+**`/gsd:surface [list|status|profile <name>|disable <cluster>|enable <cluster>|reset]`**
+Toggle which skills are surfaced — apply a profile, list, or disable a cluster without reinstall.
+
+- `list` / `status` — Show enabled and disabled clusters and skills with token cost
+- `profile <name>` — Switch to a named base profile (`core`, `standard`, `full`)
+- `disable <cluster>` — Remove a cluster from the active surface
+- `enable <cluster>` — Add a cluster back to the active surface
+- `reset` — Delete the surface delta and return to the install-time profile
+
+Usage: `/gsd:surface list`
+Usage: `/gsd:surface profile standard`
+Usage: `/gsd:surface disable utility`
+
 ### Utility Commands
 
 **`/gsd:cleanup`**

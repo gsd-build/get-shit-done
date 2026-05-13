@@ -2,7 +2,10 @@
 name: gsd:surface
 description: Toggle which skills are surfaced — apply a profile, list, or disable a cluster without reinstall
 argument-hint: "[list|status|profile <name>|disable <cluster>|enable <cluster>|reset]"
-allowed-tools: [Read, Write, Bash]
+allowed-tools:
+  - Read
+  - Write
+  - Bash
 requires: [config, update]
 ---
 
