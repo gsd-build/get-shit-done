@@ -222,7 +222,11 @@ export const resolveModel: QueryHandler = async (args, projectDir, workstream) =
   const tier = typeof phaseTier === 'string' ? phaseTier : alias;
   const runtimeTier = resolveRuntimeTier(config as Record<string, unknown>, tier);
   if (runtimeTier?.model) {
-    return { data: { model: runtimeTier.model, profile } };
+    const result: Record<string, unknown> = { model: runtimeTier.model, profile };
+    if (runtimeTier.reasoning_effort) {
+      result.reasoning_effort = runtimeTier.reasoning_effort;
+    }
+    return { data: result };
   }
 
   if (resolveModelIds === 'omit') {

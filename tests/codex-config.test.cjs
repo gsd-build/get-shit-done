@@ -133,6 +133,8 @@ describe('getCodexSkillAdapterHeader', () => {
     const result = getCodexSkillAdapterHeader('gsd-execute-phase');
     assert.ok(result.includes('spawn_agent'), 'maps to spawn_agent');
     assert.ok(result.includes('agent_type'), 'maps subagent_type to agent_type');
+    assert.ok(result.includes('reasoning_effort'), 'documents reasoning_effort transport');
+    assert.ok(result.includes('do not invent one-off effort literals'), 'keeps effort policy centralized');
     assert.ok(result.includes('fork_context'), 'documents fork_context default');
     assert.ok(result.includes('wait(ids)'), 'documents parallel wait pattern');
     assert.ok(result.includes('close_agent'), 'documents close_agent cleanup');
