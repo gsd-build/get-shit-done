@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const childProcess = require('child_process');
+const { execTool } = require('./shell-command-projection.cjs');
 const { atomicWriteFileSync, execGit } = require('./core.cjs');
 
 // ─── Config Gate ─────────────────────────────────────────────────────────────
@@ -58,15 +58,13 @@ const GRAPHIFY_REASON = Object.freeze({
 
 function execGraphify(cwd, args, options = {}) {
   const timeout = options.timeout ?? 30000;
-  const result = childProcess.spawnSync('graphify', args, {
+  const result = execTool('graphify', args, {
     cwd,
-    stdio: 'pipe',
-    encoding: 'utf-8',
     timeout,
     env: { ...process.env, PYTHONUNBUFFERED: '1' },
   });
 
-  // ENOENT -- graphify binary not found on PATH
+  // ENOENT — seam normalizes to exitCode 127. Surface as typed reason.
   if (result.error && result.error.code === 'ENOENT') {
     return {
       exitCode: 127,
@@ -76,23 +74,22 @@ function execGraphify(cwd, args, options = {}) {
     };
   }
 
-  // Timeout -- subprocess killed via SIGTERM
+  // Timeout — seam exposes signal; spawnSync sets SIGTERM when killed by timeout.
   if (result.signal === 'SIGTERM') {
     return {
       exitCode: 124,
-      stdout: (result.stdout ?? '').toString().trim(),
+      stdout: result.stdout,
       stderr: 'graphify timed out after ' + timeout + 'ms',
       reason: GRAPHIFY_REASON.TIMEOUT,
       timeout_ms: timeout,
     };
   }
 
-  const exitCode = result.status ?? 1;
   return {
-    exitCode,
-    stdout: (result.stdout ?? '').toString().trim(),
-    stderr: (result.stderr ?? '').toString().trim(),
-    reason: exitCode === 0 ? GRAPHIFY_REASON.OK : GRAPHIFY_REASON.EXIT_NONZERO,
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    reason: result.exitCode === 0 ? GRAPHIFY_REASON.OK : GRAPHIFY_REASON.EXIT_NONZERO,
   };
 }
 
@@ -105,11 +102,7 @@ function execGraphify(cwd, args, options = {}) {
  * @returns {{ installed: boolean, message?: string }}
  */
 function checkGraphifyInstalled() {
-  const result = childProcess.spawnSync('graphify', ['--help'], {
-    stdio: 'pipe',
-    encoding: 'utf-8',
-    timeout: 5000,
-  });
+  const result = execTool('graphify', ['--help'], { timeout: 5000 });
 
   if (result.error) {
     return {
@@ -134,18 +127,13 @@ function checkGraphifyInstalled() {
  */
 function checkGraphifyVersion() {
   // Strategy 1: try `graphify --version` directly (2s timeout -- fast path)
-  const versionResult = childProcess.spawnSync('graphify', ['--version'], {
-    stdio: 'pipe',
-    encoding: 'utf-8',
-    timeout: 2000,
-  });
+  const versionResult = execTool('graphify', ['--version'], { timeout: 2000 });
 
   let versionStr = null;
 
-  if (!versionResult.error && versionResult.status === 0) {
-    const raw = (versionResult.stdout || '').trim();
+  if (!versionResult.error && versionResult.exitCode === 0) {
     // graphify --version may emit "graphify 0.4.23" or just "0.4.23"
-    const match = raw.match(/(\d+\.\d+(?:\.\d+)*)/);
+    const match = versionResult.stdout.match(/(\d+\.\d+(?:\.\d+)*)/);
     if (match) {
       versionStr = match[1];
     }
@@ -153,17 +141,13 @@ function checkGraphifyVersion() {
 
   // Strategy 2: fall back to python3 importlib.metadata
   if (!versionStr) {
-    const pyResult = childProcess.spawnSync('python3', [
+    const pyResult = execTool('python3', [
       '-c',
       'from importlib.metadata import version; print(version("graphifyy"))',
-    ], {
-      stdio: 'pipe',
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
+    ], { timeout: 5000 });
 
-    if (!pyResult.error && pyResult.status === 0 && pyResult.stdout && pyResult.stdout.trim()) {
-      versionStr = pyResult.stdout.trim();
+    if (!pyResult.error && pyResult.exitCode === 0 && pyResult.stdout) {
+      versionStr = pyResult.stdout;
     }
   }
 
