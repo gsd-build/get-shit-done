@@ -660,3 +660,16 @@ Module owning all OS-facing I/O for the tool: runtime-aware command-text renderi
   - add `review-reviewer-selection.cjs` row + count update in `docs/INVENTORY.md`
   - regenerate `docs/INVENTORY-MANIFEST.json`
   - replace legacy `/gsd-review` mention with canonical `/gsd:review` in source comments
+
+### 2026-05-13 — Phase 1 rebase + PR open (#3465)
+
+- branch: `feat/3465-shell-projection-platform-io-seam`; PR: #3470 on `gsd-build/get-shit-done`
+- rebase pattern: 4 sibling-branch commits (#3464) were skipped as "patch contents already upstream" — expected when a feature branch is cut before a sibling merges to main
+- untracked files block rebase: `git stash --include-untracked` before `git rebase origin/main`
+- add/add conflict resolution: when HEAD side is empty (feature didn't have the file) and ours has the content, `git checkout --theirs <file>` is correct
+- content conflict resolution: `git checkout --ours CONTEXT.md` + manual append of our new sections — preserves main's full content while adding our additions
+- `docs/research/` was untracked pre-rebase but came in from main during rebase — already tracked, no action required
+- force-push after rebase: `git push --force-with-lease origin <branch>` (not `--force`)
+- stash pop can fail if main brought in the same files: drop the stash with `git stash drop` when files are already present
+- PR hook requires reading all listed contribution files before `gh pr create` will execute — including `pull_request_template.md`, all typed templates, and all issue templates
+- changeset type for seam additions: `Changed` (not `Added`) — expands existing module, not a new standalone feature
