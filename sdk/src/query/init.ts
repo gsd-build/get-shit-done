@@ -707,7 +707,7 @@ export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) =>
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   // If the only match comes from an archived milestone, prefer current ROADMAP
-  if (await shouldDropArchivedPhaseMatch(phaseInfo, roadmapPhase, projectDir, workstream)) {
+  if (roadmapPhase?.found && await shouldDropArchivedPhaseMatch(phaseInfo, roadmapPhase, projectDir, workstream)) {
     const phaseName = roadmapPhase.phase_name as string;
     phaseInfo = {
       found: true,
