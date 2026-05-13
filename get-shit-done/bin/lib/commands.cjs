@@ -3,8 +3,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
+const { execGit } = require('./shell-command-projection.cjs');
+const { safeReadFile, loadConfig, isGitIgnored, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
 const { planningDir, planningPaths } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { MODEL_PROFILES } = require('./model-profiles.cjs');
@@ -302,12 +302,12 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
       }
     }
     if (branchName) {
-      const currentBranch = execGit(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
+      const currentBranch = execGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
       if (currentBranch.exitCode === 0 && currentBranch.stdout.trim() !== branchName) {
         // Create branch if it doesn't exist, or switch to it if it does
-        const create = execGit(cwd, ['checkout', '-b', branchName]);
+        const create = execGit(['checkout', '-b', branchName], { cwd });
         if (create.exitCode !== 0) {
-          execGit(cwd, ['checkout', branchName]);
+          execGit(['checkout', branchName], { cwd });
         }
       }
     }
@@ -327,16 +327,16 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
       }
       // Default mode (staging all of .planning/): stage the deletion so
       // removed planning files are not left dangling in the index.
-      execGit(cwd, ['rm', '--cached', '--ignore-unmatch', file]);
+      execGit(['rm', '--cached', '--ignore-unmatch', file], { cwd });
     } else {
-      execGit(cwd, ['add', file]);
+      execGit(['add', file], { cwd });
     }
   }
 
   // Commit (--no-verify skips pre-commit hooks, used by parallel executor agents)
   const commitArgs = amend ? ['commit', '--amend', '--no-edit'] : ['commit', '-m', message];
   if (noVerify) commitArgs.push('--no-verify');
-  const commitResult = execGit(cwd, commitArgs);
+  const commitResult = execGit(commitArgs, { cwd });
   if (commitResult.exitCode !== 0) {
     if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
       const result = { committed: false, hash: null, reason: 'nothing_to_commit' };
@@ -349,7 +349,7 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
   }
 
   // Get short hash
-  const hashResult = execGit(cwd, ['rev-parse', '--short', 'HEAD']);
+  const hashResult = execGit(['rev-parse', '--short', 'HEAD'], { cwd });
   const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
   const result = { committed: true, hash, reason: 'committed' };
   output(result, raw, hash || 'committed');
@@ -395,11 +395,11 @@ function cmdCommitToSubrepo(cwd, message, files, raw) {
     // Stage files (strip sub-repo prefix for paths relative to that repo)
     for (const file of repoFiles) {
       const relativePath = file.slice(repo.length + 1);
-      execGit(repoCwd, ['add', relativePath]);
+      execGit(['add', relativePath], { cwd: repoCwd });
     }
 
     // Commit
-    const commitResult = execGit(repoCwd, ['commit', '-m', message]);
+    const commitResult = execGit(['commit', '-m', message], { cwd: repoCwd });
     if (commitResult.exitCode !== 0) {
       if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
         repos[repo] = { committed: false, hash: null, files: repoFiles, reason: 'nothing_to_commit' };
@@ -410,7 +410,7 @@ function cmdCommitToSubrepo(cwd, message, files, raw) {
     }
 
     // Get hash
-    const hashResult = execGit(repoCwd, ['rev-parse', '--short', 'HEAD']);
+    const hashResult = execGit(['rev-parse', '--short', 'HEAD'], { cwd: repoCwd });
     const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
     repos[repo] = { committed: true, hash, files: repoFiles };
   }
@@ -914,14 +914,14 @@ function cmdStats(cwd, format, raw) {
   // Git stats
   let gitCommits = 0;
   let gitFirstCommitDate = null;
-  const commitCount = execGit(cwd, ['rev-list', '--count', 'HEAD']);
+  const commitCount = execGit(['rev-list', '--count', 'HEAD'], { cwd });
   if (commitCount.exitCode === 0) {
     gitCommits = parseInt(commitCount.stdout, 10) || 0;
   }
-  const rootHash = execGit(cwd, ['rev-list', '--max-parents=0', 'HEAD']);
+  const rootHash = execGit(['rev-list', '--max-parents=0', 'HEAD'], { cwd });
   if (rootHash.exitCode === 0 && rootHash.stdout) {
     const firstCommit = rootHash.stdout.split('\n')[0].trim();
-    const firstDate = execGit(cwd, ['show', '-s', '--format=%as', firstCommit]);
+    const firstDate = execGit(['show', '-s', '--format=%as', firstCommit], { cwd });
     if (firstDate.exitCode === 0) {
       gitFirstCommitDate = firstDate.stdout || null;
     }
@@ -990,9 +990,9 @@ function cmdCheckCommit(cwd, raw) {
   }
 
   // commit_docs is false — check if any .planning/ files are staged
-  try {
-    const staged = execSync('git diff --cached --name-only', { cwd, encoding: 'utf-8' }).trim();
-    const planningFiles = staged.split('\n').filter(f => f.startsWith('.planning/') || f.startsWith('.planning\\'));
+  const stagedResult = execGit(['diff', '--cached', '--name-only'], { cwd });
+  if (stagedResult.exitCode === 0) {
+    const planningFiles = stagedResult.stdout.split('\n').filter(f => f.startsWith('.planning/') || f.startsWith('.planning\\'));
 
     if (planningFiles.length > 0) {
       error(
@@ -1001,9 +1001,8 @@ function cmdCheckCommit(cwd, raw) {
         `\n\nTo unstage: git reset HEAD ${planningFiles.join(' ')}`
       );
     }
-  } catch {
-    // git diff --cached failed (no staged files or not a git repo) — allow
   }
+  // exitCode !== 0 → no staged files or not a git repo — allow
 
   output({ allowed: true, reason: 'no_planning_files_staged' }, raw, 'allowed');
 }
