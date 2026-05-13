@@ -11,7 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
+const { probeTty } = require('./shell-command-projection.cjs');
 const { isValidActiveWorkstreamName } = require('./workstream-name-policy.cjs');
 
 const WORKSTREAM_SESSION_ENV_KEYS = [
@@ -92,16 +92,11 @@ function probeControllingTtyToken() {
     return cachedControllingTtyToken;
   }
 
-  try {
-    const ttyPath = execFileSync('tty', [], {
-      encoding: 'utf-8',
-      stdio: ['inherit', 'pipe', 'ignore'],
-    }).trim();
-    if (ttyPath && ttyPath !== 'not a tty') {
-      const token = sanitizeWorkstreamSessionToken(ttyPath.replace(/^\/dev\//, ''));
-      if (token) cachedControllingTtyToken = `tty-${token}`;
-    }
-  } catch {}
+  const ttyPath = probeTty();
+  if (ttyPath) {
+    const token = sanitizeWorkstreamSessionToken(ttyPath.replace(/^\/dev\//, ''));
+    if (token) cachedControllingTtyToken = `tty-${token}`;
+  }
 
   return cachedControllingTtyToken;
 }
