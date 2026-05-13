@@ -1637,8 +1637,32 @@ export const statePrune: QueryHandler = async (args, projectDir, workstream) => 
   }
 
   const fullContent = await readFile(statePath, 'utf-8');
-  const currentPhaseRaw = stateExtractField(fullContent, 'Current Phase');
-  const currentPhase = parseInt(String(currentPhaseRaw ?? ''), 10) || 0;
+  const fm = extractFrontmatter(fullContent);
+  const fmProgress = (typeof fm.progress === 'object' && fm.progress !== null)
+    ? fm.progress as Record<string, unknown>
+    : null;
+  const phaseCandidates: unknown[] = [
+    fm.current_phase,
+    stateExtractField(fullContent, 'Current Phase'),
+    fmProgress?.completed_phases,
+    fmProgress?.total_phases,
+  ];
+  let currentPhase: number | null = null;
+  for (const candidate of phaseCandidates) {
+    const parsed = parseInt(String(candidate ?? '').trim(), 10);
+    if (Number.isInteger(parsed) && parsed > 0) {
+      currentPhase = parsed;
+      break;
+    }
+  }
+  if (currentPhase === null) {
+    return {
+      data: {
+        pruned: false,
+        reason: 'Could not determine current phase from STATE.md. Add **Current Phase:** N, frontmatter current_phase: N, progress.completed_phases, or progress.total_phases.',
+      },
+    };
+  }
   const cutoff = currentPhase - keepRecent;
 
   if (cutoff <= 0) {
