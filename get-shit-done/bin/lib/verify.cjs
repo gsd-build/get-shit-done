@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { safeReadFile, loadConfig, normalizePhaseName, escapeRegex, execGit, findPhaseInternal, getMilestoneInfo, stripShippedMilestones, extractCurrentMilestone, output, error, checkAgentsInstalled, CONFIG_DEFAULTS, inspectWorktreeHealth } = require('./core.cjs');
+const { safeReadFile, loadConfig, normalizePhaseName, escapeRegex, findPhaseInternal, getMilestoneInfo, stripShippedMilestones, extractCurrentMilestone, output, error, checkAgentsInstalled, CONFIG_DEFAULTS, inspectWorktreeHealth } = require('./core.cjs');
+const { execGit } = require('./shell-command-projection.cjs');
 const { planningDir } = require('./planning-workspace.cjs');
 const { extractFrontmatter, parseMustHavesBlock } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
@@ -68,7 +69,7 @@ function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   let commitsExist = false;
   if (hashes.length > 0) {
     for (const hash of hashes.slice(0, 3)) {
-      const result = execGit(cwd, ['cat-file', '-t', hash]);
+      const result = execGit(['cat-file', '-t', hash], { cwd });
       if (result.exitCode === 0 && result.stdout === 'commit') {
         commitsExist = true;
         break;
@@ -265,7 +266,7 @@ function cmdVerifyCommits(cwd, hashes, raw) {
   const valid = [];
   const invalid = [];
   for (const hash of hashes) {
-    const result = execGit(cwd, ['cat-file', '-t', hash]);
+    const result = execGit(['cat-file', '-t', hash], { cwd });
     if (result.exitCode === 0 && result.stdout.trim() === 'commit') {
       valid.push(hash);
     } else {
@@ -1226,7 +1227,7 @@ function cmdVerifySchemaDrift(cwd, phaseArg, skipFlag, raw) {
   }
 
   // Also check git commit messages for push evidence
-  const gitLog = execGit(cwd, ['log', '--oneline', '--all', '-50']);
+  const gitLog = execGit(['log', '--oneline', '--all', '-50'], { cwd });
   if (gitLog.exitCode === 0) {
     executionLog += '\n' + gitLog.stdout;
   }
@@ -1288,7 +1289,7 @@ function cmdVerifyCodebaseDrift(cwd, raw) {
     const lastMapped = drift.readMappedCommit(structurePath);
 
     // Verify we're inside a git repo and resolve the diff range.
-    const revProbe = execGit(cwd, ['rev-parse', 'HEAD']);
+    const revProbe = execGit(['rev-parse', 'HEAD'], { cwd });
     if (revProbe.exitCode !== 0) {
       emit({
         skipped: true,
@@ -1307,11 +1308,11 @@ function cmdVerifyCodebaseDrift(cwd, raw) {
       base = EMPTY_TREE;
     } else {
       // Verify the commit is reachable; if not, fall back to EMPTY_TREE.
-      const verify = execGit(cwd, ['cat-file', '-t', base]);
+      const verify = execGit(['cat-file', '-t', base], { cwd });
       if (verify.exitCode !== 0) base = EMPTY_TREE;
     }
 
-    const diff = execGit(cwd, ['diff', '--name-status', base, 'HEAD']);
+    const diff = execGit(['diff', '--name-status', base, 'HEAD'], { cwd });
     if (diff.exitCode !== 0) {
       emit({
         skipped: true,

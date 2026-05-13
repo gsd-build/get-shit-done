@@ -2,8 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execTool } = require('./shell-command-projection.cjs');
-const { atomicWriteFileSync, execGit } = require('./core.cjs');
+const { execTool, execGit } = require('./shell-command-projection.cjs');
+const { atomicWriteFileSync } = require('./core.cjs');
 
 // ─── Config Gate ─────────────────────────────────────────────────────────────
 
@@ -354,7 +354,7 @@ const COMMIT_HASH_RE = /^[0-9a-f]{4,40}$/i;
  * success, or null when cwd is not a git repo / `git` is not on PATH.
  */
 function readGitHead(cwd) {
-  const r = execGit(cwd, ['rev-parse', 'HEAD']);
+  const r = execGit(['rev-parse', 'HEAD'], { cwd });
   if (r.exitCode !== 0) return null;
   return r.stdout.trim() || null;
 }
@@ -365,7 +365,7 @@ function readGitHead(cwd) {
  * or the cwd is not a git repo.
  */
 function countCommitsBetween(cwd, from, to) {
-  const r = execGit(cwd, ['rev-list', '--count', `${from}..${to}`]);
+  const r = execGit(['rev-list', '--count', `${from}..${to}`], { cwd });
   if (r.exitCode !== 0) return null;
   const n = parseInt(r.stdout.trim(), 10);
   return Number.isFinite(n) ? n : null;
