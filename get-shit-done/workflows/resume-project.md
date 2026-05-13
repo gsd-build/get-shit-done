@@ -69,7 +69,7 @@ cat .planning/HANDOFF.json 2>/dev/null || true
 # Check for continue-here files (phase + non-phase + legacy fallback)
 ls .planning/phases/*/.continue-here*.md \
    .planning/spikes/*/.continue-here*.md \
-   .planning/sketches/.continue-here*.md \
+   .planning/sketches/*/.continue-here*.md \
    .planning/deliberations/.continue-here*.md \
    .planning/.continue-here*.md \
    .continue-here*.md 2>/dev/null || true

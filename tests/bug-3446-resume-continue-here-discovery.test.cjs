@@ -24,6 +24,15 @@ describe('bug #3446: resume-project detects non-phase and legacy continue-here h
     );
   });
 
+  test('check_incomplete_work scans sketch subdirectory continue-here checkpoints', () => {
+    const block = readCheckBlock();
+    assert.match(
+      block,
+      /\.planning\/sketches\/\*\/\.continue-here\*\.md/,
+      'resume workflow must scan .planning/sketches/*/.continue-here*.md for sketch checkpoint handoffs'
+    );
+  });
+
   test('check_incomplete_work scans legacy repo-root continue-here fallback', () => {
     const block = readCheckBlock();
     assert.match(
