@@ -116,6 +116,7 @@ const CLUSTERS = Object.freeze({
     'review-backlog',
     'debug',
     'extract-learnings',
+    'surface',
   ]),
 });
 
