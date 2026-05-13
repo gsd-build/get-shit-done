@@ -262,6 +262,15 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   } catch { /* phases dir doesn't exist */ }
 
   if (!phaseDir) {
+    const found = await findPhase([phase], projectDir, workstream);
+    const foundData = found.data as Record<string, unknown> | null;
+    const relDir = foundData?.directory;
+    if (foundData?.found && typeof relDir === 'string' && relDir.trim() !== '') {
+      phaseDir = join(projectDir, relDir);
+    }
+  }
+
+  if (!phaseDir) {
     return {
       data: {
         phase: normalized,

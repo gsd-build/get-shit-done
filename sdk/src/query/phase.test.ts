@@ -307,6 +307,36 @@ describe('phasePlanIndex', () => {
     expect(data.plans).toEqual([]);
   });
 
+  it('falls back to archived milestone directory when root phases dir has no match (#3469)', async () => {
+    const archiveDir = join(tmpDir, '.planning', 'milestones', 'v2.0-phases', '02-auth');
+    await mkdir(archiveDir, { recursive: true });
+    await writeFile(join(archiveDir, '02-01-PLAN.md'), [
+      '---',
+      'phase: 02',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      '---',
+      '<objective>',
+      'Archived milestone plan.',
+      '</objective>',
+      '<tasks>',
+      '<task type=\"auto\">',
+      '  <name>Task 1</name>',
+      '</task>',
+      '</tasks>',
+    ].join('\n'));
+    await writeFile(join(archiveDir, '02-01-SUMMARY.md'), '# Summary\n');
+
+    const result = await phasePlanIndex(['2'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const plans = data.plans as Array<Record<string, unknown>>;
+
+    expect(data.error).toBeUndefined();
+    expect(plans.length).toBe(1);
+    expect(plans[0].id).toBe('02-01');
+  });
+
   // ── #3266 regression tests ─────────────────────────────────────────────
 
   it('#3266: wave 0 round-trip — plan with wave: 0 lands in waves["0"] with PlanInfo.wave === 0', async () => {

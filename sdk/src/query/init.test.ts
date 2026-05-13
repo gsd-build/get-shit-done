@@ -358,6 +358,55 @@ describe('initExecutePhase', () => {
     expect(data.branching_strategy).toBe('phase');
     expect(typeof data.branch_name).toBe('string');
   });
+
+  it('keeps same-milestone archived phase directory instead of nulling it (#3469)', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'gsd-init-3469-'));
+    try {
+      await mkdir(join(tmp, '.planning', 'milestones', 'v2.0-phases', '02-auth'), { recursive: true });
+      await writeFile(join(tmp, '.planning', 'PROJECT.md'), '# Project\n\n## What This Is\n\nA project.\n\n## Core Value\n\nValue here.\n\n## Requirements\n\n- Req 1\n');
+      await writeFile(join(tmp, '.planning', 'ROADMAP.md'), [
+        '# Roadmap',
+        '',
+        '## v2.0: Current',
+        '',
+        '### Phase 2: Auth',
+        '',
+        '**Goal:** Implement auth',
+        '',
+      ].join('\n'));
+      await writeFile(join(tmp, '.planning', 'STATE.md'), [
+        '---',
+        'milestone: v2.0',
+        'status: executing',
+        '---',
+        '',
+        '# Session State',
+      ].join('\n'));
+      await writeFile(join(tmp, '.planning', 'config.json'), JSON.stringify({
+        model_profile: 'balanced',
+        commit_docs: false,
+        git: {
+          branching_strategy: 'none',
+          phase_branch_template: 'gsd/phase-{phase}-{slug}',
+          milestone_branch_template: 'gsd/{milestone}-{slug}',
+          quick_branch_template: null,
+        },
+        workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: true },
+      }));
+      await writeFile(
+        join(tmp, '.planning', 'milestones', 'v2.0-phases', '02-auth', '02-01-PLAN.md'),
+        '# Plan\n',
+      );
+
+      const result = await initExecutePhase(['2'], tmp);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_found).toBe(true);
+      expect(data.phase_dir).toBe('.planning/milestones/v2.0-phases/02-auth');
+      expect(data.plan_count).toBe(1);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('initPlanPhase', () => {
