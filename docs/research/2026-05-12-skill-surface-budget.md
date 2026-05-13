@@ -139,12 +139,14 @@ Implementation: write enable/disable state to `~/.claude/skills/<name>/SKILL.md.
 
 Collapse semantically related skills into a single dispatcher with sub-modes:
 
+```text
+gsd-phase           → keeps existing
+gsd-milestone {new|complete|summary|audit}        # was 4 skills (hypothetical)
+gsd-research  {sketch|spike|forensics|explore}    # was 4 skills (hypothetical)
+gsd-workspace {pause|resume|capture|inbox|thread} # was 5 skills (hypothetical)
 ```
-/gsd:phase           → keeps existing
-/gsd:milestone {new|complete|summary|audit}        # was 4 skills
-/gsd:research  {sketch|spike|forensics|explore}    # was 4 skills
-/gsd:workspace {pause|resume|capture|inbox|thread} # was 5 skills
-```
+
+(The hypothetical dispatchers above are written without the slash prefix to signal they are not shipped commands — Option C is a sketch, not a recommendation.)
 
 | Dimension | Assessment |
 |---|---|

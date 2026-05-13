@@ -2,8 +2,9 @@
 /**
  * Runtime surface module — ADR-0011 Phase 2 (Option B).
  *
- * Manages the runtime enable/disable surface state (`~/.claude/skills/.gsd-surface.json`)
- * independently of the install-time profile marker (`.gsd-profile`).
+ * Manages the runtime enable/disable surface state (the `.gsd-surface.json` marker in
+ * each runtime's skills dir) independently of the install-time profile marker
+ * (`.gsd-profile`). Runtime config locations are resolved by callers.
  *
  * Effective skill set = base profile ∪ explicitAdds − disabledClusters − explicitRemoves,
  * then transitively closed via the manifest.
@@ -207,8 +208,8 @@ function resolveSurface(runtimeConfigDir, manifest, clusterMap) {
  *  4. Sync: copy missing, delete superseded (gsd-only)
  *
  * @param {string} runtimeConfigDir
- * @param {string} commandsDir  runtime commands/gsd dir (e.g. ~/.claude/commands/gsd)
- * @param {string} agentsDir    runtime agents dir (e.g. ~/.claude/agents)
+ * @param {string} commandsDir  runtime commands/gsd dir (resolved per-runtime by callers)
+ * @param {string} agentsDir    runtime agents dir (resolved per-runtime by callers)
  * @param {Map<string, string[]>} manifest
  * @param {Object} [clusterMap]
  */
@@ -277,7 +278,8 @@ function _syncGsdDir(stagedDir, destDir, context) {
 
 /**
  * Find the install source commands/gsd directory.
- * Checks ~/.claude/skills/.gsd-source marker, then walks up from __dirname.
+ * Checks the runtime's `.gsd-source` marker (sibling of the surface state file),
+ * then walks up from __dirname to find the installed package source.
  *
  * @param {string} runtimeConfigDir
  * @returns {string} path to install source commands/gsd
