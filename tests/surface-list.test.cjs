@@ -96,7 +96,7 @@ describe('listSurface', () => {
       assert.ok(afterList.enabled.length <= beforeList.enabled.length,
         'disabling utility cluster should not increase enabled count');
       assert.ok(afterList.tokenCost <= beforeList.tokenCost,
-        'disabling a cluster should reduce token cost');
+        'disabling a cluster should not increase token cost');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
