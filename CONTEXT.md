@@ -613,3 +613,35 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `DEFECT.GENERATIVE-PRIORITY=these defect classes share a common root: parallel implementations diverge silently because no parity test enforces equality at the test layer`
 `DEFECT.GENERATIVE-FIX=for any new constant/array/parser shared between CJS and SDK (or between two workflow surfaces), the same commit MUST add a parity assertion that fails when the two diverge`
 `DEFECT.GENERATIVE-EXEMPLAR=tests/config-schema-sdk-parity.test.cjs (asserts SDK VALID_CONFIG_KEYS == CJS VALID_CONFIG_KEYS); tests/bug-3298-phase-dir-prefix-drift-in-workflows.test.cjs (asserts every workflow surface uses expected_phase_dir)`
+
+### Shell Command Projection Module
+Module owning all OS-facing I/O for the tool: runtime-aware command-text rendering (hook commands, PATH action lines, shim scripts), subprocess dispatch (`execGit`, `execNpm`, `execTool`, `probeTty`), and platform file I/O (`platformWriteSync`, `platformReadSync`, `platformEnsureDir`). Single seam for platform-conditional logic — one place to fix any shell or file write regression across Windows, macOS, and Linux. Lives in `get-shit-done/bin/lib/shell-command-projection.cjs`. See ADR-0009.
+
+## Session learnings
+
+### 2026-05-13 — CodeRabbit guard + merge recovery (PR #3464)
+
+- scope: `gsd-build/get-shit-done` only; run all `gh` checks with `--repo gsd-build/get-shit-done`.
+- invariant: review completion requires all three gates:
+  - CI required checks green
+  - CodeRabbit green
+  - GraphQL unresolved review threads = `0`
+- failure mode: `mergeStateStatus=DIRTY` can exist even when CodeRabbit + thread count are clean.
+  - remediation: rebase/replay onto latest `origin/main` before treating PR as merge-ready.
+- failure mode: primary worktree rebase blocked by unrelated untracked files.
+  - remediation: use isolated worktree seeded from `origin/main`, replay feature commits there, then `push --force-with-lease` to PR head.
+- replay conflict learned seam:
+  - file: `get-shit-done/bin/lib/config.cjs`
+  - keep both behaviors during conflict resolution:
+    - existing `ship.pr_body_sections` and `workflow.human_verify_mode` validations
+    - new `review.default_reviewers` normalization path
+- post-rebase CI drift classes to verify immediately:
+  - SDK schema parity (`tests/config-schema-sdk-parity.test.cjs`)
+  - docs inventory counts (`tests/inventory-counts.test.cjs`)
+  - inventory manifest sync (`tests/inventory-manifest-sync.test.cjs`)
+  - slash namespace invariant (`tests/bug-2543-gsd-slash-namespace.test.cjs`)
+- concrete regressions fixed in this session:
+  - add `review.default_reviewers` to `sdk/src/query/config-schema.ts`
+  - add `review-reviewer-selection.cjs` row + count update in `docs/INVENTORY.md`
+  - regenerate `docs/INVENTORY-MANIFEST.json`
+  - replace legacy `/gsd-review` mention with canonical `/gsd:review` in source comments
