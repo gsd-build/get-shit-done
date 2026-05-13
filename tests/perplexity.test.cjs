@@ -124,6 +124,26 @@ describe('perplexity.resolveApiKey + fallback', () => {
 // ─── Request mapping + attribution header ────────────────────────────────────
 
 describe('perplexity HTTP request shape', () => {
+  let prevHome;
+  let prevUserProfile;
+  let sandboxedHome;
+
+  beforeEach(() => {
+    prevHome = process.env.HOME;
+    prevUserProfile = process.env.USERPROFILE;
+    // Sandbox HOME / USERPROFILE so a real `~/.gsd/perplexity_api_key`
+    // on the developer or CI machine cannot satisfy the no-key branches
+    // exercised here.
+    sandboxedHome = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'pplx-test-home-'));
+    process.env.HOME = sandboxedHome;
+    process.env.USERPROFILE = sandboxedHome;
+  });
+  afterEach(() => {
+    if (prevHome === undefined) delete process.env.HOME; else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prevUserProfile;
+    try { fs.rmSync(sandboxedHome, { recursive: true, force: true }); } catch { /* best-effort */ }
+  });
+
   test('search() POSTs to /search with X-Pplx-Integration + body mapping', async () => {
     const prevEnv = process.env.PERPLEXITY_API_KEY;
     delete process.env.PERPLEXITY_API_KEY;
