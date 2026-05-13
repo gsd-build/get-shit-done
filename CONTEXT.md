@@ -616,3 +616,63 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `DEFECT.GENERATIVE-PRIORITY=these defect classes share a common root: parallel implementations diverge silently because no parity test enforces equality at the test layer`
 `DEFECT.GENERATIVE-FIX=for any new constant/array/parser shared between CJS and SDK (or between two workflow surfaces), the same commit MUST add a parity assertion that fails when the two diverge`
 `DEFECT.GENERATIVE-EXEMPLAR=tests/config-schema-sdk-parity.test.cjs (asserts SDK VALID_CONFIG_KEYS == CJS VALID_CONFIG_KEYS); tests/bug-3298-phase-dir-prefix-drift-in-workflows.test.cjs (asserts every workflow surface uses expected_phase_dir)`
+
+### Shell Command Projection Module
+Module owning all OS-facing I/O for the tool: runtime-aware command-text rendering (hook commands, PATH action lines, shim scripts), subprocess dispatch (`execGit`, `execNpm`, `execTool`, `probeTty`), and platform file I/O (`platformWriteSync`, `platformReadSync`, `platformEnsureDir`). Single seam for platform-conditional logic — one place to fix any shell or file write regression across Windows, macOS, and Linux. Lives in `get-shit-done/bin/lib/shell-command-projection.cjs`. See ADR-0009.
+
+## Session learnings
+
+### 2026-05-13 — Shell Command Projection Module expansion (issues #3465–#3468)
+
+- scope: `shell-command-projection.cjs` extended to own subprocess dispatch + platform file I/O
+- ADR-0009 "does not execute" constraint superseded; ADR-0010 File Operation Engine superseded
+- new exports: `execGit`, `execNpm`, `execTool`, `probeTty`, `normalizeContent`, `platformWriteSync`, `platformReadSync`, `platformEnsureDir`
+- result shape invariant: all `exec*` return `{ exitCode, stdout, stderr }`; never throw on non-zero exit
+- platform policy owned at seam: `shell: process.platform === 'win32'` lives only in `execNpm`; `probeTty` returns `null` on Windows
+- normalization policy: `platformWriteSync` owns full `normalizeMd` for `.md`; CRLF→LF + trailing newline for all others; callers must not pre-call `normalizeMd`
+- `normalizeContent(filePath, content)` is the pure typed surface tests assert on — no file content read-back in tests (CONTRIBUTING.md rule)
+- `_normalizeMd` is re-implemented inline (not imported from `core.cjs`) to avoid circular dep
+- `atomicWriteFileSync`, `safeReadFile`, `normalizeMd` remain in `core.cjs` exports until Phase 4 (#3468)
+- phase gate: no call site migration until Phase 1 branch merged; Phase 2 (#3466) targets 6 subprocess files; Phase 3 (#3467) targets 15 fs files (215 call sites); Phase 4 (#3468) removes compat exports
+- branch: `feat/3465-shell-projection-platform-io-seam`
+- test file: `tests/shell-command-projection-dispatch.test.cjs` — 31 behavioral tests, node:test + node:assert/strict, no source-grep
+
+### 2026-05-13 — CodeRabbit guard + merge recovery (PR #3464)
+
+- scope: `gsd-build/get-shit-done` only; run all `gh` checks with `--repo gsd-build/get-shit-done`.
+- invariant: review completion requires all three gates:
+  - CI required checks green
+  - CodeRabbit green
+  - GraphQL unresolved review threads = `0`
+- failure mode: `mergeStateStatus=DIRTY` can exist even when CodeRabbit + thread count are clean.
+  - remediation: rebase/replay onto latest `origin/main` before treating PR as merge-ready.
+- failure mode: primary worktree rebase blocked by unrelated untracked files.
+  - remediation: use isolated worktree seeded from `origin/main`, replay feature commits there, then `push --force-with-lease` to PR head.
+- replay conflict learned seam:
+  - file: `get-shit-done/bin/lib/config.cjs`
+  - keep both behaviors during conflict resolution:
+    - existing `ship.pr_body_sections` and `workflow.human_verify_mode` validations
+    - new `review.default_reviewers` normalization path
+- post-rebase CI drift classes to verify immediately:
+  - SDK schema parity (`tests/config-schema-sdk-parity.test.cjs`)
+  - docs inventory counts (`tests/inventory-counts.test.cjs`)
+  - inventory manifest sync (`tests/inventory-manifest-sync.test.cjs`)
+  - slash namespace invariant (`tests/bug-2543-gsd-slash-namespace.test.cjs`)
+- concrete regressions fixed in this session:
+  - add `review.default_reviewers` to `sdk/src/query/config-schema.ts`
+  - add `review-reviewer-selection.cjs` row + count update in `docs/INVENTORY.md`
+  - regenerate `docs/INVENTORY-MANIFEST.json`
+  - replace legacy `/gsd-review` mention with canonical `/gsd:review` in source comments
+
+### 2026-05-13 — Phase 1 rebase + PR open (#3465)
+
+- branch: `feat/3465-shell-projection-platform-io-seam`; PR: #3470 on `gsd-build/get-shit-done`
+- rebase pattern: 4 sibling-branch commits (#3464) were skipped as "patch contents already upstream" — expected when a feature branch is cut before a sibling merges to main
+- untracked files block rebase: `git stash --include-untracked` before `git rebase origin/main`
+- add/add conflict resolution: when HEAD side is empty (feature didn't have the file) and ours has the content, `git checkout --theirs <file>` is correct
+- content conflict resolution: `git checkout --ours CONTEXT.md` + manual append of our new sections — preserves main's full content while adding our additions
+- `docs/research/` was untracked pre-rebase but came in from main during rebase — already tracked, no action required
+- force-push after rebase: `git push --force-with-lease origin <branch>` (not `--force`)
+- stash pop can fail if main brought in the same files: drop the stash with `git stash drop` when files are already present
+- PR hook requires reading all listed contribution files before `gh pr create` will execute — including `pull_request_template.md`, all typed templates, and all issue templates
+- changeset type for seam additions: `Changed` (not `Added`) — expands existing module, not a new standalone feature

@@ -1,6 +1,8 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
+const { spawnSync, execFileSync } = require('child_process');
 
 /**
  * Shell Command Projection Module
@@ -352,6 +354,155 @@ function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
   return { shimLocationLine, actionLines, shellActions, npxNoteLines, isNpx, isWin32 };
 }
 
+// ─── Subprocess dispatch ──────────────────────────────────────────────────────
+
+function _spawnResult(result, program) {
+  if (result.error && result.error.code === 'ENOENT') {
+    return { exitCode: 127, stdout: '', stderr: `${program}: not found` };
+  }
+  return {
+    exitCode: result.status ?? 1,
+    stdout: (result.stdout ?? '').toString().trim(),
+    stderr: (result.stderr ?? '').toString().trim(),
+  };
+}
+
+function execGit(args, opts = {}) {
+  const result = spawnSync('git', args, {
+    cwd: opts.cwd,
+    encoding: 'utf-8',
+    stdio: 'pipe',
+    timeout: opts.timeout ?? 10_000,
+  });
+  return _spawnResult(result, 'git');
+}
+
+function execNpm(args, opts = {}) {
+  const result = spawnSync('npm', args, {
+    cwd: opts.cwd,
+    shell: process.platform === 'win32',
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: opts.timeout ?? 15_000,
+  });
+  return _spawnResult(result, 'npm');
+}
+
+function execTool(program, args, opts = {}) {
+  const result = spawnSync(program, args, {
+    cwd: opts.cwd,
+    encoding: 'utf-8',
+    stdio: 'pipe',
+    timeout: opts.timeout ?? 30_000,
+  });
+  return _spawnResult(result, program);
+}
+
+function probeTty(opts = {}) {
+  const platform = opts.platform ?? process.platform;
+  if (platform === 'win32') return null;
+  try {
+    const ttyPath = execFileSync('tty', [], {
+      encoding: 'utf-8',
+      stdio: ['inherit', 'pipe', 'ignore'],
+    }).trim();
+    if (!ttyPath || ttyPath === 'not a tty') return null;
+    return ttyPath;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Platform file I/O ────────────────────────────────────────────────────────
+
+function _normalizeMd(content) {
+  if (!content || typeof content !== 'string') return content;
+  let text = content.replace(/\r\n/g, '\n');
+  const lines = text.split('\n');
+  const result = [];
+  const fenceRegex = /^```/;
+  const insideFence = new Array(lines.length);
+  let fenceOpen = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (fenceRegex.test(lines[i].trimEnd())) {
+      if (fenceOpen) {
+        insideFence[i] = false;
+        fenceOpen = false;
+      } else {
+        insideFence[i] = false;
+        fenceOpen = true;
+      }
+    } else {
+      insideFence[i] = fenceOpen;
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const prev = i > 0 ? lines[i - 1] : '';
+    const prevTrimmed = prev.trimEnd();
+    const trimmed = line.trimEnd();
+    const isFenceLine = fenceRegex.test(trimmed);
+    if (/^#{1,6}\s/.test(trimmed) && i > 0 && prevTrimmed !== '' && prevTrimmed !== '---') result.push('');
+    if (isFenceLine && i > 0 && prevTrimmed !== '' && !insideFence[i] && (i === 0 || !insideFence[i - 1] || isFenceLine)) {
+      if (i === 0 || !insideFence[i - 1]) result.push('');
+    }
+    if (/^(\s*[-*+]\s|\s*\d+\.\s)/.test(line) && i > 0 && prevTrimmed !== '' && !/^(\s*[-*+]\s|\s*\d+\.\s)/.test(prev) && prevTrimmed !== '---') result.push('');
+    result.push(line);
+    if (/^#{1,6}\s/.test(trimmed) && i < lines.length - 1 && (lines[i + 1] ?? '').trimEnd() !== '') result.push('');
+    if (/^```\s*$/.test(trimmed) && i > 0 && insideFence[i - 1] && i < lines.length - 1 && (lines[i + 1] ?? '').trimEnd() !== '') result.push('');
+    if (/^(\s*[-*+]\s|\s*\d+\.\s)/.test(line) && i < lines.length - 1) {
+      const next = lines[i + 1];
+      if (next !== undefined && next.trimEnd() !== '' && !/^(\s*[-*+]\s|\s*\d+\.\s)/.test(next) && !/^\s/.test(next)) result.push('');
+    }
+  }
+  text = result.join('\n');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  text = text.replace(/\n*$/, '\n');
+  return text;
+}
+
+function normalizeContent(filePath, content, opts = {}) {
+  const encoding = opts.encoding ?? 'utf-8';
+  const isMd = path.extname(filePath).toLowerCase() === '.md';
+  let normalized;
+  if (isMd) {
+    normalized = _normalizeMd(content);
+  } else {
+    normalized = (content ?? '').replace(/\r\n/g, '\n').replace(/\n*$/, '\n');
+  }
+  return { content: normalized, encoding };
+}
+
+function platformWriteSync(filePath, content, opts = {}) {
+  const { content: normalized, encoding } = normalizeContent(filePath, content, opts);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmpPath = filePath + '.tmp.' + process.pid;
+  try {
+    fs.writeFileSync(tmpPath, normalized, encoding);
+    fs.renameSync(tmpPath, filePath);
+  } catch {
+    try { fs.unlinkSync(tmpPath); } catch { /* already gone */ }
+    fs.writeFileSync(filePath, normalized, encoding);
+  }
+}
+
+function platformReadSync(filePath, opts = {}) {
+  const encoding = opts.encoding ?? 'utf-8';
+  try {
+    return fs.readFileSync(filePath, encoding);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      if (opts.required) throw err;
+      return null;
+    }
+    throw err;
+  }
+}
+
+function platformEnsureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
 module.exports = {
   hookCommandNeedsPowerShellCallOperator,
   formatHookCommandForRuntime,
@@ -370,4 +521,12 @@ module.exports = {
   projectPersistentPathExportActions,
   buildWindowsShimTriple,
   formatSdkPathDiagnostic,
+  execGit,
+  execNpm,
+  execTool,
+  probeTty,
+  normalizeContent,
+  platformWriteSync,
+  platformReadSync,
+  platformEnsureDir,
 };

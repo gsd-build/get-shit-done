@@ -60,6 +60,7 @@ const PROFILES = Object.freeze({
     'discuss-phase',
     'plan-phase',
     'execute-phase',
+    'phase',
     'help',
     'update',
   ]),
