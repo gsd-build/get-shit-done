@@ -207,7 +207,9 @@ node gsd-tools.cjs config-set-model-profile <profile>
 ```bash
 # Get model for agent based on current profile
 node gsd-tools.cjs resolve-model <agent-name>
-# Returns: opus | sonnet | haiku | inherit
+# Raw output returns the selected model ID/tier.
+# JSON output also includes profile and, when the active runtime supports it,
+# reasoning_effort.
 ```
 
 Agent names: `gsd-planner`, `gsd-executor`, `gsd-phase-researcher`, `gsd-project-researcher`, `gsd-research-synthesizer`, `gsd-verifier`, `gsd-plan-checker`, `gsd-integration-checker`, `gsd-roadmapper`, `gsd-debugger`, `gsd-codebase-mapper`, `gsd-nyquist-auditor`

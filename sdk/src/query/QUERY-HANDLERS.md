@@ -155,7 +155,7 @@ From `read-only-parity.integration.test.ts` (full `toEqual` on this repo):
 
 | SDK dispatch (canonical) | Notes |
 | ------------------------ | ----- |
-| `resolve-model` | Args e.g. `gsd-planner`. |
+| `resolve-model` | Args e.g. `gsd-planner`; returns `reasoning_effort` when the selected runtime tier defines one. |
 | `phase-plan-index` | Phase number arg. |
 | `roadmap.get-phase` | Phase number arg. |
 | `list.todos` | No args. |
