@@ -19,6 +19,22 @@ function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-surface-list-'));
 }
 
+function readFrontmatterDescription(markdown) {
+  const lines = markdown.split('\n');
+  if (lines[0].trim() !== '---') return '';
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === '---') break;
+    const sep = line.indexOf(':');
+    if (sep === -1) continue;
+    const key = line.slice(0, sep).trim();
+    if (key !== 'description') continue;
+    return line.slice(sep + 1).trim();
+  }
+  return '';
+}
+
 describe('listSurface', () => {
   test('returns { enabled, disabled, tokenCost } structure', () => {
     const dir = tmpDir();
@@ -99,9 +115,9 @@ describe('listSurface', () => {
       for (const stem of result.enabled) {
         const filePath = path.join(REAL_COMMANDS_DIR, `${stem}.md`);
         if (!fs.existsSync(filePath)) continue;
-        const content = fs.readFileSync(filePath, 'utf8');
-        const descMatch = content.match(/^description:\s*(.+)$/m);
-        if (descMatch) expected += Math.ceil(descMatch[1].trim().length / 4);
+        const markdown = fs.readFileSync(filePath, 'utf8');
+        const description = readFrontmatterDescription(markdown);
+        if (description) expected += Math.ceil(description.length / 4);
       }
 
       assert.strictEqual(result.tokenCost, expected, 'tokenCost must equal sum of description lengths ÷ 4');

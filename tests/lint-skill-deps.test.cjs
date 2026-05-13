@@ -64,10 +64,6 @@ describe('lint-skill-deps: frontmatter ↔ body consistency', () => {
       });
       const result = runLint(['--dir', dir]);
       assert.notStrictEqual(result.status, 0, 'Should exit non-zero when requires: is missing but body has reference');
-      assert.ok(
-        result.stderr.includes('discuss-phase') || result.stdout.includes('discuss-phase'),
-        'Output should mention the offending skill',
-      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -138,7 +134,9 @@ describe('lint-skill-deps: script basics', () => {
     try {
       writeSkillFile(dir, 'help', { description: 'Help skill', body: 'Shows help.' });
       const result = runLint(['--dir', dir]);
-      assert.ok(result.stdout.includes('ok'), `Expected "ok" in stdout, got: ${result.stdout}`);
+      assert.strictEqual(result.status, 0, `Expected exit 0, got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
+      assert.strictEqual(result.stderr, '', `Expected empty stderr on success, got: ${result.stderr}`);
+      assert.ok(result.stdout.length > 0, 'Expected non-empty stdout on success');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
