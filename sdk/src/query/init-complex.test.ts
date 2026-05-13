@@ -329,6 +329,12 @@ describe('initProgress', () => {
         '',
         '## Phase 4.23: New pending work',
         '',
+        '## Phase 4.24: Follow-up item (PROMOTED)',
+        '',
+        '## Phase 4.25: Another follow-up (REGISTERED)',
+        '',
+        '## Phase 4.26: Triage marker (INSERTED)',
+        '',
       ].join('\n'));
 
       const result = await initProgress([], tmp);
@@ -337,10 +343,16 @@ describe('initProgress', () => {
       const phase412 = phases.find(p => p.number === '4.12');
       const phase413 = phases.find(p => p.number === '4.13');
       const phase417 = phases.find(p => p.number === '4.17');
+      const phase424 = phases.find(p => p.number === '4.24');
+      const phase425 = phases.find(p => p.number === '4.25');
+      const phase426 = phases.find(p => p.number === '4.26');
 
       expect(phase412?.status).toBe('complete');
       expect(phase413?.status).toBe('complete');
       expect(phase417?.status).toBe('complete');
+      expect(phase424?.status).not.toBe('complete');
+      expect(phase425?.status).not.toBe('complete');
+      expect(phase426?.status).not.toBe('complete');
       expect(data.completed_count).toBe(3);
       expect((data.next_phase as Record<string, unknown>).number).toBe('4.23');
     } finally {
