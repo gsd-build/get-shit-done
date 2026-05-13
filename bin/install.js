@@ -6719,9 +6719,12 @@ function uninstall(isGlobal, runtime = 'claude') {
           .map(entry => {
             if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
             // Filter out individual GSD hooks, keep user hooks
-            entry.hooks = entry.hooks.filter(h => !isManagedHookCommand(h.command, {
-              surface: 'settings-json',
-            }));
+            entry.hooks = entry.hooks.filter((h) => {
+              if (!h || typeof h.command !== 'string') return true;
+              return !isManagedHookCommand(h.command, {
+                surface: 'settings-json',
+              });
+            });
             return entry.hooks.length > 0 ? entry : null;
           })
           .filter(Boolean);
