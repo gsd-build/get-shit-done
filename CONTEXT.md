@@ -619,6 +619,21 @@ Module owning all OS-facing I/O for the tool: runtime-aware command-text renderi
 
 ## Session learnings
 
+### 2026-05-13 — Shell Command Projection Module expansion (issues #3465–#3468)
+
+- scope: `shell-command-projection.cjs` extended to own subprocess dispatch + platform file I/O
+- ADR-0009 "does not execute" constraint superseded; ADR-0010 File Operation Engine superseded
+- new exports: `execGit`, `execNpm`, `execTool`, `probeTty`, `normalizeContent`, `platformWriteSync`, `platformReadSync`, `platformEnsureDir`
+- result shape invariant: all `exec*` return `{ exitCode, stdout, stderr }`; never throw on non-zero exit
+- platform policy owned at seam: `shell: process.platform === 'win32'` lives only in `execNpm`; `probeTty` returns `null` on Windows
+- normalization policy: `platformWriteSync` owns full `normalizeMd` for `.md`; CRLF→LF + trailing newline for all others; callers must not pre-call `normalizeMd`
+- `normalizeContent(filePath, content)` is the pure typed surface tests assert on — no file content read-back in tests (CONTRIBUTING.md rule)
+- `_normalizeMd` is re-implemented inline (not imported from `core.cjs`) to avoid circular dep
+- `atomicWriteFileSync`, `safeReadFile`, `normalizeMd` remain in `core.cjs` exports until Phase 4 (#3468)
+- phase gate: no call site migration until Phase 1 branch merged; Phase 2 (#3466) targets 6 subprocess files; Phase 3 (#3467) targets 15 fs files (215 call sites); Phase 4 (#3468) removes compat exports
+- branch: `feat/3465-shell-projection-platform-io-seam`
+- test file: `tests/shell-command-projection-dispatch.test.cjs` — 31 behavioral tests, node:test + node:assert/strict, no source-grep
+
 ### 2026-05-13 — CodeRabbit guard + merge recovery (PR #3464)
 
 - scope: `gsd-build/get-shit-done` only; run all `gh` checks with `--repo gsd-build/get-shit-done`.
