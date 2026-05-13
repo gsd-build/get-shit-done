@@ -426,7 +426,7 @@ phase: XX-name
 plan: NN
 type: execute
 wave: N                     # Execution wave (1, 2, 3...)
-depends_on: []              # Plan IDs this plan requires
+depends_on: []              # Use `01-01`/`01-01-auth-hardening`
 files_modified: []          # Files this plan touches
 autonomous: true            # false if plan has checkpoints
 requirements: []            # REQUIRED — Requirement IDs from ROADMAP this plan addresses. MUST NOT be empty.
@@ -496,7 +496,7 @@ Output: [Artifacts created]
 </success_criteria>
 
 <output>
-After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
+Create `.planning/phases/XX-name/{padded_phase}-{plan}-SUMMARY.md` when done
 </output>
 ```
 

@@ -149,6 +149,8 @@ Research, plan, and verify a phase.
 | `--gaps` | Gap closure mode (reads VERIFICATION.md, skips research) |
 | `--skip-verify` | Skip plan checker verification loop |
 | `--prd <file>` | Use a PRD file instead of discuss-phase for context |
+| `--ingest <path-or-glob>` | Use ADR file(s) instead of discuss-phase for context synthesis |
+| `--ingest-format <auto\|nygard\|madr\|narrative>` | Optional ADR parser format override for `--ingest` |
 | `--reviews` | Replan with cross-AI review feedback from REVIEWS.md |
 | `--validate` | Run state validation before planning begins |
 | `--bounce` | Run external plan bounce validation after planning (uses `workflow.plan_bounce_script`) |
@@ -179,6 +181,8 @@ See [Package Legitimacy Gate in the User Guide](USER-GUIDE.md#package-legitimacy
 /gsd-plan-phase --auto                         # Non-interactive planning
 /gsd-plan-phase 2 --validate                   # Validate state before planning
 /gsd-plan-phase 1 --bounce                     # Plan + external bounce validation
+/gsd-plan-phase 2 --ingest docs/adr/0010.md   # ADR express path for context synthesis
+/gsd-plan-phase 2 --ingest 'docs/adr/00*.md' --ingest-format auto
 /gsd-plan-phase --research-phase 4             # Research only on phase 4 (prompts if RESEARCH.md exists)
 /gsd-plan-phase --research-phase 4 --view      # Print existing RESEARCH.md, no spawn
 /gsd-plan-phase --research-phase 4 --research  # Force-refresh research, no prompt

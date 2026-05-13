@@ -1,6 +1,6 @@
 import { createRegistry } from './index.js';
 import { runQueryDispatch } from './query-dispatch.js';
-import { resolveGsdToolsPath } from '../gsd-tools.js';
+import { resolveGsdToolsPath } from '../query-gsd-tools-path.js';
 import { resolveQueryRuntimeContext } from './query-runtime-context.js';
 import { createCommandTopology } from './command-topology.js';
 import { buildQueryCliOutputFromDispatch, buildQueryCliOutputFromError, type QueryCliAdapterOutput } from './query-cli-output.js';

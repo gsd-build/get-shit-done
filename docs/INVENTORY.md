@@ -359,13 +359,14 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (53 shipped)
+## CLI Modules (55 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
 | Module | Responsibility |
 |--------|----------------|
 | `active-workstream-store.cjs` | Workstream source precedence and selection (CLI `--ws` > `GSD_WORKSTREAM` env > stored pointer); name validation and environment propagation |
+| `adr-parser.cjs` | ADR decision parser for plan-phase ingest express path; normalizes section synonyms, parses status/decision/scope fences, and enforces status rejection gates |
 | `artifacts.cjs` | Canonical artifact registry — known `.planning/` root file names; used by `gsd-health` W019 lint |
 | `audit.cjs` | Audit dispatch, audit open sessions, audit storage helpers |
 | `cjs-command-router-adapter.cjs` | Shared compatibility adapter for manifest-backed CJS command-family routers |
@@ -406,6 +407,7 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `schema-detect.cjs` | Schema-drift detection for ORM patterns (Prisma, Drizzle, etc.) |
 | `secrets.cjs` | Secret-config masking convention (`****<last-4>`) for integration keys managed by `/gsd-config --integrations` — keeps plaintext out of `config-set` output |
 | `security.cjs` | Path traversal prevention, prompt injection detection, safe JSON/shell helpers |
+| `shell-command-projection.cjs` | Runtime-aware shell command projection for managed hook serialization: decides PowerShell call-operator usage by runtime/platform and normalizes Windows script path tokens |
 | `state-command-router.cjs` | Thin CJS subcommand router adapter for `gsd-tools state` |
 | `state.cjs` | STATE.md parsing, updating, progression, metrics |
 | `state-document.cjs` | Pure STATE.md field extraction, replacement, status normalization, and progress calculation transforms |

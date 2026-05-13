@@ -212,7 +212,7 @@ For each classified PR, review against its template requirements.
 - [ ] PR title is descriptive (not just "fix" or "update")
 - [ ] One concern per PR (not mixing fix + enhancement)
 - [ ] No unrelated formatting changes visible in diff
-- [ ] CHANGELOG.md updated
+- [ ] `.changeset/*.md` fragment added for user-facing changes (or `no-changelog` label applied)
 - [ ] Not using `--no-verify` or skipping hooks
 
 **Scoring:** Same as issues — completeness percentage per PR.

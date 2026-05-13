@@ -505,4 +505,27 @@ describe('phasePlanIndex', () => {
     expect(planA!.depends_on).toEqual([]);
     expect(planB!.depends_on).toEqual(['15-01']);
   });
+
+  it('#3430: native phase-plan-index warns about noncanonical plan-shaped files it cannot index', async () => {
+    const phase16 = join(tmpDir, '.planning', 'phases', '16-warning');
+    await mkdir(phase16, { recursive: true });
+    await writeFile(join(phase16, '16-PLAN-01-eval-harness.md'), [
+      '---',
+      'phase: 16-warning',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Noncanonical plan filename.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['16'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.plans).toEqual([]);
+    expect(data.warnings).toEqual([
+      'Ignored noncanonical plan files: 16-PLAN-01-eval-harness.md',
+    ]);
+  });
 });

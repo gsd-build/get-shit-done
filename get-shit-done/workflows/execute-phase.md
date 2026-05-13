@@ -747,11 +747,20 @@ increases monotonically across waves. `{status}` is `complete` (success),
      exit 1
    }
 
+   # Guard: pin cleanup back to the primary worktree and fail on branch drift (#3174).
+   PRIMARY_WT=$(git worktree list --porcelain | awk '/^worktree /{print substr($0,10); exit}')
+   if [ -z "$PRIMARY_WT" ]; then
+     echo "FATAL: could not resolve primary worktree before cleanup" >&2
+     exit 1
+   fi
+   if [ -n "$PRIMARY_WT" ] && [ "$(pwd -P 2>/dev/null)" != "$(cd "$PRIMARY_WT" 2>/dev/null && pwd -P)" ]; then echo "⚠ Orchestrator CWD drifted to $(pwd) — pinning to $PRIMARY_WT before worktree cleanup (#3174)"; cd "$PRIMARY_WT" || { echo "FATAL: cannot cd to primary worktree $PRIMARY_WT" >&2; exit 1; }; fi
+   ORCH_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+   [ -z "${EXPECTED_BRANCH:-}" ] || [ "$ORCH_BRANCH" = "$EXPECTED_BRANCH" ] || { echo "FATAL: orchestrator on '$ORCH_BRANCH' but expected '$EXPECTED_BRANCH' before worktree cleanup — refusing to merge (#3174-class drift)" >&2; exit 1; }
+
    if command -v gsd-sdk >/dev/null 2>&1; then
      gsd-sdk query worktree.cleanup-wave --manifest "$WAVE_WORKTREE_MANIFEST" || exit 1
    else
      echo "WARN: gsd-sdk unavailable; using manifest-scoped shell fallback (#3384)." >&2
-
    WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
    node -e 'const fs=require("fs");const p=process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("WAVE_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read WAVE_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
    while IFS= read -r WT; do
@@ -759,12 +768,10 @@ increases monotonically across waves. `{status}` is `complete` (success),
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
      if [ -n "$WT_BRANCH" ] && [ "$WT_BRANCH" != "HEAD" ]; then
        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
        STATE_BACKUP=$(mktemp)
        ROADMAP_BACKUP=$(mktemp)
        [ -f .planning/STATE.md ] && cp .planning/STATE.md "$STATE_BACKUP" || true
        [ -f .planning/ROADMAP.md ] && cp .planning/ROADMAP.md "$ROADMAP_BACKUP" || true
-
        DELETIONS=$(git diff --diff-filter=D --name-only HEAD..."$WT_BRANCH" 2>/dev/null || true)
        if [ -n "$DELETIONS" ]; then
          echo "BLOCKED: Worktree branch $WT_BRANCH contains file deletions: $DELETIONS"
@@ -772,7 +779,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
          rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
          continue
        fi
-
        git merge "$WT_BRANCH" --no-ff --no-edit -m "chore: merge executor worktree ($WT_BRANCH)" 2>&1 || {
          echo "⚠ Merge conflict from worktree $WT_BRANCH — resolve manually"
          echo "  STATE.md backup:   $STATE_BACKUP"
@@ -780,7 +786,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
          echo "  Restore with: cp \$STATE_BACKUP .planning/STATE.md && cp \$ROADMAP_BACKUP .planning/ROADMAP.md"
          break
        }
-
        MERGE_DEL_COUNT=$(git diff --diff-filter=D --name-only HEAD~1 HEAD 2>/dev/null | grep -vc '^\.planning/' || true)
        if [ "$MERGE_DEL_COUNT" -gt 5 ] && [ "${ALLOW_BULK_DELETE:-0}" != "1" ]; then
          MERGE_DELETIONS=$(git diff --diff-filter=D --name-only HEAD~1 HEAD 2>/dev/null | grep -v '^\.planning/' || true)
@@ -791,7 +796,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
          rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
          continue
        fi
-
        if [ -s "$STATE_BACKUP" ]; then
          cp "$STATE_BACKUP" .planning/STATE.md
        fi
@@ -799,7 +803,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
          cp "$ROADMAP_BACKUP" .planning/ROADMAP.md
        fi
        rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
-
        # Detect files deleted on main but re-added by worktree merge (#2501).
        DELETED_FILES=$(git diff --diff-filter=A --name-only HEAD~1 -- .planning/ 2>/dev/null || true)
        for RESURRECTED in $DELETED_FILES; do
@@ -808,7 +811,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
            git rm -f "$RESURRECTED" 2>/dev/null || true
          fi
        done
-
        if ! git diff --quiet .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || \
           [ -n "$DELETED_FILES" ]; then
          COMMIT_DOCS=$(gsd-sdk query config-get commit_docs 2>/dev/null || echo "true")
@@ -817,7 +819,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
            git commit --amend --no-edit 2>/dev/null || true
          fi
        fi
-
        # Safety net: rescue uncommitted SUMMARY.md before worktree removal (#2070, #2838).
        while IFS= read -r SUMMARY; do
          [ -z "$SUMMARY" ] && continue
@@ -828,7 +829,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
            echo "⚠ Rescued $REL_PATH from worktree before removal"
          fi
        done < <(find "$WT/.planning" -name "*SUMMARY.md" 2>/dev/null)
-
        REMOVE_OK=false
        if git worktree remove "$WT" --force; then
          REMOVE_OK=true
@@ -847,7 +847,6 @@ increases monotonically across waves. `{status}` is `complete` (success),
            echo "⚠ Residual worktree at $WT (remove failed) — investigate manually"
          fi
        fi
-
        if [ "$REMOVE_OK" = "true" ]; then
          git branch -D "$WT_BRANCH" 2>/dev/null || true
        else
@@ -863,6 +862,9 @@ increases monotonically across waves. `{status}` is `complete` (success),
    If the orchestrator deviated from the standard wave merge path (e.g., custom inter-worktree base-update merges with `merge: bring …` style messages), run this snippet after the custom merges are complete. It reads only `WAVE_WORKTREE_MANIFEST`; do not discover unrelated `worktree-agent-*` worktrees.
 
    ```bash
+   # Cleanup-tail: pin orchestrator CWD to primary worktree before cleanup-tail (#3174).
+   PRIMARY_WT=$(git worktree list --porcelain | awk '/^worktree /{print substr($0,10); exit}')
+   if [ -n "$PRIMARY_WT" ] && [ "$(pwd -P 2>/dev/null)" != "$(cd "$PRIMARY_WT" 2>/dev/null && pwd -P)" ]; then echo "⚠ Orchestrator CWD drifted to $(pwd) — pinning to $PRIMARY_WT before cleanup-tail (#3174)"; cd "$PRIMARY_WT" || { echo "FATAL: cannot cd to primary worktree $PRIMARY_WT" >&2; exit 1; }; fi
    # Cleanup-tail: remove residual agent worktrees after a cross-wave-dependency deviation.
    # Uses only the current wave manifest to avoid touching unrelated active agents (#3384).
    WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")

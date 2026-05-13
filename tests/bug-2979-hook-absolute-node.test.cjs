@@ -103,23 +103,51 @@ describe('Bug #2979: buildHookCommand for .js hooks emits absolute node runner',
   });
 });
 
-describe('Bug #3362: Windows PowerShell hook commands use the call operator', () => {
-  test('global install: .js hook command starts with & so quoted runners execute in PowerShell', () => {
+describe('Bug #3362 / #3413: Windows hook commands are runtime-aware', () => {
+  test('Gemini global install: .js hook command starts with & so quoted runners execute in PowerShell', () => {
     const cmd = buildHookCommand('C:/Program Files/Gemini/.gemini', 'gsd-check-update.js', {
       platform: 'win32',
+      runtime: 'gemini',
     });
-    assert.ok(cmd.startsWith('& '), `PowerShell commands need call operator, got: ${cmd}`);
+    assert.ok(cmd.startsWith('& '), `Gemini PowerShell commands need call operator, got: ${cmd}`);
     assert.ok(cmd.includes('"C:/Program Files/Gemini/.gemini/hooks/gsd-check-update.js"'));
   });
 
-  test('portable install: .js hook command also uses & on Windows PowerShell', () => {
+  test('Gemini portable install: .js hook command also uses & on Windows PowerShell', () => {
     const home = require('node:os').homedir().replace(/\\/g, '/');
     const cmd = buildHookCommand(`${home}/.gemini`, 'gsd-check-update.js', {
       portableHooks: true,
       platform: 'win32',
+      runtime: 'gemini',
     });
-    assert.ok(cmd.startsWith('& '), `PowerShell commands need call operator, got: ${cmd}`);
+    assert.ok(cmd.startsWith('& '), `Gemini PowerShell commands need call operator, got: ${cmd}`);
     assert.equal(parseHookCommand(cmd.slice(2)).hookPath, '$HOME/.gemini/hooks/gsd-check-update.js');
+  });
+
+  test('Claude global install: .js hook command stays shell-neutral on Windows Git Bash', () => {
+    const cmd = buildHookCommand('C:/Users/me/.claude', 'gsd-check-update.js', {
+      platform: 'win32',
+      runtime: 'claude',
+    });
+    assert.ok(!cmd.startsWith('& '), `Claude hook command must not use PowerShell call operator: ${cmd}`);
+    assert.equal(parseHookCommand(cmd).hookPath, 'C:/Users/me/.claude/hooks/gsd-check-update.js');
+  });
+
+  test('Windows .js hook with no runtime stays shell-neutral', () => {
+    const cmd = buildHookCommand('C:/Users/me/.claude', 'gsd-check-update.js', {
+      platform: 'win32',
+    });
+    assert.ok(!cmd.startsWith('& '), `Missing runtime must not imply PowerShell syntax: ${cmd}`);
+    assert.equal(parseHookCommand(cmd).hookPath, 'C:/Users/me/.claude/hooks/gsd-check-update.js');
+  });
+
+  test('Gemini runtime on non-Windows platform does not get PowerShell syntax', () => {
+    const cmd = buildHookCommand('/home/me/.claude', 'gsd-check-update.js', {
+      platform: 'linux',
+      runtime: 'gemini',
+    });
+    assert.ok(!cmd.startsWith('& '), `Non-Windows Gemini hook must stay shell-neutral: ${cmd}`);
+    assert.equal(parseHookCommand(cmd).hookPath, '/home/me/.claude/hooks/gsd-check-update.js');
   });
 });
 
@@ -138,7 +166,7 @@ describe('Bug #2979: buildHookCommand for .sh hooks still uses bare "bash" (POSI
     });
     assert.equal(
       cmd,
-      '& "C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.codex/hooks/gsd-validate-commit.sh"',
+      '"C:/Program Files/Git/bin/bash.exe" "C:/Users/me/.codex/hooks/gsd-validate-commit.sh"',
     );
   });
 
@@ -195,7 +223,7 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
   });
 
-  test('adds PowerShell call operator to existing quoted managed hooks on Windows', () => {
+  test('Gemini on Windows adds PowerShell call operator to existing quoted managed hooks', () => {
     const settings = {
       hooks: {
         SessionStart: [{
@@ -204,7 +232,7 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
       },
     };
     const runner = '"/usr/local/bin/node"';
-    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32', runtime: 'gemini' });
     assert.equal(changed, true);
     assert.equal(
       settings.hooks.SessionStart[0].hooks[0].command,
@@ -212,7 +240,7 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     );
   });
 
-  test('does NOT double-prefix managed hooks that already use the PowerShell call operator', () => {
+  test('Gemini on Windows does NOT double-prefix managed hooks that already use the PowerShell call operator', () => {
     const settings = {
       hooks: {
         SessionStart: [{
@@ -222,12 +250,12 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     };
     const runner = '"/usr/local/bin/node"';
     const before = settings.hooks.SessionStart[0].hooks[0].command;
-    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32', runtime: 'gemini' });
     assert.equal(changed, false);
     assert.equal(settings.hooks.SessionStart[0].hooks[0].command, before);
   });
 
-  test('rewrites PowerShell bare-node managed hooks to absolute runner without dropping &', () => {
+  test('Gemini on Windows rewrites PowerShell bare-node managed hooks to absolute runner without dropping &', () => {
     const settings = {
       hooks: {
         SessionStart: [{
@@ -236,11 +264,28 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
       },
     };
     const runner = '"/usr/local/bin/node"';
-    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32', runtime: 'gemini' });
     assert.equal(changed, true);
     assert.equal(
       settings.hooks.SessionStart[0].hooks[0].command,
       '& "/usr/local/bin/node" "C:/Users/me/.gemini/hooks/gsd-check-update.js"',
+    );
+  });
+
+  test('Claude on Windows strips stale PowerShell prefix from managed hooks on reinstall (#3413)', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{
+          hooks: [{ type: 'command', command: '& "/usr/local/bin/node" "C:/Users/me/.claude/hooks/gsd-check-update.js"' }],
+        }],
+      },
+    };
+    const runner = '"/usr/local/bin/node"';
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32', runtime: 'claude' });
+    assert.equal(changed, true);
+    assert.equal(
+      settings.hooks.SessionStart[0].hooks[0].command,
+      '"/usr/local/bin/node" "C:/Users/me/.claude/hooks/gsd-check-update.js"',
     );
   });
 
@@ -357,23 +402,23 @@ describe('Bug #2979 (#3002 CR): rewriteLegacyManagedNodeHookCommands rewrites ba
     assert.equal(changed, true);
   });
 
-  test('normalizes single-quoted Windows managed hook paths to double-quoted forward-slash paths (#3392)', () => {
+  test('Gemini on Windows normalizes single-quoted managed hook paths to double-quoted forward-slash paths (#3392)', () => {
     const settings = {
       hooks: {
         PreToolUse: [{
           hooks: [{
             type: 'command',
-            command: "node 'C:\\Users\\me\\.codex\\hooks\\gsd-prompt-guard.js'",
+            command: "node 'C:\\Users\\me\\.gemini\\hooks\\gsd-prompt-guard.js'",
           }],
         }],
       },
     };
     const runner = '"C:/nvm4w/nodejs/node.exe"';
-    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32' });
+    const changed = rewriteLegacyManagedNodeHookCommands(settings, runner, { platform: 'win32', runtime: 'gemini' });
     assert.equal(changed, true);
     assert.equal(
       settings.hooks.PreToolUse[0].hooks[0].command,
-      '& "C:/nvm4w/nodejs/node.exe" "C:/Users/me/.codex/hooks/gsd-prompt-guard.js"',
+      '& "C:/nvm4w/nodejs/node.exe" "C:/Users/me/.gemini/hooks/gsd-prompt-guard.js"',
     );
   });
 });
