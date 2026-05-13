@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, normalizeMd, output, error, atomicWriteFileSync } = require('./core.cjs');
+const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error } = require('./core.cjs');
+const { platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningDir, planningPaths } = require('./planning-workspace.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
@@ -41,10 +42,7 @@ function cmdStateLoad(cwd, raw) {
   const config = loadConfig(cwd);
   const planDir = planningPaths(cwd).planning;
 
-  let stateRaw = '';
-  try {
-    stateRaw = fs.readFileSync(path.join(planDir, 'STATE.md'), 'utf-8');
-  } catch { /* intentionally empty */ }
+  const stateRaw = platformReadSync(path.join(planDir, 'STATE.md')) || '';
 
   const configExists = fs.existsSync(path.join(planDir, 'config.json'));
   const roadmapExists = fs.existsSync(path.join(planDir, 'ROADMAP.md'));
@@ -84,8 +82,12 @@ function cmdStateLoad(cwd, raw) {
 
 function cmdStateGet(cwd, section, raw) {
   const statePath = planningPaths(cwd).state;
-  try {
-    const content = fs.readFileSync(statePath, 'utf-8');
+  const content = platformReadSync(statePath);
+  if (content === null) {
+    error('STATE.md not found');
+    return;
+  }
+  {
 
     if (!section) {
       output({ content }, raw, content);
@@ -120,8 +122,6 @@ function cmdStateGet(cwd, section, raw) {
     }
 
     output({ error: `Section or field "${section}" not found` }, raw, '');
-  } catch {
-    error('STATE.md not found');
   }
 }
 
@@ -974,7 +974,7 @@ function writeStateMd(statePath, content, cwd) {
   const synced = syncStateFrontmatter(content, cwd);
   const lockPath = acquireStateLock(statePath);
   try {
-    atomicWriteFileSync(statePath, normalizeMd(synced), 'utf-8');
+    platformWriteSync(statePath, synced);
   } finally {
     releaseStateLock(lockPath);
   }
@@ -1002,7 +1002,7 @@ function readModifyWriteStateMd(statePath, transformFn, cwd, options) {
   const resync = !options || options.resync !== false;
   const lockPath = acquireStateLock(statePath);
   try {
-    const content = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf-8') : '';
+    const content = platformReadSync(statePath) || '';
     // Snapshot the existing progress block BEFORE the transform so we can
     // restore it when resync is false.
     const preFm = resync ? null : extractFrontmatter(content);
@@ -1022,7 +1022,7 @@ function readModifyWriteStateMd(statePath, transformFn, cwd, options) {
       synced = `---\n${yamlStr}\n---\n\n${body}`;
     }
 
-    atomicWriteFileSync(statePath, normalizeMd(synced), 'utf-8');
+    platformWriteSync(statePath, synced);
   } finally {
     releaseStateLock(lockPath);
   }
@@ -1217,8 +1217,8 @@ function cmdSignalWaiting(cwd, type, question, options, phase, raw) {
   };
 
   try {
-    fs.mkdirSync(gsdDir, { recursive: true });
-    fs.writeFileSync(waitingPath, JSON.stringify(signal, null, 2), 'utf-8');
+    platformEnsureDir(gsdDir);
+    platformWriteSync(waitingPath, JSON.stringify(signal, null, 2));
     output({ signaled: true, path: waitingPath }, raw, 'true');
   } catch (e) {
     output({ signaled: false, error: e.message }, raw, 'false');
@@ -1347,7 +1347,7 @@ function cmdStateMilestoneSwitch(cwd, version, name, raw) {
 
   const lockPath = acquireStateLock(statePath);
   try {
-    const content = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf-8') : '';
+    const content = platformReadSync(statePath) || '';
     const existingFm = extractFrontmatter(content);
     const body = stripFrontmatter(content);
 
@@ -1383,7 +1383,7 @@ function cmdStateMilestoneSwitch(cwd, version, name, raw) {
 
     const yamlStr = reconstructFrontmatter(fm);
     const assembled = `---\n${yamlStr}\n---\n\n${newBody.replace(/^\n+/, '')}`;
-    atomicWriteFileSync(statePath, normalizeMd(assembled), 'utf-8');
+    platformWriteSync(statePath, assembled);
     output(
       { switched: true, version, name: resolvedName, status: 'planning' },
       raw,
@@ -1752,17 +1752,15 @@ function cmdStatePrune(cwd, options, raw) {
   // Write archived entries to STATE-ARCHIVE.md
   if (archived.length > 0) {
     const timestamp = new Date().toISOString().split('T')[0];
-    let archiveContent = '';
-    if (fs.existsSync(archivePath)) {
-      archiveContent = fs.readFileSync(archivePath, 'utf-8');
-    } else {
+    let archiveContent = platformReadSync(archivePath);
+    if (archiveContent === null) {
       archiveContent = '# STATE Archive\n\nPruned entries from STATE.md. Recoverable but no longer loaded into agent context.\n\n';
     }
     archiveContent += `## Pruned ${timestamp} (phases 1-${cutoff}, kept recent ${keepRecent})\n\n`;
     for (const section of archived) {
       archiveContent += `### ${section.section}\n\n${section.lines.join('\n')}\n\n`;
     }
-    atomicWriteFileSync(archivePath, archiveContent);
+    platformWriteSync(archivePath, archiveContent);
   }
 
   const totalPruned = archived.reduce((sum, s) => sum + s.count, 0);
