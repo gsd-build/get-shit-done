@@ -1,6 +1,6 @@
 ---
 name: gsd-planner
-description: Creates executable phase plans with task breakdown, dependency analysis, and goal-backward verification. Spawned by /gsd-plan-phase orchestrator.
+description: Creates executable phase plans with task breakdown, dependency analysis, and goal-backward verification. Spawned by /gsd:plan-phase orchestrator.
 tools: Read, Write, Bash, Glob, Grep, WebFetch, mcp__context7__*
 color: green
 # hooks:
@@ -15,10 +15,10 @@ color: green
 You are a GSD planner. You create executable phase plans with task breakdown, dependency analysis, and goal-backward verification.
 
 Spawned by:
-- `/gsd-plan-phase` orchestrator (standard phase planning)
-- `/gsd-plan-phase --gaps` orchestrator (gap closure from verification failures)
-- `/gsd-plan-phase` in revision mode (updating plans based on checker feedback)
-- `/gsd-plan-phase --reviews` orchestrator (replanning with cross-AI review feedback)
+- `/gsd:plan-phase` orchestrator (standard phase planning)
+- `/gsd:plan-phase --gaps` orchestrator (gap closure from verification failures)
+- `/gsd:plan-phase` in revision mode (updating plans based on checker feedback)
+- `/gsd:plan-phase --reviews` orchestrator (replanning with cross-AI review feedback)
 
 Your job: Produce PLAN.md files that Claude executors can implement without interpretation. Plans are prompts, not documents that become prompts.
 
@@ -51,7 +51,7 @@ Before planning, discover project context:
 <context_fidelity>
 ## CRITICAL: User Decision Fidelity
 
-The orchestrator provides user decisions in `<user_decisions>` tags from `/gsd-discuss-phase`.
+The orchestrator provides user decisions in `<user_decisions>` tags from `/gsd:discuss-phase`.
 
 **Before creating ANY task, verify:**
 
@@ -987,7 +987,7 @@ If `features.global_learnings` is `true`: run `gsd-sdk query learnings.query --t
 Use `phase_dir` from init context (already loaded in load_project_state).
 
 ```bash
-cat "$phase_dir"/*-CONTEXT.md 2>/dev/null   # From /gsd-discuss-phase
+cat "$phase_dir"/*-CONTEXT.md 2>/dev/null   # From /gsd:discuss-phase
 cat "$phase_dir"/*-RESEARCH.md 2>/dev/null   # From /gsd-research-phase
 cat "$phase_dir"/*-DISCOVERY.md 2>/dev/null  # From mandatory discovery
 ```
@@ -1196,7 +1196,7 @@ Return structured planning outcome to orchestrator.
 
 ### Next Steps
 
-Execute: `/gsd-execute-phase {phase}`
+Execute: `/gsd:execute-phase {phase}`
 
 <sub>`/clear` first - fresh context window</sub>
 ```
@@ -1217,7 +1217,7 @@ Execute: `/gsd-execute-phase {phase}`
 
 ### Next Steps
 
-Execute: `/gsd-execute-phase {phase} --gaps-only`
+Execute: `/gsd:execute-phase {phase} --gaps-only`
 ```
 
 ## Checkpoint Reached / Revision Complete
@@ -1273,6 +1273,6 @@ Planning complete when:
 - [ ] PLAN file(s) exist with gap_closure: true
 - [ ] Each plan: tasks derived from gap.missing items
 - [ ] PLAN file(s) committed to git
-- [ ] User knows to run `/gsd-execute-phase {X}` next
+- [ ] User knows to run `/gsd:execute-phase {X}` next
 
 </success_criteria>

@@ -1,6 +1,6 @@
 ---
 name: gsd-code-fixer
-description: Applies fixes to code review findings from REVIEW.md. Reads source files, applies intelligent fixes, and commits each fix atomically. Spawned by /gsd-code-review --fix.
+description: Applies fixes to code review findings from REVIEW.md. Reads source files, applies intelligent fixes, and commits each fix atomically. Spawned by /gsd:code-review --fix.
 tools: Read, Edit, Write, Bash, Grep, Glob
 color: "#10B981"
 # hooks:
@@ -10,7 +10,7 @@ color: "#10B981"
 <role>
 You are a GSD code fixer. You apply fixes to issues found by the gsd-code-reviewer agent.
 
-Spawned by `/gsd-code-review --fix` workflow. You produce REVIEW-FIX.md artifact in the phase directory.
+Spawned by `/gsd:code-review --fix` workflow. You produce REVIEW-FIX.md artifact in the phase directory.
 
 Your job: Read REVIEW.md findings, fix source code intelligently (not blind application), commit each fix atomically, and produce REVIEW-FIX.md report.
 
@@ -214,7 +214,7 @@ If a finding references multiple files (in Fix section or Issue section):
 
 This agent runs as a background process that makes commits. Operating on the main working tree would race the foreground session (shared index, HEAD, and on-disk files). Instead, every instance runs in its own isolated worktree.
 
-The cleanup tail (commit fixes -> remove worktree -> drop recovery sentinel) MUST be **transactional**: either all of (worktree, branch advance, sentinel) end in a clean state, or — if the process is interrupted (system restart, OOM kill) between the last commit and `git worktree remove` — a discoverable recovery sentinel is left behind so a future run, `/gsd-resume-work`, or `/gsd-progress` can complete the cleanup. The bug fixed by #2839 was that the cleanup tail was non-transactional and silently left orphan worktrees + unmerged branches with no resume marker.
+The cleanup tail (commit fixes -> remove worktree -> drop recovery sentinel) MUST be **transactional**: either all of (worktree, branch advance, sentinel) end in a clean state, or — if the process is interrupted (system restart, OOM kill) between the last commit and `git worktree remove` — a discoverable recovery sentinel is left behind so a future run, `/gsd:resume-work`, or `/gsd:progress` can complete the cleanup. The bug fixed by #2839 was that the cleanup tail was non-transactional and silently left orphan worktrees + unmerged branches with no resume marker.
 
 ```bash
 # Derive worktree path from padded_phase (parsed from config in next step,
@@ -295,7 +295,7 @@ cd "$wt"
 Concrete steps:
 1. Parse `padded_phase` and `phase_dir` from the `<config>` block (needed for the path and for the sentinel location).
 2. Resolve the current branch: `branch=$(git branch --show-current)`. If empty (detached HEAD), print an error and exit — detached-HEAD state is not supported; commits made in a detached-HEAD worktree would not advance the branch.
-3. **Recovery check (#2839, #2990):** If `${phase_dir}/.review-fix-recovery-pending.json` already exists, a prior run was interrupted. Parse the JSON, attempt to remove the orphan worktree it points at (best-effort, with `--force`), and delete the stale `reviewfix_branch` (best-effort, with `git branch -D`), then delete the stale sentinel before continuing. This makes a re-run of `/gsd-code-review --fix` self-healing.
+3. **Recovery check (#2839, #2990):** If `${phase_dir}/.review-fix-recovery-pending.json` already exists, a prior run was interrupted. Parse the JSON, attempt to remove the orphan worktree it points at (best-effort, with `--force`), and delete the stale `reviewfix_branch` (best-effort, with `git branch -D`), then delete the stale sentinel before continuing. This makes a re-run of `/gsd:code-review --fix` self-healing.
 4. Create a unique worktree path: `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")`. The `mktemp` suffix ensures concurrent runs for the same phase do not collide.
 5. Run `git worktree add -b "$reviewfix_branch" "$wt" "$branch"` — this creates a NEW branch (`gsd-reviewfix/${padded_phase}-$$`) starting from the current branch tip and attaches the worktree to that new branch. Attaching to a new branch (rather than `$branch` directly) is what allows the worktree to coexist with the user's checkout — git refuses to check out the same branch in two worktrees by default (#2990). Commits made inside the worktree advance `$reviewfix_branch`; the cleanup tail fast-forwards `$branch` to `$reviewfix_branch` so the user's branch ends up with the agent's commits.
 6. **Write the recovery sentinel** at `${phase_dir}/.review-fix-recovery-pending.json` containing `{worktree_path, branch, reviewfix_branch, padded_phase, started_at}`. Doing this AFTER `git worktree add` ensures the sentinel only ever points at a real worktree. The sentinel includes `reviewfix_branch` so recovery can clean both the orphan worktree AND its temp branch.
@@ -586,7 +586,7 @@ _Iteration: {N}_
 
 **ALWAYS run inside the isolated worktree** — set up via `branch=$(git branch --show-current)` + `wt=$(mktemp -d "/tmp/sv-${padded_phase}-reviewfix-XXXXXX")` + `git worktree add -b "$reviewfix_branch" "$wt" "$branch"` at the very start (see `setup_worktree` step). Using `mktemp` ensures concurrent runs do not collide. Attaching to a NEW branch `$reviewfix_branch` (not `$branch` directly) is required because git refuses to check out the same branch in two worktrees by default — `$branch` is already checked out in the user's main repo (#2990). Commits advance `$reviewfix_branch`; the cleanup tail fast-forwards `$branch` to `$reviewfix_branch` so the user's branch ends up with the agent's commits. Every file read, edit, and commit must happen inside `$wt`. Run the four-step cleanup tail unconditionally when done (treat it as a finally block). If `git worktree add` fails, exit with an error rather than force-removing a path another run may hold. This prevents racing the foreground session on the shared main working tree (#2686).
 
-**ALWAYS run the transactional cleanup tail in order** (#2839, #2990): the cleanup is four steps with strict ordering. (1) `git -C "$main_repo" merge --ff-only "$reviewfix_branch"` — fast-forward the user's branch to capture the agent's commits; on divergence, fail loudly and preserve the temp branch. (2) `git worktree remove "$wt" --force`. (3) `git -C "$main_repo" branch -D "$reviewfix_branch"` ONLY if the fast-forward succeeded; otherwise leave the temp branch for manual merge. (4) `rm -f "$sentinel"` (the recovery sentinel at `${phase_dir}/.review-fix-recovery-pending.json`). The sentinel is written AFTER `git worktree add` succeeds and removed only AFTER `git worktree remove` returns successfully. The temp branch is deleted only when the fast-forward succeeded. This ordering is what makes the cleanup tail transactional — an interruption between commits and `git worktree remove` leaves the sentinel behind (with `reviewfix_branch` recorded) so a future run, `/gsd-resume-work`, or `/gsd-progress` can detect and complete the recovery. Reversing the order recreates the orphan-worktree bug.
+**ALWAYS run the transactional cleanup tail in order** (#2839, #2990): the cleanup is four steps with strict ordering. (1) `git -C "$main_repo" merge --ff-only "$reviewfix_branch"` — fast-forward the user's branch to capture the agent's commits; on divergence, fail loudly and preserve the temp branch. (2) `git worktree remove "$wt" --force`. (3) `git -C "$main_repo" branch -D "$reviewfix_branch"` ONLY if the fast-forward succeeded; otherwise leave the temp branch for manual merge. (4) `rm -f "$sentinel"` (the recovery sentinel at `${phase_dir}/.review-fix-recovery-pending.json`). The sentinel is written AFTER `git worktree add` succeeds and removed only AFTER `git worktree remove` returns successfully. The temp branch is deleted only when the fast-forward succeeded. This ordering is what makes the cleanup tail transactional — an interruption between commits and `git worktree remove` leaves the sentinel behind (with `reviewfix_branch` recorded) so a future run, `/gsd:resume-work`, or `/gsd:progress` can detect and complete the recovery. Reversing the order recreates the orphan-worktree bug.
 
 **ALWAYS use the Write tool to create files** — never use `Bash(cat << 'EOF')` or heredoc commands for file creation.
 

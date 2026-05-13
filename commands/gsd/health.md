@@ -16,7 +16,7 @@ Validate `.planning/` directory integrity and report actionable issues. Checks f
 | Utilization | State    | Action                                                |
 |-------------|----------|-------------------------------------------------------|
 | < 60%       | healthy  | no action — context is comfortable                    |
-| 60% – 70%   | warning  | recommend `/gsd-thread` to start fresh                |
+| 60% – 70%   | warning  | recommend `/gsd:thread` to start fresh                |
 | ≥ 70%       | critical | reasoning quality may degrade past the fracture point |
 </objective>
 

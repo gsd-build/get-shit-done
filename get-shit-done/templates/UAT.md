@@ -106,7 +106,7 @@ blocked: [N]
 **Gaps:**
 - APPEND only when issue found (YAML format)
 - After diagnosis: fill `root_cause`, `artifacts`, `missing`, `debug_session`
-- This section feeds directly into /gsd-plan-phase --gaps
+- This section feeds directly into /gsd:plan-phase --gaps
 
 </section_rules>
 
@@ -120,7 +120,7 @@ blocked: [N]
 4. UAT.md Gaps section updated with diagnosis:
    - Each gap gets `root_cause`, `artifacts`, `missing`, `debug_session` filled
 5. status → "diagnosed"
-6. Ready for /gsd-plan-phase --gaps with root causes
+6. Ready for /gsd:plan-phase --gaps with root causes
 
 **After diagnosis:**
 ```yaml
@@ -144,7 +144,7 @@ blocked: [N]
 
 <lifecycle>
 
-**Creation:** When /gsd-verify-work starts new session
+**Creation:** When /gsd:verify-work starts new session
 - Extract tests from SUMMARY.md files
 - Set status to "testing"
 - Current Test points to test 1
@@ -171,7 +171,7 @@ blocked: [N]
 - Present summary with outstanding items highlighted
 
 **Resuming partial session:**
-- `/gsd-verify-work {phase}` picks up from first pending/blocked test
+- `/gsd:verify-work {phase}` picks up from first pending/blocked test
 - When all items resolved, status advances to "complete"
 
 **Resume after /clear:**

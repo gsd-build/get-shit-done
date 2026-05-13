@@ -398,11 +398,11 @@ function runStatusline() {
       try {
         const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
         if (cache.update_available) {
-          gsdUpdate = '\x1b[33m⬆ /gsd-update\x1b[0m │ ';
+          gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
         }
         if (cache.stale_hooks && cache.stale_hooks.length > 0) {
           // If installed version is ahead of npm latest, this is a dev install.
-          // Running /gsd-update would downgrade — show a contextual warning instead.
+          // Running /gsd:update would downgrade — show a contextual warning instead.
           const isDevInstall = (() => {
             if (!cache.installed || !cache.latest || cache.latest === 'unknown') return false;
             const parseV = v => v.replace(/^v/, '').split('.').map(Number);
@@ -413,7 +413,7 @@ function runStatusline() {
           if (isDevInstall) {
             gsdUpdate += '\x1b[33m⚠ dev install — re-run installer to sync hooks\x1b[0m │ ';
           } else {
-            gsdUpdate += '\x1b[31m⚠ stale hooks — run /gsd-update\x1b[0m │ ';
+            gsdUpdate += '\x1b[31m⚠ stale hooks — run /gsd:update\x1b[0m │ ';
           }
         }
       } catch (e) {}

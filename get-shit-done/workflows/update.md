@@ -20,7 +20,7 @@ First, derive `PREFERRED_CONFIG_DIR` and `PREFERRED_RUNTIME` from the invoking p
 - Otherwise -> `claude`
 
 Use `PREFERRED_CONFIG_DIR` when available so custom `--config-dir` installs are checked before default locations.
-Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd-update` targets the runtime that invoked it.
+Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd:update` targets the runtime that invoked it.
 
 Kilo config precedence must match the installer: `KILO_CONFIG_DIR` -> `dirname(KILO_CONFIG)` -> `XDG_CONFIG_HOME/kilo` -> `~/.config/kilo`.
 
@@ -356,7 +356,7 @@ by re-running the local installer from your dev branch:
 
     node bin/install.js --global --claude
 
-Running /gsd-update would install the npm release (A.B.C) and downgrade
+Running /gsd:update would install the npm release (A.B.C) and downgrade
 your dev version — do NOT use it to resolve this warning.
 ```
 
@@ -406,7 +406,7 @@ Your custom files in other locations are preserved:
 - Custom hooks ✓
 - Your CLAUDE.md files ✓
 
-If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd-update --reapply` after the update.
+If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd:update --reapply` after the update.
 ```
 
 
@@ -588,7 +588,7 @@ done
 
 # Clear the shared tool-agnostic cache written by gsd-check-update.js hook (#2784).
 # The hook uses ~/.cache/gsd/gsd-update-check.json regardless of runtime; clear it
-# so the statusline stops showing the stale "⬆ /gsd-update" indicator after update.
+# so the statusline stops showing the stale "⬆ /gsd:update" indicator after update.
 rm -f "$HOME/.cache/gsd/gsd-update-check.json"
 ```
 
@@ -619,7 +619,7 @@ Check for gsd-local-patches/backup-meta.json in the config directory.
 
 ```
 Local patches were backed up before the update.
-Run `/gsd-update --reapply` to merge your modifications into the new version.
+Run `/gsd:update --reapply` to merge your modifications into the new version.
 ```
 
 **If no patches:** Continue normally.

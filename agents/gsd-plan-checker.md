@@ -1,6 +1,6 @@
 ---
 name: gsd-plan-checker
-description: Verifies plans will achieve phase goal before execution. Goal-backward analysis of plan quality. Spawned by /gsd-plan-phase orchestrator.
+description: Verifies plans will achieve phase goal before execution. Goal-backward analysis of plan quality. Spawned by /gsd:plan-phase orchestrator.
 tools: Read, Bash, Glob, Grep
 color: green
 ---
@@ -8,7 +8,7 @@ color: green
 <role>
 A set of phase plans has been submitted for pre-execution review. Verify they WILL achieve the phase goal — do not credit effort or intent, only verifiable coverage.
 
-Spawned by `/gsd-plan-phase` orchestrator (after planner creates PLAN.md) or re-verification (after planner revises).
+Spawned by `/gsd:plan-phase` orchestrator (after planner creates PLAN.md) or re-verification (after planner revises).
 
 Goal-backward verification of PLANS before execution. Start from what the phase SHOULD deliver, verify plans address it.
 
@@ -64,7 +64,7 @@ This ensures verification checks that plans follow project-specific conventions.
 </project_context>
 
 <upstream_input>
-**CONTEXT.md** (if exists) — User decisions from `/gsd-discuss-phase`
+**CONTEXT.md** (if exists) — User decisions from `/gsd:discuss-phase`
 
 | Section | How You Use It |
 |---------|----------------|
@@ -299,7 +299,7 @@ issue:
 
 ## Dimension 7: Context Compliance (if CONTEXT.md exists)
 
-**Question:** Do plans honor user decisions from /gsd-discuss-phase?
+**Question:** Do plans honor user decisions from /gsd:discuss-phase?
 
 **Only check if CONTEXT.md was provided in the verification context.**
 
@@ -447,7 +447,7 @@ Before running checks 8a-8d, verify VALIDATION.md exists:
 ls "${PHASE_DIR}"/*-VALIDATION.md 2>/dev/null
 ```
 
-**If missing:** **BLOCKING FAIL** — "VALIDATION.md not found for phase {N}. Re-run `/gsd-plan-phase {N} --research` to regenerate."
+**If missing:** **BLOCKING FAIL** — "VALIDATION.md not found for phase {N}. Re-run `/gsd:plan-phase {N} --research` to regenerate."
 Skip checks 8a-8d entirely. Report Dimension 8 as FAIL with this single issue.
 
 **If exists:** Proceed to checks 8a-8d.
@@ -897,7 +897,7 @@ Return all issues as a structured `issues:` YAML list (see dimension examples fo
 | 01   | 3     | 5     | 1    | Valid  |
 | 02   | 2     | 4     | 2    | Valid  |
 
-Plans verified. Run `/gsd-execute-phase {phase}` to proceed.
+Plans verified. Run `/gsd:execute-phase {phase}` to proceed.
 ```
 
 ## ISSUES FOUND

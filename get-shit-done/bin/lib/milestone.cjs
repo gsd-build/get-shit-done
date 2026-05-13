@@ -227,10 +227,10 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     if (operatorPattern.test(stateContent)) {
       stateContent = stateContent.replace(
         operatorPattern,
-        `$1\n- Start the next milestone with /gsd-new-milestone\n\n`,
+        `$1\n- Start the next milestone with /gsd:new-milestone\n\n`,
       );
     } else {
-      stateContent = `${stateContent.trimEnd()}\n\n## Operator Next Steps\n\n- Start the next milestone with /gsd-new-milestone\n`;
+      stateContent = `${stateContent.trimEnd()}\n\n## Operator Next Steps\n\n- Start the next milestone with /gsd:new-milestone\n`;
     }
 
     writeStateMd(statePath, stateContent, cwd);

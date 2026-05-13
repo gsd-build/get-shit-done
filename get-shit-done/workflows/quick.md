@@ -126,13 +126,13 @@ If `$VALIDATE_MODE` only:
 
 ```bash
 if ! command -v gsd-sdk &>/dev/null; then
-  echo "⚠ gsd-sdk not found in PATH — /gsd-quick requires it."
+  echo "⚠ gsd-sdk not found in PATH — /gsd:quick requires it."
   echo ""
   echo "Install the query-capable GSD SDK CLI:"
   echo "  npm install -g get-shit-done-cc"
   echo ""
   echo "Or update GSD to get the latest packages:"
-  echo "  /gsd-update"
+  echo "  /gsd:update"
   exit 1
 fi
 ```
@@ -170,7 +170,7 @@ fi
 
 Quick mode does not have a pre-declared `files_modified` list (the task is freeform), so use a fail-loud guard at commit time: when the executor stages files for the quick-task commit, if any staged path falls inside a `SUBMODULE_PATHS` entry, abort with a clear error explaining that worktree-isolated commits cannot safely span submodule boundaries — the user can re-run with `workflow.use_worktrees=false` to fall back to sequential execution on the main tree. If `SUBMODULE_PATHS` is empty (no `.gitmodules` in the repo), worktree isolation proceeds normally.
 
-**If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd-new-project` first.
+**If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
 
 Quick tasks can run mid-phase - validation only checks ROADMAP.md exists, not phase status.
 
@@ -1115,7 +1115,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd-quick ${GSD_WS}
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 **If NOT `$VALIDATE_MODE`:**
@@ -1132,7 +1132,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd-quick ${GSD_WS}
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 </process>
