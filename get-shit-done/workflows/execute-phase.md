@@ -1005,107 +1005,46 @@ increases monotonically across waves. `{status}` is `complete` (success),
    ---
    ```
 
-   - Bad: "Wave 2 complete. Proceeding to Wave 3."
-   - Good: "Terrain system complete — 3 biome types, height-based texturing, physics collision meshes. Vehicle physics (Wave 3) can now reference ground surfaces."
-
 7. **Handle failures:**
-
-   **Step 7.0 — Classify the agent return body before branching (#3095).**
-   Pipe the agent's failure body through the classifier so quota / rate-limit
-   terminations route to a distinct recovery prompt instead of the generic
-   real-failure branch:
-
+   **Step 7.0 — classify before branching (#3095):**
    ```bash
    CLASS_JSON=$(gsd-sdk query agent.classify-failure -- "$AGENT_RETURN_BODY")
    CLASS=$(echo "$CLASS_JSON" | jq -r '.class')
    SENTINEL=$(echo "$CLASS_JSON" | jq -r '.sentinel // empty')
    RETRY_AFTER=$(echo "$CLASS_JSON" | jq -r '.retryAfterSeconds // empty')
-   if [ -n "$RETRY_AFTER" ]; then
-     RETRY_HINT="  Provider hinted retry-after: ${RETRY_AFTER}s"
-   else
-     RETRY_HINT=""
-   fi
+   if [ -n "$RETRY_AFTER" ]; then RETRY_HINT="  Provider hinted retry-after: ${RETRY_AFTER}s"; else RETRY_HINT=""; fi
    ```
-
-   The classifier recognises sentinels from every runtime GSD dispatches into
-   — Claude Code (`usage limit`, `429`), Copilot CLI (`rate_limit`,
-   `user_weekly_rate_limited`), Codex (`usage_limit_reached`,
-   `too many requests`), Gemini (`RESOURCE_EXHAUSTED`, `exceeded your`) —
-   so a single branch covers all of them. See
-   `docs/research/provider-rate-limit-signals.md` for the proactive
-   (header / SDK event) signal landscape and the forward path once host
-   runtimes expose those signals to hooks.
-
-   **Step 7.1 — `class == "quota-exceeded"` (#3095 quota-distinct path):**
-   Do **not** offer "retry now" — the runtime will reject again until the
-   user's quota window resets. Still run the step 5 spot-check first: a
-   quota-kill that lands *after* SUMMARY.md is committed is just a noisy
-   exit, not a real failure. If SUMMARY.md is missing but commits exist,
-   surface this for the safe-resume path (#3212 / `state.verify-against-disk`)
-   rather than re-dispatching a fresh executor.
-
-   Present this prompt:
-
+   One classifier branch handles sentinels across Claude/Copilot/Codex/Gemini. Reference: `docs/research/provider-rate-limit-signals.md`.
+   **Step 7.1 — `class == "quota-exceeded"`:**
+   Do not offer "retry now". Run step-5 spot-check first; if SUMMARY.md is missing but commits exist, route to safe-resume (`state.verify-against-disk`) instead of immediate redispatch.
    ```text
    ⚠ Plan {plan_id} terminated by provider quota / rate limit
      Runtime sentinel: {SENTINEL}
      {RETRY_HINT}
      Partial commits on worktree branch: {N}
      SUMMARY.md present: {yes|no}
-
      1. Wait for quota reset, then resume (recommended)
-     2. Switch to a different runtime / model and resume
-     3. Abort phase and report partial state
+   2. Switch to a different runtime / model and resume
+   3. Abort phase and report partial state
    ```
-
-   Re-running `/gsd-execute-phase` after the quota window resets is the
-   intended Option 1 path; it relies on the safe-resume gate landing in
-   #3212 to adopt partial worktree commits.
-
-   **Step 7.2 — `class == "classify-handoff-bug"` (Claude Code runtime bug):**
-   If an agent reports "failed" with error containing
-   `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime
-   bug — not a GSD or agent issue. The error fires in the completion handler
-   AFTER all tool calls finish. Run the same spot-checks as step 5
-   (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If
-   spot-checks PASS → treat as **successful**. If spot-checks FAIL → fall
-   through to step 7.3.
-
-   **Step 7.3 — `class == "unknown-failure"` (everything else):**
-   Report which plan failed → ask "Continue?" or "Stop?" → if continue,
-   dependent plans may also fail. If stop, partial completion report.
+   Re-run `/gsd:execute-phase` after quota reset for Option 1.
+   **Step 7.2 — `class == "classify-handoff-bug"`:**
+   If error contains `classifyHandoffIfNeeded is not defined`, treat as Claude runtime bug. Run the same step-5 spot-checks; PASS => treat as success, FAIL => fall through.
+   **Step 7.3 — `class == "unknown-failure"`:**
+   Report failed plan and ask Continue/Stop; continuing may cascade into dependent plan failures.
 
 7b. **Pre-wave dependency check (waves 2+ only):**
-
-    Before spawning wave N+1, for each plan in the upcoming wave:
-    ```bash
-    gsd-sdk query verify.key-links {phase_dir}/{plan}-PLAN.md
-    ```
-
-    If any key-link from a PRIOR wave's artifact fails verification:
-
-    ## Cross-Plan Wiring Gap
-
-    | Plan | Link | From | Expected Pattern | Status |
-    |------|------|------|-----------------|--------|
-    | {plan} | {via} | {from} | {pattern} | NOT FOUND |
-
-    Wave {N} artifacts may not be properly wired. Options:
-    1. Investigate and fix before continuing
-    2. Continue (may cause cascading failures in wave {N+1})
-
-    Key-links referencing files in the CURRENT (upcoming) wave are skipped.
-
+    Before wave N+1, run `gsd-sdk query verify.key-links {phase_dir}/{plan}-PLAN.md` for each upcoming plan.
+    If any PRIOR-wave artifact link fails, present:
+    - `## Cross-Plan Wiring Gap` with plan/link/from/pattern rows
+    - Options: investigate+fix before continue, or continue with cascade risk
+    Skip key-links that reference files in the CURRENT (upcoming) wave.
 8. **Execute checkpoint plans between waves** — see `<checkpoint_handling>`.
-
 9. **Proceed to next wave.**
 </step>
-
 <step name="checkpoint_handling">
 Plans with `autonomous: false` require user interaction.
-
 **Auto-mode checkpoint handling:**
-
 Read auto-advance config (chain flag OR user preference — same boolean as `check.auto-mode`):
 ```bash
 AUTO_MODE=$(gsd-sdk query check auto-mode --pick active 2>/dev/null || echo "false")
