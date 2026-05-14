@@ -776,6 +776,19 @@ After executor returns:
    # Read line-by-line so worktree paths containing whitespace are preserved (#2774).
    while IFS= read -r WT; do
      [ -z "$WT" ] && continue
+     # Pin CWD to project root before any bare git command (#3521).
+     # An LLM orchestrator may leak CWD into a worktree across tool calls; without
+     # this pin the merge command resolves against the worktree branch itself and
+     # silently no-ops the main-branch merge.
+     PROJECT_ROOT=$(git -C "$WT" rev-parse --git-common-dir 2>/dev/null)
+     # git rev-parse --git-common-dir returns the .git dir, not the working tree root.
+     # Strip the trailing /.git (or bare .git) to get the working tree root.
+     PROJECT_ROOT=$(echo "$PROJECT_ROOT" | sed 's|/\.git$||; s|/\.git/.*||')
+     if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
+       echo "WARN: cannot resolve project root from worktree $WT — skipping cleanup for this entry (#3521)" >&2
+       continue
+     fi
+     cd "$PROJECT_ROOT" || { echo "WARN: cannot cd to project root $PROJECT_ROOT — skipping cleanup for worktree $WT (#3521)" >&2; continue; }
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
      if [ -n "$WT_BRANCH" ] && [ "$WT_BRANCH" != "HEAD" ]; then
        # --- Orchestrator file protection (#1756) ---
