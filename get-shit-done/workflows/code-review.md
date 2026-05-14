@@ -355,16 +355,30 @@ if [ -z \"$FALLOW_BIN\" ]; then
 fi
 ```
 
-3) Execute structural pass and persist JSON:
+3) Execute structural pass and persist JSON (bounded at 120s; on timeout, behaves as a fallow crash):
 ```bash
 FALLOW_JSON_PATH="${PHASE_DIR}/FALLOW.json"
+FALLOW_STDERR_TMP=$(mktemp)
 if [ \"$FALLOW_SCOPE\" = \"repo\" ]; then
-  \"$FALLOW_BIN\" audit --json --profile \"$FALLOW_PROFILE\" > \"$FALLOW_JSON_PATH\"
+  timeout 120 \"$FALLOW_BIN\" audit --json --profile \"$FALLOW_PROFILE\" > \"${FALLOW_JSON_PATH}.tmp\" 2>\"$FALLOW_STDERR_TMP\"
+  FALLOW_EXIT=$?
 else
   # phase scope: pass the already-computed review file set
-  printf '%s\n' \"${REVIEW_FILES[@]}\" | \"$FALLOW_BIN\" audit --json --profile \"$FALLOW_PROFILE\" --stdin-files > \"$FALLOW_JSON_PATH\"
+  printf '%s\n' \"${REVIEW_FILES[@]}\" | timeout 120 \"$FALLOW_BIN\" audit --json --profile \"$FALLOW_PROFILE\" --stdin-files > \"${FALLOW_JSON_PATH}.tmp\" 2>\"$FALLOW_STDERR_TMP\"
+  FALLOW_EXIT=$?
+fi
+if [ $FALLOW_EXIT -ne 0 ]; then
+  FALLOW_STDERR_SUMMARY=$(head -5 \"$FALLOW_STDERR_TMP\")
+  rm -f \"${FALLOW_JSON_PATH}.tmp\" \"$FALLOW_STDERR_TMP\"
+  echo \"WARNING: fallow structural pre-pass failed: ${FALLOW_STDERR_SUMMARY}\"
+  FALLOW_JSON_PATH=""
+else
+  mv \"${FALLOW_JSON_PATH}.tmp\" \"$FALLOW_JSON_PATH\"
+  rm -f \"$FALLOW_STDERR_TMP\"
 fi
 ```
+
+On any failure of the structural pre-pass (binary missing, non-zero exit, timeout, or JSON parse error), the workflow continues with no `<structural_findings>` injection; the reviewer agent receives a normal review request.
 
 4) Optional MCP bridge path (runtime-dependent):
 - If `FALLOW_MCP=true`, set reviewer input mode to MCP-backed structural findings.
@@ -415,7 +429,7 @@ MAX_FINDINGS_SIZE=50000
 if [ -n "$FALLOW_JSON_PATH" ] && [ -f "$FALLOW_JSON_PATH" ]; then
   FALLOW_JSON_SIZE=$(wc -c < "$FALLOW_JSON_PATH" | tr -d '[:space:]')
   if [ "$FALLOW_JSON_SIZE" -le "$MAX_FINDINGS_SIZE" ]; then
-    STRUCTURAL_FINDINGS_BLOCK="<structural_findings>\n$(cat "$FALLOW_JSON_PATH")\n</structural_findings>\n"
+    STRUCTURAL_FINDINGS_BLOCK=$(printf '<structural_findings>\n%s\n</structural_findings>\n' "$(cat "$FALLOW_JSON_PATH")")
   else
     echo "Warning: skipping structural findings embed (${FALLOW_JSON_SIZE} bytes > ${MAX_FINDINGS_SIZE} bytes). Re-run with narrower scope/profile if needed."
   fi
