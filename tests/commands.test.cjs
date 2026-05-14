@@ -1031,7 +1031,7 @@ describe('verify-path-exists command', () => {
     const absFile = path.join(tmpDir, 'abs-test.txt');
     fs.writeFileSync(absFile, 'content');
 
-    const result = runGsdTools(`verify-path-exists ${absFile}`, tmpDir);
+    const result = runGsdTools(['verify-path-exists', absFile], tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
