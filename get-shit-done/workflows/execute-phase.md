@@ -1020,6 +1020,11 @@ increases monotonically across waves. `{status}` is `complete` (success),
    CLASS=$(echo "$CLASS_JSON" | jq -r '.class')
    SENTINEL=$(echo "$CLASS_JSON" | jq -r '.sentinel // empty')
    RETRY_AFTER=$(echo "$CLASS_JSON" | jq -r '.retryAfterSeconds // empty')
+   if [ -n "$RETRY_AFTER" ]; then
+     RETRY_HINT="  Provider hinted retry-after: ${RETRY_AFTER}s"
+   else
+     RETRY_HINT=""
+   fi
    ```
 
    The classifier recognises sentinels from every runtime GSD dispatches into
@@ -1041,10 +1046,10 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
    Present this prompt:
 
-   ```
+   ```text
    ⚠ Plan {plan_id} terminated by provider quota / rate limit
      Runtime sentinel: {SENTINEL}
-     {if RETRY_AFTER: Provider hinted retry-after: {RETRY_AFTER}s}
+     {RETRY_HINT}
      Partial commits on worktree branch: {N}
      SUMMARY.md present: {yes|no}
 

@@ -57,7 +57,7 @@ function parseRetryAfter(body: string): number | undefined {
   // Match "retry-after: N" or "Retry-After: N" with optional surrounding
   // punctuation. Captures integer seconds only — HTTP-date form is rare in
   // agent return bodies and not worth the surface area.
-  const match = body.match(/retry[-_ ]after[:\s]+(\d+)/i);
+  const match = body.match(/\bretry[-_ ]after[:\s]+(\d+)\b/i);
   if (!match) return undefined;
   const seconds = Number.parseInt(match[1]!, 10);
   return Number.isFinite(seconds) ? seconds : undefined;
@@ -97,7 +97,7 @@ export function classifyAgentFailure(body: string): AgentFailureClassification {
   if (normalized.includes(CLASSIFY_HANDOFF_SENTINEL)) {
     return {
       class: 'classify-handoff-bug',
-      sentinel: 'classifyHandoffIfNeeded is not defined',
+      sentinel: CLASSIFY_HANDOFF_SENTINEL,
     };
   }
 

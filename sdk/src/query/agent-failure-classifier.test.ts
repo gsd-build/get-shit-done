@@ -101,6 +101,13 @@ describe('classifyAgentFailure', () => {
       expect(result.retryAfterSeconds).toBe(60);
     });
 
+    it('does not parse retry-after when token is embedded in another word', () => {
+      const body = 'noretry-after: 3600 quota exceeded';
+      const result = classifyAgentFailure(body);
+      expect(result.class).toBe('quota-exceeded');
+      expect(result.retryAfterSeconds).toBeUndefined();
+    });
+
     it('returns undefined retryAfterSeconds when no hint present', () => {
       const result = classifyAgentFailure("You've hit your org's monthly usage limit");
       expect(result.class).toBe('quota-exceeded');
@@ -115,7 +122,7 @@ describe('classifyAgentFailure', () => {
       const body = 'ReferenceError: classifyHandoffIfNeeded is not defined';
       const result = classifyAgentFailure(body);
       expect(result.class).toBe('classify-handoff-bug');
-      expect(result.sentinel).toBe('classifyHandoffIfNeeded is not defined');
+      expect(result.sentinel).toBe('classifyhandoffifneeded is not defined');
     });
   });
 

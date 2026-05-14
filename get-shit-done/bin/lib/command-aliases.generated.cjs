@@ -554,6 +554,13 @@ const ROADMAP_COMMAND_ALIASES = [
 
 const NON_FAMILY_COMMAND_ALIASES = [
   {
+    "canonical": "agent.classify-failure",
+    "aliases": [
+      "agent classify-failure"
+    ],
+    "mutation": false
+  },
+  {
     "canonical": "check-commit",
     "aliases": [],
     "mutation": true
