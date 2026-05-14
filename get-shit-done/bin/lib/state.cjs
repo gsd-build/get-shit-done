@@ -1875,6 +1875,27 @@ function cmdStateCompletePhase(cwd, raw, overridePhase) {
     return;
   }
 
+  // Idempotency guard (#3489). If STATE.md's canonical `Current Phase` field
+  // already names a phase distinct from the one we are being asked to mark
+  // complete, the project has advanced past the requested phase (e.g. a
+  // follow-up phase was inserted, or the next phase began). Re-running
+  // `state complete-phase --phase <N>` in that situation previously rolled
+  // STATE.md back to <N>'s moment-of-completion — silently clobbering Status,
+  // Last Activity, Last Activity Description, and the Current Position body.
+  // The handler is now a no-op in that case so re-invocation from downstream
+  // workflows cannot regress the project state.
+  const existingCurrentPhaseRaw = stateExtractField(content, 'Current Phase') || '';
+  const existingCurrentPhaseMatch = String(existingCurrentPhaseRaw).match(/(\d+[A-Z]?(?:\.\d+)*)/i);
+  const existingCurrentPhase = existingCurrentPhaseMatch ? existingCurrentPhaseMatch[1] : null;
+  if (existingCurrentPhase && existingCurrentPhase !== resolvedPhase) {
+    output(
+      { updated: [], phase: resolvedPhase, idempotent: true, note: 'phase already superseded; no-op' },
+      raw,
+      'false',
+    );
+    return;
+  }
+
   const today = new Date().toISOString().split('T')[0];
   const updated = [];
 
