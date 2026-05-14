@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { parseCliArgs, resolveInitInput, USAGE, type ParsedCliArgs } from './cli.js';
+import { parseCliArgs, resolveInitInput, USAGE, detectNestedPlanningDirs, type ParsedCliArgs } from './cli.js';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -422,5 +422,100 @@ describe('USAGE', () => {
   it('documents --init option', () => {
     expect(USAGE).toContain('--init');
     expect(USAGE).toContain('Bootstrap from a PRD');
+  });
+
+  it('documents --allow-nested-planning opt-out flag (#3046)', () => {
+    expect(USAGE).toContain('--allow-nested-planning');
+    expect(USAGE).toMatch(/nested-planning guard/i);
+  });
+});
+
+// ─── --allow-nested-planning flag parsing ────────────────────────────────────
+
+describe('parseCliArgs --allow-nested-planning', () => {
+  it('defaults to false when flag not present', () => {
+    const result = parseCliArgs(['init', 'build X']);
+    expect(result.allowNestedPlanning).toBe(false);
+  });
+
+  it('parses --allow-nested-planning on init command', () => {
+    const result = parseCliArgs(['init', 'build X', '--allow-nested-planning']);
+    expect(result.allowNestedPlanning).toBe(true);
+  });
+
+  it('parses --allow-nested-planning on run command (no-op but accepted)', () => {
+    const result = parseCliArgs(['run', 'build X', '--allow-nested-planning']);
+    expect(result.allowNestedPlanning).toBe(true);
+  });
+
+  it('parses --allow-nested-planning on query command via permissive parser', () => {
+    const result = parseCliArgs(['query', 'state.load', '--allow-nested-planning']);
+    expect(result.command).toBe('query');
+    expect(result.allowNestedPlanning).toBe(true);
+    // permissive parser should NOT forward the flag into queryArgv (it's an SDK flag)
+    expect(result.queryArgv).not.toContain('--allow-nested-planning');
+  });
+});
+
+// ─── detectNestedPlanningDirs ────────────────────────────────────────────────
+
+describe('detectNestedPlanningDirs', () => {
+  let rootDir: string;
+
+  beforeEach(async () => {
+    rootDir = join(tmpdir(), `gsd-nested-detect-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    await mkdir(rootDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(rootDir, { recursive: true, force: true });
+  });
+
+  it('returns empty list when no subdirectories exist', () => {
+    expect(detectNestedPlanningDirs(rootDir)).toEqual([]);
+  });
+
+  it('returns empty list when subdirectories exist but none have .planning/', async () => {
+    await mkdir(join(rootDir, 'project-a'));
+    await mkdir(join(rootDir, 'project-b'));
+    expect(detectNestedPlanningDirs(rootDir)).toEqual([]);
+  });
+
+  it('returns the subdirectory name when one subdir has a .planning/ directory', async () => {
+    await mkdir(join(rootDir, 'NAVIO_v3', '.planning'), { recursive: true });
+    expect(detectNestedPlanningDirs(rootDir)).toEqual(['NAVIO_v3']);
+  });
+
+  it('returns multiple names when multiple subdirs have .planning/', async () => {
+    await mkdir(join(rootDir, 'project-a', '.planning'), { recursive: true });
+    await mkdir(join(rootDir, 'project-b', '.planning'), { recursive: true });
+    await mkdir(join(rootDir, 'project-c'));
+    const result = detectNestedPlanningDirs(rootDir).sort();
+    expect(result).toEqual(['project-a', 'project-b']);
+  });
+
+  it('skips hidden directories (e.g. .git, .planning at root level)', async () => {
+    // .planning at the root is the existing-project case — NOT what this guard detects
+    await mkdir(join(rootDir, '.planning'), { recursive: true });
+    await mkdir(join(rootDir, '.git'), { recursive: true });
+    // also create a planning file inside .git so we don't accidentally match
+    await mkdir(join(rootDir, '.git', '.planning'), { recursive: true });
+    expect(detectNestedPlanningDirs(rootDir)).toEqual([]);
+  });
+
+  it('skips node_modules even when it contains nested .planning/', async () => {
+    await mkdir(join(rootDir, 'node_modules', 'some-pkg', '.planning'), { recursive: true });
+    expect(detectNestedPlanningDirs(rootDir)).toEqual([]);
+  });
+
+  it('treats a regular file named .planning as not a project (statSync.isDirectory() false)', async () => {
+    await mkdir(join(rootDir, 'fake-project'));
+    await writeFile(join(rootDir, 'fake-project', '.planning'), 'this is a file, not a dir');
+    expect(detectNestedPlanningDirs(rootDir)).toEqual([]);
+  });
+
+  it('returns empty list when projectDir is unreadable/missing', () => {
+    const missing = join(tmpdir(), `gsd-nonexistent-${Date.now()}`);
+    expect(detectNestedPlanningDirs(missing)).toEqual([]);
   });
 });

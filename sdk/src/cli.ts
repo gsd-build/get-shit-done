@@ -8,6 +8,7 @@
 
 import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
+import { readdirSync, statSync } from 'node:fs';
 import { resolve, join, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,6 +39,12 @@ export interface ParsedCliArgs {
   help: boolean;
   version: boolean;
   /**
+   * Opt-out for the nested-planning guard. When `true`, `gsd-sdk init` proceeds
+   * even if the resolved `projectDir` has immediate subdirectories that contain
+   * their own `.planning/` (i.e. nested GSD projects). See #3046 for context.
+   */
+  allowNestedPlanning?: boolean;
+  /**
    * When `command === 'query'`, tokens after `query` with only known SDK flags removed.
    * Extra flags are kept so handlers that share gsd-tools-style argv (e.g. `--pick`) still receive them.
    */
@@ -55,6 +62,7 @@ function parseCliArgsQueryPermissive(argv: string[]): ParsedCliArgs {
   let maxBudget: number | undefined;
   let help = false;
   let version = false;
+  let allowNestedPlanning = false;
   const queryArgv: string[] = [];
 
   let i = 1;
@@ -104,6 +112,11 @@ function parseCliArgsQueryPermissive(argv: string[]): ParsedCliArgs {
       i += 1;
       continue;
     }
+    if (a === '--allow-nested-planning') {
+      allowNestedPlanning = true;
+      i += 1;
+      continue;
+    }
     queryArgv.push(a);
     i += 1;
   }
@@ -128,6 +141,7 @@ function parseCliArgsQueryPermissive(argv: string[]): ParsedCliArgs {
     ws,
     help,
     version,
+    allowNestedPlanning,
     queryArgv,
   };
 }
@@ -150,6 +164,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       model: { type: 'string' },
       'max-budget': { type: 'string' },
       init: { type: 'string' },
+      'allow-nested-planning': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', short: 'v', default: false },
     },
@@ -176,7 +191,46 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     ws: values.ws as string | undefined,
     help: values.help as boolean,
     version: values.version as boolean,
+    allowNestedPlanning: values['allow-nested-planning'] as boolean,
   };
+}
+
+// ─── Nested-planning guard helper ────────────────────────────────────────────
+
+/**
+ * Detect immediate subdirectories of `projectDir` that contain their own
+ * `.planning/` directory. Used by the init guard (#3046) to refuse accidental
+ * bootstrapping in a parent dir that already contains nested GSD projects.
+ *
+ * Returns the list of subdirectory names (relative to `projectDir`). Hidden
+ * dirs (`.git`, `.planning`, etc.) and `node_modules` are skipped. An
+ * unreadable `projectDir` returns an empty list rather than throwing — the
+ * guard is advisory; failing to read should never block init.
+ */
+export function detectNestedPlanningDirs(projectDir: string): string[] {
+  let entryNames: string[];
+  try {
+    entryNames = readdirSync(projectDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .filter((d) => !d.name.startsWith('.'))
+      .filter((d) => d.name !== 'node_modules')
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
+
+  const result: string[] = [];
+  for (const name of entryNames) {
+    const planningPath = join(projectDir, name, '.planning');
+    try {
+      if (statSync(planningPath).isDirectory()) {
+        result.push(name);
+      }
+    } catch {
+      // .planning/ missing in this subdir — not a GSD project, skip
+    }
+  }
+  return result;
 }
 
 // ─── Usage ───────────────────────────────────────────────────────────────────
@@ -203,6 +257,11 @@ Options:
   --ws-port <port>      Enable WebSocket transport on <port>
   --model <model>       Override LLM model
   --max-budget <n>      Max budget per step in USD
+  --allow-nested-planning
+                        (init only) Bypass the nested-planning guard. Allows
+                        init even when subdirectories contain their own
+                        .planning/. Default: refuse with a "did you mean to
+                        init from <subdir>?" message. See #3046.
   -h, --help            Show this help
   -v, --version         Show version
 `.trim();
@@ -355,6 +414,37 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
 
   // ─── Init command ─────────────────────────────────────────────────────────
   if (args.command === 'init') {
+    // #3046: nested-planning guard. Refuse to bootstrap when the resolved
+    // projectDir has immediate subdirectories with their own .planning/ — that
+    // pattern almost always means the user is in the wrong working directory
+    // (e.g. parent of NAVIO_v3/) and a successful init would write a parallel
+    // .planning/ + .git/ that collides with the nested project. The roadmapper
+    // step inside init has shown willingness to also walk into nested ROADMAP.md
+    // files during bootstrap, so refusing up-front is the only safe stance.
+    // Opt-out via --allow-nested-planning for legitimate workspace-root inits.
+    if (!args.allowNestedPlanning) {
+      const nested = detectNestedPlanningDirs(args.projectDir);
+      if (nested.length > 0) {
+        console.error(`Error: gsd-sdk init refused — found nested GSD project(s) in subdirectories of ${args.projectDir}:`);
+        for (const name of nested) {
+          console.error(`  - ${name}/.planning/`);
+        }
+        console.error('');
+        console.error('Did you mean to init from one of these subdirectories?');
+        const suggest = nested[0];
+        const inputHint = args.initInput ?? '[input]';
+        console.error(`  cd ${suggest} && gsd-sdk init ${inputHint}`);
+        console.error(`  # or, without changing directories:`);
+        console.error(`  gsd-sdk init ${inputHint} --project-dir ${join(args.projectDir, suggest)}`);
+        console.error('');
+        console.error('If you really intend to bootstrap a new project at the current level');
+        console.error('(creates a parallel .planning/ that may collide with nested projects),');
+        console.error('pass --allow-nested-planning.');
+        process.exitCode = 1;
+        return;
+      }
+    }
+
     let input: string;
     try {
       input = await resolveInitInput(args);
