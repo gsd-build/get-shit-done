@@ -278,14 +278,6 @@ function error(message, reason = ERROR_REASON.UNKNOWN) {
 
 // ─── File & Config utilities ──────────────────────────────────────────────────
 
-function safeReadFile(filePath) {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Canonical config defaults. Single source of truth — imported by config.cjs and verify.cjs.
  */
@@ -610,118 +602,6 @@ function isGitIgnored(cwd, targetPath) {
   return ignored;
 }
 
-// ─── Markdown normalization ─────────────────────────────────────────────────
-
-/**
- * Normalize markdown to fix common markdownlint violations.
- * Applied at write points so GSD-generated .planning/ files are IDE-friendly.
- *
- * Rules enforced:
- *   MD022 — Blank lines around headings
- *   MD031 — Blank lines around fenced code blocks
- *   MD032 — Blank lines around lists
- *   MD012 — No multiple consecutive blank lines (collapsed to 2 max)
- *   MD047 — Files end with a single newline
- */
-function normalizeMd(content) {
-  if (!content || typeof content !== 'string') return content;
-
-  // Normalize line endings to LF for consistent processing
-  let text = content.replace(/\r\n/g, '\n');
-
-  const lines = text.split('\n');
-  const result = [];
-
-  // Pre-compute fence state in a single O(n) pass instead of O(n^2) per-line scanning
-  const fenceRegex = /^```/;
-  const insideFence = new Array(lines.length);
-  let fenceOpen = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (fenceRegex.test(lines[i].trimEnd())) {
-      if (fenceOpen) {
-        // This is a closing fence — mark as NOT inside (it's the boundary)
-        insideFence[i] = false;
-        fenceOpen = false;
-      } else {
-        // This is an opening fence
-        insideFence[i] = false;
-        fenceOpen = true;
-      }
-    } else {
-      insideFence[i] = fenceOpen;
-    }
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const prev = i > 0 ? lines[i - 1] : '';
-    const prevTrimmed = prev.trimEnd();
-    const trimmed = line.trimEnd();
-    const isFenceLine = fenceRegex.test(trimmed);
-
-    // MD022: Blank line before headings (skip first line and frontmatter delimiters)
-    if (/^#{1,6}\s/.test(trimmed) && i > 0 && prevTrimmed !== '' && prevTrimmed !== '---') {
-      result.push('');
-    }
-
-    // MD031: Blank line before fenced code blocks (opening fences only)
-    if (isFenceLine && i > 0 && prevTrimmed !== '' && !insideFence[i] && (i === 0 || !insideFence[i - 1] || isFenceLine)) {
-      // Only add blank before opening fences (not closing ones)
-      if (i === 0 || !insideFence[i - 1]) {
-        result.push('');
-      }
-    }
-
-    // MD032: Blank line before lists (- item, * item, N. item, - [ ] item)
-    if (/^(\s*[-*+]\s|\s*\d+\.\s)/.test(line) && i > 0 &&
-        prevTrimmed !== '' && !/^(\s*[-*+]\s|\s*\d+\.\s)/.test(prev) &&
-        prevTrimmed !== '---') {
-      result.push('');
-    }
-
-    result.push(line);
-
-    // MD022: Blank line after headings
-    if (/^#{1,6}\s/.test(trimmed) && i < lines.length - 1) {
-      const next = lines[i + 1];
-      if (next !== undefined && next.trimEnd() !== '') {
-        result.push('');
-      }
-    }
-
-    // MD031: Blank line after closing fenced code blocks
-    if (/^```\s*$/.test(trimmed) && i > 0 && insideFence[i - 1] && i < lines.length - 1) {
-      const next = lines[i + 1];
-      if (next !== undefined && next.trimEnd() !== '') {
-        result.push('');
-      }
-    }
-
-    // MD032: Blank line after last list item in a block
-    if (/^(\s*[-*+]\s|\s*\d+\.\s)/.test(line) && i < lines.length - 1) {
-      const next = lines[i + 1];
-      if (next !== undefined && next.trimEnd() !== '' &&
-          !/^(\s*[-*+]\s|\s*\d+\.\s)/.test(next) &&
-          !/^\s/.test(next)) {
-        // Only add blank line if next line is not a continuation/indented line
-        result.push('');
-      }
-    }
-  }
-
-  text = result.join('\n');
-
-  // MD012: Collapse 3+ consecutive blank lines to 2
-  text = text.replace(/\n{3,}/g, '\n\n');
-
-  // MD047: Ensure file ends with exactly one newline
-  text = text.replace(/\n*$/, '\n');
-
-  return text;
-}
-
-// Default timeout for worktree-related git subprocess calls (matches worktree-safety.cjs).
-// Prevents `git worktree list --porcelain` and similar calls from blocking the parent
 // ─── Common path helpers ──────────────────────────────────────────────────────
 
 /**
@@ -1884,38 +1764,6 @@ function readSubdirectories(dirPath, sort = false) {
   }
 }
 
-// ─── Atomic file writes ───────────────────────────────────────────────────────
-
-/**
- * Write a file atomically using write-to-temp-then-rename.
- *
- * On POSIX systems, `fs.renameSync` is atomic when the source and destination
- * are on the same filesystem. This prevents a process killed mid-write from
- * leaving a truncated file that is unparseable on next read.
- *
- * The temp file is placed alongside the target so it is guaranteed to be on
- * the same filesystem (required for rename atomicity). The PID is embedded in
- * the temp file name so concurrent writers use distinct paths.
- *
- * If `renameSync` fails (e.g. cross-device move), the function falls back to a
- * direct `writeFileSync` so callers always get a best-effort write.
- *
- * @param {string} filePath  Absolute path to write.
- * @param {string|Buffer} content  File content.
- * @param {string} [encoding='utf-8']  Encoding passed to writeFileSync.
- */
-function atomicWriteFileSync(filePath, content, encoding = 'utf-8') {
-  const tmpPath = filePath + '.tmp.' + process.pid;
-  try {
-    fs.writeFileSync(tmpPath, content, encoding);
-    fs.renameSync(tmpPath, filePath);
-  } catch (renameErr) {
-    // Clean up the temp file if rename failed, then fall back to direct write.
-    try { fs.unlinkSync(tmpPath); } catch { /* already gone or never created */ }
-    fs.writeFileSync(filePath, content, encoding);
-  }
-}
-
 /**
  * Format a Date as a fuzzy relative time string (e.g. "5 minutes ago").
  * @param {Date} date
@@ -1948,10 +1796,8 @@ module.exports = {
   ERROR_REASON,
   setJsonErrorMode,
   getJsonErrorMode,
-  safeReadFile,
   loadConfig,
   isGitIgnored,
-  normalizeMd,
   escapeRegex,
   normalizePhaseName,
   comparePhaseNum,
@@ -1999,7 +1845,6 @@ module.exports = {
   readSubdirectories,
   getAgentsDir,
   checkAgentsInstalled,
-  atomicWriteFileSync,
   timeAgo,
   pruneOrphanedWorktrees,
   inspectWorktreeHealth,

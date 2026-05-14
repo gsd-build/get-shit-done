@@ -2,8 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execTool, execGit } = require('./shell-command-projection.cjs');
-const { atomicWriteFileSync } = require('./core.cjs');
+const { execTool, execGit, platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Config Gate ─────────────────────────────────────────────────────────────
 
@@ -523,7 +522,7 @@ function graphifyBuild(cwd) {
 /**
  * Write a diff snapshot after successful build (D-06).
  * Reads graph.json from .planning/graphs/ and writes .last-build-snapshot.json
- * using atomicWriteFileSync for crash safety.
+ * using platformWriteSync for crash safety.
  *
  * @param {string} cwd - Working directory
  * @returns {object}
@@ -541,7 +540,7 @@ function writeSnapshot(cwd) {
   };
 
   const snapshotPath = path.join(cwd, '.planning', 'graphs', '.last-build-snapshot.json');
-  atomicWriteFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
+  platformWriteSync(snapshotPath, JSON.stringify(snapshot, null, 2));
   return {
     saved: true,
     timestamp: snapshot.timestamp,

@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const readline = require('readline');
-const { output, error, safeReadFile, reapStaleTempFiles } = require('./core.cjs');
+const { output, error, reapStaleTempFiles } = require('./core.cjs');
 
 // ─── Session I/O Helpers ──────────────────────────────────────────────────────
 

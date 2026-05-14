@@ -1,7 +1,12 @@
 # File Operation Engine Module owns safe runtime/config file mutations
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0009 (Shell Command Projection Module expansion, Phases 3–4, `#3467`–`#3468`)
 - **Date:** 2026-05-12
+- **Superseded:** 2026-05-13
+
+> **Supersession note.** Rather than build a separate File Operation Engine, the file-mutation safety policy this ADR proposed was absorbed into the **Shell Command Projection Module** (ADR-0009). Phase 3 (`#3467`) added `platformWriteSync` / `platformReadSync` / `platformEnsureDir` / `normalizeContent` to that seam, owning atomic write (tmp+rename), `.md` normalization, and directory creation as a single platform-conditional surface. Phase 4 (`#3468`) removed the duplicated `atomicWriteFileSync` / `safeReadFile` / `normalizeMd` wrappers from `core.cjs`. The `applyFileMutationPlan` / typed plan IR design proposed below was not built — the simpler per-call seam proved sufficient for the actual drift sites. Lock-file lifecycle (Track B item 3) remains owned by `withPlanningLock` in `planning-workspace.cjs` because its `{ flag: 'wx' }` exclusive-create semantics differ from atomic-write rename semantics.
+
+---
 
 We propose introducing a File Operation Engine Module that owns policy for managed file reads, writes, deletes, locks, backups, and rollbacks across installer, migration, and planning surfaces. Today, file mutation behavior is duplicated across `bin/install.js`, `get-shit-done/bin/lib/installer-migrations.cjs`, and multiple planning modules, with drift in atomic-write guarantees, path safety checks, and ownership classification.
 

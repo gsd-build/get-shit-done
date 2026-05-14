@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { normalizePhaseName, findPhaseInternal, generateSlugInternal, normalizeMd, toPosixPath, output, error } = require('./core.cjs');
+const { normalizePhaseName, findPhaseInternal, generateSlugInternal, toPosixPath, output, error } = require('./core.cjs');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 const { planningDir } = require('./planning-workspace.cjs');
 const { reconstructFrontmatter } = require('./frontmatter.cjs');
 
@@ -219,7 +220,7 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
     return;
   }
 
-  fs.writeFileSync(outPath, normalizeMd(fullContent), 'utf-8');
+  platformWriteSync(outPath, fullContent);
   const relPath = toPosixPath(path.relative(cwd, outPath));
   output({ created: true, path: relPath, template: templateType }, raw, relPath);
 }

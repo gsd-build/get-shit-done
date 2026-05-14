@@ -109,3 +109,23 @@ projectShellScript({ shell: 'cmd' | 'pwsh' | 'sh', executable, argsTemplate })
 - Related bug history: `#2376`, `#2979`, `#3002`, `#3011`, `#3017`, `#3020`, `#3082`, `#3181`, `#3393`, `#3413`
 - See `0005-sdk-architecture-seam-map.md`
 - See `0008-installer-migration-module.md`
+
+## Update — 2026-05-13 (Phases 1–4 expansion, `#3465`–`#3468`)
+
+The seam grew beyond the original "rendering only" scope. The "does not become a generic command runner" and "does not replace safe internal subprocess APIs" constraints (Decision §17, Initial Scope §33) were intentionally superseded.
+
+**Scope now owned by `shell-command-projection.cjs`:**
+
+- runtime-aware command-text rendering (original ADR scope)
+- subprocess dispatch — `execGit`, `execNpm`, `execTool`, `probeTty` (Phase 2, `#3466`)
+- platform file I/O — `platformWriteSync`, `platformReadSync`, `platformEnsureDir`, `normalizeContent` (Phase 3, `#3467`)
+- legacy wrappers `atomicWriteFileSync` / `safeReadFile` / `normalizeMd` removed from `core.cjs` (Phase 4, `#3468`)
+
+**Result-shape invariant:** all `exec*` return `{ exitCode, stdout, stderr }` and never throw on non-zero exit. Platform-conditional logic (`shell: process.platform === 'win32'`, `probeTty` Windows null return, `.md`-aware normalization) lives only at the seam.
+
+**Open question resolutions:**
+
+- Q4 (installer-only vs shared seam): **resolved — shared.** The seam lives in `get-shit-done/bin/lib/`, consumed by installer, planning workflow, and every fs/subprocess call site across the tool.
+- Q1, Q2, Q3 (`hooks.shell_preference`, Windows Git Bash modeling, shim/script builder migration timing): unresolved, carried forward as projection-design concerns independent of the I/O expansion.
+
+See CONTEXT.md "Shell Command Projection Module" entry for the canonical current-state description.
