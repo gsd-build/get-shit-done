@@ -103,6 +103,19 @@ describe('extract-changelog.cjs', () => {
     assert.equal(parsed.count, 0);
   });
 
+  test('malformed changelog input exits 2 and reports empty json result', () => {
+    const malformedChangelog = '# Changelog\n\nNo versions here.';
+
+    const plain = run(['--from', '1.0.0', '--to', '2.0.0'], malformedChangelog);
+    assert.equal(plain.exitCode, 2);
+
+    const json = run(['--from', '1.0.0', '--to', '2.0.0', '--json'], malformedChangelog);
+    assert.equal(json.exitCode, 2);
+    const parsed = JSON.parse(json.stdout);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.count, 0);
+  });
+
   test('exit 1 when --from or --to missing', () => {
     const r1 = run(['--to', '1.41.0'], SAMPLE_CHANGELOG);
     assert.equal(r1.exitCode, 1);
