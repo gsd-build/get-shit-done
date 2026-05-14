@@ -442,6 +442,16 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
     error(`Invalid workflow.human_verify_mode '${value}'. Valid values: ${VALID_HUMAN_VERIFY_MODES.join(', ')}`);
   }
 
+  // Fallow scope + profile enum validation (#3424)
+  const VALID_FALLOW_SCOPES = ['phase', 'repo'];
+  if (keyPath === 'code_quality.fallow.scope' && !VALID_FALLOW_SCOPES.includes(String(parsedValue))) {
+    error(`Invalid code_quality.fallow.scope '${value}'. Valid values: ${VALID_FALLOW_SCOPES.join(', ')}`);
+  }
+  const VALID_FALLOW_PROFILES = ['minimal', 'standard', 'strict'];
+  if (keyPath === 'code_quality.fallow.profile' && !VALID_FALLOW_PROFILES.includes(String(parsedValue))) {
+    error(`Invalid code_quality.fallow.profile '${value}'. Valid values: ${VALID_FALLOW_PROFILES.join(', ')}`);
+  }
+
   if (keyPath === 'review.default_reviewers') {
     const normalized = normalizeConfiguredDefaultReviewers(parsedValue);
     if (normalized.errors.length > 0) {
