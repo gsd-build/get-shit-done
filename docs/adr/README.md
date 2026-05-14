@@ -44,6 +44,7 @@ See **[CONTRIBUTING.md — "Proposing an ADR or PRD"](../../CONTRIBUTING.md#prop
 | [0011-skill-surface-budget-module.md](0011-skill-surface-budget-module.md) | Skill Surface Budget Module owns install-time profile staging and runtime surface control | Accepted |
 | [0011-review-default-reviewers.md](0011-review-default-reviewers.md) | Review default-reviewers selection policy for /gsd:review | Accepted |
 | [0011-review-default-reviewers-prd.md](0011-review-default-reviewers-prd.md) | PRD for review.default_reviewers feature (#3464) | Reference |
+| [3524-cjs-sdk-hard-seam.md](3524-cjs-sdk-hard-seam.md) | CJS↔SDK hard seam — single canonical owner per responsibility (#3524) | Proposed |
 
 ## Seam map
 

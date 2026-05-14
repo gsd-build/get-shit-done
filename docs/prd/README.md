@@ -24,4 +24,4 @@ The GitHub-assigned issue number is the prefix. Do not compute a sequential numb
 
 | PRD | Title | Status |
 |-----|-------|--------|
-| _(none yet — new PRDs use `<issue#>-<slug>.md` naming)_ | | |
+| [3524-cjs-sdk-hard-seam.md](3524-cjs-sdk-hard-seam.md) | CJS↔SDK hard seam — phased migration (#3524) | Reference |
