@@ -72,14 +72,13 @@ function readInstallState(configDir) {
   };
 }
 
-function writeInstallState(configDir, state) {
+// Strict atomic write for the install state: must never be left half-written.
+// Bypasses the seam because platformWriteSync falls back to a direct write on
+// rename failure, which would silently violate this invariant.
+function atomicWriteInstallState(configDir, content) {
   fs.mkdirSync(configDir, { recursive: true });
   const filePath = path.join(configDir, INSTALL_STATE_NAME);
   const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-  const content = JSON.stringify(state, null, 2) + '\n';
-  // Strict atomic write: the install state must never be left half-written. Bypasses
-  // the seam because platformWriteSync falls back to a direct write on rename failure,
-  // which would silently violate this invariant.
   try {
     fs.writeFileSync(tmpPath, content, 'utf8');
     fs.renameSync(tmpPath, filePath);
@@ -87,6 +86,10 @@ function writeInstallState(configDir, state) {
     try { fs.rmSync(tmpPath, { force: true }); } catch { /* best-effort */ }
     throw error;
   }
+}
+
+function writeInstallState(configDir, state) {
+  atomicWriteInstallState(configDir, JSON.stringify(state, null, 2) + '\n');
   return state;
 }
 
@@ -423,8 +426,7 @@ function rollbackAppliedMigrationResult({ configDir, journal, journalPath, rollb
     if (previousInstallStateBytes === null) {
       fs.rmSync(path.join(configDir, INSTALL_STATE_NAME), { force: true });
     } else {
-      fs.mkdirSync(configDir, { recursive: true });
-      platformWriteSync(path.join(configDir, INSTALL_STATE_NAME), previousInstallStateBytes);
+      atomicWriteInstallState(configDir, previousInstallStateBytes);
     }
   } catch (error) {
     failures.push({ relPath: INSTALL_STATE_NAME, error: error.message });
