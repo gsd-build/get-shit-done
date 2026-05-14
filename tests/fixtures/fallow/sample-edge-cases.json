@@ -1,0 +1,47 @@
+{
+  "unusedExports": [
+    {
+      "file": "src/café/utils.ts",
+      "symbol": "helperFn",
+      "line": 42
+    }
+  ],
+  "duplicates": [
+    {
+      "left": {
+        "file": "src/a.ts",
+        "start": 1,
+        "end": 5
+      },
+      "right": {
+        "file": "src/b.ts",
+        "start": 1,
+        "end": 5
+      },
+      "similarity": 0.0
+    },
+    {
+      "left": {
+        "file": "src/c.ts",
+        "start": 10,
+        "end": 20
+      },
+      "right": {
+        "file": "src/d.ts",
+        "start": 10,
+        "end": 20
+      },
+      "similarity": 1.0
+    }
+  ],
+  "circularDependencies": [
+    {
+      "cycle": [
+        "src/x.ts",
+        "src/y.ts",
+        "src/z.ts",
+        "src/x.ts"
+      ]
+    }
+  ]
+}
