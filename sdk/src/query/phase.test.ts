@@ -528,4 +528,94 @@ describe('phasePlanIndex', () => {
       'Ignored noncanonical plan files: 16-PLAN-01-eval-harness.md',
     ]);
   });
+
+  it('#3488: integer-phase short-form depends_on [01] resolves to same-phase plan', async () => {
+    const phase17 = join(tmpDir, '.planning', 'phases', '17-int-short');
+    await mkdir(phase17, { recursive: true });
+    await writeFile(join(phase17, '17-01-PLAN.md'), [
+      '---',
+      'phase: 17',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase17, '17-02-PLAN.md'), [
+      '---',
+      'phase: 17',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on: [01]',
+      '---',
+      '<objective>Plan B — short-form dep.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['17'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const waves = data.waves as Record<string, string[]>;
+    const warnings = (data.warnings as string[] | undefined) ?? [];
+
+    expect(waves['1']).toEqual(['17-01']);
+    expect(waves['2']).toEqual(['17-02']);
+    expect(warnings).toEqual([]);
+  });
+
+  it('#3488: decimal-phase short-form depends_on [01] resolves to same-phase plan', async () => {
+    const phase18 = join(tmpDir, '.planning', 'phases', '99.9-test');
+    await mkdir(phase18, { recursive: true });
+    await writeFile(join(phase18, '99.9-01-PLAN.md'), [
+      '---',
+      'phase: 99.9-test',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase18, '99.9-02-PLAN.md'), [
+      '---',
+      'phase: 99.9-test',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on: [01]',
+      '---',
+      '<objective>Plan B — short-form dep on decimal phase.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['99.9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const waves = data.waves as Record<string, string[]>;
+    const warnings = (data.warnings as string[] | undefined) ?? [];
+
+    expect(waves['1']).toEqual(['99.9-01']);
+    expect(waves['2']).toEqual(['99.9-02']);
+    expect(warnings).toEqual([]);
+  });
+
+  it('#3488: unresolved depends_on reference emits distinct warning (not wave-mismatch)', async () => {
+    const phase19 = join(tmpDir, '.planning', 'phases', '19-unresolved');
+    await mkdir(phase19, { recursive: true });
+    await writeFile(join(phase19, '19-01-PLAN.md'), [
+      '---',
+      'phase: 19',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: [does-not-exist]',
+      '---',
+      '<objective>Plan with bogus dep.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['19'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const warnings = (data.warnings as string[] | undefined) ?? [];
+
+    // A clear, dedicated warning naming the unresolved reference must surface.
+    expect(warnings.some(w => /unresolved/i.test(w) && w.includes('does-not-exist'))).toBe(true);
+  });
 });

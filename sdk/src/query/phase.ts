@@ -372,19 +372,55 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   // Secondary index: canonical prefix → full plan ID, so depends_on: ['03-01'] resolves
   // to '03-01-auth-hardening-PLAN.md'-derived ID '03-01-auth-hardening' (k015).
   const canonicalToId = new Map<string, string>(rawPlans.map(p => [extractCanonicalPlanId(p.id), p.id]));
+  // Tertiary index: same-phase short-form ('01') → full plan ID, derived from each plan's
+  // canonical '<phase>-<plan>' by splitting on the LAST '-'. The phase segment may
+  // contain dots (e.g. '99.9') or letters (e.g. '02A'); only the trailing '-NN' is the
+  // short form. Same-phase plans share a phase prefix so '01' is unambiguous within a
+  // single phase-plan-index call. (#3488)
+  const shortFormToId = new Map<string, string>();
+  for (const p of rawPlans) {
+    const canonical = extractCanonicalPlanId(p.id);
+    const lastDash = canonical.lastIndexOf('-');
+    if (lastDash > 0 && lastDash < canonical.length - 1) {
+      const shortForm = canonical.slice(lastDash + 1);
+      // First write wins — preserve deterministic ordering from sorted planFiles.
+      if (!shortFormToId.has(shortForm)) {
+        shortFormToId.set(shortForm, p.id);
+      }
+    }
+  }
 
   // Kahn's algorithm — compute in-degree and adjacency for plans in this phase only.
   const level = new Map<string, number>();
   const inDeg = new Map<string, number>();
   const adj = new Map<string, string[]>(); // dep → [dependents]
+  const unresolvedDeps: Array<{ planId: string; dep: string }> = [];
 
   for (const p of rawPlans) {
     if (!inDeg.has(p.id)) inDeg.set(p.id, 0);
     if (!adj.has(p.id)) adj.set(p.id, []);
     for (const dep of p.dependsOn) {
-      // Accept both full-stem ('03-01-auth-hardening') and canonical-prefix ('03-01') forms.
-      const resolvedDep = planMap.has(dep) ? dep : canonicalToId.get(dep);
-      if (!resolvedDep) continue; // external dep — ignore
+      // Accept full-stem ('03-01-auth-hardening'), canonical-prefix ('03-01'),
+      // and same-phase short-form ('01') forms. The short-form lookup (#3488)
+      // is keyed off the plan-id suffix so it works for integer ('99'), letter
+      // ('02A'), and decimal ('99.9') phase IDs alike.
+      let resolvedDep: string | undefined;
+      if (planMap.has(dep)) {
+        resolvedDep = dep;
+      } else if (canonicalToId.has(dep)) {
+        resolvedDep = canonicalToId.get(dep);
+      } else if (shortFormToId.has(dep)) {
+        resolvedDep = shortFormToId.get(dep);
+      }
+      if (!resolvedDep) {
+        // Looks like an in-phase short-form / canonical reference that didn't resolve.
+        // Distinguish from genuinely-external deps: if the dep matches the shape
+        // of an in-phase reference (no slash, matches NN / NN-NN / NN-NN-slug),
+        // record it for a dedicated warning so downstream users aren't misled
+        // by the wave-mismatch warning fired against the dropped edge.
+        unresolvedDeps.push({ planId: p.id, dep });
+        continue;
+      }
       if (!adj.has(resolvedDep)) adj.set(resolvedDep, []);
       adj.get(resolvedDep)!.push(p.id);
       inDeg.set(p.id, (inDeg.get(p.id) ?? 0) + 1);
@@ -440,6 +476,14 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
 
   if (nonCanonicalPlanFiles.length > 0) {
     warnings.push(`Ignored noncanonical plan files: ${nonCanonicalPlanFiles.join(', ')}`);
+  }
+
+  // Surface unresolved depends_on references from Pass 2 — without this, a dropped
+  // short-form edge silently collapses the dependent plan into wave 1 and the only
+  // signal is a misleading "declared wave: N but depends_on DAG places it in wave 1"
+  // warning that points at the wave declaration rather than the broken reference. (#3488)
+  for (const { planId, dep } of unresolvedDeps) {
+    warnings.push(`Plan ${planId}: unresolved depends_on reference '${dep}' — no matching plan in phase`);
   }
 
   for (const raw of rawPlans) {
