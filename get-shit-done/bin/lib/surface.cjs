@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 
 const {
   readActiveProfile,
@@ -74,17 +75,13 @@ function readSurface(runtimeConfigDir) {
 }
 
 /**
- * Write the surface state atomically (write to tmp then rename).
+ * Write the surface state atomically via the platform seam (mkdir + tmp+rename).
  *
  * @param {string} runtimeConfigDir
  * @param {SurfaceState} surfaceState
  */
 function writeSurface(runtimeConfigDir, surfaceState) {
-  fs.mkdirSync(runtimeConfigDir, { recursive: true });
-  const finalPath = path.join(runtimeConfigDir, SURFACE_FILE_NAME);
-  const tmpPath = finalPath + '.tmp.' + process.pid;
-  fs.writeFileSync(tmpPath, JSON.stringify(surfaceState, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmpPath, finalPath);
+  platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(surfaceState, null, 2) + '\n');
 }
 
 // ---------------------------------------------------------------------------
