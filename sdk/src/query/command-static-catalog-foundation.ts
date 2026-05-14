@@ -24,6 +24,7 @@ import { checkCompletion } from './check-completion.js';
 import { checkGates } from './check-gates.js';
 import { checkVerificationStatus } from './check-verification-status.js';
 import { checkShipReady } from './check-ship-ready.js';
+import { agentClassifyFailure } from './agent-failure-classifier.js';
 
 export const FOUNDATION_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['generate-slug', generateSlug],
@@ -97,4 +98,6 @@ export const DECISION_ROUTING_STATIC_CATALOG: ReadonlyArray<readonly [string, Qu
   ['check.ship-ready', checkShipReady],
   ['check ship-ready', checkShipReady],
   ['commands', commandsList],
+  ['agent.classify-failure', agentClassifyFailure],
+  ['agent classify-failure', agentClassifyFailure],
 ] as const;

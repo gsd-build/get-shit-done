@@ -80,4 +80,6 @@ export const NON_FAMILY_COMMAND_MANIFEST: readonly NonFamilyCommandManifestEntry
   { canonical: 'generate-claude-md', aliases: [], mutation: true, outputMode: 'json' },
 
   { canonical: 'verify-summary', aliases: ['verify.summary', 'verify summary'], mutation: false, outputMode: 'raw' },
+
+  { canonical: 'agent.classify-failure', aliases: ['agent classify-failure'], mutation: false, outputMode: 'json' },
 ] as const;

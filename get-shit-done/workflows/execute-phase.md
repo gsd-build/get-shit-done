@@ -1010,9 +1010,65 @@ increases monotonically across waves. `{status}` is `complete` (success),
 
 7. **Handle failures:**
 
-   **Known Claude Code bug (classifyHandoffIfNeeded):** If an agent reports "failed" with error containing `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a GSD or agent issue. The error fires in the completion handler AFTER all tool calls finish. In this case: run the same spot-checks as step 5 (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If spot-checks PASS → treat as **successful**. If spot-checks FAIL → treat as real failure below.
+   **Step 7.0 — Classify the agent return body before branching (#3095).**
+   Pipe the agent's failure body through the classifier so quota / rate-limit
+   terminations route to a distinct recovery prompt instead of the generic
+   real-failure branch:
 
-   For real failures: report which plan failed → ask "Continue?" or "Stop?" → if continue, dependent plans may also fail. If stop, partial completion report.
+   ```bash
+   CLASS_JSON=$(gsd-sdk query agent.classify-failure -- "$AGENT_RETURN_BODY")
+   CLASS=$(echo "$CLASS_JSON" | jq -r '.class')
+   SENTINEL=$(echo "$CLASS_JSON" | jq -r '.sentinel // empty')
+   RETRY_AFTER=$(echo "$CLASS_JSON" | jq -r '.retryAfterSeconds // empty')
+   ```
+
+   The classifier recognises sentinels from every runtime GSD dispatches into
+   — Claude Code (`usage limit`, `429`), Copilot CLI (`rate_limit`,
+   `user_weekly_rate_limited`), Codex (`usage_limit_reached`,
+   `too many requests`), Gemini (`RESOURCE_EXHAUSTED`, `exceeded your`) —
+   so a single branch covers all of them. See
+   `docs/research/provider-rate-limit-signals.md` for the proactive
+   (header / SDK event) signal landscape and the forward path once host
+   runtimes expose those signals to hooks.
+
+   **Step 7.1 — `class == "quota-exceeded"` (#3095 quota-distinct path):**
+   Do **not** offer "retry now" — the runtime will reject again until the
+   user's quota window resets. Still run the step 5 spot-check first: a
+   quota-kill that lands *after* SUMMARY.md is committed is just a noisy
+   exit, not a real failure. If SUMMARY.md is missing but commits exist,
+   surface this for the safe-resume path (#3212 / `state.verify-against-disk`)
+   rather than re-dispatching a fresh executor.
+
+   Present this prompt:
+
+   ```
+   ⚠ Plan {plan_id} terminated by provider quota / rate limit
+     Runtime sentinel: {SENTINEL}
+     {if RETRY_AFTER: Provider hinted retry-after: {RETRY_AFTER}s}
+     Partial commits on worktree branch: {N}
+     SUMMARY.md present: {yes|no}
+
+     1. Wait for quota reset, then resume (recommended)
+     2. Switch to a different runtime / model and resume
+     3. Abort phase and report partial state
+   ```
+
+   Re-running `/gsd-execute-phase` after the quota window resets is the
+   intended Option 1 path; it relies on the safe-resume gate landing in
+   #3212 to adopt partial worktree commits.
+
+   **Step 7.2 — `class == "classify-handoff-bug"` (Claude Code runtime bug):**
+   If an agent reports "failed" with error containing
+   `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime
+   bug — not a GSD or agent issue. The error fires in the completion handler
+   AFTER all tool calls finish. Run the same spot-checks as step 5
+   (SUMMARY.md exists, git commits present, no Self-Check: FAILED). If
+   spot-checks PASS → treat as **successful**. If spot-checks FAIL → fall
+   through to step 7.3.
+
+   **Step 7.3 — `class == "unknown-failure"` (everything else):**
+   Report which plan failed → ask "Continue?" or "Stop?" → if continue,
+   dependent plans may also fail. If stop, partial completion report.
 
 7b. **Pre-wave dependency check (waves 2+ only):**
 
@@ -1785,6 +1841,7 @@ For 1M+ context models, consider:
 </context_efficiency>
 
 <failure_handling>
+- **Quota / rate-limit (any runtime — #3095):** Agent return body contains a sentinel like `usage limit`, `rate limit`, `429`, `too many requests`, `RESOURCE_EXHAUSTED`, `usage_limit_reached`. Route via `gsd-sdk query agent.classify-failure` → `class: "quota-exceeded"`. Do not offer retry-now; the right action is wait-for-reset and resume.
 - **classifyHandoffIfNeeded false failure:** Agent reports "failed" but error is `classifyHandoffIfNeeded is not defined` → Claude Code bug, not GSD. Spot-check (SUMMARY exists, commits present) → if pass, treat as success
 - **Agent fails mid-plan:** Missing SUMMARY.md → report, ask user how to proceed
 - **Dependency chain breaks:** Wave 1 fails → Wave 2 dependents likely fail → user chooses attempt or skip
