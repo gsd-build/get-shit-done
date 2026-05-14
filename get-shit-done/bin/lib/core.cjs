@@ -393,6 +393,21 @@ function loadConfig(cwd) {
       configDirty = true;
     }
 
+    // #3523 — Migrate legacy top-level branching_strategy → git.branching_strategy.
+    // Canonical location is git.branching_strategy (per config-schema.cjs); writing
+    // at the top level trips the unknown-key warning even though loadConfig:485 actively
+    // reads it via the nested fallback. This migration mirrors the multiRepo → sub_repos
+    // precedent: graft then delete so the warning never fires again on this project.
+    // The nested value wins if already set (matches SDK mergeDefaults precedence, PR #3116).
+    if (Object.prototype.hasOwnProperty.call(fileData, 'branching_strategy')) {
+      if (!fileData.git) fileData.git = {};
+      if (!fileData.git.branching_strategy) {
+        fileData.git.branching_strategy = fileData.branching_strategy;
+      }
+      delete fileData.branching_strategy;
+      configDirty = true;
+    }
+
     // Keep planning.sub_repos in sync with actual filesystem
     const currentSubRepos = fileData.planning?.sub_repos || [];
     if (Array.isArray(currentSubRepos) && currentSubRepos.length > 0) {
@@ -433,13 +448,23 @@ function loadConfig(cwd) {
       // Internal keys loadConfig reads but config-set doesn't expose
       'model_overrides', 'context_window', 'resolve_model_ids', 'claude_md_path',
       // Deprecated keys (still accepted for migration, not in config-set)
-      'depth', 'multiRepo',
+      // 'branching_strategy' is kept here as a safety net: it is migrated to
+      // git.branching_strategy above (#3523), but on the first read of a root
+      // config that feeds into a workstream merge, `parsed` may still surface it.
+      'depth', 'multiRepo', 'branching_strategy',
     ]);
     const unknownKeys = Object.keys(parsed).filter(k => !KNOWN_TOP_LEVEL.has(k));
     if (unknownKeys.length > 0) {
-      process.stderr.write(
-        `gsd-tools: warning: unknown config key(s) in .planning/config.json: ${unknownKeys.join(', ')} — these will be ignored\n`
-      );
+      // Deduplicate: a single `init phase-op N` invocation calls loadConfig twice
+      // (once for the sub-command setup, once for git-config resolution). Guard with
+      // a module-level Set so the same message never fires more than once per process.
+      const warnKey = unknownKeys.join(',');
+      if (!_warnedUnknownConfigKeys.has(warnKey)) {
+        _warnedUnknownConfigKeys.add(warnKey);
+        process.stderr.write(
+          `gsd-tools: warning: unknown config key(s) in .planning/config.json: ${unknownKeys.join(', ')} — these will be ignored\n`
+        );
+      }
     }
 
     // #2517 — Validate runtime/tier values for keys that loadConfig handles but
@@ -584,6 +609,11 @@ function loadConfig(cwd) {
 }
 
 // ─── Git utilities ────────────────────────────────────────────────────────────
+
+// Module-level deduplication for unknown-key warnings (#3523).
+// A single `init phase-op N` call invokes loadConfig more than once; this Set
+// prevents the same warning from being echoed on each invocation.
+const _warnedUnknownConfigKeys = new Set();
 
 const _gitIgnoredCache = new Map();
 
