@@ -102,11 +102,12 @@ function writeCodexConfigWithStaleHooks(dir, headerEol, bodyEol) {
       ? parsed.hooks
       : parsed;
     const sessionStart = Array.isArray(table.SessionStart) ? table.SessionStart : [];
-    return sessionStart.flatMap((entry) =>
-      (Array.isArray(entry?.hooks) ? entry.hooks : [])
-        .map((hook) => hook && hook.command)
-        .filter((cmd) => typeof cmd === 'string')
-    );
+    return sessionStart.flatMap((entry) => [
+      ...(typeof entry?.command === 'string' ? [entry.command] : []),
+      ...(Array.isArray(entry?.hooks)
+        ? entry.hooks.map((hook) => hook && hook.command).filter((cmd) => typeof cmd === 'string')
+        : []),
+    ]);
   }
 
   test('LF config.toml: stale gsd-update-check block removed on reinstall', (t) => {
