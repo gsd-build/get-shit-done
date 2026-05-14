@@ -1486,28 +1486,127 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
       // Update Performance Metrics section (operates on body only)
       body = updatePerformanceMetricsSection(body, phaseNum, planCount, summaryCount);
 
-      // Update frontmatter fields separately
-      // Increment completed_phases
-      const completedFmMatch = frontmatter.match(/completed_phases:\s*(\d+)/);
-      if (completedFmMatch) {
-        const newCompleted = parseInt(completedFmMatch[1], 10) + 1;
+      // ── Root cause 1 fix: derive completed_phases from ROADMAP, not blind increment ──
+      // Read the freshly-updated ROADMAP (after Step C) to count Complete rows.
+      // This makes phase.complete idempotent: running it twice on the same phase
+      // produces the same completed_phases value.
+      let derivedCompletedPhases: number | null = null;
+      let derivedTotalPhases: number | null = null;
+      let derivedTotalPlans: number | null = null;
+      if (existsSync(paths.roadmap)) {
+        try {
+          const freshRoadmap = await readFile(paths.roadmap, 'utf-8');
+          // Count Complete rows in the progress table (Status column = "Complete")
+          const tableCompletePattern = /\|\s*\d+[A-Z]?\S*\s*\|[^|]*\|\s*Complete\s*\|/gi;
+          const completeMatches = freshRoadmap.match(tableCompletePattern);
+          derivedCompletedPhases = completeMatches ? completeMatches.length : null;
+
+          // Count total phase rows in progress table (header + separator + data rows)
+          // Identify the progress table by looking for Phase|Plans|Status|Completed header
+          const progressTableMatch = freshRoadmap.match(
+            /\|\s*Phase\s*\|\s*Plans\s*\|\s*Status\s*\|\s*Completed\s*\|(.*\n)*?(?:\n|$)/i,
+          );
+          if (progressTableMatch) {
+            const tableText = progressTableMatch[0];
+            const dataRowPattern = /^\|\s*\d+[A-Z]?\S*\s*\|/gm;
+            const dataRows = tableText.match(dataRowPattern);
+            derivedTotalPhases = dataRows ? dataRows.length : null;
+          }
+
+          // Sum plan counts from M/N or 0/N columns in the progress table
+          let totalPlansSum = 0;
+          const planCellPattern = /\|\s*\d+[A-Z]?\S*\s*\|\s*(\d+)\/(\d+)\s*\|/gi;
+          let pm: RegExpExecArray | null;
+          while ((pm = planCellPattern.exec(freshRoadmap)) !== null) {
+            totalPlansSum += parseInt(pm[2], 10);
+          }
+          if (totalPlansSum > 0) derivedTotalPlans = totalPlansSum;
+        } catch { /* intentionally empty — fall through to existing values */ }
+      }
+
+      // Count completed plans from all SUMMARY files across phase dirs
+      let derivedCompletedPlans: number | null = null;
+      try {
+        const phaseEntries = await readdir(paths.phases, { withFileTypes: true });
+        let summaryTotal = 0;
+        for (const entry of phaseEntries) {
+          if (!entry.isDirectory()) continue;
+          try {
+            const files = await readdir(join(paths.phases, entry.name));
+            summaryTotal += files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+          } catch { /* intentionally empty */ }
+        }
+        derivedCompletedPlans = summaryTotal;
+      } catch { /* intentionally empty */ }
+
+      // ── Root cause 2 fix: update all stale frontmatter fields ──
+
+      // completed_phases — derived from ROADMAP (idempotent)
+      if (derivedCompletedPhases !== null && frontmatter.includes('completed_phases:')) {
         frontmatter = frontmatter.replace(
           /completed_phases:\s*\d+/,
-          `completed_phases: ${newCompleted}`,
+          `completed_phases: ${derivedCompletedPhases}`,
         );
+      }
 
-        // Recalculate percent
-        const totalFmMatch = frontmatter.match(/total_phases:\s*(\d+)/);
-        if (totalFmMatch) {
-          const totalPhases = parseInt(totalFmMatch[1], 10);
-          if (totalPhases > 0) {
-            const newPercent = Math.round((newCompleted / totalPhases) * 100);
-            frontmatter = frontmatter.replace(
-              /(percent:\s*)\d+/,
-              `$1${newPercent}`,
-            );
-          }
-        }
+      // total_phases — keep in sync with ROADMAP
+      if (derivedTotalPhases !== null && frontmatter.includes('total_phases:')) {
+        frontmatter = frontmatter.replace(
+          /total_phases:\s*\d+/,
+          `total_phases: ${derivedTotalPhases}`,
+        );
+      }
+
+      // total_plans — derived from ROADMAP plan column sums
+      if (derivedTotalPlans !== null && frontmatter.includes('total_plans:')) {
+        frontmatter = frontmatter.replace(
+          /total_plans:\s*\d+/,
+          `total_plans: ${derivedTotalPlans}`,
+        );
+      }
+
+      // completed_plans — count of SUMMARY files on disk
+      if (derivedCompletedPlans !== null && frontmatter.includes('completed_plans:')) {
+        frontmatter = frontmatter.replace(
+          /completed_plans:\s*\d+/,
+          `completed_plans: ${derivedCompletedPlans}`,
+        );
+      }
+
+      // percent — recompute from fresh derived values
+      const effectiveCompleted = derivedCompletedPhases ?? parseInt(frontmatter.match(/completed_phases:\s*(\d+)/)?.[1] ?? '0', 10);
+      const effectiveTotal = derivedTotalPhases ?? parseInt(frontmatter.match(/total_phases:\s*(\d+)/)?.[1] ?? '0', 10);
+      if (effectiveTotal > 0 && frontmatter.includes('percent:')) {
+        const newPercent = Math.round((effectiveCompleted / effectiveTotal) * 100);
+        frontmatter = frontmatter.replace(/(percent:\s*)\d+/, `$1${newPercent}`);
+      }
+
+      // last_updated — refresh to current timestamp
+      const nowIso = new Date().toISOString();
+      if (frontmatter.includes('last_updated:')) {
+        frontmatter = frontmatter.replace(/last_updated:\s*\S+/, `last_updated: ${nowIso}`);
+      }
+
+      // stopped_at — set to phase completion message
+      const stoppedAtValue = isLastPhase
+        ? `Milestone complete (Phase ${phaseNum} was final phase)`
+        : `Phase ${phaseNum} complete (${summaryCount}/${planCount}) — ready to discuss Phase ${nextPhaseNum}`;
+      if (frontmatter.includes('stopped_at:')) {
+        frontmatter = frontmatter.replace(/stopped_at:\s*.+/, `stopped_at: ${stoppedAtValue}`);
+      } else {
+        // Insert stopped_at before closing ---
+        frontmatter = frontmatter.replace(/(---\s*)$/, `stopped_at: ${stoppedAtValue}\n$1`);
+      }
+
+      // ── Root cause 2 fix: update body Current focus ──
+      const focusValue = isLastPhase
+        ? 'Milestone complete'
+        : (nextPhaseName
+          ? `Phase ${nextPhaseNum} — ${nextPhaseName.replace(/-/g, ' ')}`
+          : `Phase ${nextPhaseNum}`);
+      const focusPattern = /(\*\*Current focus:\*\*\s*).*/i;
+      if (focusPattern.test(body)) {
+        body = body.replace(focusPattern, (_m: string, prefix: string) => `${prefix}${focusValue}`);
       }
 
       // Update frontmatter status field
