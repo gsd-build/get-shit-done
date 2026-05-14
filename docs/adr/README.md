@@ -4,6 +4,28 @@ This directory contains Architecture Decision Records (ADRs) for GSD.
 
 Each ADR documents one architectural decision: what was decided, why, and what consequences follow. ADRs are append-only. Amendments extend existing ADRs with a dated section rather than replacing them.
 
+## Naming Convention
+
+New ADRs use **issue#-prefix slug** naming:
+
+```
+docs/adr/<issue#>-<kebab-slug>.md
+```
+
+Examples: `3485-adr-prd-naming-convention.md`, `3464-review-default-reviewers.md`.
+
+### Why
+
+Two developers computing "next ADR number" locally against `main` will independently pick the same integer and both ship. The collision is already on disk — `0010-*` exists twice and `0011-*` exists three times. GitHub issue numbers are server-assigned and atomic: the moment you open an issue, that number is reserved globally. Two PRs that both edit the `### Fixed` block of `CHANGELOG.md` always conflict on merge — two PRs that each use a distinct issue# as their ADR prefix never collide. Same shape, same solution.
+
+### Legacy ADRs
+
+Files `0001-*` through `0011-*` are preserved as immutable historical record. The duplicate `0010-*` and the three-way `0011-*` are documented residue of the old local-compute convention — not patterns to imitate. Do not renumber them.
+
+### Full process
+
+See **[CONTRIBUTING.md — "Proposing an ADR or PRD"](../../CONTRIBUTING.md#proposing-an-adr-or-prd)** for the end-to-end workflow: opening the issue, waiting for approval, naming the file, and submitting the PR.
+
 ## Index
 
 | ADR | Title | Status |

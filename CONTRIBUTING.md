@@ -67,6 +67,30 @@ A feature adds something new — a new command, a new workflow, a new concept, a
 
 ---
 
+### 📐 ADR or PRD
+
+An ADR (Architecture Decision Record) documents a significant architectural decision. A PRD (Product Requirements Document) captures the what and why of a feature before implementation. Both are governed by the same issue-first rule as everything else.
+
+**Process:**
+
+1. Open an issue of the appropriate type (enhancement for an ADR revisiting an existing area, feature for a new architectural surface, chore for policy/docs decisions). Fill it out completely.
+2. **Wait for maintainer approval.** A maintainer must label the issue `approved-enhancement`, `approved-feature`, or confirm the chore before any file is created.
+3. The GitHub-assigned issue number becomes your filename prefix. Create the file on a branch named after the issue:
+   - `docs/adr/<issue#>-<slug>.md` for ADRs
+   - `docs/prd/<issue#>-<slug>.md` for PRDs
+   - Branch: `docs/<issue#>-<slug>`
+4. Open a PR using the appropriate template and close the issue with `Closes #<issue#>` in the PR body.
+
+**One issue = one ADR-or-PRD = one PR.** Do not batch multiple decisions into one file or one PR.
+
+**Do not compute a "next number" locally.** Any PR that uses the legacy `NNNN-*` sequential pattern for a *new* ADR or PRD will be asked to rename the file to the `<issue#>-<slug>.md` format before merge.
+
+**Example:** Issue #3485 was opened, approved, and its number became the prefix: `docs/adr/3485-adr-prd-naming-convention.md` on branch `docs/3485-adr-prd-naming-convention`.
+
+**Rejection reasons:** Issue not approved before file was created, filename uses local-compute sequential number instead of issue#, multiple decisions bundled in one PR, file placed in wrong directory (`docs/adr/` vs `docs/prd/`).
+
+---
+
 ## The Issue-First Rule — No Exceptions
 
 > **No code before approval.**
