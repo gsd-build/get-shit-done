@@ -1,5 +1,7 @@
 'use strict';
 
+// allow-test-rule: validates runtime CLI stdout/stderr warning behavior, not source grep
+
 /**
  * Regression tests for #3523 — CJS loadConfig must not emit a false
  * "unknown config key(s)" warning for `branching_strategy` when that key
