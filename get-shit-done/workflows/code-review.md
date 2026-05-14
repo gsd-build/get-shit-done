@@ -429,7 +429,9 @@ MAX_FINDINGS_SIZE=50000
 if [ -n "$FALLOW_JSON_PATH" ] && [ -f "$FALLOW_JSON_PATH" ]; then
   FALLOW_JSON_SIZE=$(wc -c < "$FALLOW_JSON_PATH" | tr -d '[:space:]')
   if [ "$FALLOW_JSON_SIZE" -le "$MAX_FINDINGS_SIZE" ]; then
-    STRUCTURAL_FINDINGS_BLOCK=$(printf '<structural_findings>\n%s\n</structural_findings>\n' "$(cat "$FALLOW_JSON_PATH")")
+    # Escape any literal closing tag before embedding; the closing tag literal is escaped to prevent prompt-structure breakage if a fallow finding's file path or message contains the sequence.
+    SAFE_FALLOW_JSON=$(sed 's#</structural_findings>#<\/structural_findings>#g' "$FALLOW_JSON_PATH")
+    STRUCTURAL_FINDINGS_BLOCK=$(printf '<structural_findings>\n%s\n</structural_findings>\n' "$SAFE_FALLOW_JSON")
   else
     echo "Warning: skipping structural findings embed (${FALLOW_JSON_SIZE} bytes > ${MAX_FINDINGS_SIZE} bytes). Re-run with narrower scope/profile if needed."
   fi
