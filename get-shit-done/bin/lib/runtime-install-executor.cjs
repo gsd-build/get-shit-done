@@ -66,7 +66,6 @@ function hasConfigMutation(plan, adapter, operation = null) {
 
 function getConfigMutationHandler(registry, mutation) {
   const entry = getConfigMutationEntry(registry, mutation);
-  if (typeof entry === 'function') return entry;
   return entry && typeof entry.handler === 'function' ? entry.handler : null;
 }
 
@@ -78,7 +77,7 @@ function getConfigMutationEntry(registry, mutation) {
 }
 
 function assertRequiredAdapters(entry, mutation, adapters) {
-  if (!entry || typeof entry === 'function') return;
+  if (!entry) return;
   for (const adapterName of entry.requiredAdapters || []) {
     if (typeof adapters[adapterName] !== 'function') {
       throw new Error(

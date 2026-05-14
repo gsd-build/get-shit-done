@@ -148,6 +148,29 @@ describe('Runtime install plan execution', () => {
     }, /Missing required config mutation adapter "configureCopilotInstructions" for adapter="copilot-instructions" operation="ensure-managed-instructions"/);
   });
 
+  test('every registry entry fails fast when its required adapter is missing', () => {
+    const cases = [
+      { runtime: 'claude',   adapter: 'settings-json',        operation: 'ensure-managed-hooks',         missing: 'writeSettings' },
+      { runtime: 'opencode', adapter: 'opencode-json',        operation: 'ensure-permissions',           missing: 'configureOpencodePermissions' },
+      { runtime: 'kilo',     adapter: 'kilo-json',            operation: 'ensure-permissions',           missing: 'configureKiloPermissions' },
+      { runtime: 'codex',    adapter: 'codex-toml',           operation: 'ensure-agent-profiles',        missing: 'configureCodexToml' },
+      { runtime: 'copilot',  adapter: 'copilot-instructions', operation: 'ensure-managed-instructions',  missing: 'configureCopilotInstructions' },
+      { runtime: 'cline',    adapter: 'cline-rules',          operation: 'ensure-runtime-rules',         missing: 'configureClineRules' },
+    ];
+
+    for (const { runtime, adapter, operation, missing } of cases) {
+      const expected = new RegExp(
+        `Missing required config mutation adapter "${missing}" for adapter="${adapter}" operation="${operation}"`
+      );
+      assert.throws(() => {
+        applyExecutorConfigMutations(
+          { runtime, targetDir: `/tmp/${runtime}`, configMutations: [{ adapter, operation }] },
+          { configDir: `/tmp/${runtime}`, adapters: {} }
+        );
+      }, expected, `${runtime}/${adapter}/${operation} should fail fast on missing ${missing}`);
+    }
+  });
+
   test('no-settings runtimes with no mutation intents are executor no-ops', () => {
     const tmp = makeTempDir('gsd-runtime-plan-trae-');
     const plan = createRuntimeInstallPlan({ runtime: 'trae', scope: 'local', cwd: tmp });

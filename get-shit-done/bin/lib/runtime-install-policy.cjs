@@ -180,4 +180,5 @@ module.exports = {
   parseRuntimeInput,
   createRuntimeInstallPlan,
   expandTilde,
+  prefixReplace,
 };

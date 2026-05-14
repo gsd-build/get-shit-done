@@ -8960,6 +8960,13 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   // {type: 'command', command: null} items that the runtime hook schema
   // rejects at parse time. validateHookFields filters those out so the file
   // we write is always schema-valid.
+  // Finalization step only runs JSON-config adapters whose mutations are
+  // applied after the per-runtime install body has settled (settings.json,
+  // opencode.json, kilo.json). Adapters like codex-toml, copilot-instructions,
+  // and cline-rules were already routed earlier in the install flow and would
+  // either no-op or trip assertRequiredAdapters here (no toml/instructions
+  // adapters are wired into this call site). The filter is load-bearing now
+  // that the executor fails fast on missing adapters.
   const finalizationConfigMutations = (installPlan.configMutations || []).filter(mutation =>
     mutation.adapter === 'settings-json' ||
     mutation.adapter === 'opencode-json' ||

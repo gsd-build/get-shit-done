@@ -15,6 +15,7 @@ const {
   getGlobalDir,
   parseRuntimeInput,
   createRuntimeInstallPlan,
+  prefixReplace,
 } = require('../get-shit-done/bin/lib/runtime-install-policy.cjs');
 
 const SHARED_RUNTIME_INSTALL_POLICY = JSON.parse(fs.readFileSync(
@@ -88,6 +89,15 @@ describe('Runtime Install Policy Module', () => {
       assert.equal(getConfigDirFromHome(runtime, false), `'${policy.localDir}'`, `${runtime} local fragment`);
       assert.equal(getConfigDirFromHome(runtime, true), policy.configDirFromHomeGlobal.join(', '), `${runtime} global fragment`);
     }
+  });
+
+  test('prefixReplace only swaps an anchored prefix once', () => {
+    // Duplicate prefix inside the value is left intact after the leading swap.
+    assert.equal(prefixReplace('/Users/x/p/Users/x/y', '/Users/x', '~'), '~/p/Users/x/y');
+    // Prefix occurring later in the string but not at position 0 is untouched.
+    assert.equal(prefixReplace('/var/Users/x/p', '/Users/x', '~'), '/var/Users/x/p');
+    // Falsy prefix is a no-op.
+    assert.equal(prefixReplace('/Users/x/p', '', '~'), '/Users/x/p');
   });
 
   test('unknown runtimes fail loudly', () => {

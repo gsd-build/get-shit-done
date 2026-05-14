@@ -18,6 +18,8 @@ Each ADR documents one architectural decision: what was decided, why, and what c
 | [0008-installer-migration-module.md](0008-installer-migration-module.md) | Installer Migration Module owns install-time upgrade safety | Accepted |
 | [0011-runtime-install-policy-module.md](0011-runtime-install-policy-module.md) | Runtime Install Policy Module as shared runtime data | Accepted |
 
+> Note: ADR slots 0009 and 0010 are reserved for decisions in flight on other branches and intentionally skipped here.
+
 ## Seam map
 
 ADR 0005 is the top-level SDK seam index. It references per-seam ADRs and states the narrow-waist principle each seam follows. Use it as the entry point for understanding SDK module ownership.
