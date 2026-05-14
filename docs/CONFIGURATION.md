@@ -260,12 +260,14 @@ All workflow toggles follow the **absent = enabled** pattern. If a key is missin
 
 ## Code Quality Settings
 
+The `code_quality.*` namespace gates optional structural-analysis tooling that augments `/gsd-code-review`. Settings are additive: each tool is independently opt-in and off by default.
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `code_quality.fallow.enabled` | boolean | `false` | Enables fallow structural pre-pass for `/gsd-code-review`. When `false`, no fallow binary probe or JSON artifact is produced. |
 | `code_quality.fallow.scope` | string | `phase` | Scope for fallow analysis: `phase` (current review file scope) or `repo` (entire repository). |
 | `code_quality.fallow.profile` | string | `standard` | Fallow profile selector passed to the pre-pass runner (`minimal`, `standard`, `strict`). |
-| `code_quality.fallow.mcp` | boolean | `false` | When `true`, enables MCP-backed structural findings mode for runtimes that support MCP server routing. |
+| `code_quality.fallow.mcp` | boolean | `false` | **Reserved — not yet implemented.** When `true`, enables MCP-backed structural findings mode for runtimes that support MCP server routing. Setting this to `true` is currently a no-op and emits a runtime warning. |
 
 ## Ship Settings
 
