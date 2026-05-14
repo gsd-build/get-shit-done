@@ -90,11 +90,12 @@ function readHooksSessionStartCommands(codexHome) {
     ? parsed.hooks
     : parsed;
   const sessionStart = Array.isArray(table.SessionStart) ? table.SessionStart : [];
-  return sessionStart.flatMap((entry) =>
-    (Array.isArray(entry?.hooks) ? entry.hooks : [])
-      .map((hook) => hook && hook.command)
-      .filter((cmd) => typeof cmd === 'string')
-  );
+  return sessionStart.flatMap((entry) => [
+    ...(typeof entry?.command === 'string' ? [entry.command] : []),
+    ...(Array.isArray(entry?.hooks)
+      ? entry.hooks.map((hook) => hook && hook.command).filter((cmd) => typeof cmd === 'string')
+      : []),
+  ]);
 }
 
 function countMatches(content, pattern) {
@@ -1431,7 +1432,11 @@ describe('Codex install hook configuration (e2e)', () => {
     runCodexInstall(codexHome);
 
     const configContent = readCodexConfig(codexHome);
-    assert.ok(!configContent.includes('gsd-check-update.js'), 'config.toml does not carry managed SessionStart hooks');
+    const parsedConfig = parseTomlToObject(configContent);
+    assert.ok(
+      !parsedConfig.hooks || !Array.isArray(parsedConfig.hooks.SessionStart),
+      'config.toml does not carry managed SessionStart hooks'
+    );
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
     assert.equal(
       hooksJsonCommands.some((cmd) => cmd.includes('gsd-check-update.js')),
