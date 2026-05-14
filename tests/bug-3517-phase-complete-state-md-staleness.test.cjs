@@ -1,3 +1,9 @@
+// allow-test-rule: state-md-is-the-runtime-contract — this test asserts the
+// exact STATE.md fields written by phase.complete; STATE.md IS the product
+// surface being verified, not source code. Same justification pattern as
+// tests/bug-2698-crlf-install.test.cjs. Migration to typed-IR parser tracked
+// in #2974.
+
 /**
  * Regression tests for bug #3517:
  *   `gsd-sdk query phase.complete N` returns state_updated: true but
