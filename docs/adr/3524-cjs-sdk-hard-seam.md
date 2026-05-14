@@ -1,85 +1,100 @@
-# CJS↔SDK hard seam — single canonical owner per responsibility
+# CJS↔SDK hard seam — one source of truth per Shared Module
 
 - **Status:** Proposed
 - **Date:** 2026-05-14
 - **Tracking issue:** [#3524](https://github.com/gsd-build/get-shit-done/issues/3524)
 - **Related PRD:** [`docs/prd/3524-cjs-sdk-hard-seam.md`](../prd/3524-cjs-sdk-hard-seam.md)
-- **Extends:** ADR-0005 (SDK Architecture seam map)
+- **Extends:** ADR-0005 (seam map) — adds the **Shared-Module Source Policy** to the seam family
+- **Defers to:** ADR-0001 (Dispatch Policy Module), ADR-0003 (Model Catalog Module), ADR-0004 (Planning Workspace Module), ADR-0006 (Planning Path Projection Module), ADR-0009 (Shell Command Projection Module — post-Phase 3–4, also subsuming superseded ADR-0010)
 
-We decided to make the boundary between the CJS tooling layer (`get-shit-done/bin/lib/*.cjs`) and the SDK (`sdk/src/**/*.ts`) a hard architectural seam with exactly one canonical owner per responsibility. The trigger is the recurring drift bug class — #1535, #1542, #2047/#2052, #2638/#2655, #2653/#2670, #2687/#2706, #2798/#2816, #3055/#3116, #3523 — each of which was a fix landing on one side without the other. The class keeps recurring because the boundary today is a soft convention enforced only by output-parity tests, which catch naming mismatch and read-output divergence but not structure divergence, warning/error divergence, or mutation-path divergence.
+We decided to harden the boundary between the CJS tooling layer (`get-shit-done/bin/lib/*.cjs`) and the SDK (`sdk/src/**/*.ts`) by making every Module that is conceptually shared between the two runtimes have exactly one hand-authored source of truth and at most one generated artifact per runtime. The trigger is the recurring drift bug class — #1535, #1542, #2047/#2052, #2638/#2655, #2653/#2670, #2687/#2706, #2798/#2816, #3055/#3116, #3523 — each of which was a fix landing on one side without the other.
+
+The precedent shape is already in the repo. `sdk/scripts/gen-command-aliases.ts` emits `sdk/src/query/command-aliases.generated.ts` **and** `get-shit-done/bin/lib/command-aliases.generated.cjs` from one TypeScript source. `sdk/scripts/check-command-aliases-fresh.mjs` is the CI freshness gate. The two consuming sides are pure Adapters over the generated artifact. This ADR generalizes that pattern to the other Shared Modules and forbids the hand-synced-pair anti-pattern that produced #3523.
 
 ## Decision
 
-### 1. Three layers, sharp boundaries
+### 1. Shared-Module Source Policy
 
-| Layer | Location | Owns | Imported by |
-|---|---|---|---|
-| **Shared data** | `sdk/shared/*.json` | Constants, enums, schemas as pure JSON. Examples: `config-schema.json` (VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS, RUNTIME_STATE_KEYS, CONFIG_DEFAULTS), `model-catalog.json` (already in this shape). | Both CJS and SDK via `require`/`import` of the JSON file. |
-| **Shared core (logic)** | `sdk/src/core/**/*.ts` compiled to `sdk/dist/core/*.{cjs,mjs,d.ts}` via dual CJS+ESM build. | All behavior that today lives in *both* sides: config load/normalize/migrate, project-root resolution, path projection, model resolution, validation. | Both CJS (`require('@gsd-build/sdk/core')` or relative path into the published `dist/`) and SDK (`import` from the source). |
-| **Adapter** | `get-shit-done/bin/lib/*.cjs` (CJS adapter) and `sdk/src/query/**/*.ts` (SDK adapter) | Surface-shape — CJS dispatch/router, SDK query handler registry. Adapters call into shared core for behavior. **Adapters do not define schemas, defaults, or normalization logic.** | CLI entry points (`bin/gsd-tools.cjs`, `sdk/dist/cli.js`), MCP server, hooks, workflow markdown. |
+A **Shared Module** is any Module whose Interface is consumed identically by both the CJS toolset and the SDK. The CONTEXT.md domain glossary already calls these out — e.g. `STATE.md Document Module` is explicitly typed as "Shared CJS/SDK pure transform Module."
 
-### 2. Canonical owners per responsibility
+For every Shared Module:
 
-| Responsibility | Canonical owner | Adapter shape |
-|---|---|---|
-| Config schema (VALID_CONFIG_KEYS, DYNAMIC_KEY_PATTERNS, RUNTIME_STATE_KEYS) | Shared data: `sdk/shared/config-schema.json` | Both sides `require`/`import` |
-| CONFIG_DEFAULTS | Shared data: `sdk/shared/config-defaults.json` | Both sides `require`/`import` |
-| Config load + legacy-key normalization (top-level `branching_strategy`, `sub_repos`, `multiRepo`, `depth`) | Shared core: `sdk/src/core/config.ts` exports `loadConfig(cwd)`, `mergeDefaults(parsed)`, `normalizeLegacyKeys(parsed)` | `bin/lib/config.cjs`, `bin/lib/core.cjs` import; `sdk/src/config.ts` re-exports |
-| Project-root resolution (`findProjectRoot`) | Shared core: `sdk/src/core/project-root.ts` | Both sides import |
-| Planning path projection | SDK (sealed per ADR-0006) — `helpers.planningPaths()` | CJS to be migrated off `planning-workspace.cjs` per Phase 3 of the PRD |
-| Model catalog | Shared data: `sdk/shared/model-catalog.json` (sealed per ADR-0003) | Loader hardened to single path (Phase 2 of the PRD) |
-| Command contract validation | Shared core: `sdk/src/core/command-contract.ts` | CJS routers consult before dispatch |
-| Shell command projection (platform abstraction) | CJS canonical: `bin/lib/shell-command-projection.cjs` (ADR-0009) | SDK file ops import via shared-core wrapper rather than raw `fs`/`child_process` |
-| File ops engine (safe mutations) | CJS canonical: `bin/lib/file-operation-engine.cjs` family (ADR-0010) | SDK mutation handlers import wrapper |
-| State management | SDK canonical: `sdk/src/query/state*.ts` | CJS `state.cjs` becomes a subprocess shim for `gsd-tools state ...` legacy callers |
-| Query routing/dispatch | SDK canonical: `sdk/src/query/registry.ts` + `query-dispatch.ts` (ADR-0001 amendment) | CJS `gsd-tools.cjs` shells out to `gsd-sdk query` for canonical commands |
-| Installer/migration | CJS canonical: `bin/lib/installer-migrations.cjs` (legacy runtime is CJS) | SDK package-compatibility shim consumes |
-| Verify/audit | SDK canonical: `sdk/src/query/verify.ts` | CJS `verify.cjs` becomes subprocess shim |
+1. **Exactly one hand-authored source of truth.** Lives at `sdk/src/<module-name>/` as TypeScript when the Module has behavior, or `sdk/shared/<module-name>.manifest.json` when the Module is pure data.
+2. **Generated artifacts only.** The CJS-side file is `get-shit-done/bin/lib/<module-name>.generated.cjs` and is emitted mechanically. It is never hand-edited.
+3. **Per-Module freshness check.** A CI script `sdk/scripts/check-<module>-fresh.mjs` re-runs the generator and fails if the emitted artifact differs from the committed one. Precedent: `check-command-aliases-fresh.mjs`.
+4. **Per-Module drift lint** (when the source is data, not a generator output). Precedent: `scripts/lint-shell-command-projection-drift.cjs`. The lint asserts the canonical-owner invariants that aren't captured by file-equality.
+5. **Hand-synced pairs are forbidden.** A pre-merge `lint-shared-module-handsync.cjs` greps `get-shit-done/bin/lib/` for non-`.generated.*` files whose basename matches a `sdk/src/query/<same-name>.ts` source and fails the build unless the pair is explicitly allow-listed.
 
-### 3. CJS-only domains (intentional asymmetry)
+### 2. Module-indexed canonical-owner table
 
-These remain CJS-only and are **out of scope** for the seam — drift cannot occur because there is no SDK counterpart:
+The table below indexes by Module, not by physical layer. Each row names the source of truth, the emitted artifacts, the Adapter sites, and either the new ADR section that defines the Module or the existing ADR that already owns it.
 
-- `bin/lib/graphify.cjs` — codebase knowledge-graph indexing
-- `bin/lib/gsd2-import.cjs` — GSD v2→v3 migration
-- `bin/lib/schema-detect.cjs` — project compatibility auto-detection
-- `bin/lib/fallow-runner.cjs` — optional fallow code-quality scanning
-- `bin/lib/intel.cjs` — technical intelligence file management
-- `bin/lib/drift.cjs` — code drift detection vs baseline
+| Module | Status | Source of truth | Generated artifacts | Adapters |
+|---|---|---|---|---|
+| **STATE.md Document Module** | New under this ADR (Phase 1) — see CONTEXT.md "STATE.md Document Module" | `sdk/src/state-document/index.ts` (promoted from `sdk/src/query/state-document.ts`) | `sdk/src/query/state-document.generated.ts`, `get-shit-done/bin/lib/state-document.generated.cjs` | `bin/lib/state.cjs` and `sdk/src/query/state*.ts` import the generated form |
+| **Configuration Module** | New under this ADR (Phase 2) — definition added to CONTEXT.md as part of Phase 2 | `sdk/src/configuration/index.ts` plus data manifests `sdk/shared/config-schema.manifest.json` and `sdk/shared/config-defaults.manifest.json` | `sdk/src/query/config-schema.generated.ts`, `get-shit-done/bin/lib/config-schema.generated.cjs`, `get-shit-done/bin/lib/configuration.generated.cjs` | `bin/lib/config.cjs`, `bin/lib/core.cjs:loadConfig`, `sdk/src/config.ts` |
+| **Workstream Inventory Module** (Builder) | Amended under this ADR (Phase 3) — Builder split documented in CONTEXT.md update | `sdk/src/workstream-inventory/builder.ts` (pure projection from directory entries + STATE.md text + plan scan results → typed inventory) | `sdk/src/query/workstream-inventory-builder.generated.ts`, `get-shit-done/bin/lib/workstream-inventory-builder.generated.cjs` | Per-side fs Readers (`workstream-inventory.cjs` sync, `workstream-inventory.ts` async) call the Builder. Readers stay hand-authored because the fs idiom legitimately differs. |
+| **Project-Root Resolution Module** | New under this ADR (Phase 4) — short CONTEXT.md entry, behavior already de-facto shared | `sdk/src/project-root/index.ts` | `get-shit-done/bin/lib/project-root.generated.cjs` | `bin/lib/core.cjs` (`findProjectRoot`, `findEffectiveRoot`), `sdk/src/helpers.ts` |
+| **Frontmatter Module** | Conditional (Phase 3, only if drift catalogue confirms pair duplication) | `sdk/src/frontmatter/index.ts` | `get-shit-done/bin/lib/frontmatter.generated.cjs` | Existing handler call sites |
+| **Plan Scan Module** | Conditional (Phase 3 or later) | `sdk/src/plan-scan/index.ts` | `get-shit-done/bin/lib/plan-scan.generated.cjs` | Phase/roadmap routers |
+| Command-Alias Module | **Already sealed** by this pattern's precedent — `sdk/scripts/gen-command-aliases.ts` + `check-command-aliases-fresh.mjs` | No change | No change | No change |
+| Dispatch Policy Module | **Defer — see ADR-0001** (and its 2026-05-05 SDK Runtime Bridge amendment) | n/a | n/a | n/a |
+| Model Catalog Module | **Defer — see ADR-0003**; the `sdk/shared/model-catalog.json` manifest already follows the source-of-truth policy | n/a | n/a | n/a |
+| Planning Workspace Module | **Defer — see ADR-0004**; `withPlanningLock`, workstream pointer policy, lock semantics stay where they are | n/a | n/a | n/a |
+| Planning Path Projection Module | **Defer — see ADR-0006**; SDK is canonical, CJS path resolution converges via Phase 4 if any divergence is found | n/a | n/a | n/a |
+| Shell Command Projection Module (incl. platform fs + subprocess after Phase 3–4 expansion) | **Defer — see ADR-0009**; this Module is the canonical owner for `platformWriteSync`, `platformReadSync`, `platformEnsureDir`, `execGit`, `execNpm`, `execTool`, `probeTty`, `normalizeContent` | n/a | n/a | n/a |
+| Skill Surface Budget Module | **Defer — see ADR-0011** (accepted, not the 0011-superseded draft) | n/a | n/a | n/a |
 
-If any of these later need an SDK counterpart, the migration is a new enhancement, not a parallel implementation.
+### 3. Out-of-seam Modules (per-runtime, no shared source)
 
-### 4. Enforcement mechanisms
+These remain CJS-only. Drift cannot occur because there is no SDK counterpart. If any later needs an SDK port, that port is a new enhancement, not a parallel implementation.
 
-The seam is enforced at four layers; defeating any one of them surfaces in CI before merge.
+- `bin/lib/graphify.cjs`
+- `bin/lib/gsd2-import.cjs`
+- `bin/lib/schema-detect.cjs`
+- `bin/lib/fallow-runner.cjs`
+- `bin/lib/intel.cjs`
+- `bin/lib/drift.cjs`
+- `bin/lib/installer-migrations.cjs` (installer runtime is CJS-native; SDK consumes via `sdk-package-compatibility.ts` Adapter)
 
-1. **Build-time single source** — `sdk/shared/*.json` and `sdk/dist/core/` are the *only* legal definers of the symbols in the responsibility table. A CI script (`scripts/check-seam-ownership.cjs`) greps `bin/lib/*.cjs` for forbidden patterns (e.g. `CONFIG_DEFAULTS\s*=`, `VALID_CONFIG_KEYS\s*=`, function declarations whose canonical owner is shared-core) outside of `require()` lines, and fails the build on a match. Allowlist is explicit, in the script.
-2. **Type-level parity check** — `sdk/src/contract/cjs-sdk-contract.test.ts` imports the CJS public surface (via a thin TS shim) and the SDK public surface and asserts shape equality on the seam-managed symbols. Compile-time failure if drift creeps back in.
-3. **Golden mutation parity** — `sdk/src/golden/golden.integration.test.ts` is extended from read-only to mutations. Every canonical handler in the responsibility table has a golden test that asserts CJS and SDK produce identical observable state after the same mutation.
-4. **CODEOWNERS gate** — `bin/lib/*.cjs` and `sdk/src/core/**` are owned by `@gsd-build/architecture`. PRs touching either require explicit architecture-team review.
-5. **In-file banner** — every CJS file participating in the seam carries a top-of-file comment block pointing at this ADR and the canonical owner. Banner is regenerated by the build; absence fails CI.
+### 4. Per-side I/O Adapters legitimately differ
 
-### 5. Migration policy
+The per-side state Adapter, verify Adapter, and similar handlers are **not** in the Shared-Module table. CJS callers use synchronous fs/exec; SDK callers use async I/O and the SDK observability decorators. The pure transforms behind them (parsing, projection, normalization) are extracted into Shared Modules per the table above; the I/O remains per-side. Golden parity tests in `sdk/src/golden/` pin observable behavior across the seam.
 
-- Adapters are converted **one responsibility at a time** per the PRD's phasing. No big-bang rewrites.
-- During migration, the parity test for the responsibility being moved is **promoted to a required CI check** before the duplicate is deleted on the losing side.
-- A responsibility is considered "sealed" when (a) the canonical owner exists, (b) the losing-side definition has been deleted, (c) the parity test passes, and (d) the enforcement grep covers it.
+### 5. Enforcement (per existing repo precedents, not new conventions)
+
+Drift is blocked at three layers, each modeled on an existing in-repo script:
+
+1. **Per-Module freshness check** — `sdk/scripts/check-<module>-fresh.mjs`, one per Shared Module in the table. Precedent: `check-command-aliases-fresh.mjs`.
+2. **Per-Module drift lint** (when invariants are not pure file-equality) — `scripts/lint-<module>-drift.cjs`, one per data-manifest-backed Module. Precedent: `lint-shell-command-projection-drift.cjs`.
+3. **Hand-sync pair lint** — `scripts/lint-shared-module-handsync.cjs` rejects any pair of files at `get-shit-done/bin/lib/<name>.cjs` and `sdk/src/query/<name>.ts` (or `sdk/src/<name>.ts`) that are not generated artifacts and not on an explicit allow-list. This blocks the #3523 anti-pattern at PR time.
+
+CODEOWNERS extends to `sdk/src/<module>/` for each Shared Module. Architecture-team review is required for changes to a source of truth.
+
+A top-of-file banner is auto-inserted by each generator into the emitted `.generated.cjs` / `.generated.ts` files. Banner pattern follows the existing `command-aliases.generated.*` files: a header noting "GENERATED FILE — Source: …". No additional banner tooling is introduced.
+
+### 6. New CONTEXT.md entries added by this ADR's phases
+
+- **Configuration Module** (added during Phase 2): Module owning config load, legacy-key normalization, defaults merge, and explicit on-disk migration for `.planning/config.json`. Interface: `loadConfig(cwd) → MergedConfig` (pure read, no disk write); `normalizeLegacyKeys(parsed) → { parsed, normalizations[] }` (idempotent, returns the list of normalizations applied for migration logging); `mergeDefaults(parsed) → MergedConfig`; `migrateOnDisk(cwd) → MigrationReport` (explicit, opt-in, called only by the installer and by `gsd-tools migrate-config`). Invariants: never mutates disk inside `loadConfig`; legacy top-level keys (`branching_strategy`, `sub_repos`, `multiRepo`, `depth`) are normalized into their canonical nested locations in the returned value; defaults come from the shared `config-defaults.manifest.json`.
+- **Project-Root Resolution Module** (added during Phase 4): Module owning project-root and effective-root resolution heuristics including own-`.planning` detection, parent-`sub_repos` traversal, legacy `multiRepo`, and `.git`-ancestor fallback.
+- **Workstream Inventory Module — Builder split** (CONTEXT.md amendment during Phase 3): the existing Module entry gains a sub-paragraph noting that the pure projection logic is the source of truth and the per-side Reader Adapters are hand-authored over the generated Builder.
 
 ## Consequences
 
-- **Drift becomes structurally impossible** for symbols in the responsibility table. A contributor cannot add a parallel definition without the seam-ownership CI check or the type-level contract test failing.
-- **The CJS surface shrinks** to (a) CJS-only domains, (b) thin adapters around shared core, and (c) subprocess shims for the SDK-canonical responsibilities.
-- **The SDK becomes the canonical engine.** All canonical behavior lives in TypeScript and is compiled to a dual-target artifact. CJS continues to exist as a back-compat CLI for shell scripts and legacy workflows but does not own any logic outside its CJS-only domains.
-- **Per-handler subprocess startup cost** for CJS-shelled-out responsibilities is added (~50–100 ms per invocation for shell-script consumers of `gsd-tools`). For workflow markdown consumers, no change — workflows already converge on `gsd-sdk` >90%.
-- **Build pipeline grows** to compile `sdk/src/core/` to dual CJS+ESM. Modern bundlers (`tsup`, `rollup`) handle this with a few lines of config; the cost is justified by the elimination of an entire bug class.
-- **ADR-0005's seam map is extended** to include this seam. ADR-0001 (dispatch policy) is amended to require CJS dispatch shells out for canonical handlers.
-- **The golden test suite becomes load-bearing.** Promoting mutation parity from optional to required raises the bar for new handlers — every canonical handler must have a parity fixture. This is acceptable; the alternative is the next #3523.
+- **The hand-synced-pair anti-pattern that produced #3523 becomes impossible to merge.** The `lint-shared-module-handsync.cjs` gate rejects any new pair that is not generated. The `check-<module>-fresh.mjs` gates reject any edit to a generated file that is out of sync with its source.
+- **The seam vocabulary stays inside the existing CONTEXT.md / LANGUAGE.md frame.** No new layer labels ("shared core", "shared data"); the unit of seam ownership is the Module, as it already is everywhere else in this repo.
+- **No new build tooling is introduced.** The generator pattern is the existing `gen-command-aliases.ts` shape. No dual CJS+ESM bundler, no `package.json` `exports` subpath change, no `tsup`/`rollup` decision.
+- **Each phase ships one Shared Module.** The smallest phase (STATE.md Document Module) ships first because both files are already character-identical — the deletion test passes on contact. The trigger bug class (#3523) is closed in Phase 2 by the Configuration Module.
+- **Existing ADRs are deferred to, not restated.** Planning Path Projection (ADR-0006), Model Catalog (ADR-0003), Planning Workspace (ADR-0004), Dispatch Policy (ADR-0001), Shell Command Projection (ADR-0009) remain authoritative for their domains. The new ADR adds Shared-Module Source Policy and the per-Module entries above.
+- **Per-side I/O Adapter divergence is preserved.** Async SDK and sync CJS handlers stay separate at the I/O surface. Only pure transforms are shared. This avoids forcing every CJS shell-script caller through a subprocess hop.
+- **Enforcement reuses existing scripts.** Three new lint/check primitives, all modeled on scripts already in `scripts/` and `sdk/scripts/`. CI wiring follows the existing precedent.
 
 ## Out of scope
 
-- Replacing the imperative CJS router with the SDK's declarative registry — that is a larger architecture rewrite, separate enhancement.
-- Migrating CJS-only domains (graphify, gsd2-import, schema-detect, fallow-runner, intel, drift) to SDK handlers.
-- Changing the workflow-markdown convention for which CLI to call.
+- Replacing the imperative CJS router with the SDK's declarative registry (`Command Topology Module` per ADR-0001 amendment) — a larger architecture move, separate enhancement.
+- Migrating CJS-only Modules (graphify, gsd2-import, schema-detect, fallow-runner, intel, drift) to SDK handlers — each is its own enhancement.
+- Sync→async migration of CJS state/verify Adapters — leaves the per-side Adapter shape intact, which is the point.
+- Defining a Verify Module before the verify surface has a shared Interface — that is precondition work for a future enhancement, not this one.
 
 ## Amendments
 
