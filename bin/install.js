@@ -3575,18 +3575,29 @@ function migrateCodexHooksMapFormat(content) {
   const mapOnlyBlocks = legacyMapSections
     .filter((s) => s.path !== 'hooks')   // skip bare [hooks] container
     .map((s) => {
-      const type = s.path.slice('hooks.'.length);
       const body = content.slice(s.headerEnd, s.end);
-      return buildNestedBlock(type, body);
+      // #3346: when the legacy `[hooks.<X>]` body declares `event = "..."`,
+      // prefer that as the event-name leaf key. The path segment <X> may be
+      // a `<file>:<event>:<line>:<col>` location identifier (Codex pre-AoT
+      // wrote those as table keys), which is not a valid leaf event name —
+      // emitting it verbatim produces a TOML key chain Codex 0.124.0+ rejects.
+      const bodyEvent = extractFlatHookEventName(body);
+      const type = bodyEvent !== null ? bodyEvent : s.path.slice('hooks.'.length);
+      const skipKeys = bodyEvent !== null ? new Set(['event']) : new Set();
+      return buildNestedBlock(type, body, skipKeys);
     });
 
   // Stale namespaced AoT blocks: [[hooks.TYPE]] entries with handler fields at
   // event-entry level (no .hooks sub-table). Treated like map-format blocks —
   // inserted before the first remaining table section.
   const staleNamespacedAotBlocks = staleNamespacedAotSections.map((s) => {
-    const type = s.path.slice('hooks.'.length);
     const body = content.slice(s.headerEnd, s.end);
-    return buildNestedBlock(type, body);
+    // #3346: see note in mapOnlyBlocks — body `event = "..."` wins over the
+    // raw path segment when both are present.
+    const bodyEvent = extractFlatHookEventName(body);
+    const type = bodyEvent !== null ? bodyEvent : s.path.slice('hooks.'.length);
+    const skipKeys = bodyEvent !== null ? new Set(['event']) : new Set();
+    return buildNestedBlock(type, body, skipKeys);
   });
 
   const flatAotBlocks = migratedFlatAotSections.map((s) => {
