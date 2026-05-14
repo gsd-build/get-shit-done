@@ -45,7 +45,7 @@ function findInNodeModules(cwd) {
 }
 
 function resolveFallowBinary({ cwd, envPath = process.env.PATH || '' }) {
-  return findInPath(envPath) || findInNodeModules(cwd) || null;
+  return findInNodeModules(cwd) || findInPath(envPath) || null;
 }
 
 function requireFallowBinary({ cwd, envPath = process.env.PATH || '' }) {
@@ -68,7 +68,7 @@ function normalizeFallowReport(report) {
       type: 'unused_export',
       message: `Unused export ${item.symbol || '<unknown>'}`,
       file: item.file || '',
-      line: item.line || null,
+      line: item.line ?? null,
     });
   }
 
@@ -77,7 +77,7 @@ function normalizeFallowReport(report) {
       type: 'duplicate_block',
       message: `Duplicate block (${Math.round((item.similarity || 0) * 100)}% similarity)`,
       file: item.left?.file || '',
-      line: item.left?.start || null,
+      line: item.left?.start ?? null,
       related_file: item.right?.file || '',
     });
   }
@@ -86,7 +86,7 @@ function normalizeFallowReport(report) {
     findings.push({
       type: 'circular_dependency',
       message: `Circular dependency: ${(item.cycle || []).join(' -> ')}`,
-      file: Array.isArray(item.cycle) && item.cycle.length ? item.cycle[0] : '',
+      file: Array.isArray(item.cycle) && item.cycle.length > 0 ? item.cycle[0] : '',
       line: null,
     });
   }

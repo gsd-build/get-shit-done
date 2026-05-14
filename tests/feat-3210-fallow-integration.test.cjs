@@ -88,6 +88,58 @@ describe('feat-3210: fallow integration module', () => {
   });
 });
 
+describe('feat-3210: H1 - line:0 preservation', () => {
+  test('normalizeFallowReport preserves line:0 for unused_export (not coerced to null)', () => {
+    const { normalizeFallowReport } = require('../get-shit-done/bin/lib/fallow-runner.cjs');
+    const report = {
+      unusedExports: [{ file: 'src/a.ts', symbol: 'foo', line: 0 }],
+      duplicates: [],
+      circularDependencies: [],
+    };
+    const normalized = normalizeFallowReport(report);
+    assert.strictEqual(normalized.findings[0].line, 0, 'line:0 must not be coerced to null via ||');
+  });
+
+  test('normalizeFallowReport preserves line:0 for duplicate_block left.start (not coerced to null)', () => {
+    const { normalizeFallowReport } = require('../get-shit-done/bin/lib/fallow-runner.cjs');
+    const report = {
+      unusedExports: [],
+      duplicates: [{ left: { file: 'src/a.ts', start: 0 }, right: { file: 'src/b.ts', start: 5 }, similarity: 0.9 }],
+      circularDependencies: [],
+    };
+    const normalized = normalizeFallowReport(report);
+    assert.strictEqual(normalized.findings[0].line, 0, 'left.start:0 must not be coerced to null via ||');
+  });
+});
+
+describe('feat-3210: M2 - node_modules/.bin resolution order', () => {
+  test('resolveFallowBinary prefers node_modules/.bin over PATH when both exist', () => {
+    const { resolveFallowBinary } = require('../get-shit-done/bin/lib/fallow-runner.cjs');
+    const baseTmp = fs.existsSync('/private/tmp') ? '/private/tmp' : os.tmpdir();
+    const tmp = fs.mkdtempSync(path.join(baseTmp, 'gsd-fallow-order-'));
+    try {
+      // local node_modules/.bin/fallow
+      const binDir = path.join(tmp, 'node_modules', '.bin');
+      fs.mkdirSync(binDir, { recursive: true });
+      const localFallow = path.join(binDir, 'fallow');
+      fs.writeFileSync(localFallow, '#!/usr/bin/env sh\necho local\n');
+      if (process.platform !== 'win32') fs.chmodSync(localFallow, 0o755);
+
+      // PATH fallow (a different file)
+      const pathDir = path.join(tmp, 'pathbin');
+      fs.mkdirSync(pathDir, { recursive: true });
+      const pathFallow = path.join(pathDir, 'fallow');
+      fs.writeFileSync(pathFallow, '#!/usr/bin/env sh\necho path\n');
+      if (process.platform !== 'win32') fs.chmodSync(pathFallow, 0o755);
+
+      const resolved = resolveFallowBinary({ cwd: tmp, envPath: pathDir });
+      assert.strictEqual(resolved, localFallow, 'node_modules/.bin/fallow must win over PATH fallow');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('feat-3210: workflow and config contracts', () => {
   test('config schema allows code_quality.fallow.* keys in CJS and SDK', () => {
     const cjsSchema = fs.readFileSync(

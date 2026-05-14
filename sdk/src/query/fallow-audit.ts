@@ -38,6 +38,9 @@ export interface NormalizedFallowReport {
   findings: NormalizedFallowFinding[];
 }
 
+// TODO(parity): SDK lacks a TS test harness for normalizeFallowReport. CJS parity tests live in
+// tests/feat-3210-fallow-integration.test.cjs (H1 suite). When a TS test runner is added,
+// mirror those cases here — especially the line:0 preservation assertions.
 export function normalizeFallowReport(report: FallowReport | null | undefined): NormalizedFallowReport {
   const unused = Array.isArray(report?.unusedExports) ? report.unusedExports : [];
   const duplicates = Array.isArray(report?.duplicates) ? report.duplicates : [];
