@@ -55,7 +55,7 @@
     "c8": "^11.0.0"
   },
   "optionalDependencies": {
-    "fallow": "^2.66.1"
+    "fallow": "^2.70.0"
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
