@@ -99,6 +99,19 @@ function computeExpectedPhaseDirName(
   return `${prefix}${paddedNum}-${slug}`;
 }
 
+async function shouldDropArchivedPhaseMatch(
+  phaseInfo: Record<string, unknown> | null,
+  roadmapPhase: Record<string, unknown> | null,
+  projectDir: string,
+  workstream?: string,
+): Promise<boolean> {
+  if (!phaseInfo?.archived || !roadmapPhase || !roadmapPhase.found) return false;
+  const archivedTag = String(phaseInfo.archived ?? '');
+  const milestone = await getMilestoneInfo(projectDir, workstream);
+  if (milestone?.version && archivedTag === milestone.version) return false;
+  return true;
+}
+
 /**
  * Get the latest completed milestone from MILESTONES.md.
  * Port of getLatestCompletedMilestone from init.cjs lines 10-25.
@@ -169,7 +182,7 @@ async function getPhaseInfoWithFallback(
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   // Match init.cjs: drop archived disk match when the phase is listed in the current ROADMAP
-  if (phaseInfo?.archived && roadmapPhase?.found) {
+  if (await shouldDropArchivedPhaseMatch(phaseInfo, roadmapPhase, projectDir, workstream)) {
     phaseInfo = null;
   }
 
@@ -212,7 +225,7 @@ async function getPhaseInfoForVerifyWork(
   const roadmapResult = await roadmapGetPhase([phase], projectDir, workstream);
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
-  if (phaseInfo?.archived && roadmapPhase?.found) {
+  if (await shouldDropArchivedPhaseMatch(phaseInfo, roadmapPhase, projectDir, workstream)) {
     phaseInfo = null;
   }
 
@@ -694,7 +707,7 @@ export const initPhaseOp: QueryHandler = async (args, projectDir, workstream) =>
   const roadmapPhase = roadmapResult.data as Record<string, unknown> | null;
 
   // If the only match comes from an archived milestone, prefer current ROADMAP
-  if (phaseInfo?.archived && roadmapPhase?.found) {
+  if (roadmapPhase?.found && await shouldDropArchivedPhaseMatch(phaseInfo, roadmapPhase, projectDir, workstream)) {
     const phaseName = roadmapPhase.phase_name as string;
     phaseInfo = {
       found: true,

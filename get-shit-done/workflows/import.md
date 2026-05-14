@@ -32,7 +32,7 @@ Parse `$ARGUMENTS` to determine the execution mode:
 - If neither flag is found: display usage and exit:
 
 ```
-Usage: /gsd-import --from <path>
+Usage: /gsd:import --from <path>
 
   --from <path>   Import an external plan file into GSD format
 ```

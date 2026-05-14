@@ -58,7 +58,7 @@ describe('gsd-tools validate context — JSON vs human rendering', () => {
     assert.strictEqual(r.success, true);
     assert.match(r.output, /70%/);
     assert.match(r.output, /critical/);
-    assert.match(r.output, /\/gsd-thread/);
+    assert.match(r.output, /\/gsd:thread/);
   });
 
   test('human mode omits the recommendation line for healthy state', () => {
@@ -66,25 +66,25 @@ describe('gsd-tools validate context — JSON vs human rendering', () => {
     assert.strictEqual(r.success, true);
     assert.match(r.output, /20%/);
     assert.match(r.output, /healthy/);
-    assert.doesNotMatch(r.output, /\/gsd-thread/, 'healthy output must not nag the user');
+    assert.doesNotMatch(r.output, /\/gsd:thread/, 'healthy output must not nag the user');
   });
 });
 
 describe('gsd-tools validate context — recommendation copy per state', () => {
   // The CLI owns the recommendation strings (the classifier does not).
   // These tests pin the wording so a regression to the prose is caught.
-  test('warning state recommends /gsd-thread', () => {
+  test('warning state recommends /gsd:thread', () => {
     const r = runGsdTools(['validate', 'context', '--tokens-used', '130000', '--context-window', '200000', '--json']);
     const obj = JSON.parse(r.output);
     assert.strictEqual(obj.state, 'warning');
-    assert.match(obj.recommendation, /\/gsd-thread/);
+    assert.match(obj.recommendation, /\/gsd:thread/);
   });
 
   test('critical state names the fracture-point reasoning risk', () => {
     const r = runGsdTools(['validate', 'context', '--tokens-used', '160000', '--context-window', '200000', '--json']);
     const obj = JSON.parse(r.output);
     assert.strictEqual(obj.state, 'critical');
-    assert.match(obj.recommendation, /\/gsd-thread/);
+    assert.match(obj.recommendation, /\/gsd:thread/);
     assert.match(obj.recommendation, /reasoning|degrade|fracture/i);
   });
 });

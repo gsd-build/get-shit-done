@@ -41,7 +41,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 Check `roadmap_exists` from init JSON. If false:
 ```
 ERROR: No roadmap found (.planning/ROADMAP.md)
-Run /gsd-new-project to initialize.
+Run /gsd:new-project to initialize.
 ```
 Exit.
 </step>
@@ -58,7 +58,7 @@ Parse the JSON result. If `found` is false:
 ```
 ERROR: Phase {target} not found in ROADMAP.md
 
-Available phases can be seen with /gsd-progress.
+Available phases can be seen with /gsd:progress.
 ```
 
 Exit.
@@ -258,9 +258,9 @@ Fields changed: {changed_field_list}
 
 ## What's Next
 
-- `/gsd-progress` — view updated roadmap
-- `/gsd-plan-phase {target}` — re-plan this phase (if needed)
-- `/gsd-discuss-phase {target}` — discuss implementation approach
+- `/gsd:progress` — view updated roadmap
+- `/gsd:plan-phase {target}` — re-plan this phase (if needed)
+- `/gsd:discuss-phase {target}` — discuss implementation approach
 
 ---
 ```

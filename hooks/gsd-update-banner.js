@@ -41,7 +41,7 @@ function buildBannerOutput(state) {
   const installed = cache.installed || 'unknown';
   const latest = cache.latest || 'unknown';
   return {
-    systemMessage: `GSD update available: ${installed} → ${latest}. Run /gsd-update.`,
+    systemMessage: `GSD update available: ${installed} → ${latest}. Run /gsd:update.`,
   };
 }
 

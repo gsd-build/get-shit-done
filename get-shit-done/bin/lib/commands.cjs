@@ -3,8 +3,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-const { safeReadFile, loadConfig, isGitIgnored, execGit, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
+const { execGit, platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
+const { loadConfig, isGitIgnored, normalizePhaseName, comparePhaseNum, getArchivedPhaseDirs, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, resolveModelInternal, stripShippedMilestones, extractCurrentMilestone, toPosixPath, output, error, findPhaseInternal, extractOneLinerFromBody, getRoadmapPhaseInternal } = require('./core.cjs');
 const { planningDir, planningPaths } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { MODEL_PROFILES } = require('./model-profiles.cjs');
@@ -23,7 +23,7 @@ function determinePhaseStatus(plans, summaries, phaseDir, defaultPending) {
     const files = fs.readdirSync(phaseDir);
     const verificationFile = files.find(f => f === 'VERIFICATION.md' || f.endsWith('-VERIFICATION.md'));
     if (verificationFile) {
-      const content = fs.readFileSync(path.join(phaseDir, verificationFile), 'utf-8');
+      const content = platformReadSync(path.join(phaseDir, verificationFile)) || '';
       if (/status:\s*passed/i.test(content)) return 'Complete';
       if (/status:\s*human_needed/i.test(content)) return 'Needs Review';
       if (/status:\s*gaps_found/i.test(content)) return 'Executed';
@@ -81,26 +81,25 @@ function cmdListTodos(cwd, area, raw) {
     const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
 
     for (const file of files) {
-      try {
-        const content = fs.readFileSync(path.join(pendingDir, file), 'utf-8');
-        const createdMatch = content.match(/^created:\s*(.+)$/m);
-        const titleMatch = content.match(/^title:\s*(.+)$/m);
-        const areaMatch = content.match(/^area:\s*(.+)$/m);
+      const content = platformReadSync(path.join(pendingDir, file));
+      if (content === null) continue;
+      const createdMatch = content.match(/^created:\s*(.+)$/m);
+      const titleMatch = content.match(/^title:\s*(.+)$/m);
+      const areaMatch = content.match(/^area:\s*(.+)$/m);
 
-        const todoArea = areaMatch ? areaMatch[1].trim() : 'general';
+      const todoArea = areaMatch ? areaMatch[1].trim() : 'general';
 
-        // Apply area filter if specified
-        if (area && todoArea !== area) continue;
+      // Apply area filter if specified
+      if (area && todoArea !== area) continue;
 
-        count++;
-        todos.push({
-          file,
-          created: createdMatch ? createdMatch[1].trim() : 'unknown',
-          title: titleMatch ? titleMatch[1].trim() : 'Untitled',
-          area: todoArea,
-          path: toPosixPath(path.relative(cwd, path.join(pendingDir, file))),
-        });
-      } catch { /* intentionally empty */ }
+      count++;
+      todos.push({
+        file,
+        created: createdMatch ? createdMatch[1].trim() : 'unknown',
+        title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+        area: todoArea,
+        path: toPosixPath(path.relative(cwd, path.join(pendingDir, file))),
+      });
     }
   } catch { /* intentionally empty */ }
 
@@ -168,8 +167,9 @@ function cmdHistoryDigest(cwd, raw) {
       const summaries = fs.readdirSync(dirPath).filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
 
       for (const summary of summaries) {
+        const content = platformReadSync(path.join(dirPath, summary));
+        if (content === null) continue;
         try {
-          const content = fs.readFileSync(path.join(dirPath, summary), 'utf-8');
           const fm = extractFrontmatter(content);
 
           const phaseNum = fm.phase || dir.split('-')[0];
@@ -302,12 +302,12 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
       }
     }
     if (branchName) {
-      const currentBranch = execGit(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
+      const currentBranch = execGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
       if (currentBranch.exitCode === 0 && currentBranch.stdout.trim() !== branchName) {
         // Create branch if it doesn't exist, or switch to it if it does
-        const create = execGit(cwd, ['checkout', '-b', branchName]);
+        const create = execGit(['checkout', '-b', branchName], { cwd });
         if (create.exitCode !== 0) {
-          execGit(cwd, ['checkout', branchName]);
+          execGit(['checkout', branchName], { cwd });
         }
       }
     }
@@ -327,29 +327,34 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
       }
       // Default mode (staging all of .planning/): stage the deletion so
       // removed planning files are not left dangling in the index.
-      execGit(cwd, ['rm', '--cached', '--ignore-unmatch', file]);
+      execGit(['rm', '--cached', '--ignore-unmatch', file], { cwd });
     } else {
-      execGit(cwd, ['add', file]);
+      execGit(['add', file], { cwd });
     }
   }
 
   // Commit (--no-verify skips pre-commit hooks, used by parallel executor agents)
   const commitArgs = amend ? ['commit', '--amend', '--no-edit'] : ['commit', '-m', message];
   if (noVerify) commitArgs.push('--no-verify');
-  const commitResult = execGit(cwd, commitArgs);
+  const commitResult = execGit(commitArgs, { cwd });
   if (commitResult.exitCode !== 0) {
     if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
       const result = { committed: false, hash: null, reason: 'nothing_to_commit' };
       output(result, raw, 'nothing');
       return;
     }
-    const result = { committed: false, hash: null, reason: 'nothing_to_commit', error: commitResult.stderr };
-    output(result, raw, 'nothing');
+    const result = {
+      committed: false,
+      hash: null,
+      reason: 'commit_failed',
+      error: commitResult.stderr || commitResult.stdout,
+    };
+    output(result, raw, 'failed');
     return;
   }
 
   // Get short hash
-  const hashResult = execGit(cwd, ['rev-parse', '--short', 'HEAD']);
+  const hashResult = execGit(['rev-parse', '--short', 'HEAD'], { cwd });
   const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
   const result = { committed: true, hash, reason: 'committed' };
   output(result, raw, hash || 'committed');
@@ -395,11 +400,11 @@ function cmdCommitToSubrepo(cwd, message, files, raw) {
     // Stage files (strip sub-repo prefix for paths relative to that repo)
     for (const file of repoFiles) {
       const relativePath = file.slice(repo.length + 1);
-      execGit(repoCwd, ['add', relativePath]);
+      execGit(['add', relativePath], { cwd: repoCwd });
     }
 
     // Commit
-    const commitResult = execGit(repoCwd, ['commit', '-m', message]);
+    const commitResult = execGit(['commit', '-m', message], { cwd: repoCwd });
     if (commitResult.exitCode !== 0) {
       if (commitResult.stdout.includes('nothing to commit') || commitResult.stderr.includes('nothing to commit')) {
         repos[repo] = { committed: false, hash: null, files: repoFiles, reason: 'nothing_to_commit' };
@@ -410,7 +415,7 @@ function cmdCommitToSubrepo(cwd, message, files, raw) {
     }
 
     // Get hash
-    const hashResult = execGit(repoCwd, ['rev-parse', '--short', 'HEAD']);
+    const hashResult = execGit(['rev-parse', '--short', 'HEAD'], { cwd: repoCwd });
     const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
     repos[repo] = { committed: true, hash, files: repoFiles };
   }
@@ -620,21 +625,20 @@ function cmdTodoMatchPhase(cwd, phase, raw) {
   try {
     const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
     for (const file of files) {
-      try {
-        const content = fs.readFileSync(path.join(pendingDir, file), 'utf-8');
-        const titleMatch = content.match(/^title:\s*(.+)$/m);
-        const areaMatch = content.match(/^area:\s*(.+)$/m);
-        const filesMatch = content.match(/^files:\s*(.+)$/m);
-        const body = content.replace(/^(title|area|files|created|priority):.*$/gm, '').trim();
+      const content = platformReadSync(path.join(pendingDir, file));
+      if (content === null) continue;
+      const titleMatch = content.match(/^title:\s*(.+)$/m);
+      const areaMatch = content.match(/^area:\s*(.+)$/m);
+      const filesMatch = content.match(/^files:\s*(.+)$/m);
+      const body = content.replace(/^(title|area|files|created|priority):.*$/gm, '').trim();
 
-        todos.push({
-          file,
-          title: titleMatch ? titleMatch[1].trim() : 'Untitled',
-          area: areaMatch ? areaMatch[1].trim() : 'general',
-          files: filesMatch ? filesMatch[1].trim().split(/[,\s]+/).filter(Boolean) : [],
-          body: body.slice(0, 200), // first 200 chars for context
-        });
-      } catch {}
+      todos.push({
+        file,
+        title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+        area: areaMatch ? areaMatch[1].trim() : 'general',
+        files: filesMatch ? filesMatch[1].trim().split(/[,\s]+/).filter(Boolean) : [],
+        body: body.slice(0, 200), // first 200 chars for context
+      });
     }
   } catch {}
 
@@ -666,13 +670,12 @@ function cmdTodoMatchPhase(cwd, phase, raw) {
       const phaseDir = path.join(cwd, phaseInfoDisk.directory);
       const planFiles = fs.readdirSync(phaseDir).filter(f => f.endsWith('-PLAN.md'));
       for (const pf of planFiles) {
-        try {
-          const planContent = fs.readFileSync(path.join(phaseDir, pf), 'utf-8');
-          const fmFiles = planContent.match(/files_modified:\s*\[([^\]]*)\]/);
-          if (fmFiles) {
-            phasePlans.push(...fmFiles[1].split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean));
-          }
-        } catch {}
+        const planContent = platformReadSync(path.join(phaseDir, pf));
+        if (planContent === null) continue;
+        const fmFiles = planContent.match(/files_modified:\s*\[([^\]]*)\]/);
+        if (fmFiles) {
+          phasePlans.push(...fmFiles[1].split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean));
+        }
       }
     } catch {}
   }
@@ -743,14 +746,14 @@ function cmdTodoComplete(cwd, filename, raw) {
   }
 
   // Ensure completed directory exists
-  fs.mkdirSync(completedDir, { recursive: true });
+  platformEnsureDir(completedDir);
 
   // Read, add completion timestamp, move
   let content = fs.readFileSync(sourcePath, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
   content = `completed: ${today}\n` + content;
 
-  fs.writeFileSync(path.join(completedDir, filename), content, 'utf-8');
+  platformWriteSync(path.join(completedDir, filename), content);
   fs.unlinkSync(sourcePath);
 
   output({ completed: true, file: filename, date: today }, raw, 'completed');
@@ -774,7 +777,7 @@ function cmdScaffold(cwd, type, options, raw) {
   switch (type) {
     case 'context': {
       filePath = path.join(phaseDir, `${padded}-CONTEXT.md`);
-      content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Context\n\n## Decisions\n\n_Decisions will be captured during /gsd-discuss-phase ${phase}_\n\n## Discretion Areas\n\n_Areas where the executor can use judgment_\n\n## Deferred Ideas\n\n_Ideas to consider later_\n`;
+      content = `---\nphase: "${padded}"\nname: "${name || phaseInfo?.phase_name || 'Unnamed'}"\ncreated: ${today}\n---\n\n# Phase ${phase}: ${name || phaseInfo?.phase_name || 'Unnamed'} — Context\n\n## Decisions\n\n_Decisions will be captured during /gsd:discuss-phase ${phase}_\n\n## Discretion Areas\n\n_Areas where the executor can use judgment_\n\n## Deferred Ideas\n\n_Ideas to consider later_\n`;
       break;
     }
     case 'uat': {
@@ -798,9 +801,9 @@ function cmdScaffold(cwd, type, options, raw) {
       const scaffoldPrefix = scaffoldProjectCode ? `${scaffoldProjectCode}-` : '';
       const dirName = `${scaffoldPrefix}${padded}-${slug}`;
       const phasesParent = planningPaths(cwd).phases;
-      fs.mkdirSync(phasesParent, { recursive: true });
+      platformEnsureDir(phasesParent);
       const dirPath = path.join(phasesParent, dirName);
-      fs.mkdirSync(dirPath, { recursive: true });
+      platformEnsureDir(dirPath);
       output({ created: true, directory: toPosixPath(path.relative(cwd, dirPath)), path: dirPath }, raw, dirPath);
       return;
     }
@@ -813,7 +816,7 @@ function cmdScaffold(cwd, type, options, raw) {
     return;
   }
 
-  fs.writeFileSync(filePath, content, 'utf-8');
+  platformWriteSync(filePath, content);
   const relPath = toPosixPath(path.relative(cwd, filePath));
   output({ created: true, path: relPath }, raw, relPath);
 }
@@ -832,7 +835,9 @@ function cmdStats(cwd, format, raw) {
   let totalSummaries = 0;
 
   try {
-    const roadmapContent = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
+    const roadmapRaw = platformReadSync(roadmapPath);
+    if (roadmapRaw === null) throw new Error('roadmap missing');
+    const roadmapContent = extractCurrentMilestone(roadmapRaw, cwd);
     const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
     let match;
     while ((match = headingPattern.exec(roadmapContent)) !== null) {
@@ -888,40 +893,36 @@ function cmdStats(cwd, format, raw) {
   // Requirements stats
   let requirementsTotal = 0;
   let requirementsComplete = 0;
-  try {
-    if (fs.existsSync(reqPath)) {
-      const reqContent = fs.readFileSync(reqPath, 'utf-8');
-      const checked = reqContent.match(/^- \[x\] \*\*/gm);
-      const unchecked = reqContent.match(/^- \[ \] \*\*/gm);
-      requirementsComplete = checked ? checked.length : 0;
-      requirementsTotal = requirementsComplete + (unchecked ? unchecked.length : 0);
-    }
-  } catch { /* intentionally empty */ }
+  const reqContent = platformReadSync(reqPath);
+  if (reqContent !== null) {
+    const checked = reqContent.match(/^- \[x\] \*\*/gm);
+    const unchecked = reqContent.match(/^- \[ \] \*\*/gm);
+    requirementsComplete = checked ? checked.length : 0;
+    requirementsTotal = requirementsComplete + (unchecked ? unchecked.length : 0);
+  }
 
   // Last activity from STATE.md
   let lastActivity = null;
-  try {
-    if (fs.existsSync(statePath)) {
-      const stateContent = fs.readFileSync(statePath, 'utf-8');
-      const activityMatch = stateContent.match(/^last_activity:\s*(.+)$/im)
-        || stateContent.match(/\*\*Last Activity:\*\*\s*(.+)/i)
-        || stateContent.match(/^Last Activity:\s*(.+)$/im)
-        || stateContent.match(/^Last activity:\s*(.+)$/im);
-      if (activityMatch) lastActivity = activityMatch[1].trim();
-    }
-  } catch { /* intentionally empty */ }
+  const stateContent = platformReadSync(statePath);
+  if (stateContent !== null) {
+    const activityMatch = stateContent.match(/^last_activity:\s*(.+)$/im)
+      || stateContent.match(/\*\*Last Activity:\*\*\s*(.+)/i)
+      || stateContent.match(/^Last Activity:\s*(.+)$/im)
+      || stateContent.match(/^Last activity:\s*(.+)$/im);
+    if (activityMatch) lastActivity = activityMatch[1].trim();
+  }
 
   // Git stats
   let gitCommits = 0;
   let gitFirstCommitDate = null;
-  const commitCount = execGit(cwd, ['rev-list', '--count', 'HEAD']);
+  const commitCount = execGit(['rev-list', '--count', 'HEAD'], { cwd });
   if (commitCount.exitCode === 0) {
     gitCommits = parseInt(commitCount.stdout, 10) || 0;
   }
-  const rootHash = execGit(cwd, ['rev-list', '--max-parents=0', 'HEAD']);
+  const rootHash = execGit(['rev-list', '--max-parents=0', 'HEAD'], { cwd });
   if (rootHash.exitCode === 0 && rootHash.stdout) {
     const firstCommit = rootHash.stdout.split('\n')[0].trim();
-    const firstDate = execGit(cwd, ['show', '-s', '--format=%as', firstCommit]);
+    const firstDate = execGit(['show', '-s', '--format=%as', firstCommit], { cwd });
     if (firstDate.exitCode === 0) {
       gitFirstCommitDate = firstDate.stdout || null;
     }
@@ -990,9 +991,9 @@ function cmdCheckCommit(cwd, raw) {
   }
 
   // commit_docs is false — check if any .planning/ files are staged
-  try {
-    const staged = execSync('git diff --cached --name-only', { cwd, encoding: 'utf-8' }).trim();
-    const planningFiles = staged.split('\n').filter(f => f.startsWith('.planning/') || f.startsWith('.planning\\'));
+  const stagedResult = execGit(['diff', '--cached', '--name-only'], { cwd });
+  if (stagedResult.exitCode === 0) {
+    const planningFiles = stagedResult.stdout.split('\n').filter(f => f.startsWith('.planning/') || f.startsWith('.planning\\'));
 
     if (planningFiles.length > 0) {
       error(
@@ -1001,9 +1002,8 @@ function cmdCheckCommit(cwd, raw) {
         `\n\nTo unstage: git reset HEAD ${planningFiles.join(' ')}`
       );
     }
-  } catch {
-    // git diff --cached failed (no staged files or not a git repo) — allow
   }
+  // exitCode !== 0 → no staged files or not a git repo — allow
 
   output({ allowed: true, reason: 'no_planning_files_staged' }, raw, 'allowed');
 }

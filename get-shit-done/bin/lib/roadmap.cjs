@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches, atomicWriteFileSync } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches } = require('./core.cjs');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 const { planningPaths, withPlanningLock } = require('./planning-workspace.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
 
@@ -407,7 +408,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
     }
 
-    atomicWriteFileSync(roadmapPath, roadmapContent, 'utf-8');
+    platformWriteSync(roadmapPath, roadmapContent);
   });
   output({
     updated: true,
@@ -580,7 +581,7 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
 
     const nextContent = content.slice(0, phaseStart) + newPhaseSection + content.slice(phaseEnd);
     if (nextContent === content) return;
-    atomicWriteFileSync(roadmapPath, nextContent);
+    platformWriteSync(roadmapPath, nextContent);
     updated = true;
   });
 

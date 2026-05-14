@@ -151,7 +151,7 @@ CUSTOM_PR_SECTIONS=$(gsd-sdk query config-get ship.pr_body_sections --default '[
 
 `ship.pr_body_sections` is an onboarding-time extension point for teams that need extra PRD-style sections such as `User Stories & Acceptance Criteria`, `Risks & Dependencies`, `Success Metrics`, `Release Criteria`, or `Stakeholder Review & Approval`.
 
-Use these sections for lean/agile PRD material that should travel with the PR without making the core `/gsd-ship` body configurable:
+Use these sections for lean/agile PRD material that should travel with the PR without making the core `/gsd:ship` body configurable:
 
 - User stories and acceptance criteria that explain the functional increment from the user's point of view.
 - Definition of Done or release criteria that make the completion standard explicit.
@@ -329,8 +329,8 @@ Requirements: {N} REQ-IDs addressed
 Next steps:
 - Review/approve PR
 - Merge when CI passes
-- /gsd-complete-milestone (if last phase in milestone)
-- /gsd-progress (to see what's next)
+- /gsd:complete-milestone (if last phase in milestone)
+- /gsd:progress (to see what's next)
 
 ───────────────────────────────────────────────────────────────
 ```
@@ -341,9 +341,9 @@ Next steps:
 <offer_next>
 After shipping:
 
-- /gsd-complete-milestone — if all phases in milestone are done
-- /gsd-progress — see overall project state
-- /gsd-execute-phase {next} — continue to next phase
+- /gsd:complete-milestone — if all phases in milestone are done
+- /gsd:progress — see overall project state
+- /gsd:execute-phase {next} — continue to next phase
 </offer_next>
 
 <success_criteria>

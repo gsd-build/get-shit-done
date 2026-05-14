@@ -9,6 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Agent
+requires: [config, import, phase, quick, review]
 ---
 <objective>
 Review source files changed during a phase for bugs, security vulnerabilities, and code quality problems.

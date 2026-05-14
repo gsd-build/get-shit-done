@@ -31,6 +31,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ function buildMessage(elements, affectedPaths, action) {
     lines.push(`Auto-remap scheduled for paths: ${affectedPaths.join(', ')}`);
   } else {
     lines.push(
-      `Run /gsd-map-codebase --paths ${affectedPaths.join(',')} to refresh planning context.`,
+      `Run /gsd:map-codebase --paths ${affectedPaths.join(',')} to refresh planning context.`,
     );
   }
   return lines.join('\n');
@@ -360,7 +361,7 @@ function writeMappedCommit(filePath, commitSha, isoDate) {
   const { data, body } = parseFrontmatter(content);
   data.last_mapped_commit = commitSha;
   if (isoDate) data.last_mapped_at = isoDate;
-  fs.writeFileSync(filePath, serializeFrontmatter(data, body));
+  platformWriteSync(filePath, serializeFrontmatter(data, body));
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

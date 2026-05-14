@@ -101,7 +101,7 @@ If a scope has no directory or no entries, show: `(no notes)`
 1. Run the **list** logic to build the numbered index (both scopes)
 2. Find entry N from the numbered list
 3. If N is invalid or refers to an already-promoted note, tell the user and stop
-4. **Requires `.planning/` directory** — if it doesn't exist, warn: "Todos require a GSD project. Run `/gsd-new-project` to initialize one."
+4. **Requires `.planning/` directory** — if it doesn't exist, warn: "Todos require a GSD project. Run `/gsd:new-project` to initialize one."
 5. Ensure `.planning/todos/pending/` directory exists
 6. Generate todo ID: `{NNN}-{slug}` where NNN is the next sequential number (scan both `.planning/todos/pending/` and `.planning/todos/completed/` for the highest existing number, increment by 1, zero-pad to 3 digits) and slug is the first ~4 meaningful words of the note text
 7. Extract the note text from the source file (body after frontmatter)
@@ -139,7 +139,7 @@ Promoted from quick note captured on {original date}.
 <edge_cases>
 1. **"list" as note text**: `/gsd-note list of things` saves note "list of things" (subcommand only when `list` is the entire arg)
 2. **No `.planning/`**: Falls back to global `~/.claude/notes/` — works in any directory
-3. **Promote without project**: Warns that todos require `.planning/`, suggests `/gsd-new-project`
+3. **Promote without project**: Warns that todos require `.planning/`, suggests `/gsd:new-project`
 4. **Large files**: `list` shows last 10 when >20 active entries
 5. **Duplicate slugs**: Append `-2`, `-3` etc. to filename if slug already used on same date
 6. **`--global` position**: Stripped from anywhere — `--global my idea` and `my idea --global` both save "my idea" globally

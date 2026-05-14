@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, getMilestonePhaseFilter, extractOneLinerFromBody, normalizeMd, output, error, atomicWriteFileSync } = require('./core.cjs');
+const { escapeRegex, getMilestonePhaseFilter, extractOneLinerFromBody, output, error } = require('./core.cjs');
+const { platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningPaths } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd, stateReplaceFieldWithFallback } = require('./state.cjs');
@@ -75,7 +76,7 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   }
 
   if (updated.length > 0) {
-    atomicWriteFileSync(reqPath, reqContent);
+    platformWriteSync(reqPath, reqContent);
   }
 
   output({
@@ -102,7 +103,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   const milestoneName = options.name || version;
 
   // Ensure archive directory exists
-  fs.mkdirSync(archiveDir, { recursive: true });
+  platformEnsureDir(archiveDir);
 
   // Scope stats and accomplishments to only the phases belonging to the
   // current milestone's ROADMAP.  Uses the shared filter from core.cjs
@@ -158,14 +159,14 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   // Archive ROADMAP.md
   if (fs.existsSync(roadmapPath)) {
     const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-    fs.writeFileSync(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent, 'utf-8');
+    platformWriteSync(path.join(archiveDir, `${version}-ROADMAP.md`), roadmapContent);
   }
 
   // Archive REQUIREMENTS.md
   if (fs.existsSync(reqPath)) {
     const reqContent = fs.readFileSync(reqPath, 'utf-8');
     const archiveHeader = `# Requirements Archive: ${version} ${milestoneName}\n\n**Archived:** ${today}\n**Status:** SHIPPED\n\nFor current requirements, see \`.planning/REQUIREMENTS.md\`.\n\n---\n\n`;
-    fs.writeFileSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent, 'utf-8');
+    platformWriteSync(path.join(archiveDir, `${version}-REQUIREMENTS.md`), archiveHeader + reqContent);
   }
 
   // Archive audit file if exists
@@ -182,21 +183,21 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     const existing = fs.readFileSync(milestonesPath, 'utf-8');
     if (!existing.trim()) {
       // Empty file — treat like new
-      atomicWriteFileSync(milestonesPath, normalizeMd(`# Milestones\n\n${milestoneEntry}`));
+      platformWriteSync(milestonesPath, `# Milestones\n\n${milestoneEntry}`);
     } else {
       // Insert after the header line(s) for reverse chronological order (newest first)
       const headerMatch = existing.match(/^(#{1,3}\s+[^\n]*\n\n?)/);
       if (headerMatch) {
         const header = headerMatch[1];
         const rest = existing.slice(header.length);
-        atomicWriteFileSync(milestonesPath, normalizeMd(header + milestoneEntry + rest));
+        platformWriteSync(milestonesPath, header + milestoneEntry + rest);
       } else {
         // No recognizable header — prepend the entry
-        atomicWriteFileSync(milestonesPath, normalizeMd(milestoneEntry + existing));
+        platformWriteSync(milestonesPath, milestoneEntry + existing);
       }
     }
   } else {
-    atomicWriteFileSync(milestonesPath, normalizeMd(`# Milestones\n\n${milestoneEntry}`));
+    platformWriteSync(milestonesPath, `# Milestones\n\n${milestoneEntry}`);
   }
 
   // Update STATE.md — keep frontmatter/body semantically aligned after closure
@@ -227,10 +228,10 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     if (operatorPattern.test(stateContent)) {
       stateContent = stateContent.replace(
         operatorPattern,
-        `$1\n- Start the next milestone with /gsd-new-milestone\n\n`,
+        `$1\n- Start the next milestone with /gsd:new-milestone\n\n`,
       );
     } else {
-      stateContent = `${stateContent.trimEnd()}\n\n## Operator Next Steps\n\n- Start the next milestone with /gsd-new-milestone\n`;
+      stateContent = `${stateContent.trimEnd()}\n\n## Operator Next Steps\n\n- Start the next milestone with /gsd:new-milestone\n`;
     }
 
     writeStateMd(statePath, stateContent, cwd);
@@ -241,7 +242,7 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
   if (options.archivePhases) {
     try {
       const phaseArchiveDir = path.join(archiveDir, `${version}-phases`);
-      fs.mkdirSync(phaseArchiveDir, { recursive: true });
+      platformEnsureDir(phaseArchiveDir);
 
       const phaseEntries = fs.readdirSync(phasesDir, { withFileTypes: true });
       const phaseDirNames = phaseEntries.filter(e => e.isDirectory()).map(e => e.name);

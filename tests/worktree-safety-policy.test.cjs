@@ -27,7 +27,7 @@ describe('worktree-safety policy module', () => {
   test('resolveWorktreeContext maps linked worktree to common-dir parent', () => {
     const context = resolveWorktreeContext('/repo/wt', {
       existsSync: () => false,
-      execGit: (_, args) => {
+      execGit: (args) => {
         if (args[1] === '--git-dir') return { exitCode: 0, stdout: '.git/worktrees/wt', stderr: '' };
         if (args[1] === '--git-common-dir') return { exitCode: 0, stdout: '../.git', stderr: '' };
         return { exitCode: 1, stdout: '', stderr: '' };
@@ -50,7 +50,7 @@ describe('worktree-safety policy module', () => {
   test('resolveWorktreeContext keeps cwd for main worktree checkout', () => {
     const context = resolveWorktreeContext('/repo/main', {
       existsSync: () => false,
-      execGit: (_, args) => {
+      execGit: (args) => {
         if (args[1] === '--git-dir') return { exitCode: 0, stdout: '.git', stderr: '' };
         if (args[1] === '--git-common-dir') return { exitCode: 0, stdout: '.git', stderr: '' };
         return { exitCode: 1, stdout: '', stderr: '' };
@@ -127,8 +127,8 @@ describe('worktree-safety policy module', () => {
     const result = executeWorktreePrunePlan(
       { repoRoot: '/repo/main', action: 'metadata_prune_only', reason: 'worktrees_present' },
       {
-        execGit: (cwd, args) => {
-          calls.push({ cwd, args });
+        execGit: (args, opts) => {
+          calls.push({ cwd: opts.cwd, args });
           return { exitCode: 0, stdout: '', stderr: '' };
         },
       }

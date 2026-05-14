@@ -209,8 +209,8 @@ describe('/gsd-settings advertises /gsd-settings-advanced', () => {
   test('settings workflow mentions canonical /gsd-config --advanced', () => {
     const text = fs.readFileSync(SETTINGS_WORKFLOW_PATH, 'utf-8');
     assert.ok(
-      text.includes('gsd-config --advanced'),
-      'get-shit-done/workflows/settings.md must mention /gsd-config --advanced'
+      text.includes('/gsd:config --advanced'),
+      'get-shit-done/workflows/settings.md must mention /gsd:config --advanced'
     );
     assert.ok(
       !text.includes('gsd-settings-advanced') && !text.includes('gsd:settings-advanced'),

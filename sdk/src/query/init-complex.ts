@@ -102,6 +102,25 @@ function extractCheckboxStates(content: string): Map<string, boolean> {
 }
 
 /**
+ * Extract terminal phase markers from ROADMAP phase headings, e.g.
+ * `(COMPLETE)`, `(SHIPPED ...)`, `(DEFERRED)`, `(SUPERSEDED ...)`.
+ * These labels mean the phase should not be selected as next pending work.
+ */
+function extractTerminalStatusLabels(content: string): Set<string> {
+  const terminal = new Set<string>();
+  const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const terminalRe = /(?:\(|\*\*)\s*(SHIPPED|COMPLETE|DEFERRED|SUPERSEDED|MERGED\s+INTO|FOLDED\s+INTO)\b/i;
+  let m: RegExpExecArray | null;
+  while ((m = headingPattern.exec(content)) !== null) {
+    if (terminalRe.test(m[2])) {
+      terminal.add(m[1]);
+      terminal.add(m[1].replace(/^0+/, '') || '0');
+    }
+  }
+  return terminal;
+}
+
+/**
  * Derive progress-level status from a ROADMAP checkbox when the phase has
  * no on-disk directory. Returns 'complete' for `[x]`, 'not_started' otherwise.
  * Disk status (when present) always wins — it's more recent truth for in-flight work.
@@ -291,6 +310,7 @@ export const initProgress: QueryHandler = async (_args, projectDir, workstream) 
   const roadmapPhaseNames = new Map<string, string>();
   const seenPhaseNums = new Set<string>();
   let checkboxStates = new Map<string, boolean>();
+  let terminalLabels = new Set<string>();
 
   try {
     const rawRoadmap = await readFile(paths.roadmap, 'utf-8');
@@ -303,6 +323,7 @@ export const initProgress: QueryHandler = async (_args, projectDir, workstream) 
       roadmapPhaseNames.set(pNum, pName);
     }
     checkboxStates = extractCheckboxStates(roadmapContent);
+    terminalLabels = extractTerminalStatusLabels(roadmapContent);
   } catch { /* intentionally empty */ }
 
   // Scan phase directories
@@ -345,6 +366,9 @@ export const initProgress: QueryHandler = async (_args, projectDir, workstream) 
       if (roadmapComplete && status !== 'complete') {
         status = 'complete';
       }
+      if (terminalLabels.has(phaseNumber) || terminalLabels.has(strippedNum)) {
+        status = 'complete';
+      }
 
       const phaseInfo: Record<string, unknown> = {
         number: phaseNumber,
@@ -373,17 +397,18 @@ export const initProgress: QueryHandler = async (_args, projectDir, workstream) 
     const stripped = num.replace(/^0+/, '') || '0';
     if (!seenPhaseNums.has(stripped)) {
       const status = deriveStatusFromCheckbox(num, checkboxStates);
+      const terminalComplete = terminalLabels.has(num) || terminalLabels.has(stripped);
       const phaseInfo: Record<string, unknown> = {
         number: num,
         name: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
         directory: null,
-        status,
+        status: terminalComplete ? 'complete' : status,
         plan_count: 0,
         summary_count: 0,
         has_research: false,
       };
       phases.push(phaseInfo);
-      if (!nextPhase && !currentPhase && status !== 'complete') {
+      if (!nextPhase && !currentPhase && phaseInfo.status !== 'complete') {
         nextPhase = phaseInfo;
       }
     }

@@ -1,6 +1,6 @@
 # Doc Conflict Engine
 
-Shared conflict-detection contract for workflows that ingest external content into `.planning/` (e.g., `/gsd-import`, `/gsd-ingest-docs`). Defines the report format, severity semantics, and safety-gate behavior. The specific checks that populate each severity bucket are workflow-specific and defined by the calling workflow.
+Shared conflict-detection contract for workflows that ingest external content into `.planning/` (e.g., `/gsd:import`, `/gsd:ingest-docs`). Defines the report format, severity semantics, and safety-gate behavior. The specific checks that populate each severity bucket are workflow-specific and defined by the calling workflow.
 
 ---
 

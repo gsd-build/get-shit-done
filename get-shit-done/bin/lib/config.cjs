@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { output, error, ERROR_REASON, CONFIG_DEFAULTS, atomicWriteFileSync } = require('./core.cjs');
+const { output, error, ERROR_REASON, CONFIG_DEFAULTS } = require('./core.cjs');
+const { platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const {
   VALID_PROFILES,
@@ -13,6 +14,7 @@ const {
 } = require('./model-profiles.cjs');
 const { VALID_CONFIG_KEYS, isValidConfigKey } = require('./config-schema.cjs');
 const { isSecretKey, maskSecret } = require('./secrets.cjs');
+const { normalizeConfiguredDefaultReviewers } = require('./review-reviewer-selection.cjs');
 
 const CONFIG_KEY_SUGGESTIONS = {
   'workflow.nyquist_validation_enabled': 'workflow.nyquist_validation',
@@ -111,7 +113,7 @@ function validateShipPrBodySections(value) {
  * Merges (increasing priority):
  *   1. Hardcoded defaults — every key that loadConfig() resolves, plus mode/granularity
  *   2. User-level defaults from ~/.gsd/defaults.json (if present)
- *   3. userChoices — the settings the user explicitly selected during /gsd-new-project
+ *   3. userChoices — the settings the user explicitly selected during /gsd:new-project
  *
  * Uses the canonical `git` namespace for branching keys (consistent with VALID_CONFIG_KEYS
  * and the settings workflow). loadConfig() handles both flat and nested formats, so this
@@ -143,7 +145,7 @@ function buildNewProjectConfig(userChoices) {
         userDefaults.granularity = depthToGranularity[userDefaults.depth] || userDefaults.depth;
         delete userDefaults.depth;
         try {
-          fs.writeFileSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2), 'utf-8');
+          platformWriteSync(globalDefaultsPath, JSON.stringify(userDefaults, null, 2));
         } catch { /* intentionally empty */ }
       }
     }
@@ -247,7 +249,7 @@ function buildNewProjectConfig(userChoices) {
  * Command: create a fully-materialized .planning/config.json for a new project.
  *
  * Accepts user-chosen settings as a JSON string (the keys the user explicitly
- * configured during /gsd-new-project). All remaining keys are filled from
+ * configured during /gsd:new-project). All remaining keys are filled from
  * hardcoded defaults and optional ~/.gsd/defaults.json.
  *
  * Idempotent: if config.json already exists, returns { created: false }.
@@ -274,9 +276,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
 
   // Ensure .planning directory exists
   try {
-    if (!fs.existsSync(planningBase)) {
-      fs.mkdirSync(planningBase, { recursive: true });
-    }
+    platformEnsureDir(planningBase);
   } catch (err) {
     error('Failed to create .planning directory: ' + err.message);
   }
@@ -284,7 +284,7 @@ function cmdConfigNewProject(cwd, choicesJson, raw) {
   const config = buildNewProjectConfig(userChoices);
 
   try {
-    atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    platformWriteSync(configPath, JSON.stringify(config, null, 2));
     output({ created: true, path: '.planning/config.json' }, raw, 'created');
   } catch (err) {
     error('Failed to write config.json: ' + err.message);
@@ -303,9 +303,7 @@ function ensureConfigFile(cwd) {
 
   // Ensure .planning directory exists
   try {
-    if (!fs.existsSync(planningBase)) {
-      fs.mkdirSync(planningBase, { recursive: true });
-    }
+    platformEnsureDir(planningBase);
   } catch (err) {
     error('Failed to create .planning directory: ' + err.message);
   }
@@ -318,7 +316,7 @@ function ensureConfigFile(cwd) {
   const config = buildNewProjectConfig({});
 
   try {
-    atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    platformWriteSync(configPath, JSON.stringify(config, null, 2));
     return { created: true, path: '.planning/config.json' };
   } catch (err) {
     error('Failed to create config.json: ' + err.message);
@@ -376,7 +374,7 @@ function setConfigValue(cwd, keyPath, parsedValue) {
 
     // Write back
     try {
-      atomicWriteFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      platformWriteSync(configPath, JSON.stringify(config, null, 2));
       return { updated: true, key: keyPath, value: parsedValue, previousValue };
     } catch (err) {
       error('Failed to write config.json: ' + err.message);
@@ -442,6 +440,14 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   const VALID_HUMAN_VERIFY_MODES = ['mid-flight', 'end-of-phase'];
   if (keyPath === 'workflow.human_verify_mode' && !VALID_HUMAN_VERIFY_MODES.includes(String(parsedValue))) {
     error(`Invalid workflow.human_verify_mode '${value}'. Valid values: ${VALID_HUMAN_VERIFY_MODES.join(', ')}`);
+  }
+
+  if (keyPath === 'review.default_reviewers') {
+    const normalized = normalizeConfiguredDefaultReviewers(parsedValue);
+    if (normalized.errors.length > 0) {
+      error(normalized.errors[0]);
+    }
+    parsedValue = normalized.values;
   }
 
   const setConfigValueResult = setConfigValue(cwd, keyPath, parsedValue);

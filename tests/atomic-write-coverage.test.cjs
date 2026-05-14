@@ -3,8 +3,10 @@
  *
  * Ensures that milestone.cjs, phase.cjs, and frontmatter.cjs do NOT
  * contain bare fs.writeFileSync calls targeting .planning/ files. All
- * such writes must go through atomicWriteFileSync to prevent partial
- * writes from corrupting planning artifacts on crash.
+ * such writes must go through platformWriteSync (the shell-projection
+ * seam's atomic writer) to prevent partial writes from corrupting planning
+ * artifacts on crash. platformWriteSync uses the same tmp-file + rename
+ * primitive as the legacy atomicWriteFileSync — migrated in #3467.
  *
  * Allowed exceptions:
  *   - Writes to .gitkeep (empty files, no corruption risk)
@@ -66,29 +68,29 @@ describe('atomic write coverage (#1972)', () => {
         const report = violations.map(v => `  line ${v.line}: ${v.text}`).join('\n');
         assert.fail(
           `${file} contains ${violations.length} bare fs.writeFileSync call(s) targeting planning files.\n` +
-          `These should use atomicWriteFileSync instead:\n${report}`
+          `These should use platformWriteSync instead:\n${report}`
         );
       }
     });
 
-    test(`${file}: imports atomicWriteFileSync from core.cjs`, () => {
+    test(`${file}: imports platformWriteSync from shell-command-projection.cjs`, () => {
       const filePath = path.join(libDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
       assert.match(
         content,
-        /atomicWriteFileSync.*require\(['"]\.\/core\.cjs['"]\)|atomicWriteFileSync[^)]*\}\s*=\s*require\(['"]\.\/core\.cjs['"]\)/s,
-        `${file} must import atomicWriteFileSync from core.cjs`
+        /platformWriteSync[^)]*\}\s*=\s*require\(['"]\.\/shell-command-projection\.cjs['"]\)/s,
+        `${file} must import platformWriteSync from shell-command-projection.cjs`
       );
     });
   }
 
-  test('all three files use atomicWriteFileSync at least once', () => {
+  test('all three files use platformWriteSync at least once', () => {
     for (const file of targetFiles) {
       const content = fs.readFileSync(path.join(libDir, file), 'utf-8');
       assert.match(
         content,
-        /atomicWriteFileSync\s*\(/,
-        `${file} must contain at least one atomicWriteFileSync call`
+        /platformWriteSync\s*\(/,
+        `${file} must contain at least one platformWriteSync call`
       );
     }
   });

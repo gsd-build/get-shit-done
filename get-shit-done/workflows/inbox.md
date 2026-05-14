@@ -212,7 +212,7 @@ For each classified PR, review against its template requirements.
 - [ ] PR title is descriptive (not just "fix" or "update")
 - [ ] One concern per PR (not mixing fix + enhancement)
 - [ ] No unrelated formatting changes visible in diff
-- [ ] CHANGELOG.md updated
+- [ ] `.changeset/*.md` fragment added for user-facing changes (or `no-changelog` label applied)
 - [ ] Not using `--no-verify` or skipping hooks
 
 **Scoring:** Same as issues — completeness percentage per PR.
@@ -370,10 +370,10 @@ Next steps:
 <offer_next>
 After triage:
 
-- /gsd-review — Run cross-AI peer review on a specific phase plan
-- /gsd-ship — Create a PR from completed work
-- /gsd-progress — See overall project state
-- /gsd-inbox --label — Re-run with auto-labeling enabled
+- /gsd:review — Run cross-AI peer review on a specific phase plan
+- /gsd:ship — Create a PR from completed work
+- /gsd:progress — See overall project state
+- /gsd:inbox --label — Re-run with auto-labeling enabled
 </offer_next>
 
 <success_criteria>

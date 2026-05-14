@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -36,9 +37,7 @@ const INTEL_FILES = {
  */
 function ensureIntelDir(planningDir) {
   const intelPath = path.join(planningDir, 'intel');
-  if (!fs.existsSync(intelPath)) {
-    fs.mkdirSync(intelPath, { recursive: true });
-  }
+  platformEnsureDir(intelPath);
   return intelPath;
 }
 
@@ -53,8 +52,9 @@ function ensureIntelDir(planningDir) {
 function isIntelEnabled(planningDir) {
   try {
     const configPath = path.join(planningDir, 'config.json');
-    if (!fs.existsSync(configPath)) return false;
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const raw = platformReadSync(configPath);
+    if (raw === null) return false;
+    const config = JSON.parse(raw);
     if (config && config.intel && config.intel.enabled === true) return true;
     return false;
   } catch (_e) {
@@ -89,8 +89,9 @@ function intelFilePath(planningDir, filename) {
  */
 function safeReadJson(filePath) {
   try {
-    if (!fs.existsSync(filePath)) return null;
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const raw = platformReadSync(filePath);
+    if (raw === null) return null;
+    return JSON.parse(raw);
   } catch (_e) {
     return null;
   }
@@ -105,8 +106,8 @@ function safeReadJson(filePath) {
  */
 function hashFile(filePath) {
   try {
-    if (!fs.existsSync(filePath)) return null;
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = platformReadSync(filePath);
+    if (content === null) return null;
     return crypto.createHash('sha256').update(content).digest('hex');
   } catch (_e) {
     return null;
@@ -178,8 +179,8 @@ function matchesInValue(value, lowerTerm) {
  */
 function searchArchMd(filePath, term) {
   try {
-    if (!fs.existsSync(filePath)) return [];
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = platformReadSync(filePath);
+    if (content === null) return [];
     const lowerTerm = term.toLowerCase();
     const lines = content.split(/\r?\n/);
     return lines.filter(line => line.toLowerCase().includes(lowerTerm));
@@ -343,11 +344,11 @@ function saveRefreshSnapshot(planningDir) {
 
   const timestamp = new Date().toISOString();
   const snapshotPath = path.join(intelPath, '.last-refresh.json');
-  fs.writeFileSync(snapshotPath, JSON.stringify({
+  platformWriteSync(snapshotPath, JSON.stringify({
     hashes,
     timestamp,
     version: 1
-  }, null, 2), 'utf8');
+  }, null, 2));
 
   return { saved: true, timestamp, files: fileCount };
 }
@@ -392,9 +393,14 @@ function intelValidate(planningDir) {
     // All intel files are JSON — validate _meta and entries structure
 
     // Parse JSON
+    const raw = platformReadSync(filePath);
+    if (raw === null) {
+      errors.push(`${filename}: file missing`);
+      continue;
+    }
     let data;
     try {
-      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      data = JSON.parse(raw);
     } catch (e) {
       errors.push(`${filename}: invalid JSON — ${e.message}`);
       continue;
@@ -462,11 +468,10 @@ function intelValidate(planningDir) {
  */
 function intelPatchMeta(filePath) {
   try {
-    if (!fs.existsSync(filePath)) {
+    const content = platformReadSync(filePath);
+    if (content === null) {
       return { patched: false, error: `File not found: ${filePath}` };
     }
-
-    const content = fs.readFileSync(filePath, 'utf8');
     let data;
     try {
       data = JSON.parse(content);
@@ -482,7 +487,7 @@ function intelPatchMeta(filePath) {
     data._meta.updated_at = timestamp;
     data._meta.version = (data._meta.version || 0) + 1;
 
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+    platformWriteSync(filePath, JSON.stringify(data, null, 2) + '\n');
 
     return { patched: true, file: filePath, timestamp };
   } catch (e) {
@@ -500,11 +505,10 @@ function intelPatchMeta(filePath) {
  * @returns {{ file: string, exports: string[], method: string }}
  */
 function intelExtractExports(filePath) {
-  if (!fs.existsSync(filePath)) {
+  const content = platformReadSync(filePath);
+  if (content === null) {
     return { file: filePath, exports: [], method: 'none' };
   }
-
-  const content = fs.readFileSync(filePath, 'utf8');
   let exports = [];
   let method = 'none';
 

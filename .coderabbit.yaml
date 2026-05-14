@@ -24,3 +24,13 @@ reviews:
     # at their defaults.
     docstrings:
       mode: off
+
+  tools:
+    # Disable ESLint. The repo intentionally does not use ESLint — it ships
+    # its own targeted lint scripts (scripts/lint-no-source-grep.cjs, plus
+    # the `lint:tests` npm script) that enforce repo-specific test-quality
+    # invariants. Adding ESLint config purely to satisfy CR would add an
+    # external dependency (CONTRIBUTING.md: "No external dependencies in
+    # core") and overlap with the existing custom lint surface.
+    eslint:
+      enabled: false

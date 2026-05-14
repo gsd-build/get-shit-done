@@ -1,6 +1,6 @@
 'use strict';
 /**
- * One-shot script: replace retired /gsd:<cmd> with /gsd-<cmd> for known command names.
+ * One-shot script: replace retired /gsd-<cmd> with /gsd:<cmd> for known command names.
  * Only replaces when followed by a word boundary (space, newline, quote, backtick, ), end).
  *
  * The transform is exported as a pure function so it can be unit-tested directly
@@ -19,7 +19,7 @@ const SEARCH_DIRS = [
   path.join(__dirname, '..', 'get-shit-done', 'contexts'),
   path.join(__dirname, '..', 'commands', 'gsd'),
   path.join(__dirname, '..', 'agents'),
-  path.join(__dirname, '..', 'sdk', 'src'),
+  path.join(__dirname, '..', 'hooks'),
 ];
 
 const TOP_LEVEL_FILES = [
@@ -36,25 +36,25 @@ function isTestFile(name) {
 }
 
 function buildPattern(cmdNames) {
-  // Empty input would compile `/gsd:()(?=[^a-zA-Z0-9_-]|$)/g`, which the regex
-  // engine still matches at any `/gsd:` token followed by a non-word boundary
-  // (e.g. EOL, whitespace, punctuation) — rewriting it to a stray `/gsd-`.
+  // Empty input would compile `/gsd-()(?=[^a-zA-Z0-9_-]|$)/g`, which the regex
+  // engine still matches at any `/gsd-` token followed by a non-word boundary
+  // (e.g. EOL, whitespace, punctuation) — rewriting it to a stray `/gsd:`.
   // Short-circuit so the caller can no-op on a missing/empty registry rather
   // than perform an unintended broad rewrite.
   if (!Array.isArray(cmdNames) || cmdNames.length === 0) return null;
   const sorted = [...cmdNames].sort((a, b) => b.length - a.length); // longest first to avoid partial matches
-  return new RegExp(`/gsd:(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
+  return new RegExp(`/gsd-(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
 }
 
 /**
- * Pure transform: rewrite retired `/gsd:<cmd>` to `/gsd-<cmd>` for the given command names.
- * Returns the rewritten string. Identifiers not in `cmdNames` (e.g. `/gsd:sdk`,
- * `/gsd:tools`) are left untouched.
+ * Pure transform: rewrite retired `/gsd-<cmd>` to `/gsd:<cmd>` for the given command names.
+ * Returns the rewritten string. Identifiers not in `cmdNames` (e.g. `/gsd-sdk`,
+ * `/gsd-tools`) are left untouched.
  */
 function transformContent(src, cmdNames) {
   const pattern = buildPattern(cmdNames);
   if (!pattern) return src;
-  return src.replace(pattern, (_, cmd) => `/gsd-${cmd}`);
+  return src.replace(pattern, (_, cmd) => `/gsd:${cmd}`);
 }
 
 function readCmdNames() {

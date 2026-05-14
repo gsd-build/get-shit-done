@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [code-review, audit-uat, secure-phase, eval-review, ui-review, validate-phase, debug, forensics]
 ---
 
 Route to the appropriate quality / review skill based on the user's intent.

@@ -6,6 +6,7 @@ allowed-tools:
   - Write
   - Bash
   - AskUserQuestion
+requires: [quick]
 ---
 
 <objective>

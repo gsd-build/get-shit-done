@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { safeReadFile, loadConfig, normalizePhaseName, escapeRegex, execGit, findPhaseInternal, getMilestoneInfo, stripShippedMilestones, extractCurrentMilestone, output, error, checkAgentsInstalled, CONFIG_DEFAULTS, inspectWorktreeHealth } = require('./core.cjs');
+const { loadConfig, normalizePhaseName, escapeRegex, findPhaseInternal, getMilestoneInfo, stripShippedMilestones, extractCurrentMilestone, output, error, checkAgentsInstalled, CONFIG_DEFAULTS, inspectWorktreeHealth } = require('./core.cjs');
+const { execGit, platformReadSync: safeReadFile, platformWriteSync } = require('./shell-command-projection.cjs');
 const { planningDir } = require('./planning-workspace.cjs');
 const { extractFrontmatter, parseMustHavesBlock } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
@@ -68,8 +69,8 @@ function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   let commitsExist = false;
   if (hashes.length > 0) {
     for (const hash of hashes.slice(0, 3)) {
-      const result = execGit(cwd, ['cat-file', '-t', hash]);
-      if (result.exitCode === 0 && result.stdout === 'commit') {
+      const result = execGit(['cat-file', '-t', hash], { cwd });
+      if (result.exitCode === 0 && result.stdout.trim() === 'commit') {
         commitsExist = true;
         break;
       }
@@ -265,7 +266,7 @@ function cmdVerifyCommits(cwd, hashes, raw) {
   const valid = [];
   const invalid = [];
   for (const hash of hashes) {
-    const result = execGit(cwd, ['cat-file', '-t', hash]);
+    const result = execGit(['cat-file', '-t', hash], { cwd });
     if (result.exitCode === 0 && result.stdout.trim() === 'commit') {
       valid.push(hash);
     } else {
@@ -608,7 +609,7 @@ function cmdValidateHealth(cwd, options, raw) {
 
   // ─── Check 1: .planning/ exists ───────────────────────────────────────────
   if (!fs.existsSync(planBase)) {
-    addIssue('error', 'E001', '.planning/ directory not found', 'Run /gsd-new-project to initialize');
+    addIssue('error', 'E001', '.planning/ directory not found', 'Run /gsd:new-project to initialize');
     output({
       status: 'broken',
       errors,
@@ -621,7 +622,7 @@ function cmdValidateHealth(cwd, options, raw) {
 
   // ─── Check 2: PROJECT.md exists and has required sections ─────────────────
   if (!fs.existsSync(projectPath)) {
-    addIssue('error', 'E002', 'PROJECT.md not found', 'Run /gsd-new-project to create');
+    addIssue('error', 'E002', 'PROJECT.md not found', 'Run /gsd:new-project to create');
   } else {
     const content = fs.readFileSync(projectPath, 'utf-8');
     const requiredSections = ['## What This Is', '## Core Value', '## Requirements'];
@@ -634,12 +635,12 @@ function cmdValidateHealth(cwd, options, raw) {
 
   // ─── Check 3: ROADMAP.md exists ───────────────────────────────────────────
   if (!fs.existsSync(roadmapPath)) {
-    addIssue('error', 'E003', 'ROADMAP.md not found', 'Run /gsd-new-milestone to create roadmap');
+    addIssue('error', 'E003', 'ROADMAP.md not found', 'Run /gsd:new-milestone to create roadmap');
   }
 
   // ─── Check 4: STATE.md exists and references valid phases ─────────────────
   if (!fs.existsSync(statePath)) {
-    addIssue('error', 'E004', 'STATE.md not found', 'Run /gsd-health --repair to regenerate', true);
+    addIssue('error', 'E004', 'STATE.md not found', 'Run /gsd:health --repair to regenerate', true);
     repairs.push('regenerateState');
   } else {
     const stateContent = fs.readFileSync(statePath, 'utf-8');
@@ -686,7 +687,7 @@ function cmdValidateHealth(cwd, options, raw) {
             'warning',
             'W002',
             `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort().join(', ')} are declared`,
-            'Review STATE.md manually before changing it; /gsd-health --repair will not overwrite an existing STATE.md for phase mismatches'
+            'Review STATE.md manually before changing it; /gsd:health --repair will not overwrite an existing STATE.md for phase mismatches'
           );
         }
       }
@@ -695,7 +696,7 @@ function cmdValidateHealth(cwd, options, raw) {
 
   // ─── Check 5: config.json valid JSON + valid schema ───────────────────────
   if (!fs.existsSync(configPath)) {
-    addIssue('warning', 'W003', 'config.json not found', 'Run /gsd-health --repair to create with defaults', true);
+    addIssue('warning', 'W003', 'config.json not found', 'Run /gsd:health --repair to create with defaults', true);
     repairs.push('createConfig');
   } else {
     try {
@@ -707,7 +708,7 @@ function cmdValidateHealth(cwd, options, raw) {
         addIssue('warning', 'W004', `config.json: invalid model_profile "${parsed.model_profile}"`, `Valid values: ${validProfiles.join(', ')}`);
       }
     } catch (err) {
-      addIssue('error', 'E005', `config.json: JSON parse error - ${err.message}`, 'Run /gsd-health --repair to reset to defaults', true);
+      addIssue('error', 'E005', `config.json: JSON parse error - ${err.message}`, 'Run /gsd:health --repair to reset to defaults', true);
       repairs.push('resetConfig');
     }
   }
@@ -718,11 +719,11 @@ function cmdValidateHealth(cwd, options, raw) {
       const configRaw = fs.readFileSync(configPath, 'utf-8');
       const configParsed = JSON.parse(configRaw);
       if (configParsed.workflow && configParsed.workflow.nyquist_validation === undefined) {
-        addIssue('warning', 'W008', 'config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip)', 'Run /gsd-health --repair to add key', true);
+        addIssue('warning', 'W008', 'config.json: workflow.nyquist_validation absent (defaults to enabled but agents may skip)', 'Run /gsd:health --repair to add key', true);
         if (!repairs.includes('addNyquistKey')) repairs.push('addNyquistKey');
       }
       if (configParsed.workflow && configParsed.workflow.ai_integration_phase === undefined) {
-        addIssue('warning', 'W016', 'config.json: workflow.ai_integration_phase absent (defaults to enabled — run /gsd-ai-integration-phase before planning AI system phases)', 'Run /gsd-health --repair to add key', true);
+        addIssue('warning', 'W016', 'config.json: workflow.ai_integration_phase absent (defaults to enabled — run /gsd:ai-integration-phase before planning AI system phases)', 'Run /gsd:health --repair to add key', true);
         if (!repairs.includes('addAiIntegrationPhaseKey')) repairs.push('addAiIntegrationPhaseKey');
       }
     } catch { /* intentionally empty */ }
@@ -772,7 +773,7 @@ function cmdValidateHealth(cwd, options, raw) {
       try {
         const researchContent = fs.readFileSync(path.join(phasesDir, e.name, researchFile), 'utf-8');
         if (researchContent.includes('## Validation Architecture')) {
-          addIssue('warning', 'W009', `Phase ${e.name}: has Validation Architecture in RESEARCH.md but no VALIDATION.md`, 'Re-run /gsd-plan-phase with --research to regenerate');
+          addIssue('warning', 'W009', `Phase ${e.name}: has Validation Architecture in RESEARCH.md but no VALIDATION.md`, 'Re-run /gsd:plan-phase with --research to regenerate');
         }
       } catch { /* intentionally empty */ }
     }
@@ -861,7 +862,7 @@ function cmdValidateHealth(cwd, options, raw) {
           if (statusVal !== 'complete' && statusVal !== 'done') {
             addIssue('warning', 'W011',
               `STATE.md says current phase is ${statePhase} (status: ${statusVal || 'unknown'}) but ROADMAP.md shows it as [x] complete — state files may be out of sync`,
-              'Run /gsd-progress to re-derive current position, or manually update STATE.md');
+              'Run /gsd:progress to re-derive current position, or manually update STATE.md');
           }
         }
       }
@@ -970,7 +971,7 @@ function cmdValidateHealth(cwd, options, raw) {
         if (missingFromRegistry.length > 0) {
           addIssue('warning', 'W018',
             `MILESTONES.md missing ${missingFromRegistry.length} archived milestone(s): ${missingFromRegistry.join(', ')}`,
-            'Run /gsd-health --backfill to synthesize missing entries from archive snapshots',
+            'Run /gsd:health --backfill to synthesize missing entries from archive snapshots',
             true);
           repairs.push('backfillMilestones');
         }
@@ -1019,7 +1020,7 @@ function cmdValidateHealth(cwd, options, raw) {
               parallelization: CONFIG_DEFAULTS.parallelization,
               brave_search: CONFIG_DEFAULTS.brave_search,
             };
-            fs.writeFileSync(configPath, JSON.stringify(defaults, null, 2), 'utf-8');
+            platformWriteSync(configPath, JSON.stringify(defaults, null, 2));
             repairActions.push({ action: repair, success: true, path: 'config.json' });
             break;
           }
@@ -1044,7 +1045,7 @@ function cmdValidateHealth(cwd, options, raw) {
             stateContent += `**Current phase:** (determining...)\n`;
             stateContent += `**Status:** Resuming\n\n`;
             stateContent += `## Session Log\n\n`;
-            stateContent += `- ${new Date().toISOString().split('T')[0]}: STATE.md regenerated by /gsd-health --repair\n`;
+            stateContent += `- ${new Date().toISOString().split('T')[0]}: STATE.md regenerated by /gsd:health --repair\n`;
             writeStateMd(statePath, stateContent, cwd);
             repairActions.push({ action: repair, success: true, path: 'STATE.md' });
             break;
@@ -1057,7 +1058,7 @@ function cmdValidateHealth(cwd, options, raw) {
                 if (!configParsed.workflow) configParsed.workflow = {};
                 if (configParsed.workflow.nyquist_validation === undefined) {
                   configParsed.workflow.nyquist_validation = true;
-                  fs.writeFileSync(configPath, JSON.stringify(configParsed, null, 2), 'utf-8');
+                  platformWriteSync(configPath, JSON.stringify(configParsed, null, 2));
                 }
                 repairActions.push({ action: repair, success: true, path: 'config.json' });
               } catch (err) {
@@ -1074,7 +1075,7 @@ function cmdValidateHealth(cwd, options, raw) {
                 if (!configParsed.workflow) configParsed.workflow = {};
                 if (configParsed.workflow.ai_integration_phase === undefined) {
                   configParsed.workflow.ai_integration_phase = true;
-                  fs.writeFileSync(configPath, JSON.stringify(configParsed, null, 2), 'utf-8');
+                  platformWriteSync(configPath, JSON.stringify(configParsed, null, 2));
                 }
                 repairActions.push({ action: repair, success: true, path: 'config.json' });
               } catch (err) {
@@ -1090,24 +1091,24 @@ function cmdValidateHealth(cwd, options, raw) {
             for (const ver of missingFromRegistry) {
               try {
                 const snapshotPath = path.join(milestonesArchiveDir, `${ver}-ROADMAP.md`);
-                const snapshot = fs.existsSync(snapshotPath) ? fs.readFileSync(snapshotPath, 'utf-8') : null;
+                const snapshot = safeReadFile(snapshotPath);
                 // Build minimal entry from snapshot title or version
                 const titleMatch = snapshot && snapshot.match(/^#\s+(.+)$/m);
                 const milestoneName = titleMatch ? titleMatch[1].replace(/^Milestone\s+/i, '').replace(/^v[\d.]+\s*/, '').trim() : ver;
-                const entry = `## ${ver}${milestoneName && milestoneName !== ver ? ` ${milestoneName}` : ''} (Backfilled: ${today})\n\n**Note:** Synthesized from archive snapshot by \`/gsd-health --backfill\`. Original completion date unknown.\n\n---\n\n`;
+                const entry = `## ${ver}${milestoneName && milestoneName !== ver ? ` ${milestoneName}` : ''} (Backfilled: ${today})\n\n**Note:** Synthesized from archive snapshot by \`/gsd:health --backfill\`. Original completion date unknown.\n\n---\n\n`;
                 const milestonesContent = fs.existsSync(milestonesPath)
                   ? fs.readFileSync(milestonesPath, 'utf-8')
                   : '';
                 if (!milestonesContent.trim()) {
-                  fs.writeFileSync(milestonesPath, `# Milestones\n\n${entry}`, 'utf-8');
+                  platformWriteSync(milestonesPath, `# Milestones\n\n${entry}`);
                 } else {
                   const headerMatch = milestonesContent.match(/^(#{1,3}\s+[^\n]*\n\n?)/);
                   if (headerMatch) {
                     const header = headerMatch[1];
                     const rest = milestonesContent.slice(header.length);
-                    fs.writeFileSync(milestonesPath, header + entry + rest, 'utf-8');
+                    platformWriteSync(milestonesPath, header + entry + rest);
                   } else {
-                    fs.writeFileSync(milestonesPath, entry + milestonesContent, 'utf-8');
+                    platformWriteSync(milestonesPath, entry + milestonesContent);
                   }
                 }
                 backfilled++;
@@ -1226,7 +1227,7 @@ function cmdVerifySchemaDrift(cwd, phaseArg, skipFlag, raw) {
   }
 
   // Also check git commit messages for push evidence
-  const gitLog = execGit(cwd, ['log', '--oneline', '--all', '-50']);
+  const gitLog = execGit(['log', '--oneline', '--all', '-50'], { cwd });
   if (gitLog.exitCode === 0) {
     executionLog += '\n' + gitLog.stdout;
   }
@@ -1288,7 +1289,7 @@ function cmdVerifyCodebaseDrift(cwd, raw) {
     const lastMapped = drift.readMappedCommit(structurePath);
 
     // Verify we're inside a git repo and resolve the diff range.
-    const revProbe = execGit(cwd, ['rev-parse', 'HEAD']);
+    const revProbe = execGit(['rev-parse', 'HEAD'], { cwd });
     if (revProbe.exitCode !== 0) {
       emit({
         skipped: true,
@@ -1307,11 +1308,11 @@ function cmdVerifyCodebaseDrift(cwd, raw) {
       base = EMPTY_TREE;
     } else {
       // Verify the commit is reachable; if not, fall back to EMPTY_TREE.
-      const verify = execGit(cwd, ['cat-file', '-t', base]);
+      const verify = execGit(['cat-file', '-t', base], { cwd });
       if (verify.exitCode !== 0) base = EMPTY_TREE;
     }
 
-    const diff = execGit(cwd, ['diff', '--name-status', base, 'HEAD']);
+    const diff = execGit(['diff', '--name-status', base, 'HEAD'], { cwd });
     if (diff.exitCode !== 0) {
       emit({
         skipped: true,

@@ -11,11 +11,11 @@ process.env.GSD_TEST_MODE = '1';
  * Bug #2954: keep `help.md` and the live `commands/gsd/*` slash surface
  * in lockstep. Two regression tests:
  *
- *   1. help.md must not advertise any /gsd-<name> that has no shipped
+ *   1. help.md must not advertise any /gsd[-:]<name> that has no shipped
  *      slash command. (Caught the original #2954 regression: #2824 deleted
  *      31 stubs without updating help.md.)
  *
- *   2. Every shipped /gsd-<name> command must appear in help.md. (Caught
+ *   2. Every shipped /gsd[-:]<name> command must appear in help.md. (Caught
  *      the inverse: a command lands without docs, so users never discover it.)
  *
  * The shipped slash name is parsed from frontmatter `name:` (which can be
@@ -24,7 +24,7 @@ process.env.GSD_TEST_MODE = '1';
  * different slash name (`gsd-context`) than their filename suggests.
  *
  * Also covers `do.md`, the dispatcher invoked at runtime by
- * `/gsd-progress --do`: any `/gsd-<name>` token in its routing table must
+ * `/gsd:progress --do`: any `/gsd[-:]<name>` token in its routing table must
  * resolve to a live command, otherwise the dispatcher emits "Unknown command".
  */
 
@@ -74,7 +74,7 @@ function listShippedSlashBaseNames() {
 
 function extractSlashReferences(contents) {
   const names = new Set();
-  const tokenRe = /\/gsd-([a-z][a-z0-9-]*)/g;
+  const tokenRe = /\/gsd[:-]([a-z][a-z0-9-]*)/g;
   let match;
   while ((match = tokenRe.exec(contents)) !== null) {
     names.add(match[1]);
@@ -109,7 +109,7 @@ function listShippedFlagsByCommand() {
 }
 
 describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
-  test('every /gsd-<name> referenced in help.md is a shipped command', () => {
+  test('every /gsd[-:]<name> referenced in help.md is a shipped command', () => {
     const helpContents = fs.readFileSync(HELP_MD, 'utf8');
     const referenced = extractSlashReferences(helpContents);
     const shipped = listShippedSlashBaseNames();
@@ -117,11 +117,11 @@ describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
     assert.deepEqual(
       dangling,
       [],
-      `help.md advertises /gsd-<name> commands that are not shipped: ${dangling.join(', ')}`,
+      `help.md advertises /gsd[-:]<name> commands that are not shipped: ${dangling.join(', ')}`,
     );
   });
 
-  test('every shipped /gsd-<name> command is documented in help.md', () => {
+  test('every shipped /gsd[-:]<name> command is documented in help.md', () => {
     const helpContents = fs.readFileSync(HELP_MD, 'utf8');
     const referenced = extractSlashReferences(helpContents);
     const shipped = listShippedSlashBaseNames();
@@ -129,11 +129,11 @@ describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
     assert.deepEqual(
       undocumented,
       [],
-      `commands shipped under commands/gsd/ with no /gsd-<name> reference in help.md: ${undocumented.join(', ')}`,
+      `commands shipped under commands/gsd/ with no /gsd[-:]<name> reference in help.md: ${undocumented.join(', ')}`,
     );
   });
 
-  test('every /gsd-<name> in do.md (live dispatcher) is a shipped command', () => {
+  test('every /gsd[-:]<name> in do.md (live dispatcher) is a shipped command', () => {
     const doContents = fs.readFileSync(DO_MD, 'utf8');
     const referenced = extractSlashReferences(doContents);
     const shipped = listShippedSlashBaseNames();
@@ -141,7 +141,7 @@ describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
     assert.deepEqual(
       dangling,
       [],
-      `do.md routing table references /gsd-<name> that is not shipped: ${dangling.join(', ')}`,
+      `do.md routing table references /gsd[-:]<name> that is not shipped: ${dangling.join(', ')}`,
     );
   });
 
@@ -154,10 +154,15 @@ describe('Bug #2954: help.md ↔ commands/gsd/ bidirectional parity', () => {
         // Accept `/gsd-<command> --<flag>` (precise) OR a bare `--<flag>` token
         // anywhere in help.md (good enough for shared flags like `--force` that
         // appear under multiple commands' descriptions).
-        const preciseToken = `/gsd-${command} --${flag}`;
+        const preciseDash = `/gsd-${command} --${flag}`;
+        const preciseColon = `/gsd:${command} --${flag}`;
         const flagToken = `--${flag}`;
-        if (!helpContents.includes(preciseToken) && !helpContents.includes(flagToken)) {
-          gaps.push(`/gsd-${command} --${flag}`);
+        if (
+          !helpContents.includes(preciseDash) &&
+          !helpContents.includes(preciseColon) &&
+          !helpContents.includes(flagToken)
+        ) {
+          gaps.push(`/gsd:${command} --${flag}`);
         }
       }
     }

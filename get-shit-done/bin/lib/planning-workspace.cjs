@@ -11,7 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
+const { probeTty, platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { isValidActiveWorkstreamName } = require('./workstream-name-policy.cjs');
 
 const WORKSTREAM_SESSION_ENV_KEYS = [
@@ -92,16 +92,11 @@ function probeControllingTtyToken() {
     return cachedControllingTtyToken;
   }
 
-  try {
-    const ttyPath = execFileSync('tty', [], {
-      encoding: 'utf-8',
-      stdio: ['inherit', 'pipe', 'ignore'],
-    }).trim();
-    if (ttyPath && ttyPath !== 'not a tty') {
-      const token = sanitizeWorkstreamSessionToken(ttyPath.replace(/^\/dev\//, ''));
-      if (token) cachedControllingTtyToken = `tty-${token}`;
-    }
-  } catch {}
+  const ttyPath = probeTty();
+  if (ttyPath) {
+    const token = sanitizeWorkstreamSessionToken(ttyPath.replace(/^\/dev\//, ''));
+    if (token) cachedControllingTtyToken = `tty-${token}`;
+  }
 
   return cachedControllingTtyToken;
 }
@@ -158,14 +153,11 @@ function createSharedPointerAdapter(cwd) {
   const filePath = path.join(planningRoot(cwd), 'active-workstream');
   return {
     read() {
-      try {
-        return fs.readFileSync(filePath, 'utf-8').trim() || null;
-      } catch {
-        return null;
-      }
+      const raw = platformReadSync(filePath);
+      return raw ? raw.trim() || null : null;
     },
     write(name) {
-      fs.writeFileSync(filePath, name + '\n', 'utf-8');
+      platformWriteSync(filePath, name + '\n');
     },
     clear() {
       try { fs.unlinkSync(filePath); } catch {}
@@ -179,15 +171,12 @@ function createSessionScopedPointerAdapter(cwd, fixedSessionKey) {
 
   return {
     read() {
-      try {
-        return fs.readFileSync(scoped.filePath, 'utf-8').trim() || null;
-      } catch {
-        return null;
-      }
+      const raw = platformReadSync(scoped.filePath);
+      return raw ? raw.trim() || null : null;
     },
     write(name) {
-      fs.mkdirSync(scoped.dirPath, { recursive: true });
-      fs.writeFileSync(scoped.filePath, name + '\n', 'utf-8');
+      platformEnsureDir(scoped.dirPath);
+      platformWriteSync(scoped.filePath, name + '\n');
     },
     clear() {
       try { fs.unlinkSync(scoped.filePath); } catch {}
@@ -245,7 +234,7 @@ function withPlanningLock(cwd, fn) {
   const start = Date.now();
 
   // Ensure .planning/ exists
-  try { fs.mkdirSync(planningDir(cwd), { recursive: true }); } catch { /* ok */ }
+  try { platformEnsureDir(planningDir(cwd)); } catch { /* ok */ }
 
   function runWithHeldLock() {
     // Atomic create — fails if file exists
@@ -338,7 +327,7 @@ function createPlanningWorkspace(cwd, opts = {}) {
         }
 
         const wsDir = path.join(planningRoot(cwd), 'workstreams', name);
-        fs.mkdirSync(wsDir, { recursive: true });
+        platformEnsureDir(wsDir);
         adapter.write(name);
       },
       clear() {

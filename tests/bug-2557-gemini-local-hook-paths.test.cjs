@@ -13,62 +13,40 @@
  * dir as cwd. Claude Code and others still use "$CLAUDE_PROJECT_DIR"/ (#1906).
  */
 
-const { describe, test, before } = require('node:test');
+const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
-const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
+const projection = require(path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'shell-command-projection.cjs'));
+const { projectLocalHookPrefix, projectShellCommandText } = projection;
 
 describe('bug #2557: Gemini/Antigravity local hooks use relative paths (not $CLAUDE_PROJECT_DIR)', () => {
-  let src;
-
-  before(() => {
-    src = fs.readFileSync(INSTALL_SRC, 'utf-8');
+  test('Gemini local prefix is bare dirName', () => {
+    assert.equal(projectLocalHookPrefix({ runtime: 'gemini', dirName: '.gemini' }), '.gemini');
   });
 
-  test('localPrefix is a ternary that branches on Gemini/Antigravity', () => {
-    assert.match(
-      src,
-      /const localPrefix\s*=\s*\(runtime\s*===\s*['"]gemini['"]/,
-      'localPrefix must branch on runtime === "gemini"',
+  test('Antigravity local prefix is bare dirName', () => {
+    assert.equal(projectLocalHookPrefix({ runtime: 'antigravity', dirName: '.agent' }), '.agent');
+  });
+
+  test('non-Gemini local prefix remains $CLAUDE_PROJECT_DIR anchored', () => {
+    assert.equal(
+      projectLocalHookPrefix({ runtime: 'claude', dirName: '.claude' }),
+      '"$CLAUDE_PROJECT_DIR"/.claude',
     );
   });
 
-  test('Gemini/Antigravity branch of localPrefix uses bare dirName (relative path)', () => {
-    // The ternary must assign `dirName` (not `"$CLAUDE_PROJECT_DIR"/` + dirName)
-    // for the Gemini branch so hooks use a relative path on all platforms.
-    assert.match(
-      src,
-      /const localPrefix\s*=\s*\(runtime\s*===\s*['"]gemini['"]\s*\|\|\s*runtime\s*===\s*['"]antigravity['"]\)\s*\n?\s*\?\s*dirName/,
-      'Gemini/Antigravity branch must resolve to bare dirName',
-    );
-  });
-
-  test('non-Gemini branch of localPrefix uses "$CLAUDE_PROJECT_DIR"/', () => {
-    // The else branch must still use "$CLAUDE_PROJECT_DIR"/ to fix #1906 for
-    // Claude Code and other runtimes that do set the variable.
-    assert.match(
-      src,
-      /:\s*['"]\"\$CLAUDE_PROJECT_DIR\"\//,
-      'non-Gemini branch must use "$CLAUDE_PROJECT_DIR"/ prefix',
-    );
-  });
-
-  test('Gemini/Antigravity hook commands do not contain "$CLAUDE_PROJECT_DIR" literal', () => {
-    // Since localPrefix is now dirName for Gemini/Antigravity, no command
-    // string built via `localPrefix` should contain the variable literal.
-    // We verify by checking that the only occurrence of $CLAUDE_PROJECT_DIR
-    // in the localPrefix definition is in the non-Gemini (else) branch.
-    const lines = src.split('\n');
-    const prefixDefIdx = lines.findIndex(l => /const localPrefix\s*=/.test(l));
-    assert.ok(prefixDefIdx >= 0, 'localPrefix definition not found');
-    // The Gemini (truthy) branch is the line right after the ternary condition.
-    // It must NOT contain $CLAUDE_PROJECT_DIR.
-    const geminiLine = lines[prefixDefIdx + 1] || '';
+  test('Gemini local command projection does not contain "$CLAUDE_PROJECT_DIR"', () => {
+    const prefix = projectLocalHookPrefix({ runtime: 'gemini', dirName: '.gemini' });
+    const command = projectShellCommandText({
+      runnerToken: '"/usr/local/bin/node"',
+      argTokens: [`${prefix}/hooks/gsd-check-update.js`],
+      runtime: 'gemini',
+      platform: 'linux',
+    });
     assert.ok(
-      !geminiLine.includes('$CLAUDE_PROJECT_DIR'),
-      'Gemini branch of localPrefix must not reference $CLAUDE_PROJECT_DIR',
+      !command.includes('$CLAUDE_PROJECT_DIR'),
+      'Gemini local command must not include $CLAUDE_PROJECT_DIR',
     );
   });
 });

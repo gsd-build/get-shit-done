@@ -17,68 +17,33 @@
 
 const { describe, test, before } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
 const path = require('path');
 
-const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
-
-// All hooks that the installer registers for local installs
-const HOOKS = [
-  'gsd-statusline.js',
-  'gsd-check-update.js',
-  'gsd-context-monitor.js',
-  'gsd-prompt-guard.js',
-  'gsd-read-guard.js',
-  'gsd-workflow-guard.js',
-  'gsd-validate-commit.sh',
-  'gsd-session-state.sh',
-  'gsd-phase-boundary.sh',
-];
+const projection = require(path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'shell-command-projection.cjs'));
+const { projectLocalHookPrefix, projectShellCommandText } = projection;
 
 describe('bug #1906: local hook commands use $CLAUDE_PROJECT_DIR', () => {
-  let src;
-
   before(() => {
-    src = fs.readFileSync(INSTALL_SRC, 'utf-8');
+    assert.equal(typeof projectLocalHookPrefix, 'function');
+    assert.equal(typeof projectShellCommandText, 'function');
   });
 
-  test('localPrefix definition includes $CLAUDE_PROJECT_DIR for non-Gemini runtimes', () => {
-    // localPrefix is now a ternary — Gemini/Antigravity use bare dirName (#2557),
-    // all other runtimes use "$CLAUDE_PROJECT_DIR"/ to anchor hook paths.
-    assert.match(src, /const localPrefix\s*=[\s\S]*?"\$CLAUDE_PROJECT_DIR"/,
-      'localPrefix definition must include "$CLAUDE_PROJECT_DIR" branch for non-Gemini runtimes');
+  test('non-Gemini runtimes get $CLAUDE_PROJECT_DIR anchored local prefix', () => {
+    const prefix = projectLocalHookPrefix({ runtime: 'claude', dirName: '.claude' });
+    assert.equal(prefix, '"$CLAUDE_PROJECT_DIR"/.claude');
   });
 
-  for (const hook of HOOKS) {
-    test(`${hook} local command uses localPrefix (not bare dirName)`, () => {
-      // Find all local command strings for this hook
-      // The pattern is: `<runner> ' + localPrefix + '/hooks/<hook>'`
-      // or the old broken pattern: `<runner> ' + dirName + '/hooks/<hook>'`
-      const hookEscaped = hook.replace(/\./g, '\\.');
-      const brokenPattern = new RegExp(
-        `['"](?:node|bash)\\s['"]\\s*\\+\\s*dirName\\s*\\+\\s*['"]/hooks/${hookEscaped}['"]`
-      );
-      assert.ok(
-        !brokenPattern.test(src),
-        `${hook} must not use bare dirName — should use localPrefix for cwd-independent resolution`
-      );
+  test('local command projection for non-Gemini keeps $CLAUDE_PROJECT_DIR anchor', () => {
+    const prefix = projectLocalHookPrefix({ runtime: 'claude', dirName: '.claude' });
+    const command = projectShellCommandText({
+      runnerToken: '"/usr/local/bin/node"',
+      argTokens: [`${prefix}/hooks/gsd-context-monitor.js`],
+      runtime: 'claude',
+      platform: 'linux',
     });
-  }
-
-  test('no local hook command uses bare dirName + /hooks/', () => {
-    // Broader check: no local (non-global) hook path should use dirName directly
-    // The pattern `': '<runner> ' + dirName + '/hooks/'` is the broken form
-    const lines = src.split('\n');
-    const offenders = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      // Match lines that build local hook commands with bare dirName
-      if (/['"](?:node|bash)\s['"][^;]*\+\s*dirName\s*\+\s*['"]\/hooks\//.test(line)) {
-        offenders.push(`line ${i + 1}: ${line.trim()}`);
-      }
-    }
-    assert.equal(offenders.length, 0,
-      'Found local hook commands using bare dirName instead of localPrefix:\n' +
-      offenders.join('\n'));
+    assert.equal(
+      command,
+      '"/usr/local/bin/node" "$CLAUDE_PROJECT_DIR"/.claude/hooks/gsd-context-monitor.js',
+    );
   });
 });

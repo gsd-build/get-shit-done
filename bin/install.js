@@ -5,6 +5,20 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 const crypto = require('crypto');
+const {
+  buildWindowsShimTriple: buildWindowsShimTripleFromProjection,
+  formatSdkPathDiagnostic: formatSdkPathDiagnosticFromProjection,
+  isManagedHookBasename,
+  isManagedHookCommand,
+  projectLocalHookPrefix,
+  projectLegacySettingsHookCommand,
+  projectManagedHookCommand,
+  projectPathActionProjection,
+  projectPortableHookBaseDir,
+  projectPersistentPathExportActions,
+  projectShellCommandText,
+  projectCodexHookTomlCommand,
+} = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
 // Colors
 const cyan = '\x1b[36m';
@@ -75,6 +89,14 @@ const {
   MINIMAL_SKILL_ALLOWLIST,
   isMinimalMode,
   stageSkillsForMode,
+  readActiveProfile,
+  writeActiveProfile,
+  resolveEffectiveProfile,
+  mostRestrictiveProfile,
+  resolveProfile,
+  loadSkillsManifest,
+  stageSkillsForProfile,
+  stageAgentsForProfile,
 } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
 const {
   discoverInstallerMigrations,
@@ -110,9 +132,28 @@ const hasUninstall = args.includes('--uninstall') || args.includes('-u');
 const hasSkillsRoot = args.includes('--skills-root');
 const hasPortableHooks = args.includes('--portable-hooks') || process.env.GSD_PORTABLE_HOOKS === '1';
 const hasMinimal = args.includes('--minimal') || args.includes('--core-only');
-const installMode = hasMinimal ? 'minimal' : 'full';
+// --profile=<name> or --profile=<n1>,<n2> (composable); mutually exclusive with --minimal
+const _profileArgRaw = (() => {
+  for (const arg of args) {
+    if (arg.startsWith('--profile=')) return arg.slice('--profile='.length);
+  }
+  return null;
+})();
+// Resolve active profile name:
+// 1. --minimal / --core-only → 'core' (back-compat alias)
+// 2. --profile=<name> → named profile
+// 3. neither → 'full' (default, back-compat)
+// Note: when re-running as `gsd update` the marker is read later (after
+// configDir is resolved) and may override 'full' — see writeActiveProfile call below.
+const _profileIsCore = _profileArgRaw === 'core';
+const _requestedProfileName = (hasMinimal || _profileIsCore) ? 'core' : (_profileArgRaw || null);
 const hasSdk = args.includes('--sdk');
 const hasNoSdk = args.includes('--no-sdk');
+
+if (hasMinimal && _profileArgRaw) {
+  console.error(`  ${yellow}Cannot specify both --minimal/--core-only and --profile${reset}`);
+  process.exit(1);
+}
 
 if (hasSdk && hasNoSdk) {
   console.error(`  ${yellow}Cannot specify both --sdk and --no-sdk${reset}`);
@@ -494,7 +535,7 @@ if (hasUninstall) {
 
 // Show help if requested
 if (hasHelp) {
-  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--hermes${reset}                  Install for Hermes Agent only\n    ${cyan}--cline${reset}                   Install for Cline only\n    ${cyan}--codebuddy${reset}              Install for CodeBuddy only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n    ${cyan}--portable-hooks${reset}          Emit \$HOME-relative hook paths in settings.json\n                              (for WSL/Docker bind-mount setups; also GSD_PORTABLE_HOOKS=1)\n    ${cyan}--minimal${reset}                 Install only the main-loop skills (new-project,\n                              discuss-phase, plan-phase, execute-phase, help, update)\n                              and zero gsd-* subagents. Cuts cold-start system-prompt\n                              overhead from ~12k tokens to ~700 — useful for local LLMs\n                              with 32K–128K context. Re-run \`gsd update\` (without --minimal)\n                              to expand to the full surface. Alias: --core-only.\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Hermes Agent globally${reset}\n    npx get-shit-done-cc --hermes --global\n\n    ${dim}# Install for Hermes Agent locally${reset}\n    npx get-shit-done-cc --hermes --local\n\n    ${dim}# Install for Cline locally${reset}\n    npx get-shit-done-cc --cline --local\n\n    ${dim}# Install for CodeBuddy globally${reset}\n    npx get-shit-done-cc --codebuddy --global\n\n    ${dim}# Install for CodeBuddy locally${reset}\n    npx get-shit-done-cc --codebuddy --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR / HERMES_HOME / CLINE_CONFIG_DIR / CODEBUDDY_CONFIG_DIR environment variables.\n`);
+  console.log(`  ${yellow}Usage:${reset} npx get-shit-done-cc [options]\n\n  ${yellow}Options:${reset}\n    ${cyan}-g, --global${reset}              Install globally (to config directory)\n    ${cyan}-l, --local${reset}               Install locally (to current directory)\n    ${cyan}--claude${reset}                  Install for Claude Code only\n    ${cyan}--opencode${reset}                Install for OpenCode only\n    ${cyan}--gemini${reset}                  Install for Gemini only\n    ${cyan}--kilo${reset}                    Install for Kilo only\n    ${cyan}--codex${reset}                   Install for Codex only\n    ${cyan}--copilot${reset}                 Install for Copilot only\n    ${cyan}--antigravity${reset}             Install for Antigravity only\n    ${cyan}--cursor${reset}                  Install for Cursor only\n    ${cyan}--windsurf${reset}                Install for Windsurf only\n    ${cyan}--augment${reset}                 Install for Augment only\n    ${cyan}--trae${reset}                    Install for Trae only\n    ${cyan}--qwen${reset}                    Install for Qwen Code only\n    ${cyan}--hermes${reset}                  Install for Hermes Agent only\n    ${cyan}--cline${reset}                   Install for Cline only\n    ${cyan}--codebuddy${reset}              Install for CodeBuddy only\n    ${cyan}--all${reset}                     Install for all runtimes\n    ${cyan}-u, --uninstall${reset}           Uninstall GSD (remove all GSD files)\n    ${cyan}-c, --config-dir <path>${reset}   Specify custom config directory\n    ${cyan}-h, --help${reset}                Show this help message\n    ${cyan}--force-statusline${reset}        Replace existing statusline config\n    ${cyan}--portable-hooks${reset}          Emit \$HOME-relative hook paths in settings.json\n                              (for WSL/Docker bind-mount setups; also GSD_PORTABLE_HOOKS=1)\n    ${cyan}--profile=<name>${reset}         Install a named skill profile. Profiles:\n                              core     — 7 main-loop skills incl. phase (~130 desc tokens)\n                              standard — ~13 skills incl. phase, review, config (~700)\n                              full     — all 66 skills (default)\n                              Composable: --profile=core,audit installs union of closures.\n                              Profile is persisted and respected by \`gsd update\`.\n    ${cyan}--minimal${reset}                 Alias for --profile=core (back-compat).\n                              Cuts cold-start overhead from ~12k tokens to ~700.\n                              Alias: --core-only.\n\n  ${yellow}Examples:${reset}\n    ${dim}# Interactive install (prompts for runtime and location)${reset}\n    npx get-shit-done-cc\n\n    ${dim}# Install for Claude Code globally${reset}\n    npx get-shit-done-cc --claude --global\n\n    ${dim}# Install for Gemini globally${reset}\n    npx get-shit-done-cc --gemini --global\n\n    ${dim}# Install for Kilo globally${reset}\n    npx get-shit-done-cc --kilo --global\n\n    ${dim}# Install for Codex globally${reset}\n    npx get-shit-done-cc --codex --global\n\n    ${dim}# Install for Copilot globally${reset}\n    npx get-shit-done-cc --copilot --global\n\n    ${dim}# Install for Copilot locally${reset}\n    npx get-shit-done-cc --copilot --local\n\n    ${dim}# Install for Antigravity globally${reset}\n    npx get-shit-done-cc --antigravity --global\n\n    ${dim}# Install for Antigravity locally${reset}\n    npx get-shit-done-cc --antigravity --local\n\n    ${dim}# Install for Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global\n\n    ${dim}# Install for Cursor locally${reset}\n    npx get-shit-done-cc --cursor --local\n\n    ${dim}# Install for Windsurf globally${reset}\n    npx get-shit-done-cc --windsurf --global\n\n    ${dim}# Install for Windsurf locally${reset}\n    npx get-shit-done-cc --windsurf --local\n\n    ${dim}# Install for Augment globally${reset}\n    npx get-shit-done-cc --augment --global\n\n    ${dim}# Install for Augment locally${reset}\n    npx get-shit-done-cc --augment --local\n\n    ${dim}# Install for Trae globally${reset}\n    npx get-shit-done-cc --trae --global\n\n    ${dim}# Install for Trae locally${reset}\n    npx get-shit-done-cc --trae --local\n\n    ${dim}# Install for Hermes Agent globally${reset}\n    npx get-shit-done-cc --hermes --global\n\n    ${dim}# Install for Hermes Agent locally${reset}\n    npx get-shit-done-cc --hermes --local\n\n    ${dim}# Install for Cline locally${reset}\n    npx get-shit-done-cc --cline --local\n\n    ${dim}# Install for CodeBuddy globally${reset}\n    npx get-shit-done-cc --codebuddy --global\n\n    ${dim}# Install for CodeBuddy locally${reset}\n    npx get-shit-done-cc --codebuddy --local\n\n    ${dim}# Install for all runtimes globally${reset}\n    npx get-shit-done-cc --all --global\n\n    ${dim}# Install to custom config directory${reset}\n    npx get-shit-done-cc --kilo --global --config-dir ~/.kilo-work\n\n    ${dim}# Install to current project only${reset}\n    npx get-shit-done-cc --claude --local\n\n    ${dim}# Uninstall GSD from Cursor globally${reset}\n    npx get-shit-done-cc --cursor --global --uninstall\n\n  ${yellow}Notes:${reset}\n    The --config-dir option is useful when you have multiple configurations.\n    It takes priority over CLAUDE_CONFIG_DIR / OPENCODE_CONFIG_DIR / GEMINI_CONFIG_DIR / KILO_CONFIG_DIR / CODEX_HOME / COPILOT_CONFIG_DIR / ANTIGRAVITY_CONFIG_DIR / CURSOR_CONFIG_DIR / WINDSURF_CONFIG_DIR / AUGMENT_CONFIG_DIR / TRAE_CONFIG_DIR / QWEN_CONFIG_DIR / HERMES_HOME / CLINE_CONFIG_DIR / CODEBUDDY_CONFIG_DIR environment variables.\n`);
   process.exit(0);
 }
 
@@ -602,17 +643,6 @@ function resolveNodeRunner() {
  *
  * Returns true if any entry was rewritten.
  */
-function formatHookCommandForShell(command, opts) {
-  const platform = (opts && opts.platform) || process.platform;
-  return platform === 'win32' ? `& ${command}` : command;
-}
-
-function formatManagedHookScriptToken(scriptPath, opts) {
-  const platform = (opts && opts.platform) || process.platform;
-  if (platform !== 'win32') return null;
-  return JSON.stringify(scriptPath.replace(/\\/g, '/'));
-}
-
 function resolveBashRunner(opts) {
   const platform = (opts && opts.platform) || process.platform;
   if (platform !== 'win32') return 'bash';
@@ -640,16 +670,6 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
   if (!settings || !settings.hooks || !absoluteRunner) return false;
   if (!opts) opts = {};
   const platform = opts.platform || process.platform;
-  const MANAGED_HOOK_FILES = new Set([
-    'gsd-check-update.js',
-    'gsd-statusline.js',
-    'gsd-context-monitor.js',
-    'gsd-prompt-guard.js',
-    'gsd-read-guard.js',
-    'gsd-read-injection-scanner.js',
-    'gsd-update-banner.js',
-    'gsd-workflow-guard.js',
-  ]);
   let changed = false;
   for (const entries of Object.values(settings.hooks)) {
     if (!Array.isArray(entries)) continue;
@@ -691,8 +711,9 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
           const runnerPath = (m[2] || m[3] || m[4] || '').replace(/\\/g, '/');
           const stableRunner = normalizeNodePath(runnerPath);
           // Process Cellar paths so they normalize to a stable symlink. On
-          // Windows, also process already-absolute runners so PowerShell gets
-          // the call operator needed to invoke a quoted executable path (#3362).
+          // Windows, already-absolute runners still flow through the projection
+          // seam because some runtimes need additional wrapper policy while
+          // others must stay shell-neutral (#3362, #3413).
           if (stableRunner === runnerPath && platform !== 'win32') continue;
           scriptToken = m[5];
           scriptPath = m[6] || m[7] || m[8] || '';
@@ -701,31 +722,30 @@ function rewriteLegacyManagedNodeHookCommands(settings, absoluteRunner, opts) {
         // Take the basename — match against MANAGED_HOOK_FILES by exact
         // equality, not substring containment. Handles both forward and
         // backslash separators (Windows).
-        const scriptBase = scriptPath.split(/[\\/]/).pop() || '';
-        if (!MANAGED_HOOK_FILES.has(scriptBase)) continue;
+        if (!isManagedHookBasename(scriptPath, { surface: 'settings-json' })) continue;
 
-        // Skip if already using the desired stable runner.
-        if (runnerToken !== 'node' && runnerToken === absoluteRunner) {
-          if (platform !== 'win32' || hadPowerShellCallOperator) continue;
-        }
+        const projectedCommand = projectLegacySettingsHookCommand({
+          absoluteRunner,
+          scriptPath,
+          scriptToken,
+          runtime: opts.runtime || 'generic',
+          platform,
+        });
+        if (!projectedCommand) continue;
 
-        const safeScriptToken = formatManagedHookScriptToken(scriptPath, opts) || scriptToken;
-        h.command = formatHookCommandForShell(`${absoluteRunner} ${safeScriptToken}`, opts);
+        // Skip only when the existing managed command already matches the
+        // desired runtime-aware projected shape. This preserves Gemini's
+        // required PowerShell prefix while still letting Claude strip stale
+        // prefixes on reinstall (#3413).
+        if (h.command === projectedCommand) continue;
+
+        h.command = projectedCommand;
         changed = true;
       }
     }
   }
   return changed;
 }
-
-/**
- * Codex managed-hook filenames eligible for legacy-bare-node migration.
- * Mirrors the settings.json allowlist in rewriteLegacyManagedNodeHookCommands.
- * Centralized so the codex toml branch and the settings.json branch can't drift.
- */
-const CODEX_MANAGED_HOOK_BASENAMES = new Set([
-  'gsd-check-update.js',
-]);
 
 /**
  * Build the GSD-managed Codex SessionStart hook block for config.toml.
@@ -753,19 +773,19 @@ function buildCodexHookBlock(targetDir, opts) {
   const absoluteRunner = opts && opts.absoluteRunner;
   if (!absoluteRunner) return null;
   const eol = (opts && opts.eol) || '\n';
-  const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-  // toml requires escaped interior quotes (\"). The runner is already a
-  // JSON-stringified token (with literal " around the absolute path); we
-  // need to escape those quotes so the toml parser sees them as part of
-  // the string value, not as the closing quote of the command field.
-  const runnerEscaped = absoluteRunner.replace(/"/g, '\\"');
-  const hookPathEscaped = updateCheckScript.replace(/"/g, '\\"');
+  const platform = (opts && opts.platform) || process.platform;
+  const updateCheckScript = path.resolve(targetDir, 'hooks', 'gsd-check-update.js');
+  const commandValue = projectCodexHookTomlCommand({
+    absoluteRunner,
+    scriptPath: updateCheckScript,
+    platform,
+  });
   return `${eol}# GSD Hooks${eol}` +
     `[[hooks.SessionStart]]${eol}` +
     `${eol}` +
     `[[hooks.SessionStart.hooks]]${eol}` +
     `type = "command"${eol}` +
-    `command = "${runnerEscaped} \\"${hookPathEscaped}\\""${eol}`;
+    `command = "${commandValue}"${eol}`;
 }
 
 /**
@@ -781,8 +801,9 @@ function buildCodexHookBlock(targetDir, opts) {
  * @param {string|null} absoluteRunner - Result of resolveNodeRunner().
  * @returns {{ content: string, changed: boolean }}
  */
-function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
+function rewriteLegacyCodexHookBlock(content, absoluteRunner, opts) {
   if (!content || !absoluteRunner) return { content, changed: false };
+  const platform = (opts && opts.platform) || process.platform;
   let changed = false;
   // Match `command = "node <scriptToken>"` lines where scriptToken is
   // either an unquoted path (no spaces) or a toml-escaped quoted path.
@@ -797,16 +818,26 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
     /^(command\s*=\s*")node\s+((?:\\"[^"]+\\"|\S+))("\s*)$/gm,
     (full, prefix, scriptToken, suffix) => {
       // Extract the underlying script path from the captured token —
-      // either the bare token or the inner content of \"...\".
-      const quoted = scriptToken.match(/^\\"(.+)\\"$/);
-      const scriptPath = quoted ? quoted[1] : scriptToken;
-      const base = scriptPath.split(/[\\/]/).pop() || '';
-      if (!CODEX_MANAGED_HOOK_BASENAMES.has(base)) return full;
+      // either the bare token or the decoded inner content of \"...\".
+      const quoted = scriptToken.match(/^\\"([\s\S]+)\\"$/);
+      let scriptPath = scriptToken;
+      if (quoted) {
+        try {
+          scriptPath = String(parseTomlValue(`"${quoted[1]}"`, 0).value);
+        } catch {
+          scriptPath = quoted[1];
+        }
+      }
+      if (!isManagedHookBasename(scriptPath, { surface: 'codex-toml' })) return full;
+      const desiredCommand = projectCodexHookTomlCommand({
+        absoluteRunner,
+        scriptPath,
+        platform,
+      });
+      const currentCommand = `${prefix}${scriptToken}${suffix}`.replace(/^(command\s*=\s*")|("\s*)$/g, '');
+      if (currentCommand === desiredCommand) return full;
       changed = true;
-      const runnerEscaped = absoluteRunner.replace(/"/g, '\\"');
-      // Always re-quote the path on output for consistency with the new
-      // builder's shape.
-      return `${prefix}${runnerEscaped} \\"${scriptPath}\\"${suffix}`;
+      return `${prefix}${desiredCommand}${suffix}`;
     },
   );
   return { content: updated, changed };
@@ -818,11 +849,12 @@ function rewriteLegacyCodexHookBlock(content, absoluteRunner) {
  *
  * @param {string} configDir - Resolved absolute config directory path
  * @param {string} hookName - Hook filename (e.g. 'gsd-statusline.js')
- * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform }} [opts] - Options
+ * @param {{ portableHooks?: boolean, platform?: NodeJS.Platform, runtime?: string }} [opts] - Options
  *   portableHooks: when true, emit $HOME-relative paths instead of absolute paths.
  *   Safe for Linux/macOS global installs and WSL/Docker bind-mount scenarios.
  *   Not suitable for pure Windows (cmd.exe/PowerShell do not expand $HOME).
  *   platform: test injection for shell command formatting. Defaults to process.platform.
+ *   runtime: target runtime name for shell projection policy.
  */
 function buildHookCommand(configDir, hookName, opts) {
   if (!opts) opts = {};
@@ -842,19 +874,26 @@ function buildHookCommand(configDir, hookName, opts) {
   if (runner === null) return null;
 
   if (opts.portableHooks) {
-    // Replace the home directory prefix with $HOME so the path works when
-    // ~/.claude is bind-mounted into a container at a different absolute path.
-    const home = os.homedir().replace(/\\/g, '/');
-    const normalized = configDir.replace(/\\/g, '/');
-    const relative = normalized.startsWith(home)
-      ? '$HOME' + normalized.slice(home.length)
-      : normalized;
-    return formatHookCommandForShell(`${runner} "${relative}/hooks/${hookName}"`, opts);
+    const portableBaseDir = projectPortableHookBaseDir({
+      configDir,
+      homeDir: os.homedir(),
+    });
+    return projectManagedHookCommand({
+      absoluteRunner: runner,
+      scriptPath: `${portableBaseDir}/hooks/${hookName}`,
+      runtime: opts.runtime || 'generic',
+      platform: opts.platform || process.platform,
+    });
   }
 
   // Default: absolute path with forward slashes (Windows-safe, fixes #2045/#2046).
   const hooksPath = configDir.replace(/\\/g, '/') + '/hooks/' + hookName;
-  return formatHookCommandForShell(`${runner} "${hooksPath}"`, opts);
+  return projectManagedHookCommand({
+    absoluteRunner: runner,
+    scriptPath: hooksPath,
+    runtime: opts.runtime || 'generic',
+    platform: opts.platform || process.platform,
+  });
 }
 
 /**
@@ -3266,14 +3305,6 @@ function stripLeakedGsdCodexSections(content) {
  * Pure function, exported for test coverage. Returns the input unchanged
  * if no GSD-managed hook section is present.
  */
-// Legacy hook command basenames to detect during strip. Template-literal
-// form so install-hooks-copy.test.cjs's quoted-literal guard continues to
-// catch accidental regressions where someone *registers* the inverted
-// `gsd-update-check.js` filename in a Codex hook command.
-const STALE_HOOK_BASENAMES = new Set([
-  `gsd-update-check.js`,
-  `gsd-check-update.js`,
-]);
 function stripStaleGsdHookBlocks(configContent) {
   const sections = getTomlTableSections(configContent);
   const lineRecords = getTomlLineRecords(configContent);
@@ -3309,10 +3340,10 @@ function stripStaleGsdHookBlocks(configContent) {
         continue;
       }
       if (typeof parsed.value !== 'string') continue;
-      // Match the basename — Codex configs reference these files by absolute
-      // path under the user's `.codex/hooks/` directory.
-      const basename = parsed.value.split(/[\\/]/).pop() || '';
-      if (STALE_HOOK_BASENAMES.has(basename)) {
+      if (isManagedHookCommand(parsed.value, {
+        surface: 'codex-toml',
+        includeLegacyAliases: true,
+      })) {
         return true;
       }
     }
@@ -6332,6 +6363,12 @@ function uninstall(isGlobal, runtime = 'claude') {
 
   let removedCount = 0;
 
+  // Remove profile marker so a clean reinstall defaults to full surface.
+  try {
+    fs.unlinkSync(path.join(targetDir, '.gsd-profile'));
+    removedCount++;
+  } catch {}
+
   // 1. Remove GSD commands/skills
   if (isOpencode || isKilo) {
     // OpenCode/Kilo: remove command/gsd-*.md files
@@ -6708,22 +6745,19 @@ function uninstall(isGlobal, runtime = 'claude') {
 
     // Remove GSD hooks from settings — per-hook granularity to preserve
     // user hooks that share an entry with a GSD hook (#1755 followup)
-    const isGsdHookCommand = (cmd) =>
-      cmd && (cmd.includes('gsd-check-update') || cmd.includes('gsd-statusline') ||
-        cmd.includes('gsd-session-state') || cmd.includes('gsd-context-monitor') ||
-        cmd.includes('gsd-phase-boundary') || cmd.includes('gsd-prompt-guard') ||
-        cmd.includes('gsd-read-guard') || cmd.includes('gsd-read-injection-scanner') ||
-        cmd.includes('gsd-update-banner') ||
-        cmd.includes('gsd-validate-commit') || cmd.includes('gsd-workflow-guard'));
-
     for (const eventName of ['SessionStart', 'PostToolUse', 'AfterTool', 'PreToolUse', 'BeforeTool']) {
       if (settings.hooks && settings.hooks[eventName]) {
         const before = JSON.stringify(settings.hooks[eventName]);
         settings.hooks[eventName] = settings.hooks[eventName]
           .map(entry => {
-            if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
+            if (!entry || typeof entry !== 'object' || !Array.isArray(entry.hooks)) return entry;
             // Filter out individual GSD hooks, keep user hooks
-            entry.hooks = entry.hooks.filter(h => !isGsdHookCommand(h.command));
+            entry.hooks = entry.hooks.filter((h) => {
+              if (!h || typeof h.command !== 'string') return true;
+              return !isManagedHookCommand(h.command, {
+                surface: 'settings-json',
+              });
+            });
             return entry.hooks.length > 0 ? entry : null;
           })
           .filter(Boolean);
@@ -7577,6 +7611,55 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // `@$HOME/...` is treated as a literal path relative to the config dir, producing
   // `command/$HOME/...` (file not found). Use the absolute path for OpenCode so
   // @-references resolve correctly (#2376 Windows, #2831 macOS/Linux).
+  // gsd update marker re-application (ADR-0010 Deviation 2):
+  // Resolve which profile to use for this runtime's install:
+  //   1. --minimal / --core-only → back-compat path (stageSkillsForMode keeps strict core allowlist)
+  //   2. Explicit --profile=<name> → use it (overrides any marker)
+  //   3. Marker exists in targetDir → honor it (prevents silent expansion on update)
+  //   4. Else → 'full' (back-compat for fresh non-interactive installs)
+  //
+  // Multi-runtime disagreement: if installing across runtimes and their markers
+  // differ, the caller may use mostRestrictiveProfile() across the per-runtime
+  // results — here we resolve each runtime independently.
+  //
+  // Note: --minimal uses stageSkillsForMode (back-compat: strict allowlist, no closure).
+  // Named profiles (--profile=X or marker-driven) use resolveProfile() for transitive closure.
+  const _activeProfileName = hasMinimal
+    ? 'core'  // --minimal is a back-compat alias for the core profile; marker records 'core'
+    : resolveEffectiveProfile({
+        requestedProfileName: _requestedProfileName,
+        targetDir,
+      });
+  const _isCoreProfileAlias = _activeProfileName === 'core';
+  const _effectiveInstallMode = _isCoreProfileAlias ? 'minimal' : 'full';
+  // Load the manifest and compute resolved profile for named profiles.
+  // --minimal keeps its own staging path via _stageSkillsFn (see below).
+  const _commandsDir = path.join(src, 'commands', 'gsd');
+  const _skillsManifest = _isCoreProfileAlias ? new Map() : loadSkillsManifest(_commandsDir);
+  const _resolvedProfile = _isCoreProfileAlias
+    ? null  // --minimal uses stageSkillsForMode at dispatch sites
+    : resolveProfile({
+        modes: [_activeProfileName],
+        manifest: _skillsManifest,
+      });
+  // Unified staging function: for --minimal uses stageSkillsForMode (back-compat);
+  // for named profiles uses stageSkillsForProfile (new API with transitive closure).
+  function _stageSkills(commandsGsdDir) {
+    if (_isCoreProfileAlias) return stageSkillsForMode(commandsGsdDir, _effectiveInstallMode);
+    return stageSkillsForProfile(commandsGsdDir, _resolvedProfile);
+  }
+  function _stageAgents(agentsDir) {
+    if (_isCoreProfileAlias) return agentsDir;
+    return stageAgentsForProfile(agentsDir, _resolvedProfile);
+  }
+  const persistActiveProfileMarker = () => {
+    try {
+      writeActiveProfile(targetDir, _activeProfileName);
+    } catch {
+      // Non-fatal: marker persistence failure doesn't break the install.
+    }
+  };
+
   const resolvedTarget = path.resolve(targetDir).replace(/\\/g, '/');
   const homeDir = os.homedir().replace(/\\/g, '/');
   const isWindowsHost = process.platform === 'win32';
@@ -7660,7 +7743,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // Map<filename, Buffer> — content snapshot of each pre-existing gsd-* agent file.
   const codexPreInstallAgentContents = new Map();
   let codexPreInstallVersionBytes = null;
-  if (isCodex && !isMinimalMode(installMode)) {
+  if (isCodex && !isMinimalMode(_effectiveInstallMode)) {
     const _preSkillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(_preSkillsDir)) {
       for (const entry of fs.readdirSync(_preSkillsDir, { withFileTypes: true })) {
@@ -7714,7 +7797,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // atomic-write temp files. It is safe to call before any writes have happened.
   // The full restoreCodexSnapshot() (defined inside the config block) additionally
   // handles config.toml, which is not yet touched at this point in the pipeline.
-  const _codexPreConfigRollback = !isCodex || isMinimalMode(installMode) ? null : () => {
+  const _codexPreConfigRollback = !isCodex || isMinimalMode(_effectiveInstallMode) ? null : () => {
     rollbackInstallerMigrations();
     // skills/gsd-* — pass 1: restore snapshot entries (may be absent if deleted mid-install).
     const _earlySkillsDir = path.join(targetDir, 'skills');
@@ -7825,7 +7908,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     fs.mkdirSync(commandDir, { recursive: true });
 
     // Copy commands/gsd/*.md as command/gsd-*.md (flatten structure)
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyFlattenedCommands(gsdSrc, commandDir, 'gsd', pathPrefix, runtime);
     if (verifyInstalled(commandDir, 'command/gsd-*')) {
       const count = fs.readdirSync(commandDir).filter(f => f.startsWith('gsd-')).length;
@@ -7835,7 +7918,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCodex) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCodexSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -7845,7 +7928,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCopilot) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCopilotSkills(gsdSrc, skillsDir, 'gsd', isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -7860,7 +7943,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isAntigravity) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsAntigravitySkills(gsdSrc, skillsDir, 'gsd', isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -7875,7 +7958,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCursor) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCursorSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
     if (installedSkillNames.length > 0) {
@@ -7885,7 +7968,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isWindsurf) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsWindsurfSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
     if (installedSkillNames.length > 0) {
@@ -7895,7 +7978,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isAugment) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsAugmentSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -7905,7 +7988,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isTrae) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsTraeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -7915,7 +7998,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isQwen) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -7951,7 +8034,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // gsd/ category dir, alongside a DESCRIPTION.md that Hermes uses as the
     // category summary.
     const hermesSkillsDir = path.join(targetDir, 'skills', 'gsd');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsClaudeSkills(gsdSrc, hermesSkillsDir, 'gsd', pathPrefix, runtime, isGlobal);
     writeHermesCategoryDescription(hermesSkillsDir);
     if (fs.existsSync(hermesSkillsDir)) {
@@ -7994,7 +8077,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   } else if (isCodebuddy) {
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsCodebuddySkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
     const installedSkillNames = listCodexSkillNames(skillsDir);
     if (installedSkillNames.length > 0) {
@@ -8048,7 +8131,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     } else {
       const commandsDir = path.join(targetDir, 'commands');
       fs.mkdirSync(commandsDir, { recursive: true });
-      const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+      const gsdSrc = _stageSkills(_commandsDir);
       const gsdDest = path.join(commandsDir, 'gsd');
       copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
       if (verifyInstalled(gsdDest, 'commands/gsd')) {
@@ -8060,7 +8143,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   } else if (isGlobal) {
     // Claude Code global: skills/ format (2.1.88+ compatibility)
     const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
     if (fs.existsSync(skillsDir)) {
       const count = fs.readdirSync(skillsDir, { withFileTypes: true })
@@ -8095,7 +8178,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // commands from .claude/commands/gsd/, not .claude/skills/
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
-    const gsdSrc = stageSkillsForMode(path.join(src, 'commands', 'gsd'), installMode);
+    const gsdSrc = _stageSkills(_commandsDir);
     const gsdDest = path.join(commandsDir, 'gsd');
     copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true, isGlobal);
     if (verifyInstalled(gsdDest, 'commands/gsd')) {
@@ -8160,7 +8243,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // when no GSD workflow is active. See gsd-build/get-shit-done#2762.
   // Note: agentsSrc is declared as let before the enclosing try block so it
   // is accessible by installCodexConfig() in the Codex config section below.
-  agentsSrc = path.join(src, 'agents');
+  agentsSrc = _stageAgents(path.join(src, 'agents'));
   const agentsDest = path.join(targetDir, 'agents');
 
   // Always remove stale gsd-* agents first so re-installing with
@@ -8178,7 +8261,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   }
 
-  if (isMinimalMode(installMode)) {
+  if (isMinimalMode(_effectiveInstallMode)) {
     // Codex registers agents in `config.toml` via `[agents.gsd-*]` sections.
     // Without stripping them here, a full → minimal reinstall would leave the
     // runtime advertising the old full agent surface even though the agent
@@ -8379,7 +8462,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   }
 
   // Write file manifest for future modification detection
-  writeManifest(targetDir, runtime, { mode: installMode });
+  writeManifest(targetDir, runtime, { mode: _effectiveInstallMode });
   console.log(`  ${green}✓${reset} Wrote file manifest (${MANIFEST_NAME})`);
 
   // Report any backed-up local patches
@@ -8451,7 +8534,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     throw _earlyInstallErr;
   }
 
-  if (isCodex && !isMinimalMode(installMode)) {
+  if (isCodex && !isMinimalMode(_effectiveInstallMode)) {
     // Capture pre-install snapshot of config.toml before ANY GSD mutation
     // (#2760 fix 3). On post-write schema-validation failure OR any throw
     // during the mutation sequence (write failure, merge throw, etc.) we
@@ -8590,17 +8673,20 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       _cleanTmpFiles(targetDir);
     };
 
-    let agentCount;
-    try {
-      // Generate Codex config.toml and per-agent .toml files.
-      // Skipped under --minimal — same rationale as filesystem agents above.
-      agentCount = installCodexConfig(targetDir, agentsSrc);
-    } catch (e) {
-      restoreCodexSnapshot();
-      throw e;
+    let agentCount = 0;
+    if (!isMinimalMode(_effectiveInstallMode)) {
+      try {
+        // Generate Codex config.toml and per-agent .toml files.
+        agentCount = installCodexConfig(targetDir, agentsSrc);
+      } catch (e) {
+        restoreCodexSnapshot();
+        throw e;
+      }
+      console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
+      console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
+    } else {
+      console.log(`  ${dim}↳${reset} Skipping Codex agent config generation (minimal install)`);
     }
-    console.log(`  ${green}✓${reset} Generated config.toml with ${agentCount} agent roles`);
-    console.log(`  ${green}✓${reset} Generated ${agentCount} agent .toml config files`);
 
     // Copy hook files that are referenced in config.toml (#2153)
     // The main hook-copy block is gated to non-Codex runtimes, but Codex registers
@@ -8767,6 +8853,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       throw wrapped;
     }
 
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
@@ -8780,21 +8867,25 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       console.log(`  ${green}✓${reset} Generated copilot-instructions.md`);
     }
     // Copilot: no settings.json, no hooks, no statusline (like Codex)
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isCursor) {
     // Cursor uses skills — no config.toml, no settings.json hooks needed
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isWindsurf) {
     // Windsurf uses skills — no config.toml, no settings.json hooks needed
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
   if (isTrae) {
     // Trae uses skills — no settings.json hooks needed
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
@@ -8815,6 +8906,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     ].join('\n') + '\n';
     fs.writeFileSync(clinerulesDest, clinerules);
     console.log(`  ${green}✓${reset} Wrote .clinerules`);
+    persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
@@ -8825,6 +8917,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const rawSettings = readSettings(settingsPath);
   if (rawSettings === null) {
     console.log('  ' + yellow + 'i' + reset + '  Skipping settings.json configuration — file could not be parsed (comments or malformed JSON). Your existing settings are preserved.');
+    persistActiveProfileMarker();
     return;
   }
   const settings = validateHookFields(cleanupOrphanedHooks(rawSettings));
@@ -8833,28 +8926,40 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // existing managed hook entries stay bare-`node`-prefixed across reinstalls
   // and remain broken under GUI/minimal-PATH runtimes.
   const settingsRunner = resolveNodeRunner();
-  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner)) {
+  if (settingsRunner && rewriteLegacyManagedNodeHookCommands(settings, settingsRunner, { platform: process.platform, runtime })) {
     console.log(`  ${green}✓${reset} Rewrote legacy bare-node managed-hook commands to absolute path (#2979)`);
   }
   // Local installs anchor hook paths so they resolve regardless of cwd (#1906).
   // Claude Code sets $CLAUDE_PROJECT_DIR; Gemini/Antigravity do not — and on
   // Windows their own substitution logic doubles the path (#2557). Those runtimes
   // run project hooks with the project dir as cwd, so bare relative paths work.
-  const localPrefix = (runtime === 'gemini' || runtime === 'antigravity')
-    ? dirName
-    : '"$CLAUDE_PROJECT_DIR"/' + dirName;
-  const hookOpts = { portableHooks: hasPortableHooks };
+  const localPrefix = projectLocalHookPrefix({ runtime, dirName });
+  const hookOpts = { portableHooks: hasPortableHooks, runtime };
   // #2979: local-install hook commands also use the absolute node path so
   // GUI/minimal-PATH runtimes can resolve them. Bare `node` fails when the
   // host launches the runtime with a stripped PATH (Finder/Antigravity/etc).
   const localNodeRunner = resolveNodeRunner();
+  const localBashRunner = resolveBashRunner({ platform: process.platform });
   // If we cannot resolve an absolute node path AND this is a local install,
   // skip managed-hook registration. Returning null from buildHookCommand on
   // global installs has the same effect. Better to skip than to emit a bare
   // `node` command that recreates the #2979 failure.
   const localCmd = (hookFile) => localNodeRunner === null
     ? null
-    : formatHookCommandForShell(localNodeRunner + ' ' + localPrefix + '/hooks/' + hookFile, hookOpts);
+    : projectShellCommandText({
+      runnerToken: localNodeRunner,
+      argTokens: [`${localPrefix}/hooks/${hookFile}`],
+      runtime,
+      platform: process.platform,
+    });
+  const localShellCmd = (hookFile) => localBashRunner === null
+    ? null
+    : projectShellCommandText({
+      runnerToken: localBashRunner,
+      argTokens: [`${localPrefix}/hooks/${hookFile}`],
+      runtime,
+      platform: process.platform,
+    });
   const statuslineCommand = isGlobal
     ? buildHookCommand(targetDir, 'gsd-statusline.js', hookOpts)
     : localCmd('gsd-statusline.js');
@@ -9089,7 +9194,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // Configure commit validation hook (Conventional Commits enforcement, opt-in)
     const validateCommitCommand = isGlobal
       ? buildHookCommand(targetDir, 'gsd-validate-commit.sh', hookOpts)
-      : 'bash ' + localPrefix + '/hooks/gsd-validate-commit.sh';
+      : localShellCmd('gsd-validate-commit.sh');
     const hasValidateCommitHook = settings.hooks[preToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-validate-commit'))
     );
@@ -9118,7 +9223,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // Configure session state orientation hook (opt-in)
     const sessionStateCommand = isGlobal
       ? buildHookCommand(targetDir, 'gsd-session-state.sh', hookOpts)
-      : 'bash ' + localPrefix + '/hooks/gsd-session-state.sh';
+      : localShellCmd('gsd-session-state.sh');
     const hasSessionStateHook = settings.hooks.SessionStart.some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-session-state'))
     );
@@ -9142,7 +9247,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     // Configure phase boundary detection hook (opt-in)
     const phaseBoundaryCommand = isGlobal
       ? buildHookCommand(targetDir, 'gsd-phase-boundary.sh', hookOpts)
-      : 'bash ' + localPrefix + '/hooks/gsd-phase-boundary.sh';
+      : localShellCmd('gsd-phase-boundary.sh');
     const hasPhaseBoundaryHook = settings.hooks[postToolEvent].some(entry =>
       entry.hooks && entry.hooks.some(h => h.command && h.command.includes('gsd-phase-boundary'))
     );
@@ -9176,6 +9281,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       ? buildHookCommand(targetDir, 'gsd-update-banner.js', hookOpts)
       : localCmd('gsd-update-banner.js'));
 
+  persistActiveProfileMarker();
   return {
     settingsPath,
     settings,
@@ -9735,7 +9841,8 @@ function homePathCoveredByRc(globalBin, homeDir, rcFileNames) {
  *   - a diagnostic "already covered via rc file" note, if an rc file has
  *     `export PATH="$HOME/…/bin:$PATH"` (or equivalent) and the user just
  *     needs to reopen their shell
- *   - the absolute `echo 'export PATH="…:$PATH"' >> ~/.zshrc` suggestion,
+ *   - projected shell actions that append `export PATH="…:$PATH"` to
+ *     `~/.zshrc` / `~/.bashrc` when neither PATH nor rc files cover globalBin
  *     if neither PATH nor any rc file covers globalBin
  *
  * Exported for tests; the installer calls this from finishInstall.
@@ -9764,8 +9871,14 @@ function maybeSuggestPathExport(globalBin, homeDir) {
   console.log('');
   console.log(`  ${yellow}⚠${reset} ${bold}${globalBin}${reset} is not on your PATH.`);
   console.log(`    Add it with one of:`);
-  console.log(`      ${cyan}echo 'export PATH="${globalBin}:$PATH"' >> ~/.zshrc${reset}`);
-  console.log(`      ${cyan}echo 'export PATH="${globalBin}:$PATH"' >> ~/.bashrc${reset}`);
+  const projected = projectPersistentPathExportActions({
+    targetDir: globalBin,
+    platform: process.platform,
+  });
+  for (const action of projected.shellActions) {
+    const labelPrefix = action.label ? `${action.label}: ` : '';
+    console.log(`      ${cyan}${labelPrefix}${action.command}${reset}`);
+  }
   console.log('');
 }
 
@@ -10485,32 +10598,7 @@ function trySelfLinkGsdSdk(shimSrc) {
  * over rendered shim text.
  */
 function buildWindowsShimTriple(shimSrc) {
-  const path = require('path');
-  const shimAbs = path.resolve(shimSrc);
-  // JSON.stringify produces a double-quoted string with backslash+quote
-  // escaping — the safe quoting form for cmd.exe and PowerShell paths alike.
-  const shimQuoted = JSON.stringify(shimAbs);
-
-  const invocation = {
-    interpreter: 'node',
-    target: shimAbs,
-  };
-
-  // Renderers are template literals — the only place text is constructed.
-  // Tests do not parse these strings; they assert on the typed fields above.
-  const renderCmd = () =>
-    '@ECHO OFF\r\n@SETLOCAL\r\n@node ' + shimQuoted + ' %*\r\n';
-  const renderPs1 = () =>
-    '#!/usr/bin/env pwsh\n& node ' + shimQuoted + ' $args\nexit $LASTEXITCODE\n';
-  const renderSh = () =>
-    '#!/usr/bin/env sh\nexec node ' + shimQuoted + ' "$@"\n';
-
-  return {
-    invocation,
-    eol: { cmd: '\r\n', ps1: '\n', sh: '\n' },
-    fileNames: { cmd: 'gsd-sdk.cmd', ps1: 'gsd-sdk.ps1', sh: 'gsd-sdk' },
-    render: { cmd: renderCmd, ps1: renderPs1, sh: renderSh },
-  };
+  return buildWindowsShimTripleFromProjection(shimSrc);
 }
 
 /**
@@ -10530,56 +10618,7 @@ function buildWindowsShimTriple(shimSrc) {
  * console output. Pure function — no fs, no spawn, no console.
  */
 function formatSdkPathDiagnostic({ shimDir, platform, runDir }) {
-  const path = require('path');
-  const isWin32 = platform === 'win32';
-  // Detect either path separator — the test fixtures pass Windows-style
-  // paths while running on POSIX, and real users hit either depending on
-  // their npm/npx setup. Anchor on `_npx` between separators.
-  const isNpx = typeof runDir === 'string' &&
-    (runDir.includes('/_npx/') || runDir.includes('\\_npx\\'));
-
-  const shimLocationLine = shimDir ? `Shim written to: ${shimDir}` : '';
-  const actionLines = [];
-
-  if (shimDir) {
-    // Escape shimDir for each shell context. A path containing a single
-    // quote (e.g. C:\Users\O'Neil\AppData\...) would otherwise generate
-    // broken commands the user can't paste:
-    //   - PowerShell single-quoted string: '' escapes a literal single quote
-    //   - bash inside outer single quotes: '\'' (close, escaped quote, reopen)
-    //   - POSIX export inside double quotes: escape \ $ " ` so the path is
-    //     copied verbatim and $PATH (which is OUTSIDE the escaped substring)
-    //     still expands at paste time.
-    const psShimDir   = shimDir.replace(/'/g, "''");
-    const bashShimDir = shimDir.replace(/\\/g, '/').replace(/'/g, "'\\''");
-    const posixShimDir = shimDir.replace(/[\\$"`]/g, '\\$&');
-    actionLines.push('Add that directory to your PATH and restart your shell.');
-    if (isWin32) {
-      actionLines.push(`PowerShell: [Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')`);
-      // setx PATH "...;%PATH%" silently truncates above 1024 chars and
-      // expands %PATH% / %SystemRoot% to literals (turning REG_EXPAND_SZ
-      // into REG_SZ), permanently breaking lazy variable references.
-      // Invoke PowerShell from cmd.exe with the same SetEnvironmentVariable
-      // call as the PowerShell line so cmd.exe users get a safe command.
-      actionLines.push(`cmd.exe   : powershell -Command "[Environment]::SetEnvironmentVariable('PATH', '${psShimDir};' + [Environment]::GetEnvironmentVariable('PATH', 'User'), 'User')"`);
-      actionLines.push(`Git Bash  : echo 'export PATH="${bashShimDir}:$PATH"' >> ~/.bashrc`);
-    } else {
-      actionLines.push(`export PATH="${posixShimDir}:$PATH"`);
-    }
-  } else {
-    actionLines.push('Could not locate a writable PATH directory to install the shim.');
-    actionLines.push('Install globally to materialize the bin symlink:');
-    actionLines.push('npm install -g get-shit-done-cc');
-  }
-
-  const npxNoteLines = isNpx
-    ? [
-        "Note: you're running via npx. For a persistent shim,",
-        'install globally instead: npm install -g get-shit-done-cc',
-      ]
-    : [];
-
-  return { shimLocationLine, actionLines, npxNoteLines, isNpx, isWin32 };
+  return formatSdkPathDiagnosticFromProjection({ shimDir, platform, runDir });
 }
 
 function trySelfLinkGsdSdkWindows(shimSrc) {

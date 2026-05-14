@@ -4,7 +4,7 @@
  * Scans all .planning/ artifact categories for items with open/unresolved state.
  * Returns structured JSON for workflow consumption.
  * Called by: gsd-tools.cjs audit-open
- * Used by: /gsd-complete-milestone pre-close gate
+ * Used by: /gsd:complete-milestone pre-close gate
  */
 
 'use strict';
@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { toPosixPath } = require('./core.cjs');
+const { platformReadSync } = require('./shell-command-projection.cjs');
 const { planningDir } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { requireSafePath, sanitizeForDisplay } = require('./security.cjs');
@@ -46,12 +47,8 @@ function scanDebugSessions(planDir) {
       continue;
     }
 
-    let content;
-    try {
-      content = fs.readFileSync(safeFilePath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const content = platformReadSync(safeFilePath);
+    if (content === null) continue;
 
     const fm = extractFrontmatter(content);
     const status = (fm.status || 'unknown').toLowerCase();
@@ -133,12 +130,12 @@ function scanQuickTasks(planDir) {
       } catch {
         continue;
       }
-      try {
-        const content = fs.readFileSync(safeSum, 'utf-8');
+      const content = platformReadSync(safeSum);
+      if (content === null) {
+        status = 'unreadable';
+      } else {
         const fm = extractFrontmatter(content);
         status = (fm.status || 'unknown').toLowerCase();
-      } catch {
-        status = 'unreadable';
       }
     }
 
@@ -195,12 +192,8 @@ function scanThreads(planDir) {
       continue;
     }
 
-    let content;
-    try {
-      content = fs.readFileSync(safeFilePath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const content = platformReadSync(safeFilePath);
+    if (content === null) continue;
 
     const fm = extractFrontmatter(content);
     let status = (fm.status || '').toLowerCase().trim();
@@ -266,12 +259,8 @@ function scanTodos(planDir) {
       continue;
     }
 
-    let content;
-    try {
-      content = fs.readFileSync(safeFilePath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const content = platformReadSync(safeFilePath);
+    if (content === null) continue;
 
     const fm = extractFrontmatter(content);
 
@@ -326,12 +315,8 @@ function scanSeeds(planDir) {
       continue;
     }
 
-    let content;
-    try {
-      content = fs.readFileSync(safeFilePath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const content = platformReadSync(safeFilePath);
+    if (content === null) continue;
 
     const fm = extractFrontmatter(content);
     const status = (fm.status || 'dormant').toLowerCase();
@@ -406,12 +391,8 @@ function scanUatGaps(planDir) {
         continue;
       }
 
-      let content;
-      try {
-        content = fs.readFileSync(safeFilePath, 'utf-8');
-      } catch {
-        continue;
-      }
+      const content = platformReadSync(safeFilePath);
+      if (content === null) continue;
 
       const fm = extractFrontmatter(content);
       const status = (fm.status || 'unknown').toLowerCase();
@@ -478,12 +459,8 @@ function scanVerificationGaps(planDir) {
         continue;
       }
 
-      let content;
-      try {
-        content = fs.readFileSync(safeFilePath, 'utf-8');
-      } catch {
-        continue;
-      }
+      const content = platformReadSync(safeFilePath);
+      if (content === null) continue;
 
       const fm = extractFrontmatter(content);
       const status = (fm.status || 'unknown').toLowerCase();
@@ -542,12 +519,8 @@ function scanContextQuestions(planDir) {
         continue;
       }
 
-      let content;
-      try {
-        content = fs.readFileSync(safeFilePath, 'utf-8');
-      } catch {
-        continue;
-      }
+      const content = platformReadSync(safeFilePath);
+      if (content === null) continue;
 
       const fm = extractFrontmatter(content);
 

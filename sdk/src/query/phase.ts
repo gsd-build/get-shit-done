@@ -262,6 +262,15 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   } catch { /* phases dir doesn't exist */ }
 
   if (!phaseDir) {
+    const found = await findPhase([phase], projectDir, workstream);
+    const foundData = found.data as Record<string, unknown> | null;
+    const relDir = foundData?.directory;
+    if (foundData?.found && typeof relDir === 'string' && relDir.trim() !== '') {
+      phaseDir = join(projectDir, relDir);
+    }
+  }
+
+  if (!phaseDir) {
     return {
       data: {
         phase: normalized,
@@ -278,6 +287,11 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   const phaseFiles = await readdir(phaseDir);
   const planFiles = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').sort();
   const summaryFiles = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+  const nonCanonicalPlanFiles = phaseFiles.filter((f) => (
+    f.toLowerCase().endsWith('.md')
+    && /(^|-)plan(-|\.)/i.test(f)
+    && !(f.endsWith('-PLAN.md') || f === 'PLAN.md')
+  )).sort();
 
   // Build set of plan IDs with summaries — match the planId derivation logic
   const completedPlanIds = new Set(
@@ -432,6 +446,10 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   const incomplete: string[] = [];
   let hasCheckpoints = false;
   const warnings: string[] = [];
+
+  if (nonCanonicalPlanFiles.length > 0) {
+    warnings.push(`Ignored noncanonical plan files: ${nonCanonicalPlanFiles.join(', ')}`);
+  }
 
   for (const raw of rawPlans) {
     if (!raw.autonomous) {

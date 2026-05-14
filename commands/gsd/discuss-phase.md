@@ -12,6 +12,7 @@ allowed-tools:
   - Agent
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
+requires: [config, phase]
 ---
 
 <objective>

@@ -19,6 +19,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
@@ -420,7 +421,7 @@ function buildPreview(gsd2Data, artifacts) {
   lines.push('');
   lines.push('Cannot migrate automatically:');
   lines.push('  - GSD-2 cost/token ledger (no v1 equivalent)');
-  lines.push('  - GSD-2 database state (rebuilt from files on first /gsd-health)');
+  lines.push('  - GSD-2 database state (rebuilt from files on first /gsd:health)');
   lines.push('  - VS Code extension state');
 
   return lines.join('\n');
@@ -434,8 +435,7 @@ function buildPreview(gsd2Data, artifacts) {
 function writePlanningDir(artifacts, planningRoot) {
   for (const [rel, content] of artifacts) {
     const absPath = path.join(planningRoot, rel);
-    fs.mkdirSync(path.dirname(absPath), { recursive: true });
-    fs.writeFileSync(absPath, content, 'utf8');
+    platformWriteSync(absPath, content);
   }
 }
 

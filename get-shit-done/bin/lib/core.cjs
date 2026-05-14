@@ -5,7 +5,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execSync, execFileSync, spawnSync } = require('child_process');
+const { execGit, platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { MODEL_PROFILES, AGENT_TO_PHASE_TYPE, VALID_PHASE_TYPES, AGENT_DEFAULT_TIERS, VALID_AGENT_TIERS, nextTier } = require('./model-profiles.cjs');
 const { MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT } = require('./model-catalog.cjs');
 const {
@@ -107,7 +107,9 @@ function findProjectRoot(startDir) {
     if (fs.existsSync(parentPlanning) && fs.statSync(parentPlanning).isDirectory()) {
       const configPath = path.join(parentPlanning, 'config.json');
       try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        const raw = platformReadSync(configPath);
+        if (raw === null) throw new Error('missing');
+        const config = JSON.parse(raw);
         const subRepos = config.sub_repos || config.planning?.sub_repos || [];
 
         // Check explicit sub_repos list
@@ -155,7 +157,7 @@ function findProjectRoot(startDir) {
 const GSD_TEMP_DIR = path.join(require('os').tmpdir(), 'gsd');
 
 function ensureGsdTempDir() {
-  fs.mkdirSync(GSD_TEMP_DIR, { recursive: true });
+  platformEnsureDir(GSD_TEMP_DIR);
 }
 
 function reapStaleTempFiles(prefix = 'gsd-', { maxAgeMs = 5 * 60 * 1000, dirsOnly = false } = {}) {
@@ -196,7 +198,7 @@ function output(result, raw, rawValue) {
       reapStaleTempFiles();
       ensureGsdTempDir();
       const tmpPath = path.join(GSD_TEMP_DIR, `gsd-${Date.now()}.json`);
-      fs.writeFileSync(tmpPath, json, 'utf-8');
+      platformWriteSync(tmpPath, json);
       data = '@file:' + tmpPath;
     } else {
       data = json;
@@ -276,14 +278,6 @@ function error(message, reason = ERROR_REASON.UNKNOWN) {
 
 // ─── File & Config utilities ──────────────────────────────────────────────────
 
-function safeReadFile(filePath) {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Canonical config defaults. Single source of truth — imported by config.cjs and verify.cjs.
  */
@@ -311,7 +305,7 @@ const CONFIG_DEFAULTS = {
   phase_naming: 'sequential', // 'sequential' (default, auto-increment) or 'custom' (arbitrary string IDs)
   project_code: null, // optional short prefix for phase dirs (e.g., 'CK' → 'CK-01-foundation')
   subagent_timeout: 300000, // 5 min default; increase for large codebases or slower models (ms)
-  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd-secure-phase
+  security_enforcement: true, // workflow.security_enforcement — threat-model-anchored security verification via /gsd:secure-phase
   security_asvs_level: 1, // workflow.security_asvs_level — OWASP ASVS verification level (1=opportunistic, 2=standard, 3=comprehensive)
   security_block_on: 'high', // workflow.security_block_on — minimum severity that blocks phase advancement ('high' | 'medium' | 'low')
   post_planning_gaps: true, // workflow.post_planning_gaps — unified post-planning gap report (#2493): scan REQUIREMENTS.md + CONTEXT.md decisions vs all PLAN.md files
@@ -351,7 +345,8 @@ function loadConfig(cwd, options = {}) {
   if (ws) {
     const rootConfigPath = path.join(planningRoot(cwd), 'config.json');
     try {
-      const raw = fs.readFileSync(rootConfigPath, 'utf-8');
+      const raw = platformReadSync(rootConfigPath);
+      if (raw === null) throw new Error('missing');
       rootParsed = JSON.parse(raw);
     } catch {
       // Root config missing or unparseable — workstream config stands alone
@@ -362,7 +357,8 @@ function loadConfig(cwd, options = {}) {
   const defaults = CONFIG_DEFAULTS;
 
   try {
-    const raw = fs.readFileSync(configPath, 'utf-8');
+    const raw = platformReadSync(configPath);
+    if (raw === null) throw new Error('missing');
     // `fileData` is the parsed content of the config.json file on disk — used
     // for migrations and writes so we never persist merged values back to disk.
     const fileData = JSON.parse(raw);
@@ -372,7 +368,7 @@ function loadConfig(cwd, options = {}) {
       const depthToGranularity = { quick: 'coarse', standard: 'standard', comprehensive: 'fine' };
       fileData.granularity = depthToGranularity[fileData.depth] || fileData.depth;
       delete fileData.depth;
-      try { fs.writeFileSync(configPath, JSON.stringify(fileData, null, 2), 'utf-8'); } catch { /* intentionally empty */ }
+      try { platformWriteSync(configPath, JSON.stringify(fileData, null, 2)); } catch { /* intentionally empty */ }
     }
 
     // Auto-detect and sync sub_repos: scan for child directories with .git
@@ -420,7 +416,7 @@ function loadConfig(cwd, options = {}) {
     // Persist sub_repos changes (migration or sync) — write only the on-disk
     // file contents, never the merged result, to avoid polluting workstream configs.
     if (configDirty) {
-      try { fs.writeFileSync(configPath, JSON.stringify(fileData, null, 2), 'utf-8'); } catch {}
+      try { platformWriteSync(configPath, JSON.stringify(fileData, null, 2)); } catch {}
     }
 
     // Now apply root→workstream inheritance. `parsed` is the effective config
@@ -556,7 +552,8 @@ function loadConfig(cwd, options = {}) {
     try {
       const home = process.env.GSD_HOME || os.homedir();
       const globalDefaultsPath = path.join(home, '.gsd', 'defaults.json');
-      const raw = fs.readFileSync(globalDefaultsPath, 'utf-8');
+      const raw = platformReadSync(globalDefaultsPath);
+      if (raw === null) throw new Error('missing');
       const globalDefaults = JSON.parse(raw);
       return {
         ...defaults,
@@ -593,168 +590,16 @@ const _gitIgnoredCache = new Map();
 function isGitIgnored(cwd, targetPath) {
   const key = cwd + '::' + targetPath;
   if (_gitIgnoredCache.has(key)) return _gitIgnoredCache.get(key);
-  try {
-    // --no-index checks .gitignore rules regardless of whether the file is tracked.
-    // Without it, git check-ignore returns "not ignored" for tracked files even when
-    // .gitignore explicitly lists them — a common source of confusion when .planning/
-    // was committed before being added to .gitignore.
-    // Use execFileSync (array args) to prevent shell interpretation of special characters
-    // in file paths — avoids command injection via crafted path names.
-    execFileSync('git', ['check-ignore', '-q', '--no-index', '--', targetPath], {
-      cwd,
-      stdio: 'pipe',
-    });
-    _gitIgnoredCache.set(key, true);
-    return true;
-  } catch {
-    _gitIgnoredCache.set(key, false);
-    return false;
-  }
-}
-
-// ─── Markdown normalization ─────────────────────────────────────────────────
-
-/**
- * Normalize markdown to fix common markdownlint violations.
- * Applied at write points so GSD-generated .planning/ files are IDE-friendly.
- *
- * Rules enforced:
- *   MD022 — Blank lines around headings
- *   MD031 — Blank lines around fenced code blocks
- *   MD032 — Blank lines around lists
- *   MD012 — No multiple consecutive blank lines (collapsed to 2 max)
- *   MD047 — Files end with a single newline
- */
-function normalizeMd(content) {
-  if (!content || typeof content !== 'string') return content;
-
-  // Normalize line endings to LF for consistent processing
-  let text = content.replace(/\r\n/g, '\n');
-
-  const lines = text.split('\n');
-  const result = [];
-
-  // Pre-compute fence state in a single O(n) pass instead of O(n^2) per-line scanning
-  const fenceRegex = /^```/;
-  const insideFence = new Array(lines.length);
-  let fenceOpen = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (fenceRegex.test(lines[i].trimEnd())) {
-      if (fenceOpen) {
-        // This is a closing fence — mark as NOT inside (it's the boundary)
-        insideFence[i] = false;
-        fenceOpen = false;
-      } else {
-        // This is an opening fence
-        insideFence[i] = false;
-        fenceOpen = true;
-      }
-    } else {
-      insideFence[i] = fenceOpen;
-    }
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const prev = i > 0 ? lines[i - 1] : '';
-    const prevTrimmed = prev.trimEnd();
-    const trimmed = line.trimEnd();
-    const isFenceLine = fenceRegex.test(trimmed);
-
-    // MD022: Blank line before headings (skip first line and frontmatter delimiters)
-    if (/^#{1,6}\s/.test(trimmed) && i > 0 && prevTrimmed !== '' && prevTrimmed !== '---') {
-      result.push('');
-    }
-
-    // MD031: Blank line before fenced code blocks (opening fences only)
-    if (isFenceLine && i > 0 && prevTrimmed !== '' && !insideFence[i] && (i === 0 || !insideFence[i - 1] || isFenceLine)) {
-      // Only add blank before opening fences (not closing ones)
-      if (i === 0 || !insideFence[i - 1]) {
-        result.push('');
-      }
-    }
-
-    // MD032: Blank line before lists (- item, * item, N. item, - [ ] item)
-    if (/^(\s*[-*+]\s|\s*\d+\.\s)/.test(line) && i > 0 &&
-        prevTrimmed !== '' && !/^(\s*[-*+]\s|\s*\d+\.\s)/.test(prev) &&
-        prevTrimmed !== '---') {
-      result.push('');
-    }
-
-    result.push(line);
-
-    // MD022: Blank line after headings
-    if (/^#{1,6}\s/.test(trimmed) && i < lines.length - 1) {
-      const next = lines[i + 1];
-      if (next !== undefined && next.trimEnd() !== '') {
-        result.push('');
-      }
-    }
-
-    // MD031: Blank line after closing fenced code blocks
-    if (/^```\s*$/.test(trimmed) && i > 0 && insideFence[i - 1] && i < lines.length - 1) {
-      const next = lines[i + 1];
-      if (next !== undefined && next.trimEnd() !== '') {
-        result.push('');
-      }
-    }
-
-    // MD032: Blank line after last list item in a block
-    if (/^(\s*[-*+]\s|\s*\d+\.\s)/.test(line) && i < lines.length - 1) {
-      const next = lines[i + 1];
-      if (next !== undefined && next.trimEnd() !== '' &&
-          !/^(\s*[-*+]\s|\s*\d+\.\s)/.test(next) &&
-          !/^\s/.test(next)) {
-        // Only add blank line if next line is not a continuation/indented line
-        result.push('');
-      }
-    }
-  }
-
-  text = result.join('\n');
-
-  // MD012: Collapse 3+ consecutive blank lines to 2
-  text = text.replace(/\n{3,}/g, '\n\n');
-
-  // MD047: Ensure file ends with exactly one newline
-  text = text.replace(/\n*$/, '\n');
-
-  return text;
-}
-
-// Default timeout for worktree-related git subprocess calls (matches worktree-safety.cjs).
-// Prevents `git worktree list --porcelain` and similar calls from blocking the parent
-// process indefinitely when git is stalled (locked index, hung remote, NFS mount freeze).
-// Callers can override via an options bag if needed.
-const DEFAULT_GIT_TIMEOUT_MS = 10000;
-
-/**
- * Execute a git command with a bounded timeout.
- *
- * Return shape: { exitCode, stdout, stderr, timedOut, error }
- *   - timedOut: true when spawnSync reports SIGTERM + ETIMEDOUT — callers must
- *               branch on this to surface a structured warning (PRED.k302).
- *   - error:    spawnSync error object or null
- *
- * Backward-compatible: existing callers that only read exitCode/stdout/stderr
- * continue to work unchanged.
- */
-function execGit(cwd, args, options = {}) {
-  const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
-  const result = spawnSync('git', args, {
-    cwd,
-    stdio: 'pipe',
-    encoding: 'utf-8',
-    timeout,
-  });
-  const timedOut = result.signal === 'SIGTERM' && result.error?.code === 'ETIMEDOUT';
-  return {
-    exitCode: result.status ?? 1,
-    stdout: (result.stdout ?? '').toString().trim(),
-    stderr: (result.stderr ?? '').toString().trim(),
-    timedOut,
-    error: result.error ?? null,
-  };
+  // --no-index checks .gitignore rules regardless of whether the file is tracked.
+  // Without it, git check-ignore returns "not ignored" for tracked files even when
+  // .gitignore explicitly lists them — a common source of confusion when .planning/
+  // was committed before being added to .gitignore.
+  // Array args (via the seam) prevent shell interpretation of special characters in
+  // file paths — avoids command injection via crafted path names.
+  const result = execGit(['check-ignore', '-q', '--no-index', '--', targetPath], { cwd });
+  const ignored = result.exitCode === 0;
+  _gitIgnoredCache.set(key, ignored);
+  return ignored;
 }
 
 // ─── Common path helpers ──────────────────────────────────────────────────────
@@ -765,8 +610,10 @@ function execGit(cwd, args, options = {}) {
  * Returns the main worktree path, or cwd if not in a worktree.
  */
 function resolveWorktreeRoot(cwd) {
+  // Omit execGit so worktree-safety uses its own execGitDefault — that wrapper
+  // delegates to the seam and derives the `timedOut` field that pruneResult
+  // branches on below.
   const context = resolveWorktreeContext(cwd, {
-    execGit,
     existsSync: fs.existsSync,
   });
   return context.effectiveRoot;
@@ -798,9 +645,9 @@ function pruneOrphanedWorktrees(repoRoot) {
     const plan = planWorktreePrune(
       repoRoot,
       { allowDestructive: false },
-      { execGit, parseWorktreePorcelain }
+      { parseWorktreePorcelain }
     );
-    const pruneResult = executeWorktreePrunePlan(plan, { execGit });
+    const pruneResult = executeWorktreePrunePlan(plan);
     if (pruneResult && pruneResult.timedOut) {
       // AC2: surface structured warning instead of silently swallowing the timeout.
       // Uses process.stderr.write to match the [gsd-tools] WARNING prefix style.
@@ -1076,8 +923,8 @@ function extractCurrentMilestone(content, cwd) {
   let version = null;
   try {
     const statePath = path.join(planningDir(cwd), 'STATE.md');
-    if (fs.existsSync(statePath)) {
-      const stateRaw = fs.readFileSync(statePath, 'utf-8');
+    const stateRaw = platformReadSync(statePath);
+    if (stateRaw !== null) {
       const milestoneMatch = stateRaw.match(/^milestone:\s*(.+)/m);
       if (milestoneMatch) {
         version = milestoneMatch[1].trim();
@@ -1183,7 +1030,9 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
   if (!fs.existsSync(roadmapPath)) return null;
 
   try {
-    const content = extractCurrentMilestone(fs.readFileSync(roadmapPath, 'utf-8'), cwd);
+    const roadmapRaw = platformReadSync(roadmapPath);
+    if (roadmapRaw === null) throw new Error('missing');
+    const content = extractCurrentMilestone(roadmapRaw, cwd);
     // Strip leading zeros from purely numeric phase numbers so "03" matches "Phase 3:"
     // in canonical ROADMAP headings. Non-numeric IDs (e.g. "PROJ-42") are kept as-is.
     const normalized = /^\d+$/.test(String(phaseNum))
@@ -1693,7 +1542,8 @@ function generateSlugInternal(text) {
 
 function getMilestoneInfo(cwd) {
   try {
-    const roadmap = fs.readFileSync(path.join(planningDir(cwd), 'ROADMAP.md'), 'utf-8');
+    const roadmap = platformReadSync(path.join(planningDir(cwd), 'ROADMAP.md'));
+    if (roadmap === null) throw new Error('missing');
 
     // 0. Prefer STATE.md milestone: frontmatter as the authoritative source.
     // This prevents falling through to a regex that may match an old heading
@@ -1703,8 +1553,8 @@ function getMilestoneInfo(cwd) {
     if (cwd) {
       try {
         const statePath = path.join(planningDir(cwd), 'STATE.md');
-        if (fs.existsSync(statePath)) {
-          const stateRaw = fs.readFileSync(statePath, 'utf-8');
+        const stateRaw = platformReadSync(statePath);
+        if (stateRaw !== null) {
           const m = stateRaw.match(/^milestone:\s*(.+)/m);
           if (m) stateVersion = m[1].trim();
         }
@@ -1785,7 +1635,8 @@ function getMilestonePhaseFilter(cwd, versionOverride) {
   let missingExplicitVersion = false;
   try {
     const roadmapPath = path.join(planningDir(cwd), 'ROADMAP.md');
-    const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+    const roadmapContent = platformReadSync(roadmapPath);
+    if (roadmapContent === null) throw new Error('missing');
     let roadmap = extractCurrentMilestone(roadmapContent, cwd);
 
     if (versionOverride) {
@@ -1913,38 +1764,6 @@ function readSubdirectories(dirPath, sort = false) {
   }
 }
 
-// ─── Atomic file writes ───────────────────────────────────────────────────────
-
-/**
- * Write a file atomically using write-to-temp-then-rename.
- *
- * On POSIX systems, `fs.renameSync` is atomic when the source and destination
- * are on the same filesystem. This prevents a process killed mid-write from
- * leaving a truncated file that is unparseable on next read.
- *
- * The temp file is placed alongside the target so it is guaranteed to be on
- * the same filesystem (required for rename atomicity). The PID is embedded in
- * the temp file name so concurrent writers use distinct paths.
- *
- * If `renameSync` fails (e.g. cross-device move), the function falls back to a
- * direct `writeFileSync` so callers always get a best-effort write.
- *
- * @param {string} filePath  Absolute path to write.
- * @param {string|Buffer} content  File content.
- * @param {string} [encoding='utf-8']  Encoding passed to writeFileSync.
- */
-function atomicWriteFileSync(filePath, content, encoding = 'utf-8') {
-  const tmpPath = filePath + '.tmp.' + process.pid;
-  try {
-    fs.writeFileSync(tmpPath, content, encoding);
-    fs.renameSync(tmpPath, filePath);
-  } catch (renameErr) {
-    // Clean up the temp file if rename failed, then fall back to direct write.
-    try { fs.unlinkSync(tmpPath); } catch { /* already gone or never created */ }
-    fs.writeFileSync(filePath, content, encoding);
-  }
-}
-
 /**
  * Format a Date as a fuzzy relative time string (e.g. "5 minutes ago").
  * @param {Date} date
@@ -1977,11 +1796,8 @@ module.exports = {
   ERROR_REASON,
   setJsonErrorMode,
   getJsonErrorMode,
-  safeReadFile,
   loadConfig,
   isGitIgnored,
-  execGit,
-  normalizeMd,
   escapeRegex,
   normalizePhaseName,
   comparePhaseNum,
@@ -2029,7 +1845,6 @@ module.exports = {
   readSubdirectories,
   getAgentsDir,
   checkAgentsInstalled,
-  atomicWriteFileSync,
   timeAgo,
   pruneOrphanedWorktrees,
   inspectWorktreeHealth,

@@ -295,6 +295,70 @@ describe('initProgress', () => {
       await rm(tmp, { recursive: true, force: true });
     }
   });
+
+  it('treats terminal heading labels as complete when selecting next_phase (#3472)', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'gsd-init-complex-3472-'));
+    try {
+      await mkdir(join(tmp, '.planning'), { recursive: true });
+      await writeFile(join(tmp, '.planning', 'config.json'), JSON.stringify({
+        model_profile: 'balanced',
+        commit_docs: false,
+        git: {
+          branching_strategy: 'none',
+          phase_branch_template: 'gsd/phase-{phase}-{slug}',
+          milestone_branch_template: 'gsd/{milestone}-{slug}',
+          quick_branch_template: null,
+        },
+        workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: true },
+      }));
+      await writeFile(join(tmp, '.planning', 'STATE.md'), [
+        '---',
+        'milestone: v1.0',
+        '---',
+      ].join('\n'));
+      await writeFile(join(tmp, '.planning', 'ROADMAP.md'), [
+        '# Roadmap',
+        '',
+        '## v1.0: Current',
+        '',
+        '## Phase 4.12: Old Work (COMPLETE)',
+        '',
+        '## Phase 4.13: Another old one (SHIPPED 2026-05-12)',
+        '',
+        '## Phase 4.17: Human Auth (DEFERRED)',
+        '',
+        '## Phase 4.23: New pending work',
+        '',
+        '## Phase 4.24: Follow-up item (PROMOTED)',
+        '',
+        '## Phase 4.25: Another follow-up (REGISTERED)',
+        '',
+        '## Phase 4.26: Triage marker (INSERTED)',
+        '',
+      ].join('\n'));
+
+      const result = await initProgress([], tmp);
+      const data = result.data as Record<string, unknown>;
+      const phases = data.phases as Record<string, unknown>[];
+      const phase412 = phases.find(p => p.number === '4.12');
+      const phase413 = phases.find(p => p.number === '4.13');
+      const phase417 = phases.find(p => p.number === '4.17');
+      const phase424 = phases.find(p => p.number === '4.24');
+      const phase425 = phases.find(p => p.number === '4.25');
+      const phase426 = phases.find(p => p.number === '4.26');
+
+      expect(phase412?.status).toBe('complete');
+      expect(phase413?.status).toBe('complete');
+      expect(phase417?.status).toBe('complete');
+      expect(phase424?.status).not.toBe('complete');
+      expect(phase425?.status).not.toBe('complete');
+      expect(phase426?.status).not.toBe('complete');
+      expect(data.completed_count).toBe(3);
+      expect((data.next_phase as Record<string, unknown>).number).toBe('4.23');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('initManager', () => {

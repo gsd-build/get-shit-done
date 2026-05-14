@@ -9,6 +9,7 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+requires: [phase, progress, update]
 ---
 
 <objective>
