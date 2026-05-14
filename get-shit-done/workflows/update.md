@@ -366,9 +366,26 @@ Exit.
 <step name="show_changes_and_confirm">
 **If update available**, fetch and show what's new BEFORE updating:
 
-1. Fetch changelog from GitHub raw URL
-2. Extract entries between installed and latest versions
-3. Display preview and ask for confirmation:
+Use the bundled `extract-changelog.cjs` script for deterministic changelog parsing.
+Do NOT attempt to parse the changelog text yourself — the script handles
+Keep-a-Changelog format with exact version-boundary matching.
+
+```bash
+CHANGELOG_URL="https://raw.githubusercontent.com/gsd-build/get-shit-done/main/CHANGELOG.md"
+CHANGELOG=$(curl -sL "$CHANGELOG_URL")
+EXTRACT_SCRIPT="$GSD_BIN_DIR/extract-changelog.cjs"
+
+if [ -f "$EXTRACT_SCRIPT" ]; then
+  CHANGES=$(echo "$CHANGELOG" | node "$EXTRACT_SCRIPT" --from "$INSTALLED_VERSION" --to "$LATEST_VERSION")
+  if [ $? -ne 0 ]; then
+    CHANGES="(Could not extract changelog — [View full changelog]($CHANGELOG_URL))"
+  fi
+else
+  CHANGES="(extract-changelog.cjs not found — [View full changelog]($CHANGELOG_URL))"
+fi
+```
+
+Display the extracted changes and ask for confirmation:
 
 ```
 ## GSD Update Available
