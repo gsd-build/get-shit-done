@@ -20,7 +20,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { GSDError, ErrorClassification } from '../errors.js';
-import { planningPaths, normalizePhaseName } from './helpers.js';
+import { planningPaths, normalizePhaseName, comparePhaseNum } from './helpers.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -192,8 +192,9 @@ function stateAdvancedPastPlan(projectDir: string, phase: string, plan: string, 
   const askPhase = normalizePhaseName(phase);
   const curPlan = parseInt(String(currentPlanMatch[1]).trim().replace(/^0+/, '') || '0', 10);
   const askPlan = parseInt(plan.replace(/^0+/, '') || '0', 10);
-  if (curPhase > askPhase) return true;
-  if (curPhase === askPhase && Number.isFinite(curPlan) && Number.isFinite(askPlan) && curPlan > askPlan) return true;
+  const phaseComparison = comparePhaseNum(curPhase, askPhase);
+  if (phaseComparison > 0) return true;
+  if (phaseComparison === 0 && Number.isFinite(curPlan) && Number.isFinite(askPlan) && curPlan > askPlan) return true;
   // STATE.md may also encode completion via status === 'completed' for the
   // milestone — that signal is downstream of all individual plans being
   // done, so we treat it as "advanced past everything".

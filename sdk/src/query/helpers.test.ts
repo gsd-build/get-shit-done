@@ -91,6 +91,10 @@ describe('comparePhaseNum', () => {
     expect(comparePhaseNum('12-foo', '12.1-bar')).toBeLessThan(0);
   });
 
+  it('compares multi-digit decimal segments numerically', () => {
+    expect(comparePhaseNum('12.2-feature', '12.10-feature')).toBeLessThan(0);
+  });
+
   it('returns 0 for equal phases', () => {
     expect(comparePhaseNum('01-name', '01-other')).toBe(0);
   });

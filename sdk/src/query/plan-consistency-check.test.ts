@@ -179,6 +179,20 @@ describe('planConsistencyCheck — classification matrix', () => {
     expect(data.state_advanced).toBe(true);
     expect(data.roadmap_updated).toBe(true);
   });
+
+  test('consistent_complete: decimal phase 12.10 advances past 12.2', async () => {
+    const decimalPhaseDir = join(fix.dir, '.planning', 'phases', '12.2-inserted');
+    mkdirSync(decimalPhaseDir, { recursive: true });
+    landProductionCommit(fix.dir, '12.2', '03', 'decimal phase task');
+    writeSummary(decimalPhaseDir, '12.2', '03');
+    writeStateAdvanced(fix.dir, '12.10', '01');
+    writeRoadmapPlanComplete(fix.dir, '12.2', '03');
+
+    const out = await planConsistencyCheck(['--phase', '12.2', '--plan', '03'], fix.dir);
+    const data = out.data as PlanConsistencyResult;
+    expect(data.state).toBe('consistent_complete');
+    expect(data.state_advanced).toBe(true);
+  });
 });
 
 describe('planConsistencyCheck — read-only contract', () => {
