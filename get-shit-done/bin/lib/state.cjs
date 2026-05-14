@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error } = require('./core.cjs');
+const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error, findPhaseInternal } = require('./core.cjs');
 const { platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningDir, planningPaths } = require('./planning-workspace.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
@@ -265,6 +265,129 @@ function updateCurrentPositionFields(content, fields) {
   }
 
   return content.replace(posPattern, () => `${posMatch[1]}${posBody}`);
+}
+
+/**
+ * Mark a phase row as Complete in any "phase queue" / status table inside STATE.md.
+ *
+ * Finds markdown-table rows whose first non-empty cell is exactly the phase number
+ * (with optional leading zeros and whitespace) and replaces the last cell with
+ * `Complete (YYYY-MM-DD)`. Idempotent: rows whose last cell already starts with
+ * "Complete" are left untouched so the original completion date is preserved.
+ * Header separator rows (e.g. `| --- |`) are skipped.
+ *
+ * Closes the gap where state complete-phase only updated the Status / Last
+ * activity scalars but left the human-facing phase queue table stuck on
+ * "Not started" — a recurring source of stale roadmap displays.
+ */
+function markPhaseQueueRowComplete(content, phaseNum, today) {
+  if (!phaseNum) return content;
+  const phaseEsc = escapeRegex(String(phaseNum));
+  const rowPattern = new RegExp(`^\\|\\s*0*${phaseEsc}\\s*\\|.*$`, 'gm');
+  return content.replace(rowPattern, (row) => {
+    const cells = row.split('|');
+    if (cells.length < 4) return row;
+    const realCells = cells.slice(1, -1);
+    if (realCells.every((c) => /^[\s:-]+$/.test(c))) return row;
+    const lastIdx = cells.length - 2;
+    const lastCell = cells[lastIdx].trim();
+    if (/^complete\b/i.test(lastCell)) return row;
+    cells[lastIdx] = ` Complete (${today}) `;
+    return cells.join('|');
+  });
+}
+
+/**
+ * Update the `Progress: X/Y phases complete (P%)` line and the adjacent fenced
+ * ASCII progress bar inside the `## Current Position` section of STATE.md so
+ * they reflect the disk-derived phase completion count.
+ *
+ * Bar width is preserved when an existing fenced bar is found; otherwise no bar
+ * is added. Returns the content unchanged when no Current Position section
+ * exists or when neither the progress line nor a bar are present.
+ */
+function updateCurrentPositionPhaseProgress(content, completedPhases, totalPhases) {
+  if (!Number.isFinite(totalPhases) || totalPhases <= 0) return content;
+  if (!Number.isFinite(completedPhases) || completedPhases < 0) return content;
+
+  const percent = Math.min(100, Math.round((completedPhases / totalPhases) * 100));
+
+  const posPattern = /(##\s*Current Position\s*\n)([\s\S]*?)(?=\n##|$)/i;
+  const posMatch = content.match(posPattern);
+  if (!posMatch) return content;
+
+  let posBody = posMatch[2];
+  let mutated = false;
+
+  // Progress: X/Y phases complete (P%)
+  const progressLinePattern = /^Progress:\s*\d+\s*\/\s*\d+\s+phases\s+complete\s*\(\s*\d+%\s*\)\s*$/im;
+  if (progressLinePattern.test(posBody)) {
+    posBody = posBody.replace(
+      progressLinePattern,
+      `Progress: ${completedPhases}/${totalPhases} phases complete (${percent}%)`
+    );
+    mutated = true;
+  }
+
+  // Fenced ASCII bar like:
+  //   ```
+  //   [████░░░░░░] 80%
+  //   ```
+  // Preserve existing width by counting current fill+empty chars.
+  const fencedBarPattern = /(```\s*\r?\n)\[([█░]+)\]\s+\d+%(\s*\r?\n```)/;
+  const fencedBarMatch = posBody.match(fencedBarPattern);
+  if (fencedBarMatch) {
+    const barWidth = fencedBarMatch[2].length || 20;
+    const filled = Math.round((percent / 100) * barWidth);
+    const bar = '█'.repeat(filled) + '░'.repeat(Math.max(0, barWidth - filled));
+    posBody = posBody.replace(
+      fencedBarPattern,
+      (_m, open, _oldBar, close) => `${open}[${bar}] ${percent}%${close}`
+    );
+    mutated = true;
+  }
+
+  if (!mutated) return content;
+  return content.replace(posPattern, () => `${posMatch[1]}${posBody}`);
+}
+
+/**
+ * Count completed phases in the current milestone from disk.
+ *
+ * Returns `{ totalPhases, completedPhases }`. A phase counts as complete when
+ * its directory has at least one PLAN file and the SUMMARY count is >= the
+ * PLAN count. Phases without any PLAN files (e.g. not-yet-planned future
+ * phases) are not counted as complete. `totalPhases` is the count declared by
+ * the milestone filter when available, otherwise the on-disk directory count.
+ *
+ * Falls back to `{ totalPhases: 0, completedPhases: 0 }` on any read error so
+ * callers can guard with `totalPhases > 0` before computing percentages.
+ */
+function countMilestonePhasesOnDisk(cwd) {
+  try {
+    const phasesDir = planningPaths(cwd).phases;
+    if (!fs.existsSync(phasesDir)) return { totalPhases: 0, completedPhases: 0 };
+
+    const isDirInMilestone = getMilestonePhaseFilter(cwd);
+    const phaseDirs = fs.readdirSync(phasesDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory()).map((e) => e.name)
+      .filter(isDirInMilestone);
+
+    let completedPhases = 0;
+    for (const dir of phaseDirs) {
+      const files = fs.readdirSync(path.join(phasesDir, dir));
+      const plans = files.filter((f) => /-PLAN\.md$/i.test(f)).length;
+      const summaries = files.filter((f) => /-SUMMARY\.md$/i.test(f)).length;
+      if (plans > 0 && summaries >= plans) completedPhases++;
+    }
+
+    const declared = isDirInMilestone && isDirInMilestone.phaseCount > 0
+      ? isDirInMilestone.phaseCount : 0;
+    const totalPhases = Math.max(phaseDirs.length, declared);
+    return { totalPhases, completedPhases };
+  } catch {
+    return { totalPhases: 0, completedPhases: 0 };
+  }
 }
 
 function cmdStateAdvancePlan(cwd, raw) {
@@ -1854,8 +1977,42 @@ function cmdStateCompletePhase(cwd, raw, overridePhase) {
       updated.push('Current Position');
     }
 
+    // Mark the phase row complete in any milestone phase-queue table.
+    // Idempotent — already-Complete rows preserve their original date.
+    const beforeQueue = content;
+    content = markPhaseQueueRowComplete(content, currentPhase, today);
+    if (content !== beforeQueue) updated.push('Phase Queue Row');
+
+    // Refresh Current Position "Progress: X/Y phases complete (P%)" + ASCII bar
+    // from disk truth. Invalidate the disk-scan cache first because the just-
+    // marked-complete phase may have had its final SUMMARY committed during
+    // this same process.
+    _diskScanCache.delete(cwd);
+    const { totalPhases, completedPhases } = countMilestonePhasesOnDisk(cwd);
+    if (totalPhases > 0) {
+      const beforeProgress = content;
+      content = updateCurrentPositionPhaseProgress(content, completedPhases, totalPhases);
+      if (content !== beforeProgress) updated.push('Current Position Progress');
+    }
+
     return content;
   }, cwd);
+
+  // Also update .planning/ROADMAP.md so the human-facing Progress Table and
+  // phase checkbox stay in lockstep with STATE.md. Without this, the verify-work
+  // manual mark-complete path leaves the roadmap stuck on "In Progress" while
+  // STATE.md says complete. Skip silently when the phase has no on-disk
+  // directory (state-only test fixtures, parallel mid-restructure repos): the
+  // roadmap updater calls error() which would terminate the process otherwise.
+  if (findPhaseInternal(cwd, resolvedPhase)) {
+    try {
+      const { cmdRoadmapUpdatePlanProgress } = require('./roadmap.cjs');
+      cmdRoadmapUpdatePlanProgress(cwd, resolvedPhase, true);
+      updated.push('Roadmap Progress Table');
+    } catch (e) {
+      process.stderr.write(`[gsd-tools] WARNING: roadmap update skipped after complete-phase: ${e.message}\n`);
+    }
+  }
 
   output(
     { updated, phase: resolvedPhase },
@@ -1871,6 +2028,9 @@ module.exports = {
   writeStateMd,
   readModifyWriteStateMd,
   updatePerformanceMetricsSection,
+  markPhaseQueueRowComplete,
+  updateCurrentPositionPhaseProgress,
+  countMilestonePhasesOnDisk,
   cmdStateLoad,
   cmdStateGet,
   cmdStatePatch,

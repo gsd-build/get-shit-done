@@ -387,13 +387,18 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       : `${summaryCount}/${planCount} plans executed`;
     roadmapContent = replaceInCurrentMilestone(roadmapContent, planCountPattern, `$1${planCountText}`);
 
-    // If complete: check checkbox
+    // If complete: check checkbox. Strip any pre-existing "(completed DATE)"
+    // suffix before appending today's date so repeated runs stay idempotent
+    // and don't accumulate duplicate suffixes.
     if (isComplete) {
       const checkboxPattern = new RegExp(
-        `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phasePattern}[:\\s][^\\n]*)`,
+        `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phasePattern}[:\\s])([^\\n]*)`,
         'i'
       );
-      roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
+      roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, (_m, p1, p2, tail) => {
+        const trimmedTail = tail.replace(/\s*\(completed\s+\d{4}-\d{2}-\d{2}\)\s*$/i, '');
+        return `${p1}x${p2}${trimmedTail} (completed ${today})`;
+      });
     }
 
     // Mark completed plan checkboxes (e.g. "- [ ] 50-01-PLAN.md", "- [ ] 50-01:", or "- [ ] **50-01**")

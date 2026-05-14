@@ -8,7 +8,7 @@ const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseI
 const { platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
-const { writeStateMd, readModifyWriteStateMd, stateExtractField, stateReplaceField, stateReplaceFieldWithFallback, updatePerformanceMetricsSection } = require('./state.cjs');
+const { writeStateMd, readModifyWriteStateMd, stateExtractField, stateReplaceField, stateReplaceFieldWithFallback, updatePerformanceMetricsSection, markPhaseQueueRowComplete, updateCurrentPositionPhaseProgress, countMilestonePhasesOnDisk } = require('./state.cjs');
 
 // #2893 — strict canonical filter: `{padded_phase}-{NN}-PLAN.md` or `PLAN.md`.
 // Documented in agents/gsd-planner.md (write_phase_prompt step). The wider
@@ -1274,6 +1274,18 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
 
       // Gate 4: Update Performance Metrics section (#1627)
       stateContent = updatePerformanceMetricsSection(stateContent, cwd, phaseNum, planCount, summaryCount);
+
+      // Mark the just-completed phase row as Complete in any milestone phase-queue
+      // table inside STATE.md. Idempotent — already-complete rows keep their date.
+      stateContent = markPhaseQueueRowComplete(stateContent, phaseNum, today);
+
+      // Refresh "Progress: X/Y phases complete (P%)" + ASCII bar inside the
+      // ## Current Position section from disk truth so display surfaces stay
+      // in lockstep with the frontmatter progress block.
+      const { totalPhases: discPhases, completedPhases: discComplete } = countMilestonePhasesOnDisk(cwd);
+      if (discPhases > 0) {
+        stateContent = updateCurrentPositionPhaseProgress(stateContent, discComplete, discPhases);
+      }
 
       return stateContent;
     }, cwd);
