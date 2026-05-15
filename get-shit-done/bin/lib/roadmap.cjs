@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, phaseMarkdownRegexSource, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches } = require('./core.cjs');
 const { platformWriteSync } = require('./shell-command-projection.cjs');
 const { planningPaths, withPlanningLock } = require('./planning-workspace.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
@@ -50,17 +50,6 @@ function countPhasePlansAndSummaries(phaseDir) {
     hasContext: phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md'),
     hasResearch: phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
   };
-}
-
-function phaseMarkdownRegexSource(phaseNum) {
-  const stripped = String(phaseNum).replace(/^[A-Z]{1,6}-(?=\d)/i, '');
-  const match = stripped.match(/^0*(\d+)([A-Z])?((?:\.\d+)*)$/i);
-  if (!match) return escapeRegex(phaseNum);
-
-  const integer = match[1].replace(/^0+/, '') || '0';
-  const letter = match[2] ? escapeRegex(match[2]) : '';
-  const decimal = match[3] ? escapeRegex(match[3]) : '';
-  return `0*${escapeRegex(integer)}${letter}${decimal}`;
 }
 
 /**
@@ -147,8 +136,9 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
     const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
     const milestoneContent = extractCurrentMilestone(rawContent, cwd);
 
-    // Escape special regex chars in phase number, handle decimal
-    const escapedPhase = escapeRegex(phaseNum);
+    // Padding-tolerant phase-number fragment — a padded caller ("02.6") still
+    // matches un-padded ROADMAP prose ("Phase 2.6"). See phaseMarkdownRegexSource().
+    const escapedPhase = phaseMarkdownRegexSource(phaseNum);
 
     // Search the current milestone slice first, then fall back to full roadmap.
     // A malformed_roadmap result (checklist-only) from the milestone should not
@@ -249,7 +239,7 @@ function cmdRoadmapAnalyze(cwd, raw) {
     } catch { /* intentionally empty */ }
 
     // Check ROADMAP checkbox status
-    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
+    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${phaseMarkdownRegexSource(phaseNum)}[:\\s]`, 'i');
     const checkboxMatch = content.match(checkboxPattern);
     const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
 
@@ -511,8 +501,8 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
   withPlanningLock(cwd, () => {
     let content = fs.readFileSync(roadmapPath, 'utf-8');
 
-    // Find the phase section
-    const phaseEscaped = escapeRegex(phaseNum);
+    // Find the phase section (padding-tolerant — see phaseMarkdownRegexSource)
+    const phaseEscaped = phaseMarkdownRegexSource(phaseNum);
     const phaseHeaderPattern = new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEscaped}:[^\\n]*)`, 'i');
     const phaseMatch = content.match(phaseHeaderPattern);
     if (!phaseMatch) return;
