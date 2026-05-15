@@ -33,9 +33,11 @@ describe('skill-manifest', () => {
     writeSkill(path.join(tmpDir, '.claude', 'skills'), 'gsd-help', 'Installed GSD skill');
     writeSkill(path.join(tmpDir, '.agents', 'skills'), 'project-agents', 'Project agent skill');
     writeSkill(path.join(tmpDir, '.codex', 'skills'), 'project-codex', 'Project Codex skill');
+    writeSkill(path.join(tmpDir, '.grok', 'skills'), 'project-grok', 'Project Grok skill');
 
     writeSkill(path.join(homeDir, '.claude', 'skills'), 'global-claude', 'Global Claude skill');
     writeSkill(path.join(homeDir, '.codex', 'skills'), 'global-codex', 'Global Codex skill');
+    writeSkill(path.join(homeDir, '.grok', 'skills'), 'global-grok', 'Global Grok skill');
     writeSkill(
       path.join(homeDir, '.claude', 'get-shit-done', 'skills'),
       'legacy-import',
@@ -65,11 +67,13 @@ describe('skill-manifest', () => {
     assert.deepStrictEqual(skillNames, [
       'global-claude',
       'global-codex',
+      'global-grok',
       'gsd-help',
       'legacy-import',
       'project-agents',
       'project-claude',
       'project-codex',
+      'project-grok',
     ]);
 
     const codexSkill = manifest.skills.find((skill) => skill.name === 'project-codex');
@@ -82,6 +86,23 @@ describe('skill-manifest', () => {
       },
       {
         root: '.codex/skills',
+        scope: 'project',
+        installed: true,
+        deprecated: false,
+      }
+    );
+
+    const grokSkill = manifest.skills.find((skill) => skill.name === 'project-grok');
+    assert.ok(grokSkill, 'project-grok skill should be discovered under .grok/skills');
+    assert.deepStrictEqual(
+      {
+        root: grokSkill.root,
+        scope: grokSkill.scope,
+        installed: grokSkill.installed,
+        deprecated: grokSkill.deprecated,
+      },
+      {
+        root: '.grok/skills',
         scope: 'project',
         installed: true,
         deprecated: false,
@@ -113,7 +134,7 @@ describe('skill-manifest', () => {
 
     assert.strictEqual(manifest.installation.gsd_skills_installed, true);
     assert.strictEqual(manifest.installation.legacy_claude_commands_installed, true);
-    assert.strictEqual(manifest.counts.skills, 7);
+    assert.strictEqual(manifest.counts.skills, 9);
   });
 
   test('writes manifest to .planning/skill-manifest.json when --write flag is used', () => {

@@ -1835,6 +1835,12 @@ function buildSkillManifest(cwd, skillsDir = null) {
       kind: 'skills',
     },
     {
+      root: '.grok/skills',
+      path: path.join(cwd, '.grok', 'skills'),
+      scope: 'project',
+      kind: 'skills',
+    },
+    {
       root: '~/.claude/skills',
       path: getGlobalSkillsBase('claude'),
       scope: 'global',
@@ -1843,6 +1849,12 @@ function buildSkillManifest(cwd, skillsDir = null) {
     {
       root: '~/.codex/skills',
       path: getGlobalSkillsBase('codex'),
+      scope: 'global',
+      kind: 'skills',
+    },
+    {
+      root: '~/.grok/skills',
+      path: getGlobalSkillsBase('grok'),
       scope: 'global',
       kind: 'skills',
     },

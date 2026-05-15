@@ -8784,6 +8784,14 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(bareDirRegex, normalizedPathPrefix);
           content = content.replace(bareHomeDirRegex, normalizedPathPrefix);
         }
+        // Also rewrite local project .claude/ and bare .claude/ (used in agent prose for skills discovery)
+        // so Grok (and other runtimes) get correct .grok/skills/ etc.
+        const localClaudeRegex = /\.\/\.claude\//g;
+        const bareLocalClaudeRegex = /\.\/\.claude\b/g;
+        const bareDotClaudeRegex = /\.claude\//g;
+        content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
+        content = content.replace(bareLocalClaudeRegex, `./${getDirName(runtime)}`);
+        content = content.replace(bareDotClaudeRegex, `${getDirName(runtime)}/`);
         content = processAttribution(content, getCommitAttribution(runtime));
         // Convert frontmatter for runtime compatibility (agents need different handling)
         if (isOpencode) {
@@ -8904,6 +8912,10 @@ function install(isGlobal, runtime = 'claude', options = {}) {
             if (isHermes) {
               content = content.replace(/CLAUDE\.md/g, 'HERMES.md');
               content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
+            }
+            if (isGrok) {
+              content = content.replace(/CLAUDE\.md/g, 'AGENTS.md');
+              content = content.replace(/\bClaude Code\b/g, 'Grok Build');
             }
             content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
             fs.writeFileSync(destFile, content);
@@ -10063,10 +10075,11 @@ const runtimeMap = {
   '12': 'opencode',
   '13': 'qwen',
   '14': 'trae',
-  '15': 'windsurf'
+  '15': 'windsurf',
+  '16': 'grok'
 };
-const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'hermes', 'kilo', 'opencode', 'qwen', 'trae', 'windsurf'];
-const ALL_RUNTIMES_OPTION = '16';
+const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'hermes', 'kilo', 'opencode', 'qwen', 'trae', 'windsurf', 'grok'];
+const ALL_RUNTIMES_OPTION = '17';
 
 /**
  * Build the runtime-selection prompt text shown by the interactive installer.
@@ -10089,7 +10102,8 @@ function buildRuntimePromptText() {
   ${cyan}13${reset}) Qwen Code    ${dim}(~/.qwen)${reset}
   ${cyan}14${reset}) Trae         ${dim}(~/.trae)${reset}
   ${cyan}15${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
-  ${cyan}16${reset}) All
+  ${cyan}16${reset}) Grok Build   ${dim}(~/.grok)${reset}
+  ${cyan}17${reset}) All
 
   ${dim}Select multiple: 1,2,6 or 1 2 6${reset}
 `;
@@ -10100,7 +10114,7 @@ function buildRuntimePromptText() {
  * Pure function — exported so tests can verify split/dedupe/fallback behavior.
  *  - Accepts comma- and/or whitespace-separated choices
  *  - Deduplicates while preserving order
- *  - Maps option 16 ("All") to every runtime
+ *  - Maps option 17 ("All") to every runtime
  *  - Falls back to ['claude'] when nothing valid is selected
  */
 function parseRuntimeInput(answer) {

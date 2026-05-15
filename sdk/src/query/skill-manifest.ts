@@ -66,8 +66,10 @@ export function buildSkillManifest(cwd: string, skillsDir: string | null = null)
       { root: '.cursor/skills', path: join(cwd, '.cursor', 'skills'), scope: 'project', kind: 'skills' as const },
       { root: '.github/skills', path: join(cwd, '.github', 'skills'), scope: 'project', kind: 'skills' as const },
       { root: '.codex/skills', path: join(cwd, '.codex', 'skills'), scope: 'project', kind: 'skills' as const },
+      { root: '.grok/skills', path: join(cwd, '.grok', 'skills'), scope: 'project', kind: 'skills' as const },
       { root: renderGlobalSkillsBaseDisplayPath('claude'), path: resolveGlobalSkillsBase('claude')!, scope: 'global', kind: 'skills' as const },
       { root: renderGlobalSkillsBaseDisplayPath('codex'), path: resolveGlobalSkillsBase('codex')!, scope: 'global', kind: 'skills' as const },
+      { root: renderGlobalSkillsBaseDisplayPath('grok'), path: resolveGlobalSkillsBase('grok')!, scope: 'global', kind: 'skills' as const },
       {
         root: '.claude/get-shit-done/skills',
         path: resolveLegacySkillsDir(),

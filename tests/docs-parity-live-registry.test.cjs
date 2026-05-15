@@ -57,6 +57,12 @@ function isReleaseDoc(filePath) {
   return path.basename(filePath).startsWith('RELEASE-') && filePath.endsWith('.md');
 }
 
+// grok-build-support/ contains internal design docs with example/placeholder
+// command tokens (e.g. /gsd-foo) that are not meant to be live registered commands.
+function isGrokBuildSupportDoc(filePath) {
+  return filePath.includes(`${path.sep}grok-build-support${path.sep}`);
+}
+
 // Slugs that appear in docs as internal component names or documentation
 // syntax placeholders — they match the /gsd-* regex but are NOT user-typable
 // slash commands and never appear in the command registry. Adding a slug here
@@ -362,6 +368,7 @@ describe('docs parity — English docs/*.md ⊆ liveRegistry', () => {
     for (const filePath of docFiles) {
       if (ALLOWED_HISTORICAL_MENTIONS.has(filePath)) continue;
       if (isReleaseDoc(filePath)) continue;
+      if (isGrokBuildSupportDoc(filePath)) continue;
 
       const unknowns = findUnknownTokens(filePath, liveTokens);
       if (unknowns.length > 0) {
@@ -410,6 +417,7 @@ for (const locale of LOCALES) {
       for (const filePath of docFiles) {
         if (ALLOWED_HISTORICAL_MENTIONS.has(filePath)) continue;
         if (isReleaseDoc(filePath)) continue;
+        if (isGrokBuildSupportDoc(filePath)) continue;
 
         const unknowns = findUnknownTokens(filePath, liveTokens);
         if (unknowns.length > 0) {

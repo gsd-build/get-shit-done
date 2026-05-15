@@ -72,6 +72,8 @@ export function getRuntimeConfigDir(runtime: Runtime): string {
       return process.env.TRAE_CONFIG_DIR ? expandTilde(process.env.TRAE_CONFIG_DIR) : join(homedir(), '.trae');
     case 'qwen':
       return process.env.QWEN_CONFIG_DIR ? expandTilde(process.env.QWEN_CONFIG_DIR) : join(homedir(), '.qwen');
+    case 'grok':
+      return process.env.GROK_CONFIG_DIR ? expandTilde(process.env.GROK_CONFIG_DIR) : join(homedir(), '.grok');
     case 'codebuddy':
       return process.env.CODEBUDDY_CONFIG_DIR ? expandTilde(process.env.CODEBUDDY_CONFIG_DIR) : join(homedir(), '.codebuddy');
     case 'cline':

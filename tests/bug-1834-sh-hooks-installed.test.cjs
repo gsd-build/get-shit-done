@@ -161,7 +161,7 @@ describe('#1834: install.js source handles .sh files in the hook copy loop', () 
     const anchorIdx = src.indexOf(anchorPhrase);
     assert.ok(anchorIdx !== -1, 'hook copy loop anchor (configDirReplacement) not found in install.js');
     // Extract a window large enough to contain the if/else block (≈1500 chars)
-    const region = src.slice(anchorIdx, anchorIdx + 1500);
+    const region = src.slice(anchorIdx, anchorIdx + 2200);
     assert.ok(
       region.includes("entry.endsWith('.js')"),
       "install.js hook copy loop must check entry.endsWith('.js')"

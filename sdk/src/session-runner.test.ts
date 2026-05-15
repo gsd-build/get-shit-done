@@ -113,6 +113,16 @@ describe('runPhaseStepSession', () => {
       expect(opts.model).toBeUndefined();
     });
 
+    it('does NOT pass a Claude profile model id when runtime is grok', async () => {
+      await runPhaseStepSession(
+        'prompt',
+        PhaseStepType.Execute,
+        makeConfig({ runtime: 'grok', model_profile: 'balanced' } as Partial<GSDConfig>),
+      );
+      const opts = mockQueryCalls[0].options as { model?: string };
+      expect(opts.model).toBeUndefined();
+    });
+
     it('does NOT pass a Claude profile model id when resolve_model_ids is "omit"', async () => {
       await runPhaseStepSession(
         'prompt',

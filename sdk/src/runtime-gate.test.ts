@@ -60,6 +60,10 @@ describe('assertRuntimeSupportsAutoMode', () => {
     expect(() => assertRuntimeSupportsAutoMode({ runtime: 'opencode' })).toThrow();
   });
 
+  it('throws for grok runtime', () => {
+    expect(() => assertRuntimeSupportsAutoMode({ runtime: 'grok' })).toThrow(/grok/);
+  });
+
   it('passes for unknown runtime values (fall through to claude default)', () => {
     // Mirrors detectRuntime: unknown values are NOT in SUPPORTED_RUNTIMES,
     // so they fall through to 'claude' rather than hard-blocking.
