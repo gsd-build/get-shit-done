@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, toPosixPath, output, error, readSubdirectories, phaseTokenMatches } = require('./core.cjs');
+const { escapeRegex, loadConfig, normalizePhaseName, phaseMarkdownRegexSource, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, toPosixPath, output, error, readSubdirectories, phaseTokenMatches } = require('./core.cjs');
 const { platformWriteSync, platformReadSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningDir, withPlanningLock } = require('./planning-workspace.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
@@ -170,8 +170,10 @@ function cmdPhaseNextDecimal(cwd, basePhase, raw) {
     if (fs.existsSync(roadmapPath)) {
       try {
         const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+        // #3537: padding-tolerant on both sides — `0*${escapeRegex(...)}`
+        // tolerated extra padding but not missing.
         const phasePattern = new RegExp(
-          `#{2,4}\\s*Phase\\s+0*${escapeRegex(normalized)}\\.(\\d+)\\s*:`, 'gi'
+          `#{2,4}\\s*Phase\\s+${phaseMarkdownRegexSource(normalized)}\\.(\\d+)\\s*:`, 'gi'
         );
         let pm;
         while ((pm = phasePattern.exec(roadmapContent)) !== null) {
@@ -691,13 +693,14 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
     const content = extractCurrentMilestone(rawContent, cwd);
 
-    // Normalize input then strip leading zeros for flexible matching
+    // Normalize input then route through canonical padding-tolerant fragment
+    // (#3537). The prior hand-rolled `0*${unpadded}` worked for the integer
+    // base but duplicated logic — funnel it through the shared helper.
     const normalizedAfter = normalizePhaseName(afterPhase);
-    const unpadded = normalizedAfter.replace(/^0+/, '');
-    const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
-    const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
+    const afterPhaseEscaped = phaseMarkdownRegexSource(normalizedAfter);
+    const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+${afterPhaseEscaped}:`, 'i');
     if (!targetPattern.test(content)) {
-      const checklistPattern = new RegExp(`-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
+      const checklistPattern = new RegExp(`-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+${afterPhaseEscaped}:`, 'i');
       if (checklistPattern.test(content)) {
         error(`Phase ${afterPhase} exists in roadmap summary but is missing a detail section (### Phase ${afterPhase}: ...).`);
       }
@@ -719,9 +722,11 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
       }
     } catch { /* intentionally empty */ }
 
-    // Also scan ROADMAP.md content (already loaded) for decimal entries
+    // Also scan ROADMAP.md content (already loaded) for decimal entries.
+    // #3537: padding-tolerant fragment so un-padded `Phase 2.7:` is found
+    // when caller passes the padded base `02`.
     const rmPhasePattern = new RegExp(
-      `#{2,4}\\s*Phase\\s+0*${escapeRegex(normalizedBase)}\\.(\\d+)\\s*:`, 'gi'
+      `#{2,4}\\s*Phase\\s+${phaseMarkdownRegexSource(normalizedBase)}\\.(\\d+)\\s*:`, 'gi'
     );
     let rmMatch;
     while ((rmMatch = rmPhasePattern.exec(rawContent)) !== null) {
@@ -745,7 +750,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
     const phaseEntry = `\n### Phase ${_decimalPhase}: ${description} (INSERTED)\n\n**Goal:** [Urgent work - to be planned]\n**Requirements**: TBD\n**Depends on:** Phase ${afterPhase}\n**Plans:** 0 plans\n\nPlans:\n- [ ] TBD (run /gsd:plan-phase ${_decimalPhase} to break down)\n`;
 
     // Insert after the target phase section
-    const headerPattern = new RegExp(`(#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:[^\\n]*\\n)`, 'i');
+    const headerPattern = new RegExp(`(#{2,4}\\s*Phase\\s+${afterPhaseEscaped}:[^\\n]*\\n)`, 'i');
     const headerMatch = rawContent.match(headerPattern);
     if (!headerMatch) {
       error(`Could not find Phase ${afterPhase} header`);
@@ -1030,14 +1035,16 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
       // Checkbox: - [ ] Phase N: → - [x] Phase N: (...completed DATE)
+      // #3537: padding-tolerant fragment so the caller-resolved padded id
+      // matches un-padded ROADMAP prose.
+      const phaseEscaped = phaseMarkdownRegexSource(phaseNum);
       const checkboxPattern = new RegExp(
-        `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s][^\\n]*)`,
+        `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
         'i'
       );
       roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
 
       // Progress table: update Status to Complete, add date (handles 4 or 5 column tables)
-      const phaseEscaped = escapeRegex(phaseNum);
       const tableRowPattern = new RegExp(
         `^(\\|\\s*${phaseEscaped}\\.?\\s[^|]*(?:\\|[^\\n]*))$`,
         'im'
@@ -1093,8 +1100,10 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
       // Update REQUIREMENTS.md traceability for this phase's requirements
       const reqPath = path.join(planningDir(cwd), 'REQUIREMENTS.md');
       if (fs.existsSync(reqPath)) {
-        // Extract the current phase section from roadmap (scoped to avoid cross-phase matching)
-        const phaseEsc = escapeRegex(phaseNum);
+        // Extract the current phase section from roadmap (scoped to avoid cross-phase matching).
+        // #3537: padding-tolerant fragment so an un-padded `Phase 2.7:` heading
+        // is found when caller resolved to padded `02.7`.
+        const phaseEsc = phaseMarkdownRegexSource(phaseNum);
         const currentMilestoneRoadmap = extractCurrentMilestone(roadmapContent, cwd);
         const phaseSectionMatch = currentMilestoneRoadmap.match(
           new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEsc}[:\\s][\\s\\S]*?)(?=#{2,4}\\s*Phase\\s+|$)`, 'i')

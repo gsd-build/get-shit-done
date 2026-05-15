@@ -726,6 +726,31 @@ function normalizePhaseName(phase) {
   return str;
 }
 
+/**
+ * Render a regex source fragment matching a phase number against ROADMAP/STATE
+ * prose regardless of zero-padding on either side. Skills pass the resolved
+ * padded form (`02.7`), but human-authored ROADMAP prose is conventionally
+ * un-padded (`### Phase 2.7:`); a naive `escapeRegex(phaseNum)` fragment never
+ * matches when the two diverge. Strips leading zeros from the integer part
+ * before re-emitting with a `0*` prefix, so the fragment matches both `2.7`
+ * and `02.7` (and `002.7`).
+ *
+ * Falls back to `escapeRegex(phaseNum)` for non-numeric IDs (custom project
+ * codes like `PROJ-42`) so callers can substitute it unconditionally.
+ *
+ * See #3537 — wired into every ROADMAP-prose regex builder.
+ */
+function phaseMarkdownRegexSource(phaseNum) {
+  const stripped = String(phaseNum).replace(/^[A-Z]{1,6}-(?=\d)/i, '');
+  const match = stripped.match(/^0*(\d+)([A-Z])?((?:\.\d+)*)$/i);
+  if (!match) return escapeRegex(phaseNum);
+
+  const integer = match[1].replace(/^0+/, '') || '0';
+  const letter = match[2] ? escapeRegex(match[2]) : '';
+  const decimal = match[3] ? escapeRegex(match[3]) : '';
+  return `0*${escapeRegex(integer)}${letter}${decimal}`;
+}
+
 function comparePhaseNum(a, b) {
   // Strip optional project_code prefix before comparing (e.g., 'CK-01-name' → '01-name')
   const sa = String(a).replace(/^[A-Z]{1,6}-/, '');
@@ -1071,19 +1096,13 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
     const roadmapRaw = platformReadSync(roadmapPath);
     if (roadmapRaw === null) throw new Error('missing');
     const content = extractCurrentMilestone(roadmapRaw, cwd);
-    // Strip leading zeros from purely numeric phase numbers so "03" matches "Phase 3:"
-    // in canonical ROADMAP headings. Non-numeric IDs (e.g. "PROJ-42") are kept as-is.
-    const normalized = /^\d+$/.test(String(phaseNum))
-      ? String(phaseNum).replace(/^0+(?=\d)/, '')
-      : String(phaseNum);
-    const escapedPhase = escapeRegex(normalized);
-    // Match both numeric and custom (Phase PROJ-42:) headers.
-    // For purely numeric phases allow optional leading zeros so both "Phase 1:" and
-    // "Phase 01:" are matched regardless of whether the ROADMAP uses padded numbers.
-    const isNumeric = /^\d+$/.test(String(phaseNum));
-    const phasePattern = isNumeric
-      ? new RegExp(`#{2,4}\\s*Phase\\s+0*${escapedPhase}:\\s*([^\\n]+)`, 'i')
-      : new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
+    // #3537: route through canonical padding-tolerant fragment. The prior
+    // hand-rolled `isNumeric` branch only stripped padding on integer-only
+    // ids and missed decimal padding (`02.7` against `Phase 2.7:` headings).
+    const phasePattern = new RegExp(
+      `#{2,4}\\s*Phase\\s+${phaseMarkdownRegexSource(phaseNum)}:\\s*([^\\n]+)`,
+      'i'
+    );
     const headerMatch = content.match(phasePattern);
     if (!headerMatch) return null;
 
@@ -1880,6 +1899,7 @@ module.exports = {
   isGitIgnored,
   escapeRegex,
   normalizePhaseName,
+  phaseMarkdownRegexSource,
   comparePhaseNum,
   searchPhaseInDir,
   extractPhaseToken,
