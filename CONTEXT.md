@@ -1,6 +1,12 @@
 # Context
 
-## Domain terms
+> **Format**: this document is machine-greppable. Each operational fact is a
+> single-line predicate (`CLASS.subkey=value`). Agent briefs cite predicates
+> by ID verbatim (per `META.RULE.brief-must-cite-doc`) — never paraphrase from
+> this file. New learnings go in as predicates; chronological prose belongs
+> in the session log at the bottom.
+
+## Glossary — Domain modules and seams
 
 ### Dispatch Policy Module
 Module owning dispatch error mapping, fallback policy, timeout classification, and CLI exit mapping contract.
@@ -93,160 +99,55 @@ Five-axis story decomposition discipline (**S**pike, **P**aths, **I**nterfaces, 
 
 ---
 
-## Recurring PR mistakes (distilled from CodeRabbit reviews, 2026-05-05)
+## Test rules and lint
 
-### Tests — no source-grep
-- **Rule**: never bind `readFileSync` result to a var then call `.includes()` / `.match()` / `.startsWith()` on it. CI runs `scripts/lint-no-source-grep.cjs` and exits 1.
-- **Escape**: add `// allow-test-rule: <reason>` anywhere in the file to exempt the whole file. Use when reading product markdown or runtime output (not `.cjs` source).
-- **Pattern to reach for instead**: call the exported function, capture stdout/JSON, assert on typed fields.
+`RULESET.TESTS.no-source-grep=scripts/lint-no-source-grep.cjs rejects readFileSync source + .includes()/.match()/.startsWith() on the bound var; CI hard-fail`
+`RULESET.TESTS.no-source-grep.stdout-extension=also flags assert.match/doesNotMatch on .stdout/.stderr — emit JSON from SUT, parse, assert on typed fields`
+`RULESET.TESTS.no-source-grep.exemption=// allow-test-rule: <runtime-contract-is-the-product> with one-line justification; reserved for tests where the file content IS the product surface (STATE.md, config.toml, hooks.json, agent .md). Migration to typed-IR parser tracked in #2974.`
+`RULESET.TESTS.no-source-grep.tmp-file-traps=reading tmp files written by the SUT in tests still trips lint; round-trip through CLI (e.g. frontmatter get) instead of readFileSync+.includes()`
 
-### Tests — no unescaped RegExp interpolation
-- `new RegExp(\`prefix${someVar}\`)` — if `someVar` can contain `.` or other metacharacters (e.g. phase id `5.1`), the pattern is wrong. Always `escapeRegex(someVar)`. The `escapeRegex` utility is in `core.cjs` and already imported in most modules.
+`RULESET.TESTS.escape-regex=new RegExp("prefix${var}") must escapeRegex(var); core.cjs already exports escapeRegex; phase IDs like 5.1 contain . which is metacharacter`
+`RULESET.TESTS.no-dead-regex-in-includes=src.includes("foo.*bar") is always false — .* is regex metacharacter not wildcard; use new RegExp(...).test(src) or delete`
+`RULESET.TESTS.guard-toplevel-readFileSync=module-level const src = readFileSync(...) throws before any test() registers — wrap in try/catch in test() or use lazy load`
+`RULESET.TESTS.coderabbit-fix-prefer=behavioral tests (call exported fn, capture JSON, assert typed fields) over source-grep`
+`RULESET.TESTS.diagnostics=after JSON.parse, assert output shape (Array.isArray(output.phases)) with raw-output-prefix diagnostics before .map() — prevents opaque TypeErrors when CLI output shape changes`
 
-### Tests — no dead regex branches in `.includes()`
-- `src.includes('foo.*bar')` is always false — `.*` is a regex metacharacter, not a wildcard in `includes`. Either use `new RegExp('foo.*bar').test(src)` or delete the branch.
+`RULESET.WORKFLOW_MARKDOWN.FENCES=preserve opening language fence when editing shell snippets in workflow markdown; malformed fence creates fresh CR threads (MD040)`
+`RULESET.WORKFLOW_SIZE_BUDGET=workflow-size-budget can fail otherwise-valid review fixes; XL workflows <=1800 lines or trim prose before final checks`
+`RULESET.WORKFLOW_FILE_NAMES=workflow files use hyphens; <step name="..."> XML attributes must match (extract-learnings not extract_learnings); tests should pin exact hyphenated name`
+`RULESET.WORKFLOW_EXECUTION_CONTEXT=@-ref in commands/gsd/*.md must resolve to an existing file on disk; regression test in tests/bug-3135-capture-backlog-workflow.test.cjs; INVENTORY.md row + INVENTORY-MANIFEST.json families.workflows must stay in sync; "Invoked by" attribution must move when a flag absorbs a micro-skill`
+`RULESET.WORKFLOW_EXECUTE_END_TO_END=ADR-0002 standard for single-workflow commands is "Execute end-to-end." (no bolded **Follow the X workflow** fragments); flag-dispatch routing uses "execute the X workflow end-to-end." in routing bullets`
 
-### Tests — guard top-level `readFileSync` against ENOENT
-- Module-level `const src = fs.readFileSync(...)` throws before any `test()` registers, aborting the runner with an unhandled exception instead of a named failure. Wrap in try/catch and rethrow with a helpful message.
+`RULESET.ALLOWED-TOOLS-FRONTMATTER=command's allowed-tools must cover every tool the workflow calls (including Write for file creation); thin-wrapper pattern makes this easy to miss`
+`RULESET.ARGUMENTS-SANITIZE=any workflow step constructing .planning/.../{SLUG}.md path from user input ($ARGUMENTS, parsed remainder) must sanitize inline ([a-z0-9-] only, reject ..//\\, max-length) — "(already sanitized)" must trace back to explicit guard; RESUME/fallback modes need own guards`
+`RULESET.SHARED-HELPERS-LINT-VS-TEST=when a lint script and test suite both implement same constant (CANONICAL_TOOLS) or parser (parseFrontmatter, executionContextRefs), extract to scripts/*-helpers.cjs required by both — silent divergence otherwise`
 
-### Changesets — `pr:` field must be the PR number, not the issue number
-- The `pr:` key in `.changeset/*.md` frontmatter must reference the PR introducing the fix (e.g. `3142`), not the issue it closes (e.g. `3120`). Changelog tooling links to GitHub PRs by this value.
+`RULESET.GEMINI.TOOLS.ask_user=Gemini CLI has no ask_user tool; filter both AskUserQuestion and lowercase ask_user from tools frontmatter and neutralize both names in body text`
+`RULESET.GEMINI.TEST_SENTINEL=convertClaudeToGeminiAgent regression should assert tools excludes ask_user, body excludes AskUserQuestion/ask_user, and Read still maps to read_file`
 
-### Shell hooks — never interpolate `$VAR` into single-quoted JS strings
-- `node -e "require('$HOOK_DIR/lib/foo.js')"` breaks silently if `$HOOK_DIR` contains a single quote (POSIX-legal). Pass paths via env vars: `GIT_CMD_LIB="$HOOK_DIR/lib/foo.js" node -e "require(process.env.GIT_CMD_LIB)"`.
+`RULESET.ADR-HEADER=every docs/adr/NNNN-*.md must open with - **Status:** Accepted|Proposed|Deprecated + - **Date:** YYYY-MM-DD immediately after title`
+`RULESET.MANIFEST-CANONICAL-KEY=docs/INVENTORY-MANIFEST.json — only families.workflows is canonical (read by tooling); top-level workflows key is stale, delete if present`
 
-### Shell guards — `[ -f .git ]` does not detect worktrees from main repo
-- In the main repo `.git` is a directory, so `[ -f .git ]` is false and the entire guard is skipped. Use `git rev-parse --git-dir` and match `*.git/worktrees/*` in a `case` statement instead.
+`RULESET.SDK-ONLY-VERBS.exemption=any gsd-sdk query verb implemented only in SDK native registry (no gsd-tools.cjs mirror) must be added to NO_CJS_SUBPROCESS_REASON in sdk/src/golden/golden-policy.ts — otherwise golden-policy test fails treating verb as missing implementation`
 
-### Shell guards — absolute-path containment must use `root/` prefix, not glob
-- `[[ "$PATH" != "$ROOT"* ]]` matches sibling prefixes (`/repo-extra` passes when `ROOT=/repo`). Use `[[ "$P" != "$ROOT" && "$P" != "$ROOT/"* ]]`. Also: check `[ -z "$ROOT" ]` and exit 1 before the containment test. Warn → fail-closed for security-relevant path checks.
+`RULESET.PR-SCOPE.one-concern-per-pr=split unrelated changes into separate PRs; cherry-pick doc changes to dedicated docs/ branch immediately, then force-push original to remove the commit`
 
-### Workstream migration names — enforce one canonical slug contract
-- **Invariant**: every directory under `.planning/workstreams/*` must be addressable by `workstream status/set/complete`, so creation and migration must share the same name contract.
-- **Failure class**: accepting raw `--migrate-name` values created directories that later commands reject (e.g. `Bad Name` directory exists but CLI rejects it as invalid).
-- **Rule**: normalize `--migrate-name` through the same slug transform as `workstream create` (`[a-z0-9-]`), and fail fast if normalization yields empty.
-- **TDD sentinel**: keep regression asserting `workstream create ... --migrate-name 'Bad Name'` migrates to `bad-name` and does not leave `Bad Name` on disk.
+`RULESET.TRIAGE-EXISTING-WORK=before writing agent brief for confirmed bug, check (1) local branches git branch -a | grep <issue>, (2) untracked/modified files on that branch, (3) stash, (4) open PRs with matching head branch — recover existing work rather than re-implement`
 
-### Docs — keep internal reference counts consistent
-- When a heading says `(N shipped)` and a footnote says `N-1 top-level references`, update the footnote. CodeRabbit catches this every time.
+`RULESET.CR-THREAD-RESOLVE=after adding // allow-test-rule: to silence lint, resolve existing inline CR threads via graphql resolveReviewThread mutation before merge — open threads mislead future reviewers; pattern: gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"PRRT_..."}) { thread { isResolved } } }'`
 
----
-
-## Workflow learnings (distilled from triage + PR cycle, 2026-05-05)
-
-### Skill consolidation gap class — missing workflow files
-- When a command absorbs a micro-skill as a flag (e.g. `capture --backlog`), the old command's process steps must be ported to a `get-shit-done/workflows/<name>.md` file. The routing wrapper in `commands/gsd/*.md` declares an `execution_context` `@`-reference to that workflow — if the file doesn't exist the agent loads nothing and has no steps to follow.
-- **Detection**: `tests/bug-3135-capture-backlog-workflow.test.cjs` adds a broad regression — every `execution_context` `@`-reference in any `commands/gsd/*.md` must resolve to an existing file on disk. This test will catch all future gaps of this class immediately.
-- **Prior art**: `reapply-patches.md` was the first gap found and fixed in PR #2824 itself. `add-backlog.md` was missed in the same PR and caught later in #3135. Run the regression test after every consolidation PR.
-
-### CodeRabbit thread resolution — stale threads after allow-test-rule fixes
-- After adding `// allow-test-rule:` to silence lint, CodeRabbit's existing inline threads remain open even though the acknowledged fix is in place. Resolve them via `resolveReviewThread` GraphQL mutation before merging — open threads block clean merge history and mislead future reviewers.
-- Pattern: `gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"PRRT_..."}) { thread { isResolved } } }'`
-
-### PR discipline — split unrelated changes into separate PRs
-- A bug fix and a docs rewrite committed to the same branch produce a noisy diff and a PR that reviewers can't cleanly approve. Cherry-pick doc changes to a dedicated branch (`docs/`) immediately, then force-push the original branch to remove the commit. One concern per PR.
-
-### INVENTORY.md must be updated alongside every workflow file addition/removal
-- `docs/INVENTORY.md` tracks the shipped workflow count (`## Workflows (N shipped)`) and has one row per file. Adding or removing a workflow without updating INVENTORY produces an internally inconsistent doc.
-- Also update `docs/INVENTORY-MANIFEST.json` — it is the machine-readable manifest and must stay in sync with the filesystem.
-- When a flag absorbs a micro-skill, the old skill's `Invoked by` attribution in INVENTORY must move to the new parent (e.g. `add-todo.md` incorrectly claimed `/gsd-capture --backlog` until #3135 corrected it).
-
-### README — keep root README as storyline only; all detail lives in docs/
-- Root `README.md` should be ≤300 lines: hero, author note, 6-step loop, install, core command table, why-it-works bullets, config key dials, docs index, minimal troubleshooting.
-- Every removed detail section needs a link to the canonical doc that covers it. All doc links must resolve before committing.
-- Markdownlint rules to watch: MD001 (heading level skip — don't use `###` directly inside admonitions; use bold instead), MD040 (fenced code blocks must declare a language identifier).
-
-### Issue triage — always check for existing work before filing as new
-- Before writing an agent brief for a confirmed bug, check: (1) local branches (`git branch -a | grep <issue>`), (2) untracked/modified files on that branch, (3) stash, (4) open PRs with matching head branch. A crash may have left work 90% done — recover and commit rather than re-implementing.
-
-### SDK-only verbs — golden-policy exemption required
-- Any `gsd-sdk query` verb implemented only in the SDK native registry (no `gsd-tools.cjs` mirror) must be added to `NO_CJS_SUBPROCESS_REASON` in `sdk/src/golden/golden-policy.ts`. Without this entry the golden-policy test fails, treating the verb as a missing implementation rather than an intentional SDK-only path.
+`RULESET.DOC-CONSISTENCY=when heading says (N shipped) and footnote says N-1 top-level references, update both; CR catches every time`
 
 ---
 
-## Recurring findings from ADR-0002 PR review (2026-05-05)
-
-### allowed-tools must include every tool the workflow uses
-When a command delegates to a workflow via `execution_context`, the command's `allowed-tools` must cover every tool the workflow calls — including `Write` for file creation. The thin wrapper pattern makes this easy to miss: the process steps live in the workflow, but the tool grant lives in the command frontmatter. Missing a tool silently fails at runtime.
-
-### User-supplied slug/path args always need sanitization before file path construction
-Any workflow step that takes user input (subcommand argument, `$ARGUMENTS`, or parsed remainder) and constructs a `.planning/…/{SLUG}.md` path must sanitize first: strip non-`[a-z0-9-]` chars, reject `..`/`/`/`\`, enforce max length. Document the sanitization inline at the step, not just in `<security_notes>`. Steps that say "(already sanitized)" must trace back to an explicit sanitization guard — not just a preceding describe block.
-
-### RESUME/fallback modes bypass sanitization guards written for primary modes
-CLOSE and STATUS modes that document "(already sanitized)" do not automatically cover RESUME or default modes. Each mode that constructs a file path from user input needs its own guard — don't assume sibling modes share state.
-
-### Shared helpers prevent lint/test disagreement
-When a lint script and a test suite both implement the same constant (`CANONICAL_TOOLS`) or parser (`parseFrontmatter`, `executionContextRefs`), they will silently diverge. Extract to a `scripts/*-helpers.cjs` module required by both. A tool added to the lint's allowlist but not the test's (or vice versa) causes one layer to pass while the other fails.
-
-### readFileSync outside test() crashes the runner before any test registers
-Module-level or suite-registration-time `readFileSync` throws as an unhandled exception if the file is absent, aborting the runner with no test output. Move reads inside `test()` callbacks so failures surface as named test failures.
-
-### Global regex with `g` flag carries `lastIndex` state between calls
-A `const RE = /pattern/g` shared across functions retains `lastIndex` after `.test()` or `.exec()`. Use a non-global pattern for boolean checks (`/pattern/.test(s)`) and create a new `RegExp(pattern, 'g')` per iteration when you need `exec()` loops. Forgetting `lastIndex = 0` resets causes intermittent false negatives.
-
-### ADR files need Status + Date headers
-Every `docs/adr/NNNN-*.md` file must open with `- **Status:** Accepted` (or Proposed/Deprecated) and `- **Date:** YYYY-MM-DD` immediately after the title. Without them the ADR is undatable and untriageable when the list grows.
-
-### Step names in workflow XML must use hyphens, not underscores
-All workflow file names use hyphens; `<step name="...">` attributes inside those files must match: `extract-learnings` not `extract_learnings`. Tests asserting `content.includes('<step name=')` should tighten to the exact hyphenated name so renames are caught.
-
-### INVENTORY-MANIFEST.json has two workflow lists — only families.workflows is canonical
-`docs/INVENTORY-MANIFEST.json` has `families.workflows` (canonical, read by tooling) and a stale top-level `workflows` key (introduced by a node update script that wrote to the wrong key). Always update `families.workflows`. Delete any top-level `workflows` key if it appears.
-
-### "Follow the X workflow" prose fragments are non-standard — use "Execute end-to-end."
-After stripping prose @-refs, some command `<process>` blocks retained bolded "**Follow the X workflow**" fragments. ADR-0002 standard is `Execute end-to-end.` for single-workflow commands. Routing commands with flag dispatch use `execute the X workflow end-to-end.` in routing bullets (no bold, no redundant path).
-
----
-
-## Recurring CodeRabbit review patterns (2026-05-05, PRs #3152/#3154/#3155)
-
-### Changeset metadata drift (`pr:` points at issue instead of PR)
-- In `.changeset/*.md`, reviewers repeatedly flag `pr:` values that accidentally reference issue ids.
-- **Rule**: `pr:` must equal the GitHub PR number carrying the change.
-- **Pre-flight check**: before push, verify each new changeset file against current branch PR number.
-
-### Test diagnostics quality for command-output parsing
-- Even when behavior is correct, CR requests clearer failure surfaces before `.map()` on parsed output.
-- **Rule**: after `JSON.parse`, assert output object shape (e.g., `Array.isArray(output.phases)`) with raw-output-prefix diagnostics.
-- This prevents opaque `TypeError` failures and shortens triage loops when CLI output shape changes.
-
-### Merge gate discipline: CodeRabbit pass is necessary but not sufficient
-- CI/checks can be green while unresolved review threads still block clean merge policy.
-- **Rule**: always gate on all three together: required checks green, CodeRabbit pass, unresolved thread count = 0.
-- Keep using GraphQL `reviewThreads` as authoritative unresolved state, not summary comments/check badge alone.
-
----
-
-## SDK Runtime Bridge review synthesis (PR #3158, 2026-05-05)
-
-### What we fixed
-- Deepened one **SDK Runtime Bridge Module** seam (`sdk/src/query-runtime-bridge.ts`) for dispatch routing and observability.
-- Replaced orphan event typing with a canonical union (`RuntimeBridgeEvent`).
-- Made bridge observability non-intrusive: `onDispatchEvent` now runs behind a safe emitter so callback failures cannot alter dispatch outcomes.
-- Corrected strict-mode event semantics: strict native-adapter rejection now reports `dispatchMode: 'native'` (no fake subprocess attempt).
-- Preserved execution policy defaults by passing `allowFallbackToSubprocess` through as `undefined` when unset (no forced override in `GSDTools`).
-- Fixed transport decision ordering: fallback-disabled guard now throws before emitting subprocess decision events.
-- Added explicit invariant in `subprocessReason` for impossible states (fail loud on contract drift).
-- Updated user-facing docs (`README.md`, `docs/CLI-TOOLS.md`, `docs/ARCHITECTURE.md`) and ADR narrative consistency.
-
-### What we should not do again
-- Do not let observability callbacks sit on the critical path without isolation.
-- Do not emit structured events that claim a transport mode that never happened.
-- Do not force option defaults at call sites when policy Modules already define defaults.
-- Do not keep duplicate/inert exported types; expose one canonical union Interface.
-- Do not emit decision events before guard checks that may reject the path.
-- Do not leave architectural docs with ambiguous seam ownership between CLI and SDK paths.
-
----
-
-## AI Ops Memory (2026-05-09, machine-oriented)
+## CodeRabbit + repo-process guards (machine-oriented predicates)
 
 `RULESET.CONTRIB.GATE.ORDER=issue-first -> approval-label -> code -> PR-link -> changeset/no-changelog`
 `RULESET.CONTRIB.CLASSIFY.fix=requires confirmed/confirmed-bug before implementation`
 `RULESET.CONTRIB.CLASSIFY.enhancement=requires approved-enhancement before implementation`
 `RULESET.CONTRIB.CLASSIFY.feature=requires approved-feature before implementation`
 
-## AI Ops Memory (2026-05-10, machine-oriented)
+## Workspace seams (machine-oriented predicates)
 
 `RULESET.GH.AUTH.DEFAULT=source .envrc GITHUB_TOKEN before gh; exception=ambient allowed only when user explicitly says machine-only fallback`
 `RULESET.CODERABBIT.GUARD.OPEN_PRS=gh pr list --repo gsd-build/get-shit-done --author @me --state open; repeat near end because open PR set can change mid-run`
@@ -297,7 +198,7 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 
 ---
 
-## Release Notes Standard (2026-05-09, machine-oriented)
+## Release notes standard
 
 `RELEASE-NOTES.SCOPE=GitHub Releases body for tags vX.Y.Z, vX.Y.Z-rcN; not CHANGELOG.md (changeset workflow owns that)`
 `RELEASE-NOTES.DEFAULT-STATE=auto-generated body is "What's Changed" PR list + Full Changelog link; treat as draft, not final`
@@ -342,7 +243,7 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 
 ---
 
-## Repo-Rule Reinforcement (2026-05-09, machine-oriented)
+## Repo-rule reinforcement — k320..k331
 
 `META.RULE.canonical-source-precedence=CONTRIBUTING.md > docs/adr/* > CONTEXT.md > agent memory`
 `META.RULE.read-contributing-first=read CONTRIBUTING.md sections "Pull Request Guidelines" + "CHANGELOG Entries" before EVERY agent dispatch`
@@ -439,67 +340,7 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `PROC.MERGE-WAVE.merge-tool=gh pr merge <n> --squash --delete-branch`
 `PROC.MERGE-WAVE.merge-tool-warning=delete-branch may fail with "used by worktree at" — harmless; remote branch still deleted`
 
-## Triage+Merge Wave Outcome (2026-05-09T15:47Z, machine-oriented)
-
-`WAVE.2026-05-09.scope=trek-e-authored issues, classes=[bug, enhancement, feature]`
-`WAVE.2026-05-09.dispatched=8`
-`WAVE.2026-05-09.merged=7`
-`WAVE.2026-05-09.closed-as-subsumed=1`
-`WAVE.2026-05-09.skipped-mvp-epic=[#2826, #2885, #2882, #2879, #2877, #2875]`
-
-`WAVE.PR.3299.issue=3290`
-`WAVE.PR.3299.class=bug`
-`WAVE.PR.3299.fix=agents/gsd-intel-updater.md layout-detection block gated on framework-repo check`
-`WAVE.PR.3299.cr-state=clean (No actionable comments)`
-`WAVE.PR.3299.merged=2026-05-09T15:39:16Z`
-
-`WAVE.PR.3301.issue=3232`
-`WAVE.PR.3301.class=enhancement`
-`WAVE.PR.3301.fix=docs/contributor-standards.md first-cut + CONTRIBUTING.md cross-link + 1 CR thread resolved (MD040)`
-`WAVE.PR.3301.cr-state=clean post-fix`
-`WAVE.PR.3301.merged=2026-05-09T15:39:24Z`
-
-`WAVE.PR.3308.issue=3262`
-`WAVE.PR.3308.class=enhancement`
-`WAVE.PR.3308.fix=extract get-shit-done/bin/lib/plan-scan.cjs scanPhasePlans; port 4 call sites in init/state/roadmap/phase`
-`WAVE.PR.3308.cr-state=2 reviews real, 1 thread resolved`
-`WAVE.PR.3308.merged=2026-05-09T15:39:32Z`
-`WAVE.PR.3308.violation=carried redundant CHANGELOG.md row in violation of k320; cleanup task spawned`
-
-`WAVE.PR.3302.issue=3271`
-`WAVE.PR.3302.class=enhancement`
-`WAVE.PR.3302.fix=docs/adr/0005 + 0006 + README index + tests/enh-3271-sdk-adr-structure.test.cjs`
-`WAVE.PR.3302.cr-state=1 review, 1 thread resolved (ADR self-ref test)`
-`WAVE.PR.3302.changelog-strip=force-pushed 2026-05-09T15:35Z`
-`WAVE.PR.3302.merged=2026-05-09T15:46:28Z`
-
-`WAVE.PR.3304.issue=3255`
-`WAVE.PR.3304.class=enhancement`
-`WAVE.PR.3304.fix=get-shit-done/bin/gsd-tools.cjs --json-errors flag + GSD_JSON_ERRORS env + docs/json-errors.md taxonomy + usage-string disclosure (CR k321 finding addressed)`
-`WAVE.PR.3304.cr-state=1 review (k321 outside-diff finding fixed in code)`
-`WAVE.PR.3304.changelog-strip=force-pushed 2026-05-09T15:35Z`
-`WAVE.PR.3304.merged=2026-05-09T15:46:35Z`
-
-`WAVE.PR.3305.issue=3251`
-`WAVE.PR.3305.class=enhancement`
-`WAVE.PR.3305.fix=command-aliases.generated.cjs NON_FAMILY entries (40) + sdk gen-command-aliases.ts typed-export preservation (CR k321 Major finding addressed)`
-`WAVE.PR.3305.cr-state=1 review (k321 outside-diff finding fixed in code)`
-`WAVE.PR.3305.changelog-strip=force-pushed 2026-05-09T15:35Z`
-`WAVE.PR.3305.merged=2026-05-09T15:46:41Z`
-
-`WAVE.PR.3306.issue=3298`
-`WAVE.PR.3306.class=bug`
-`WAVE.PR.3306.fix=phase-dir prefix drift fixed in 3 sites (add-backlog.md + import.md + plan-milestone-gaps.md) per k015 sibling-audit`
-`WAVE.PR.3306.cr-state=k322 sustained-throttle silent pass — 0 reviews after 50min + 2 retriggers, CI green`
-`WAVE.PR.3306.subsumes=PR #3300 (#3297 add-backlog dedicated fix)`
-`WAVE.PR.3306.merged=2026-05-09T15:47:16Z`
-
-`WAVE.PR.3300.issue=3297`
-`WAVE.PR.3300.class=bug`
-`WAVE.PR.3300.fix=add-backlog.md project_code prefix (focused #3297 fix)`
-`WAVE.PR.3300.outcome=closed-as-subsumed by #3306; issue #3297 manually closed`
-`WAVE.PR.3300.k323-evidence=overlapped #3306 add-backlog.md hunks with different prefix idiom`
-`WAVE.PR.3300.k331-violation=close-with-comment violation, comment deleted within 30s`
+## Triage and merge-wave lessons
 
 `WAVE.LESSON.changelog-policy-violation-multiplier=brief contradicting CONTRIBUTING.md L110 produced violations on 5 of 8 PRs (#3300, #3302, #3304, #3305, #3308); k326 + k320 capture`
 `WAVE.LESSON.cr-throttle-burst-correlation=8 PRs in <15min triggered k322 sustained-throttle on multiple PRs (#3306 worst case)`
@@ -509,7 +350,7 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 
 ---
 
-## Recent Defect Anti-Patterns (2026-05-09, machine-oriented)
+## Defect anti-patterns and fix-forwards
 
 `DEFECT.SCOPE.window=PRs #3306..#3325 + sibling fixes #3240/#3242/#3245/#3257/#3261/#3267/#3286/#3287`
 `DEFECT.FORMAT=class.sub-key=value | classes are greppable; each class carries detect / fix / anchor sub-keys when applicable`
@@ -614,138 +455,81 @@ After stripping prose @-refs, some command `<process>` blocks retained bolded "*
 `DEFECT.GENERATIVE-FIX=for any new constant/array/parser shared between CJS and SDK (or between two workflow surfaces), the same commit MUST add a parity assertion that fails when the two diverge`
 `DEFECT.GENERATIVE-EXEMPLAR=tests/config-schema-sdk-parity.test.cjs (asserts SDK VALID_CONFIG_KEYS == CJS VALID_CONFIG_KEYS); tests/bug-3298-phase-dir-prefix-drift-in-workflows.test.cjs (asserts every workflow surface uses expected_phase_dir)`
 
-### Shell Command Projection Module
-Module owning all OS-facing I/O for the tool: runtime-aware command-text rendering (hook commands, PATH action lines, shim scripts), subprocess dispatch (`execGit`, `execNpm`, `execTool`, `probeTty`), and platform file I/O (`platformWriteSync`, `platformReadSync`, `platformEnsureDir`). Single seam for platform-conditional logic — one place to fix any shell or file write regression across Windows, macOS, and Linux. Lives in `get-shit-done/bin/lib/shell-command-projection.cjs`. See ADR-0009.
 
-## Session learnings
+---
 
-### 2026-05-13 — Shell Command Projection Module expansion (issues #3465–#3468)
+## Shell Command Projection Module (expanded glossary entry, 2026-05-13)
 
-- scope: `shell-command-projection.cjs` extended to own subprocess dispatch + platform file I/O
-- ADR-0009 "does not execute" constraint superseded; ADR-0010 File Operation Engine superseded
-- new exports: `execGit`, `execNpm`, `execTool`, `probeTty`, `normalizeContent`, `platformWriteSync`, `platformReadSync`, `platformEnsureDir`
-- result shape invariant: all `exec*` return `{ exitCode, stdout, stderr }`; never throw on non-zero exit
-- platform policy owned at seam: `shell: process.platform === 'win32'` lives only in `execNpm`; `probeTty` returns `null` on Windows
-- normalization policy: `platformWriteSync` owns full `normalizeMd` for `.md`; CRLF→LF + trailing newline for all others; callers must not pre-call `normalizeMd`
-- `normalizeContent(filePath, content)` is the pure typed surface tests assert on — no file content read-back in tests (CONTRIBUTING.md rule)
-- `_normalizeMd` is re-implemented inline (not imported from `core.cjs`) to avoid circular dep
-- `atomicWriteFileSync`, `safeReadFile`, `normalizeMd` remain in `core.cjs` exports until Phase 4 (#3468)
-- phase gate: no call site migration until Phase 1 branch merged; Phase 2 (#3466) targets 6 subprocess files; Phase 3 (#3467) targets 15 fs files (215 call sites); Phase 4 (#3468) removes compat exports
-- branch: `feat/3465-shell-projection-platform-io-seam`
-- test file: `tests/shell-command-projection-dispatch.test.cjs` — 31 behavioral tests, node:test + node:assert/strict, no source-grep
+Module owning all OS-facing I/O for the tool: runtime-aware command-text rendering (hook commands, PATH action lines, shim scripts), subprocess dispatch (run-git, run-npm, run-tool, probeTty), and platform file I/O (platformWriteSync, platformReadSync, platformEnsureDir). Single seam for platform-conditional logic — one place to fix any shell or file write regression across Windows, macOS, and Linux. Lives in `get-shit-done/bin/lib/shell-command-projection.cjs`. See ADR-0009 (superseded "does not execute" constraint) and ADR-0010 (superseded File Operation Engine).
 
-### 2026-05-13 — CodeRabbit guard + merge recovery (PR #3464)
+Invariants:
+- Result shape: all run-* return `{ exitCode, stdout, stderr }`; never throw on non-zero exit code.
+- Platform policy owned at the seam: `shell: process.platform === 'win32'` lives only in run-npm; probeTty returns `null` on Windows.
+- Normalization policy: platformWriteSync owns full `normalizeMd` for `.md`; CRLF-to-LF + trailing newline for all others; callers must NOT pre-call `normalizeMd`.
+- `_normalizeMd` is re-implemented inline (not imported from `core.cjs`) to avoid circular dep.
+- `atomicWriteFileSync`, `safeReadFile`, `normalizeMd` remain in `core.cjs` exports until Phase 4 (#3468).
 
-- scope: `gsd-build/get-shit-done` only; run all `gh` checks with `--repo gsd-build/get-shit-done`.
-- invariant: review completion requires all three gates:
-  - CI required checks green
-  - CodeRabbit green
-  - GraphQL unresolved review threads = `0`
-- failure mode: `mergeStateStatus=DIRTY` can exist even when CodeRabbit + thread count are clean.
-  - remediation: rebase/replay onto latest `origin/main` before treating PR as merge-ready.
-- failure mode: primary worktree rebase blocked by unrelated untracked files.
-  - remediation: use isolated worktree seeded from `origin/main`, replay feature commits there, then `push --force-with-lease` to PR head.
-- replay conflict learned seam:
-  - file: `get-shit-done/bin/lib/config.cjs`
-  - keep both behaviors during conflict resolution:
-    - existing `ship.pr_body_sections` and `workflow.human_verify_mode` validations
-    - new `review.default_reviewers` normalization path
-- post-rebase CI drift classes to verify immediately:
-  - SDK schema parity (`tests/config-schema-sdk-parity.test.cjs`)
-  - docs inventory counts (`tests/inventory-counts.test.cjs`)
-  - inventory manifest sync (`tests/inventory-manifest-sync.test.cjs`)
-  - slash namespace invariant (`tests/bug-2543-gsd-slash-namespace.test.cjs`)
-- concrete regressions fixed in this session:
-  - add `review.default_reviewers` to `sdk/src/query/config-schema.ts`
-  - add `review-reviewer-selection.cjs` row + count update in `docs/INVENTORY.md`
-  - regenerate `docs/INVENTORY-MANIFEST.json`
-  - replace legacy `/gsd-review` mention with canonical `/gsd:review` in source comments
+Migration plan: Phase 1 (#3465) seam additions complete; Phase 2 (#3466) targets 6 subprocess files; Phase 3 (#3467) targets 15 fs files (215 call sites); Phase 4 (#3468) removes compat exports.
 
-### 2026-05-13 — Phase 1 rebase + PR open (#3465)
+---
 
-- branch: `feat/3465-shell-projection-platform-io-seam`; PR: #3470 on `gsd-build/get-shit-done`
-- rebase pattern: 4 sibling-branch commits (#3464) were skipped as "patch contents already upstream" — expected when a feature branch is cut before a sibling merges to main
-- untracked files block rebase: `git stash --include-untracked` before `git rebase origin/main`
-- add/add conflict resolution: when HEAD side is empty (feature didn't have the file) and ours has the content, `git checkout --theirs <file>` is correct
-- content conflict resolution: `git checkout --ours CONTEXT.md` + manual append of our new sections — preserves main's full content while adding our additions
-- `docs/research/` was untracked pre-rebase but came in from main during rebase — already tracked, no action required
-- force-push after rebase: `git push --force-with-lease origin <branch>` (not `--force`)
-- stash pop can fail if main brought in the same files: drop the stash with `git stash drop` when files are already present
-- PR hook requires reading all listed contribution files before `gh pr create` will execute — including `pull_request_template.md`, all typed templates, and all issue templates
-- changeset type for seam additions: `Changed` (not `Added`) — expands existing module, not a new standalone feature
+## Session log (chronological, append-only, one line per session)
 
-### 2026-05-14 — Executor failure classification + cross-runtime provider sentinels (#3095, PR #3490)
+> **Discipline**: new operational lessons go into a predicate above. Each
+> dated entry below is a one-line pointer at the predicates derived from
+> that session — NOT a prose narrative. If you can't compress a session's
+> lesson into a predicate, the lesson isn't sharp enough yet — keep
+> grinding.
 
-- scope: new SDK query `agent.classify-failure` parses free-text agent return body and returns `{ class: 'quota-exceeded' | 'classify-handoff-bug' | 'unknown-failure', sentinel?, retryAfterSeconds? }`
-- handler: `sdk/src/query/agent-failure-classifier.ts`; registered in `command-static-catalog-foundation.ts` (DECISION_ROUTING_STATIC_CATALOG) and `command-manifest.non-family.ts` (`mutation: false`, `outputMode: 'json'`)
-- workflow wiring lives in `get-shit-done/workflows/execute-phase.md` step 7; replaces single-branch "real failure" routing with class-distinct prompts (quota → wait-for-reset; classify-handoff-bug → existing spot-check; unknown → existing continue/stop)
-- sentinel-order invariant: most specific first. `429` beats `too many requests`; `quota` beats `resource_exhausted`. All matches case-insensitive; canonical sentinel value is lower-cased form
-- cross-runtime sentinel coverage (catalogued in `docs/research/provider-rate-limit-signals.md`):
-  - Anthropic / Claude Code: `usage limit`, `rate limit`, `quota`, `429`, `retry-after`
-  - GitHub Copilot CLI: `rate_limit` (stem covers `rate_limited`, `rate_limit_error`, `user_weekly_rate_limited`)
-  - OpenAI Codex CLI: `429`, `usage_limit_reached`, `too many requests`
-  - Google Gemini CLI: `RESOURCE_EXHAUSTED`, `exceeded your`
-- precedence rule: quota sentinel wins over `classifyHandoffIfNeeded` bug when both appear — a quota-kill that also crashed the completion handler is still a quota event, recovery differs
-- proactive-signal forward path (NOT yet usable from GSD orchestrator): Anthropic exposes `anthropic-ratelimit-{requests,tokens,input-tokens}-remaining` + `retry-after`; Agent SDK emits `RateLimitEvent` with `status: 'allowed' | 'allowed_warning' | 'rejected'`. Claude Code subprocess does NOT forward these to hooks/statusline today — tracked in upstream anthropics/claude-code#33820, #22407, #32796
-- `retry-after` parser uses `\bretry[-_ ]after[:\s]+(\d+)\b` to avoid embedded-word false matches like `noretry-after`
+`SESSION.2026-05-05=[PRED.k320..k331 introduced; DEFECT.SOURCE-GREP-IN-NEW-TESTS, DEFECT.CHANGESET-PR-FIELD-DRIFT, DEFECT.PHASE-DIR-PREFIX-DRIFT, DEFECT.PROMPT-INJECTION-SCAN-COLLISION; ADR-0002 thin-wrapper pattern findings folded into RULESET.WORKFLOW_*]`
+`SESSION.2026-05-05.sdk-bridge=PR #3158 SDK Runtime Bridge — observability isolation rule; strict-mode dispatchMode reporting invariant; transport decision ordering (guard before event emission); folded into Dispatch Policy Module glossary`
+`SESSION.2026-05-09=[8-PR triage wave, 7 merged + 1 subsumed; META.RULE.* introduced; WAVE.LESSON.* captured; k320/k322/k323/k326/k331 evidence; AI Ops Memory predicate format established]`
+`SESSION.2026-05-10=[ai-ops memory consolidation; release-notes standard taxonomy + templates; RELEASE-NOTES.* predicates introduced]`
+`SESSION.2026-05-13=[Shell Command Projection Module expansion (#3465-#3468); ADR-0009 superseded; new exports for subprocess dispatch and platform file I/O; phase-gated migration plan; PR #3464 three-gate invariant CI+CR+unresolved=0; PR #3470 stash-include-untracked rebase pattern]`
+`SESSION.2026-05-14=[#3095/PR #3490 EXEC.CLASSIFY.* introduced (Anthropic/Copilot/Codex/Gemini cross-runtime rate-limit sentinel coverage); #3489/PR #3499 DEFECT.STATE-TRAMPLE.idempotency-oracle (STATE.md current_phase field is oracle for state.complete-phase); #3488/PR #3501 DAG resolver same-phase short-form depends_on (shortFormToId index added to sdk/src/query/phase.ts); #3491/PR #3502 DEFECT.NESTED-GIT-INIT (gitWorktreeInfoInternal helper); #3493/PR #3500 extractCurrentMilestone generic Phase Details continuation past planned-milestone siblings; #3503/PR #3504 DEFECT.PATH-SUBSTRING-CHECK (trailing-slash anchor for homedir checks); #3346/PR #3505 codex AoT TOML leaf-key via extractFlatHookEventName; #3506/PR #3507 label-scoped stale-bot sub-job pattern; multi-PR triage operational lessons folded into PROC.TRIAGE.*; #3508 DEFECT.AGENT-ISOLATION-SILENT-FAIL; gsd-test image-missing auto-build (locally-built image via embedded heredoc Dockerfile); refined PRED.k322 threshold to 3 PRs/<10min]`
+`SESSION.2026-05-15=[#3537/PR #3538 DEFECT.PHASE-REGEX-FANOUT — phaseMarkdownRegexSource promoted to core.cjs and wired to 7 sites; parity-style regression test established as DEFECT.GENERATIVE-FIX exemplar; trek-e/gsd-test-runner#1 filed for DEFECT.GSD-TEST-MIRROR-POISONED — chown-back-before-exec legacy gap (poisoned holodeck mirror unstuck via authorized docker chown to remote 1000:1000); RULESET.PR-FLOW.* codified from project CLAUDE.md load-bearing rule; first dispatch under run-tests-before-create held cleanly (PR #3520 worker stopped on Docker exit 12 infra failure, orchestrator opened PR after unblock); CONTEXT.md refactored from 882 lines of mixed prose+predicates into ~500 lines of pure-predicate format with chronological session log]`
+`SESSION.2026-05-15.parallel-fix-dispatch=[#3542/PR #3546 prohibit git stash family in executor agents (shared refs/stash across worktrees); #3541/PR #3547 non-TTY resolution for installer prompt-user actions (default remove for SDK build artifacts, keep for skills/gsd-*/SKILL.md); #3545 filed for gsd-test-summary concurrent /tmp output collision; new predicates DEFECT.HOOK-OVER-ENFORCEMENT.read-tool-tracking, DEFECT.GSD-TEST-CONCURRENT-OUTPUT-COLLISION, DEFECT.SUBAGENT-LONG-RUNNING-BG-STALL, DEFECT.AGENT-RETIRED-SLASH-SYNTAX-DRIFT, PROC.PARALLEL-FIX-DISPATCH; agent-trust-but-verify caught /gsd-update retired-syntax comment slip in #3541 implementation before PR open]`
 
-### 2026-05-14 — STATE.md idempotency oracle for `state.complete-phase` (#3489, PR #3499)
+---
 
-- `cmdStateCompletePhase` in `get-shit-done/bin/lib/state.cjs` previously wrote STATE.md unconditionally; re-invoking on a phase already superseded by a later one rewound Status / Last Activity / Current Position to stale values silently
-- invariant: STATE.md's canonical `Current Phase` field is the idempotency oracle. If the field names a phase distinct from the resolved target, return `{ updated: [], phase, idempotent: true, note: "phase already superseded; no-op" }` without touching STATE.md
-- legacy-bridge banner `'state.complete-phase' not in native registry; falling back to gsd-tools.cjs` is the user-visible signal that this path runs the .cjs handler, not a typed SDK port — when fixing handler bugs, the .cjs path is canonical until ported
+## Executor failure classification (#3095 / PR #3490)
 
-### 2026-05-14 — Same-phase short-form `depends_on` requires its own lookup index (#3488, PR #3501)
+`EXEC.CLASSIFY.handler=sdk/src/query/agent-failure-classifier.ts (registered in command-static-catalog-foundation.ts DECISION_ROUTING_STATIC_CATALOG and command-manifest.non-family.ts mutation:false outputMode:json)`
+`EXEC.CLASSIFY.workflow=get-shit-done/workflows/execute-phase.md step 7; class-distinct prompts (quota-to-wait-for-reset; classify-handoff-bug-to-spot-check; unknown-to-continue/stop)`
+`EXEC.CLASSIFY.classes={class:'quota-exceeded'|'classify-handoff-bug'|'unknown-failure', sentinel?, retryAfterSeconds?}`
+`EXEC.CLASSIFY.sentinel-order=most specific first: 429 beats too-many-requests; quota beats resource_exhausted; case-insensitive; canonical sentinel value is lower-cased form`
+`EXEC.CLASSIFY.cross-runtime=Anthropic/CC: usage limit|rate limit|quota|429|retry-after; Copilot CLI: rate_limit (stem); Codex CLI: 429|usage_limit_reached|too many requests; Gemini CLI: RESOURCE_EXHAUSTED|exceeded your`
+`EXEC.CLASSIFY.precedence=quota sentinel wins over classifyHandoffIfNeeded bug when both appear`
+`EXEC.CLASSIFY.retry-after-parser=\bretry[-_ ]after[:\s]+(\d+)\b avoids embedded-word false matches like noretry-after`
+`EXEC.CLASSIFY.proactive-signal-not-usable=Anthropic exposes anthropic-ratelimit-* headers + Agent SDK RateLimitEvent; Claude Code subprocess does NOT forward to hooks/statusline today (upstream #33820, #22407, #32796)`
 
-- bug: DAG resolver in `sdk/src/query/phase.ts` (`phasePlanIndex` Pass 2) only resolved `depends_on` via `planMap` (full-stem `<phase>-<plan>`) and `canonicalToId` (canonical-prefix); same-phase short-form `[NN]` was never indexed, so `'01'` never matched plan IDs keyed as `'99.9-01'`
-- fix: add third index `shortFormToId` built from `extractCanonicalPlanId(p.id).slice(lastIndexOf('-') + 1)` — works for integer, letter-suffixed, and decimal phase IDs. Resolution order: `planMap` → `canonicalToId` → `shortFormToId`
-- diagnostic invariant: when a `depends_on` reference cannot be resolved, the resolver MUST emit `unresolvedDeps[]` warnings (`Plan X: unresolved depends_on reference 'NN' — no matching plan in phase`). Without this, dropped edges hide behind a downstream wave-mismatch warning that misleadingly points at the wave declaration
-- reporter-claims-narrower-scope pattern: #3488 reporter believed integer-phase short-form worked; regression test proved it was equally broken — write the test for BOTH claimed-working and claimed-broken cases
+`DEFECT.GSD-TEST-MIRROR-POISONED.symptom=gsd-test-summary --both exits docker=23 (rsync partial transfer) with mkstemp Permission denied on remote mirror files; mirror has root-owned artifacts from prior cold runs`
+`DEFECT.GSD-TEST-MIRROR-POISONED.detect=docker stderr shows rsync: [generator] delete_file: unlink(...) failed: Permission denied (13) OR [receiver] mkstemp ".gsd-*.<suffix>" failed`
+`DEFECT.GSD-TEST-MIRROR-POISONED.root-cause=container ran without --user; build:hooks wrote into bind-mount as root; chown-back-before-exec patch closes forward path but not legacy hosts`
+`DEFECT.GSD-TEST-MIRROR-POISONED.recovery=ssh <host> 'docker run --rm -v ~/gsd-mirror-get-shit-done:/work gsd-test:node22 chown -R <remote-uid>:<remote-gid> /work'; remote-uid is the SSH user's uid on the remote (1000 on holodeck, NOT local Mac 501)`
+`DEFECT.GSD-TEST-MIRROR-POISONED.upstream=trek-e/gsd-test-runner#1 — proposes self-healing init-time chown probe`
 
-### 2026-05-14 — Nested git worktree detection in `new-project` bootstrap (#3491, PR #3502)
+`DEFECT.HOOK-OVER-ENFORCEMENT.read-tool-tracking=gh-templates-first PreToolUse hook tracks Read tool invocations specifically; Bash cat/head of the same file does NOT satisfy the hook; future-self must use Read tool from the first contact with template files`
+`DEFECT.GSD-TEST-CONCURRENT-OUTPUT-COLLISION.symptom=two simultaneous gsd-test-summary --both invocations (e.g. one per worktree) both crash with UnicodeDecodeError in parse_events_from_file; "local exit=1 docker exit=1" reported even though remote containers ran fine`
+`DEFECT.GSD-TEST-CONCURRENT-OUTPUT-COLLISION.root-cause=gsd-test-summary lines 126-127 default LOCAL_OUT/DOCKER_OUT to fixed /tmp/gsd-test-{local,docker}.jsonl; concurrent line-buffered writers interleave bytes mid-multibyte → split UTF-8 sequence → decoder explodes on f.read()`
+`DEFECT.GSD-TEST-CONCURRENT-OUTPUT-COLLISION.detect=two gsd-test-summary --both runs in flight; UnicodeDecodeError in parse_events_from_string traceback; /tmp/gsd-test-*.jsonl size mismatch vs total events emitted`
+`DEFECT.GSD-TEST-CONCURRENT-OUTPUT-COLLISION.fix-forward=set per-invocation LOCAL_OUT=/tmp/gsd-test-<tag>-local.jsonl DOCKER_OUT=/tmp/gsd-test-<tag>-docker.jsonl env vars; or serialize the runs; upstream fix tracked in #3545 (default to tempfile.mkstemp + advisory flock)`
+`DEFECT.GSD-TEST-CONCURRENT-OUTPUT-COLLISION.upstream=gsd-build/get-shit-done#3545`
+`DEFECT.SUBAGENT-LONG-RUNNING-BG-STALL.symptom=spawned sub-agent kicks off gsd-test-summary --both via Bash run_in_background, then stops on the harness "you will be notified" message; never receives the notification because cross-turn task-notifications are only delivered to the top-level orchestrator`
+`DEFECT.SUBAGENT-LONG-RUNNING-BG-STALL.detect=sub-agent returns prematurely with text like "I should wait for the notification per CLAUDE.md" and incomplete work in its worktree (commits absent, push absent, PR absent)`
+`DEFECT.SUBAGENT-LONG-RUNNING-BG-STALL.fix-forward=keep gsd-test-summary --both at the top-level orchestrator; sub-agents either run it foreground with timeout: 1500000 (25min) and block, OR delegate the test step back to the orchestrator (write commits + return); never have a sub-agent fire-and-await a backgrounded long task`
+`DEFECT.SUBAGENT-LONG-RUNNING-BG-STALL.anchor=project CLAUDE.md "Top-level orchestrator (cross-turn notifications available) vs Sub-agent worker (no cross-turn notifications)" guidance — load-bearing for multi-worktree parallel fix dispatch`
+`DEFECT.AGENT-RETIRED-SLASH-SYNTAX-DRIFT.symptom=sub-agent writes /gsd-<cmd> (legacy hyphen syntax) in code comments or doc strings while implementing a fix; lands as part of the implementation diff`
+`DEFECT.AGENT-RETIRED-SLASH-SYNTAX-DRIFT.examples=#3541 implementation included a typical /gsd-update path comment in installer-migration-report.cjs; caught by tests/bug-2543-gsd-slash-namespace.test.cjs (#3443 invariant)`
+`DEFECT.AGENT-RETIRED-SLASH-SYNTAX-DRIFT.detect=tests/bug-2543-gsd-slash-namespace.test.cjs prints "Found N retired /gsd-<cmd> reference(s) — use /gsd:<cmd> instead" with line-number-precise violations`
+`DEFECT.AGENT-RETIRED-SLASH-SYNTAX-DRIFT.fix-forward=replace /gsd-<cmd> with /gsd:<cmd> at the cited file:line; healthy emergent property — project-wide invariant test catches drift agents would never self-correct`
+`DEFECT.AGENT-RETIRED-SLASH-SYNTAX-DRIFT.lesson=agent-trust-but-verify is load-bearing — sub-agent reporting "done" is not a substitute for running the full suite; the invariant test surfaces drift even in doc-only changes`
+`PROC.PARALLEL-FIX-DISPATCH.pattern=bot triage brief → worktree per branch → parallel sub-agents do rubber-duck/RCA/TDD implementation only → top-level orchestrator owns commit + gsd-test-summary --both + push + PR + changeset-pr-backfill`
+`PROC.PARALLEL-FIX-DISPATCH.rationale=long-running test runs need cross-turn notifications (orchestrator-only); CONTRIBUTING.md gh-templates-first hook requires session-scoped Read calls sub-agents wouldn't otherwise make; sequencing test runs avoids GSD-TEST-CONCURRENT-OUTPUT-COLLISION`
+`PROC.PARALLEL-FIX-DISPATCH.observed=#3541 + #3542 dispatched simultaneously this session; PRs #3546 #3547 opened green; one syntax slip caught by AGENT-RETIRED-SLASH-SYNTAX-DRIFT and fixed before second PR opened`
 
-- `pathExistsInternal(cwd, '.git')` is the wrong primitive for detecting an existing git context — it only sees `.git` directly in cwd, missing the case where cwd is a subdirectory of an outer worktree
-- right primitive: `git rev-parse --is-inside-work-tree` + `git rev-parse --show-toplevel`, surfaced through the existing `execGit` seam in `get-shit-done/bin/lib/core.cjs`
-- new helper `gitWorktreeInfoInternal(cwd)` returns `{ has_git, git_worktree_root, in_nested_subdir }`; surfaced via `cmdInitNewProject` and `cmdInitIngestDocs` (`bin/lib/init.cjs`) and mirrored in SDK `sdk/src/query/init.ts` / `init-complex.ts`
-- workflow gate: `new-project.md` and `ingest-docs.md` now refuse `git init` when `in_nested_subdir: true` and surface "planning files will track to the outer worktree" warning instead of creating nested `.git`
-- when adding a new large workflow that crosses the prompt-injection-scan size threshold, append to ALLOWLIST in `tests/prompt-injection-scan.test.cjs` alongside `discuss-phase.md` / `execute-phase.md` / `plan-phase.md`
+`DEFECT.HOOK-OVER-ENFORCEMENT.write-bypass=security_reminder_hook can block Write on substring match (e.g. literal "exec("); workaround is heredoc to /tmp then mv into place, or use Edit instead — Edit hooks are more lenient than Write hooks`
 
-### 2026-05-14 — `extractCurrentMilestone` generic Phase Details continuation (#3493, PR #3500)
-
-- `nextMilestoneRegex` in `sdk/src/query/roadmap.ts` only treats same-version sub-headings as continuations (from #2455 / #2422). Generic non-version-prefixed `## Phase Details` placed AFTER a `### 📋 vX.Y+ (Planned)` sibling fell outside the milestone slice — `phase.insert N` then reported "Phase N not found in ROADMAP.md" despite the heading being unambiguously present
-- fix: after the initial boundary scan, look forward for a literal `^#{1,3}\s+Phase\s+Details\b` heading past `sectionEnd` and append that block (up to next real milestone boundary or EOF). Intervening planned-milestone content is skipped, not concatenated — cannot leak across milestones. Bounded to a single append
-- do not regress: same-version `## v2.0 Phase Details` continuation from #2455 must still work; the existing `bug-2422` regression test pins this
-
-### 2026-05-14 — Path-replacement homedir check needs trailing-slash anchor (#3503, PR #3504)
-
-- `tests/path-replacement.test.cjs:163` used `content.includes(normalizedHomedir)` — substring match false-positives when homedir is short and appears inside an identifier (e.g. Docker `/root` matches `</root_cause_analysis>` in agent markdown)
-- fix: `content.includes(normalizedHomedir + '/')` — real path leaks always have a trailing `/`; identifier substrings don't
-- general pattern: substring-containment checks on short absolute prefixes (`/root`, `/tmp`, `/opt`) need delimiter anchors
-
-### 2026-05-14 — Codex AoT hooks migration: leaf TOML key must be event name (#3346, PR #3505)
-
-- `migrateCodexHooksMapFormat` in `bin/install.js` used `s.path.slice('hooks.'.length)` as the leaf key for emitted `[[hooks.<EVENT>]]` blocks. When the legacy table key was a `<file>:<event>:<line>:<col>` diagnostic location identifier and the real event lived in the body's `event = "..."` field, the location tuple passed through verbatim as the leaf — Codex 0.124.0+ refuses to load such keys (`:` and `\` collide with TOML's `.`-separated key syntax)
-- fix: the `mapOnlyBlocks` and `staleNamespacedAotBlocks` branches now mirror the flat-AoT branch and prefer `extractFlatHookEventName(body)` over the raw path segment when the body declares `event = "..."`
-- post-write validator message "expected `[[...]]` array-of-tables" was a downstream symptom — the bracket form is correct, the leaf key chain was the bug. When validator-style errors describe a fix shape, verify the actual emitted string first; the validator may be misdiagnosing the cause
-- regression test fixture: legacy `[hooks]` block with a location-identifier table key → assert parsed result has `hooks.state.session_start` (event name) as the leaf path
-
-### 2026-05-14 — Label-scoped stale-bot sub-job pattern (#3506, PR #3507)
-
-- two `actions/stale` jobs in one workflow do not conflict when each scopes via `only-issue-labels` (tight job) plus the other's labels in its `exempt-issue-labels` (broad job)
-- tight job pattern for "we asked, no response" enforcement:
-  - `only-issue-labels: 'awaiting-retest,needs-reproduction'`
-  - `days-before-issue-stale: 5`
-  - `days-before-issue-close: 0` (stale + close in same run)
-  - `days-before-pr-stale: -1` / `days-before-pr-close: -1` (disable PR side)
-  - `remove-stale-when-updated: true`
-- broad job (28+14) must add `awaiting-retest,needs-reproduction` to its `exempt-issue-labels` so the two jobs do not race or double-close
-- maintainers dry-run via `gh workflow run "Stale Cleanup"` before next cron tick; the action publishes a closes-summary
-
-### 2026-05-14 — Multi-PR triage operational lessons
-
-- GitHub auto-close-keyword parsing: `Fix #N` / `Fixes #N` / `Closes #N` in PR body prose (e.g. "Suggested fix #2 — `stopped_at` derivation") triggers spurious closes. Neutralise with backticks or parens: `` `(2)` `` instead of `#2`. After every `gh pr create`, verify `gh pr view <n> --json closingIssuesReferences -q '[.closingIssuesReferences[].number]'`
-- `gh-templates-first` hook gates `gh pr create` / `gh pr edit` / `gh issue create|edit` until every PR/issue template has been Read in-session. Pre-empt with one parallel-Read of `CONTRIBUTING.md`, all `.github/PULL_REQUEST_TEMPLATE/*.md`, `.github/pull_request_template.md`, and all `.github/ISSUE_TEMPLATE/*.yml` before the first `gh` invocation
-- sub-agent capacity: 4 parallel test-running debugger agents @ ~4 GB each overflow a 24 GB system. For multi-bug triage waves, run isolated-worktree agents **sequentially in foreground**, not in parallel — the worktree isolation still buys clean branch separation
-- trust-but-verify on every sub-agent return: confirm PR opened (`gh pr view <n>`), `closingIssuesReferences` lists exactly the intended issue, regression test path exists, scope is clean. Agents describe intent, not action
-- when auto-generated PR-template branch (`feat/NNNN-...` from `github-actions` bot) is heavily diverged from main (hundreds of files, large negative diff), discard it and branch fresh off main — the auto-branch is a courtesy reference, not a base
-- escalation pattern: an issue asking for a release publish or backport (e.g. #3340 — fix already in main, awaiting npm publish) is `ready-for-human`, not `ready-for-agent`. No branch can resolve it
+`PROC.TRIAGE.routing-incoming=stale-bug-already-fixed to close as duplicate of originating issue + cite fix PR + first stable tag; release-publish-or-backport to ready-for-human; reporter-can-self-test to awaiting-retest`
+`PROC.TRIAGE.comment-shape=lead with "duplicate of #NNNN, fixed by PR #MMMM, in v1.X.Y"; show current code snippet proving bug-surface gone; give @latest and @next upgrade commands; close`
+`PROC.TRIAGE.no-duplicate-label=this repo has no duplicate label; framing lives in comment text + closing the issue`
