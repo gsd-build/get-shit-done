@@ -86,8 +86,11 @@ describe('ultraplan-phase workflow beta marker', () => {
 describe('ultraplan-phase workflow runtime gate', () => {
   const content = fs.readFileSync(WF_PATH, 'utf-8');
 
-  test('checks CLAUDE_CODE_VERSION to detect Claude Code runtime', () => {
-    assert.ok(content.includes('CLAUDE_CODE_VERSION'), 'workflow must gate on CLAUDE_CODE_VERSION env var');
+  test('checks Claude Code runtime markers instead of version env var', () => {
+    assert.ok(
+      content.includes('CLAUDECODE') || content.includes('CLAUDE_CODE_ENTRYPOINT'),
+      'workflow must gate on Claude Code runtime marker env vars'
+    );
   });
 
   test('error message references /gsd-plan-phase as local alternative', () => {
