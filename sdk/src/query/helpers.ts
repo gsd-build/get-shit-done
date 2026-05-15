@@ -493,6 +493,26 @@ export async function resolvePathUnderProject(projectDir: string, userPath: stri
   return realCandidate;
 }
 
+/**
+ * Resolve a user-supplied file path the way CJS frontmatter handlers do.
+ *
+ * Mirrors `path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath)`
+ * from get-shit-done/bin/lib/frontmatter.cjs (lines 323, 340, 354, 369).
+ * Does NOT enforce the "under project root" prefix check — frontmatter
+ * verbs accept arbitrary absolute paths (the user is naming a file outside
+ * `.planning/`, often a phase-scoped plan in an external location, or a
+ * tmpdir inside `/var/folders` whose path includes spaces).
+ *
+ * Bug #3509 parity: tests on macOS use `os.tmpdir()` directories that
+ * resolve outside the project root; the project-scoped variant was
+ * rejecting them with "path escapes project directory". Use this helper
+ * for the frontmatter family. Use `resolvePathUnderProject` for commands
+ * that must stay inside the project (e.g. template output, decisions).
+ */
+export function resolveFrontmatterPath(projectDir: string, userPath: string): string {
+  return isAbsolute(userPath) ? normalize(userPath) : resolve(projectDir, userPath);
+}
+
 // ─── sanitizeForDisplay (security.cjs) ───────────────────────────────────────
 
 /** Port of `sanitizeForPrompt` from `security.cjs`. */

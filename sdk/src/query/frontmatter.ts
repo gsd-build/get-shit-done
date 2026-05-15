@@ -19,7 +19,7 @@
 import { readFile } from 'node:fs/promises';
 import { GSDError, ErrorClassification } from '../errors.js';
 import type { QueryHandler } from './utils.js';
-import { escapeRegex, resolvePathUnderProject } from './helpers.js';
+import { escapeRegex, resolveFrontmatterPath } from './helpers.js';
 
 // ─── splitInlineArray ───────────────────────────────────────────────────────
 
@@ -363,15 +363,10 @@ export const frontmatterGet: QueryHandler = async (args, projectDir) => {
     throw new GSDError('file path contains null bytes', ErrorClassification.Validation);
   }
 
-  let fullPath: string;
-  try {
-    fullPath = await resolvePathUnderProject(projectDir, filePath);
-  } catch (err) {
-    if (err instanceof GSDError) {
-      return { data: { error: err.message, path: filePath } };
-    }
-    throw err;
-  }
+  // CJS parity (frontmatter.cjs:323): no project-root prefix check — accept
+  // any absolute path (and macOS tmpdir paths whose names contain spaces).
+  // Bug #3509.
+  const fullPath = resolveFrontmatterPath(projectDir, filePath);
 
   let content: string;
   try {

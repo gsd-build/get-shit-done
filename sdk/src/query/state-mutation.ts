@@ -812,7 +812,7 @@ export const stateAddDecision: QueryHandler = async (args, projectDir, workstrea
   }
 
   const entry = `- [Phase ${phase || '?'}]: ${summaryText}${rationaleText ? ` — ${rationaleText}` : ''}`;
-  let added = false;
+  let created = false;
 
   await readModifyWriteStateMd(projectDir, (content) => {
     const sectionPattern = /(###?\s*(?:Decisions|Decisions Made|Accumulated.*Decisions)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -822,16 +822,22 @@ export const stateAddDecision: QueryHandler = async (args, projectDir, workstrea
       let sectionBody = match[2];
       sectionBody = sectionBody.replace(/None yet\.?\s*\n?/gi, '').replace(/No decisions yet\.?\s*\n?/gi, '');
       sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-      content = content.replace(sectionPattern, (_match, header: string) => `${header}${sectionBody}`);
-      added = true;
+      return content.replace(sectionPattern, (_match, header: string) => `${header}${sectionBody}`);
     }
-    return content;
+
+    // Section absent — DWIM (CJS state.cjs:481-492): auto-create the
+    // canonical `## Decisions` scaffold and append the entry. Matches the
+    // begin-phase / advance-plan DWIM behavior. Without this, callers that
+    // never touched the Decisions section see `{added: false}` even though
+    // STATE.md is writable. Bug #3286.
+    const scaffold = ['', '## Decisions', '', entry, ''].join('\n');
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, workstream);
 
-  if (added) {
-    return { data: { added: true, decision: entry } };
-  }
-  return { data: { added: false, reason: 'Decisions section not found in STATE.md' } };
+  const result: Record<string, unknown> = { added: true, decision: entry };
+  if (created) result['created'] = true;
+  return { data: result };
 };
 
 /**
@@ -859,7 +865,7 @@ export const stateAddBlocker: QueryHandler = async (args, projectDir, workstream
   }
 
   const entry = `- ${blockerText}`;
-  let added = false;
+  let created = false;
 
   await readModifyWriteStateMd(projectDir, (content) => {
     const sectionPattern = /(###?\s*(?:Blockers|Blockers\/Concerns|Concerns)\s*\n)([\s\S]*?)(?=\n###?|\n##[^#]|$)/i;
@@ -869,16 +875,20 @@ export const stateAddBlocker: QueryHandler = async (args, projectDir, workstream
       let sectionBody = match[2];
       sectionBody = sectionBody.replace(/None\.?\s*\n?/gi, '').replace(/None yet\.?\s*\n?/gi, '');
       sectionBody = sectionBody.trimEnd() + '\n' + entry + '\n';
-      content = content.replace(sectionPattern, (_match, header: string) => `${header}${sectionBody}`);
-      added = true;
+      return content.replace(sectionPattern, (_match, header: string) => `${header}${sectionBody}`);
     }
-    return content;
+
+    // Section absent — DWIM (CJS state.cjs:532-542): auto-create the
+    // canonical `### Blockers` scaffold and append the entry. Bug #3286
+    // parity — matches stateAddDecision DWIM above.
+    const scaffold = ['', '### Blockers', '', entry, ''].join('\n');
+    created = true;
+    return content.trimEnd() + '\n' + scaffold;
   }, workstream);
 
-  if (added) {
-    return { data: { added: true, blocker: blockerText } };
-  }
-  return { data: { added: false, reason: 'Blockers section not found in STATE.md' } };
+  const result: Record<string, unknown> = { added: true, blocker: blockerText };
+  if (created) result['created'] = true;
+  return { data: result };
 };
 
 /**
