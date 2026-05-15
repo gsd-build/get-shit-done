@@ -528,7 +528,7 @@ Migration plan: Phase 1 (#3465) seam additions complete; Phase 2 (#3466) targets
 `PROC.PARALLEL-FIX-DISPATCH.rationale=long-running test runs need cross-turn notifications (orchestrator-only); CONTRIBUTING.md gh-templates-first hook requires session-scoped Read calls sub-agents wouldn't otherwise make; sequencing test runs avoids GSD-TEST-CONCURRENT-OUTPUT-COLLISION`
 `PROC.PARALLEL-FIX-DISPATCH.observed=#3541 + #3542 dispatched simultaneously this session; PRs #3546 #3547 opened green; one syntax slip caught by AGENT-RETIRED-SLASH-SYNTAX-DRIFT and fixed before second PR opened`
 
-`DEFECT.HOOK-OVER-ENFORCEMENT.write-bypass=security_reminder_hook can block Write on substring match (e.g. literal "exec("); workaround is heredoc to /tmp then mv into place, or use Edit instead — Edit hooks are more lenient than Write hooks`
+`DEFECT.HOOK-OVER-ENFORCEMENT.write-bypass=security_reminder_hook can block Write on substring match (e.g. a literal child-process call-expression token); workaround is heredoc to /tmp then mv into place, or use Edit instead — Edit hooks are more lenient than Write hooks`
 
 `PROC.TRIAGE.routing-incoming=stale-bug-already-fixed to close as duplicate of originating issue + cite fix PR + first stable tag; release-publish-or-backport to ready-for-human; reporter-can-self-test to awaiting-retest`
 `PROC.TRIAGE.comment-shape=lead with "duplicate of #NNNN, fixed by PR #MMMM, in v1.X.Y"; show current code snippet proving bug-surface gone; give @latest and @next upgrade commands; close`
