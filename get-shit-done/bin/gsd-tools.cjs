@@ -246,14 +246,32 @@ function _dispatchNonFamily({ registryCommand, registryArgs, legacyCommand, lega
     workstream: process.env.GSD_WORKSTREAM || undefined,
   });
   if (!result.ok) {
-    error(
-      result.errorDetails && result.errorDetails.message
-        ? result.errorDetails.message
-        : `${legacyCommand} (${registryCommand}) failed (${result.errorKind})`,
-    );
+    const message = (result.errorDetails && result.errorDetails.message)
+      || `${legacyCommand} (${registryCommand}) failed (${result.errorKind})`;
+    // Propagate the structured reason code through to CJS `error()` so the
+    // `--json-errors` JSON-shaped stderr carries the typed reason (e.g.
+    // 'config_key_not_found') instead of the generic 'unknown'.  Handlers
+    // tag the GSDError with `.reason` and the worker forwards it via
+    // errorDetails.reason. (Bugs #2943, #3086.)
+    const reason = result.errorDetails && result.errorDetails.reason;
+    if (reason) {
+      error(message, reason);
+    } else {
+      error(message);
+    }
     return true; // handled (error reported)
   }
-  output(result.data, raw);
+  // CJS parity for --raw output (config.cjs:525 `output(value, raw, String(value))`):
+  // when the caller asked for --raw and the SDK returned a scalar, pass that
+  // scalar through as `rawValue` so core.output() emits the bare string
+  // representation instead of JSON-stringifying it.  Non-scalar shapes fall
+  // through to the structured JSON path, matching `output(obj, raw)`.
+  const data = result.data;
+  if (raw && (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean')) {
+    output(data, raw, String(data));
+  } else {
+    output(data, raw);
+  }
   return true;
 }
 
