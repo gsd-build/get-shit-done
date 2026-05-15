@@ -99,11 +99,13 @@ const {
   stageAgentsForProfile,
 } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
 const {
+  applyInstallerMigrationPlan,
   discoverInstallerMigrations,
   runInstallerMigrations,
 } = require(path.join(_gsdLibDir, 'installer-migrations.cjs'));
 const {
   assertInstallerMigrationsUnblocked,
+  resolveInstallerMigrationPromptsForNonTty,
   summarizeInstallerMigrationResult,
 } = require(path.join(_gsdLibDir, 'installer-migration-report.cjs'));
 
@@ -8030,6 +8032,43 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     migrations: options.installerMigrations,
     baselineScan: true,
   });
+  // #3541: non-interactive runs (typical /gsd-update via Claude Code) have
+  // no stdin TTY and therefore no way to answer prompt-user migration
+  // actions. Resolve safe categories by classification (stale SDK build
+  // artifacts → remove; user-facing skills → keep) and log every
+  // resolution; anything that cannot be safely defaulted falls through
+  // to assertInstallerMigrationsUnblocked, which now emits a grouped
+  // error with the documented resolution path.
+  const _migrationIsTty = process.stdin && process.stdin.isTTY === true;
+  if (!_migrationIsTty &&
+      Array.isArray(installerMigrationResult.blocked) &&
+      installerMigrationResult.blocked.length > 0 &&
+      installerMigrationResult.plan &&
+      Array.isArray(installerMigrationResult.plan.actions)) {
+    const { resolutions } = resolveInstallerMigrationPromptsForNonTty(
+      installerMigrationResult,
+      { isTty: false }
+    );
+    for (const entry of resolutions) {
+      console.log(
+        `  ↪ installer-migration auto-resolved: ${entry.relPath} → ${entry.choice} ` +
+        `(category=${entry.category}, source=${entry.source})`
+      );
+    }
+    // If we resolved anything, the original run returned early without
+    // applying the (now-unblocked) plan — apply it here.
+    if (resolutions.length > 0 && installerMigrationResult.plan.blocked.length === 0) {
+      const applyResult = applyInstallerMigrationPlan({
+        configDir: targetDir,
+        plan: installerMigrationResult.plan,
+      });
+      installerMigrationResult = {
+        ...installerMigrationResult,
+        ...applyResult,
+        blocked: [],
+      };
+    }
+  }
   reportInstallerMigrationResult(installerMigrationResult);
   assertInstallerMigrationsUnblocked(installerMigrationResult);
 

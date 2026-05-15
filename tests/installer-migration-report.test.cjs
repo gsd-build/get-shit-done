@@ -146,14 +146,29 @@ test('collapses first-time baseline report rows without hiding destructive actio
 });
 
 test('throws when installer migrations require user choice', () => {
-  assert.throws(
-    () => assertInstallerMigrationsUnblocked({
+  // #3541: error message now groups paths by reason and names the
+  // non-interactive resolution surface. The thrown error carries
+  // structured `blockedByReason` data and the resolution env var
+  // name so callers can render their own report.
+  let captured = null;
+  try {
+    assertInstallerMigrationsUnblocked({
       blocked: [
         {
           relPath: 'hooks/gsd-retired-hook.js',
+          reason: 'needs a user choice',
+          choices: ['keep', 'remove'],
         },
       ],
-    }),
-    /installer migration blocked pending user choice: hooks\/gsd-retired-hook\.js/
-  );
+    });
+    assert.fail('expected throw');
+  } catch (err) {
+    captured = err;
+  }
+  assert.ok(captured instanceof Error);
+  assert.match(captured.message, /installer migration blocked pending user choice/);
+  assert.match(captured.message, /hooks\/gsd-retired-hook\.js/);
+  assert.match(captured.message, /GSD_INSTALLER_MIGRATION_RESOLVE/);
+  assert.ok(captured.blockedByReason, 'error exposes grouped-by-reason data');
+  assert.equal(captured.resolutionEnvVar, 'GSD_INSTALLER_MIGRATION_RESOLVE');
 });
