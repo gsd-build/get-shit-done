@@ -8,12 +8,16 @@
  * TypeScript file exists in sdk/src/<name>.ts, sdk/src/query/<name>.ts, or
  * sdk/src/<name>/index.ts (excluding *.generated.ts and *.test.ts).
  *
+ * Allowlist entries are keyed by the (cjs, ts) PAIR. An entry with cjs
+ * `bin/lib/foo.cjs` and ts `sdk/src/foo.ts` only allow-throughs that exact
+ * pair — a sibling at `sdk/src/query/foo.ts` is still flagged.
+ *
  * If a pair is found:
- *   - cooperatingSiblings: accepted silently (exit 0).
- *   - migrateMeBacklog: emits a WARNING for files touched in this run
- *     (detected by env var GSD_LINT_CHANGED_FILES if set, otherwise warns
- *     for all backlog pairs on --warn-all flag, else suppresses).
- *   - Unlisted pairs: ERROR — exit 1 with a clear message.
+ *   - cooperatingSiblings (matching cjs + ts): accepted silently (exit 0).
+ *   - migrateMeBacklog (matching cjs + ts): emits a WARNING only when
+ *     --warn-all is set; otherwise the pair passes silently. Backlog
+ *     pairs never fail CI.
+ *   - Unlisted pairs (cjs or ts not on either list): ERROR — exit 1.
  *
  * Usage:
  *   node scripts/lint-shared-module-handsync.cjs
@@ -76,14 +80,20 @@ try {
   process.exit(1);
 }
 
-/** @type {Set<string>} cjs relative paths in cooperatingSiblings */
-const cooperatingSet = new Set(
-  (allowlist.cooperatingSiblings || []).map((e) => e.cjs)
+/**
+ * Pair identity = `${cjs}::${ts}`. Keying on the pair (not just cjs)
+ * prevents an allowlisted entry from silently passing an unintended
+ * sibling at a different ts path with the same basename.
+ *
+ * @type {Set<string>} pair identities in cooperatingSiblings
+ */
+const cooperatingPairs = new Set(
+  (allowlist.cooperatingSiblings || []).map((e) => `${e.cjs}::${e.ts}`)
 );
 
-/** @type {Map<string, object>} cjs relative path -> entry for migrateMeBacklog */
+/** @type {Map<string, object>} pair identity -> entry for migrateMeBacklog */
 const migrateMap = new Map(
-  (allowlist.migrateMeBacklog || []).map((e) => [e.cjs, e])
+  (allowlist.migrateMeBacklog || []).map((e) => [`${e.cjs}::${e.ts}`, e])
 );
 
 // ---------------------------------------------------------------------------
@@ -206,30 +216,43 @@ function main() {
     // Is there a matching TS file?
     if (!sdkIndex.has(name)) continue;
 
-    // Compute the relative path the allowlist uses
+    // Compute the relative paths the allowlist uses
     const relCjs = path.relative(ROOT, absPath).replace(/\\/g, '/');
+    const tsPaths = sdkIndex.get(name).map((p) => path.relative(ROOT, p).replace(/\\/g, '/'));
 
-    if (cooperatingSet.has(relCjs)) {
+    // Pair-aware matching: an allowlist entry covers a specific (cjs, ts)
+    // pair only. If multiple ts candidates exist for the same name, each
+    // is checked independently against the allowlist; unmatched siblings
+    // still raise an error.
+    const matchedCooperating = tsPaths.some((relTs) =>
+      cooperatingPairs.has(`${relCjs}::${relTs}`)
+    );
+    if (matchedCooperating) {
       // Explicitly allowed — silent pass
       continue;
     }
 
-    if (migrateMap.has(relCjs)) {
+    const backlogTs = tsPaths.find((relTs) => migrateMap.has(`${relCjs}::${relTs}`));
+    if (backlogTs) {
       // Known drift anti-pattern — warn (not fail)
-      const entry = migrateMap.get(relCjs);
-      const tsPaths = sdkIndex.get(name).map((p) => path.relative(ROOT, p).replace(/\\/g, '/'));
+      const entry = migrateMap.get(`${relCjs}::${backlogTs}`);
       warnings.push({ relCjs, tsPaths, entry });
       continue;
     }
 
     // Unlisted pair — this is a new drift anti-pattern
-    const tsPaths = sdkIndex.get(name).map((p) => path.relative(ROOT, p).replace(/\\/g, '/'));
     errors.push({ relCjs, tsPaths });
   }
 
+  // Count cjs files whose pair identity (cjs+ts) is on cooperatingSiblings.
+  // A file with multiple ts candidates is counted once if any pair matches.
   const cooperatingCount = cjsFiles.filter((f) => {
-    const rel = path.relative(ROOT, f.absPath).replace(/\\/g, '/');
-    return cooperatingSet.has(rel);
+    if (!sdkIndex.has(f.name)) return false;
+    const relCjs = path.relative(ROOT, f.absPath).replace(/\\/g, '/');
+    return sdkIndex.get(f.name).some((tsAbs) => {
+      const relTs = path.relative(ROOT, tsAbs).replace(/\\/g, '/');
+      return cooperatingPairs.has(`${relCjs}::${relTs}`);
+    });
   }).length;
 
   // -------------------------------------------------------------------------

@@ -154,7 +154,7 @@ Use this when you want to extract a new piece of data or logic that both CJS and
 
 **Step 1 — Create the source-of-truth file**
 
-```
+```text
 sdk/src/<module>/index.ts
 ```
 
@@ -162,7 +162,7 @@ This is the canonical definition. It may export a schema, a set of keys, a type,
 
 **Step 2 — Write the generator script**
 
-```
+```text
 sdk/scripts/gen-<module>.mjs
 ```
 
@@ -170,7 +170,7 @@ The generator reads `sdk/src/<module>/index.ts` (or `sdk/shared/<module>.manifes
 
 **Step 3 — Write the freshness check**
 
-```
+```text
 sdk/scripts/check-<module>-fresh.mjs
 ```
 
@@ -178,7 +178,7 @@ The freshness check re-runs the generator into a temp location, diffs against th
 
 **Step 4 — Write the parity test** (optional but recommended)
 
-```
+```text
 tests/<module>-parity.test.cjs
 ```
 
