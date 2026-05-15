@@ -182,7 +182,7 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     // Upgrade path: user has a config written by GSD 1.38.x (flat [[hooks]] form).
     const legacyConfig = [
       '[features]',
-      'codex_hooks = true',
+      'hooks = true',
       '',
       '# GSD Hooks',
       '[[hooks]]',
@@ -209,7 +209,7 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     // [[hooks.SessionStart]] without a nested [[hooks.SessionStart.hooks]] sub-table.
     const prBranchConfig = [
       '[features]',
-      'codex_hooks = true',
+      'hooks = true',
       '',
       '# GSD Hooks',
       '[[hooks.SessionStart]]',
@@ -788,7 +788,7 @@ describe('#2760 CR4 finding 1 — atomicWriteFileSync failure aborts install (po
         let isHookWrite = false;
         try {
           const data = fs.readFileSync(src, 'utf8');
-          isHookWrite = /GSD codex_hooks ownership/.test(data);
+          isHookWrite = /GSD hooks ownership/.test(data);
         } catch (_) { /* ignore */ }
         if (isHookWrite) {
           throw new Error('simulated rename failure');
@@ -853,7 +853,7 @@ describe('#2760 CR5 finding 1 — pre-write failures abort install (outer catch 
     // A validator that THROWS (vs returning {ok:false}) bypasses the
     // validation branch and exits the inner try via the catch at the outer
     // level. Pre-CR5, that catch downgraded to console.warn and let the
-    // install print "Done!" with no Codex hooks. Post-CR5 it must rethrow.
+    // install print "Done!" with no hooks. Post-CR5 it must rethrow.
     const preInstall = [
       '# user file',
       '[model]',

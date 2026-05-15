@@ -31,7 +31,7 @@ const reset = '\x1b[0m';
 
 // Codex config.toml constants
 const GSD_CODEX_MARKER = '# GSD Agent Configuration \u2014 managed by get-shit-done installer';
-const GSD_CODEX_HOOKS_OWNERSHIP_PREFIX = '# GSD codex_hooks ownership: ';
+const GSD_CODEX_HOOKS_OWNERSHIP_PREFIX = '# GSD hooks ownership: ';
 
 // Copilot instructions marker constants
 const GSD_COPILOT_INSTRUCTIONS_MARKER = '<!-- GSD Configuration \u2014 managed by get-shit-done installer -->';
@@ -3230,7 +3230,7 @@ function stripCodexHooksFeatureAssignments(content, ownership = null) {
       !record.startsInMultilineString &&
       record.keySegments &&
       record.keySegments.length === 1 &&
-      record.keySegments[0] === 'codex_hooks'
+      (record.keySegments[0] === 'hooks' || record.keySegments[0] === 'codex_hooks')
     );
 
     for (const record of codexHookRecords) {
@@ -3275,7 +3275,7 @@ function stripCodexHooksFeatureAssignments(content, ownership = null) {
       record.keySegments &&
       record.keySegments.length === 2 &&
       record.keySegments[0] === 'features' &&
-      record.keySegments[1] === 'codex_hooks'
+      (record.keySegments[1] === 'hooks' || record.keySegments[1] === 'codex_hooks')
     );
 
     for (const record of rootCodexHookRecords) {
@@ -3296,7 +3296,7 @@ function getManagedCodexHooksOwnership(content) {
   }
 
   const afterMarker = content.slice(markerIndex + GSD_CODEX_MARKER.length);
-  const match = afterMarker.match(/^\r?\n# GSD codex_hooks ownership: (section|root_dotted)\r?\n/);
+  const match = afterMarker.match(/^\r?\n# GSD (?:hooks|Codex hooks feature|codex_hooks) ownership: (section|root_dotted)\r?\n/);
   return match ? match[1] : null;
 }
 
@@ -3310,7 +3310,7 @@ function setManagedCodexHooksOwnership(content, ownership) {
   const markerEnd = markerIndex + GSD_CODEX_MARKER.length;
   const afterMarker = content.slice(markerEnd);
   const normalizedAfterMarker = afterMarker.replace(
-    /^\r?\n# GSD codex_hooks ownership: (?:section|root_dotted)\r?\n/,
+    /^\r?\n# GSD (?:hooks|Codex hooks feature|codex_hooks) ownership: (?:section|root_dotted)\r?\n/,
     eol
   );
 
@@ -4431,7 +4431,8 @@ function rewriteTomlKeyLines(content, matches, key) {
       const blockEol = blockEnd > 0 && content[blockEnd - 1] === '\n'
         ? (blockEnd > 1 && content[blockEnd - 2] === '\r' ? '\r\n' : '\n')
         : '';
-      rewritten += normalizeCodexHooksLine(match.text, match.keyRaw || key) + blockEol;
+      const shouldRename = match.keySegments && match.keySegments.includes('codex_hooks');
+      rewritten += normalizeCodexHooksLine(match.text, shouldRename ? key : (match.keyRaw || key)) + blockEol;
       cursor = blockEnd;
       return;
     }
@@ -4534,7 +4535,7 @@ function repairTrappedFeaturesKeys(content) {
   }
 
   // Find non-boolean key-value lines inside [features] that don't belong there.
-  // Boolean keys (codex_hooks, multi_agent, etc.) are legitimate feature flags.
+  // Boolean keys (hooks, multi_agent, etc.) are legitimate feature flags.
   const trappedLines = lineRecords.filter((record) => {
     if (record.tableHeader || record.startsInMultilineString) return false;
     if (record.tablePath !== 'features') return false;
@@ -4612,11 +4613,11 @@ function ensureCodexHooksFeature(configContent) {
         record.end + record.eol.length <= featuresSection.end &&
         record.keySegments &&
         record.keySegments.length === 1 &&
-        record.keySegments[0] === 'codex_hooks'
+        (record.keySegments[0] === 'hooks' || record.keySegments[0] === 'codex_hooks')
       );
 
     if (sectionLines.length > 0) {
-      const rewritten = rewriteTomlKeyLines(configContent, sectionLines, 'codex_hooks');
+      const rewritten = rewriteTomlKeyLines(configContent, sectionLines, 'hooks');
       return {
         content: repairTrappedFeaturesKeys(rewritten),
         ownership: null,
@@ -4626,7 +4627,7 @@ function ensureCodexHooksFeature(configContent) {
     const sectionBody = configContent.slice(featuresSection.headerEnd, featuresSection.end);
     const needsSeparator = sectionBody.length > 0 && !sectionBody.endsWith('\n') && !sectionBody.endsWith('\r\n');
     const insertPrefix = sectionBody.length === 0 && featuresSection.headerEnd === configContent.length ? eol : '';
-    const insertText = `${insertPrefix}${needsSeparator ? eol : ''}codex_hooks = true${eol}`;
+    const insertText = `${insertPrefix}${needsSeparator ? eol : ''}hooks = true${eol}`;
     const merged = configContent.slice(0, featuresSection.end) + insertText + configContent.slice(featuresSection.end);
     return {
       content: repairTrappedFeaturesKeys(merged),
@@ -4644,11 +4645,14 @@ function ensureCodexHooksFeature(configContent) {
     );
 
   const rootCodexHooksLines = rootFeatureLines
-    .filter((record) => record.keySegments.length === 2 && record.keySegments[1] === 'codex_hooks');
+    .filter((record) =>
+      record.keySegments.length === 2 &&
+      (record.keySegments[1] === 'hooks' || record.keySegments[1] === 'codex_hooks')
+    );
 
   if (rootCodexHooksLines.length > 0) {
     return {
-      content: rewriteTomlKeyLines(configContent, rootCodexHooksLines, 'features.codex_hooks'),
+      content: rewriteTomlKeyLines(configContent, rootCodexHooksLines, 'features.hooks'),
       ownership: null,
     };
   }
@@ -4666,13 +4670,13 @@ function ensureCodexHooksFeature(configContent) {
     const prefix = insertAt > 0 && configContent[insertAt - 1] === '\n' ? '' : eol;
     return {
       content: configContent.slice(0, insertAt) +
-        `${prefix}features.codex_hooks = true${eol}` +
+        `${prefix}features.hooks = true${eol}` +
         configContent.slice(insertAt),
       ownership: 'root_dotted',
     };
   }
 
-  const featuresBlock = `[features]${eol}codex_hooks = true${eol}`;
+  const featuresBlock = `[features]${eol}hooks = true${eol}`;
   if (!configContent) {
     return { content: featuresBlock, ownership: 'section' };
   }
@@ -4703,11 +4707,11 @@ function hasEnabledCodexHooksFeature(configContent) {
 
     const isSectionKey = record.tablePath === 'features' &&
       record.keySegments.length === 1 &&
-      record.keySegments[0] === 'codex_hooks';
+      (record.keySegments[0] === 'hooks' || record.keySegments[0] === 'codex_hooks');
     const isRootDottedKey = record.tablePath === null &&
       record.keySegments.length === 2 &&
       record.keySegments[0] === 'features' &&
-      record.keySegments[1] === 'codex_hooks';
+      (record.keySegments[1] === 'hooks' || record.keySegments[1] === 'codex_hooks');
 
     if (!isSectionKey && !isRootDottedKey) {
       return false;
@@ -8925,7 +8929,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       console.log(`  ${green}✓${reset} Installed hooks`);
     }
 
-    // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
+    // Add Codex hooks (SessionStart for update checking) — requires hooks feature flag
     const configPath = path.join(targetDir, 'config.toml');
     // Use the pre-install snapshot captured before installCodexConfig ran so
     // restore returns the file to its true pre-GSD state on validation

@@ -81,7 +81,7 @@ function writeCodexConfigWithStaleHooks(dir, headerEol, bodyEol) {
     // the user area is what the hooks migration must remove.
     const content = [
       '[features]',
-      'codex_hooks = true',
+      'hooks = true',
       '',
     ].join(headerEol) + headerEol + staleBlock + headerEol + headerEol + GSD_CODEX_MARKER + headerEol;
 

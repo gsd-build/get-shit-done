@@ -426,7 +426,7 @@ describe('Codex legacy gsd-update-check migration', () => {
   test('migration regex removes LF legacy hook block', () => {
     const legacyBlock = [
       '[features]',
-      'codex_hooks = true',
+      'hooks = true',
       '',
       '# GSD Hooks',
       '[[hooks]]',
@@ -444,7 +444,7 @@ describe('Codex legacy gsd-update-check migration', () => {
   test('migration regex removes CRLF legacy hook block', () => {
     const legacyBlock = [
       '[features]',
-      'codex_hooks = true',
+      'hooks = true',
       '',
       '# GSD Hooks',
       '[[hooks]]',

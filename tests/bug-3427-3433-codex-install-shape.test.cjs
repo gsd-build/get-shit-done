@@ -84,7 +84,7 @@ describe('#3427 + #3433 — Codex installer avoids duplicate skills and mixed ho
   test('stores managed SessionStart update hook in hooks.json and removes inline gsd hook from config.toml', () => {
     const configToml = [
       '[features]',
-      'codex_hooks = true',
+      'hooks = true',
       '',
       '[[hooks.SessionStart]]',
       '[[hooks.SessionStart.hooks]]',
