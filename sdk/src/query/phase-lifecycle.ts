@@ -32,7 +32,7 @@ import {
   planningPaths,
 } from './helpers.js';
 import { extractFrontmatter } from './frontmatter.js';
-import { extractCurrentMilestone } from './roadmap.js';
+import { extractCurrentMilestone, phaseMarkdownRegexSource } from './roadmap.js';
 import { getMilestonePhaseFilter } from './state.js';
 import { isCanonicalPlanFile, describeNonCanonicalPlans } from './phase.js';
 import {
@@ -1210,7 +1210,12 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
   // Step C: Update ROADMAP.md atomically
   if (existsSync(paths.roadmap)) {
     await readModifyWriteRoadmapMd(projectDir, async (roadmapContent) => {
-      const phaseEscaped = escapeRegex(phaseNum);
+      // Padding-tolerant fragment so a padded input like "02.7" still matches
+      // un-padded ROADMAP prose ("### Phase 2.7:").  CJS routes every phase-
+      // number ROADMAP regex through phaseMarkdownRegexSource (#3537) —
+      // mirror that contract here so phase.complete with the padded form
+      // produces the same ROADMAP as the un-padded form.
+      const phaseEscaped = phaseMarkdownRegexSource(phaseNum);
 
       // Checkbox: - [ ] Phase N: -> - [x] Phase N: (...completed DATE)
       // CJS parity (phase.cjs): direct replace, NOT scoped through

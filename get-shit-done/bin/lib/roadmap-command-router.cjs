@@ -21,7 +21,13 @@ const { tryLoadSdk, getExecuteForCjs } = require('./cjs-sdk-bridge.cjs');
  */
 function routeRoadmapCommand({ roadmap, args, cwd, raw, error }) {
   const activeWorkstream = process.env.GSD_WORKSTREAM;
-  const sdkAvailable = !activeWorkstream && tryLoadSdk();
+  // GSD_SDK_NESTED is set by SDK handlers that spawn gsd-tools.cjs as a
+  // child process (e.g. roadmapAnnotateDependencies).  Without this guard
+  // the child process re-dispatches through the SDK bridge, which spawns
+  // again, ad infinitum until the synckit 15s timeout fires.  Bug #3537
+  // annotate-dependencies parity.
+  const nested = process.env.GSD_SDK_NESTED === '1';
+  const sdkAvailable = !activeWorkstream && !nested && tryLoadSdk();
 
   function sdkHandler(registryCommand, registryArgs, legacyArgs, cjsFallback) {
     if (!sdkAvailable) return cjsFallback;

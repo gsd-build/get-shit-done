@@ -492,7 +492,7 @@ export async function extractNextMilestoneSection(
  * roadmap-update-plan-progress.ts. Falls back to `escapeRegex(phaseNum)` for
  * non-numeric IDs (custom project codes like `PROJ-42`).
  */
-function phaseMarkdownRegexSource(phaseNum: string): string {
+export function phaseMarkdownRegexSource(phaseNum: string): string {
   const stripped = String(phaseNum).replace(/^[A-Z]{1,6}-(?=\d)/i, '');
   const match = stripped.match(/^0*(\d+)([A-Z])?((?:\.\d+)*)$/i);
   if (!match) return escapeRegex(phaseNum);
@@ -512,34 +512,42 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
   // Match "## Phase X:", "### Phase X:", or "#### Phase X:" with optional name.
   // Uses the padding-tolerant fragment so zero-padded inputs ("03") match
   // unpadded ROADMAP headings ("### Phase 3:"). See #2391 / #3537.
+  // Capture group 1 = the as-written phase token from the heading so callers
+  // get the canonical form (matching the ROADMAP source-of-truth), not the
+  // padded input the user typed.  Without this, `roadmap get-phase 02.7`
+  // and `roadmap get-phase 2.7` produce divergent payloads for the same
+  // heading, breaking bug-3537 parity.
   const phasePattern = new RegExp(
-    `#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`,
+    `#{2,4}\\s*Phase\\s+(${escapedPhase}):\\s*([^\\n]+)`,
     'i'
   );
   const headerMatch = content.match(phasePattern);
 
   if (!headerMatch) {
-    // Fallback: check if phase exists in summary list but missing detail section
+    // Fallback: check if phase exists in summary list but missing detail section.
+    // Same canonical-token capture: surface the as-written checklist form.
     const checklistPattern = new RegExp(
-      `-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+${escapedPhase}:\\s*([^*]+)\\*\\*`,
+      `-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+(${escapedPhase}):\\s*([^*]+)\\*\\*`,
       'i'
     );
     const checklistMatch = content.match(checklistPattern);
 
     if (checklistMatch) {
+      const canonicalChecklistPhase = checklistMatch[1];
       return {
         found: false,
-        phase_number: phaseNum,
-        phase_name: checklistMatch[1].trim(),
+        phase_number: canonicalChecklistPhase,
+        phase_name: checklistMatch[2].trim(),
         error: 'malformed_roadmap',
-        message: `Phase ${phaseNum} exists in summary list but missing "### Phase ${phaseNum}:" detail section. ROADMAP.md needs both formats.`,
+        message: `Phase ${canonicalChecklistPhase} exists in summary list but missing "### Phase ${canonicalChecklistPhase}:" detail section. ROADMAP.md needs both formats.`,
       };
     }
 
     return null;
   }
 
-  const phaseName = headerMatch[1].trim();
+  const canonicalPhaseNum = headerMatch[1];
+  const phaseName = headerMatch[2].trim();
   const headerIndex = headerMatch.index!;
 
   // Find the end of this section (next ## or ### phase header, or end of file)
@@ -567,9 +575,13 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
     ? criteriaMatch[1].trim().split('\n').map(line => line.replace(/^\s*\d+\.\s*/, '').trim()).filter(Boolean)
     : [];
 
+  // Suppress unused-arg warning — `phaseNum` is retained as the function
+  // signature so future callers can reintroduce input-mirroring if needed.
+  void phaseNum;
+
   return {
     found: true,
-    phase_number: phaseNum,
+    phase_number: canonicalPhaseNum,
     phase_name: phaseName,
     goal,
     mode,
@@ -811,12 +823,21 @@ export const roadmapAnnotateDependencies: QueryHandler = async (args, projectDir
   const { spawnSync } = await import('node:child_process');
   const toolsPath = resolveGsdToolsPath(projectDir);
 
+  // CRITICAL: set GSD_SDK_NESTED=1 so the CJS router in the child process
+  // detects nesting and routes directly to cmdRoadmapAnnotateDependencies
+  // instead of dispatching back through executeForCjs.  Without this guard,
+  // SDK→spawn(gsd-tools)→router→SDK→spawn(gsd-tools)→… loops until the
+  // synckit 15s timeout fires and bug-3537's annotate test surfaces a
+  // misleading "code=null" failure.
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, GSD_SDK_NESTED: '1' };
+
   const result = spawnSync(process.execPath, [toolsPath, 'roadmap', 'annotate-dependencies', phase], {
     cwd: projectDir,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     timeout: 15000,
     maxBuffer: 1024 * 1024,
+    env: childEnv,
   });
 
   if (result.error) {
