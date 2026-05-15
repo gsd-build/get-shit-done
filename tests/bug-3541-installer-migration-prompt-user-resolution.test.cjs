@@ -198,4 +198,42 @@ describe('#3541: installer migration prompt-user non-TTY resolution', { concurre
     assert.equal(reasons.length, 1, 'two same-reason paths grouped under one key');
     assert.equal(captured.blockedByReason[reasons[0]].length, 2);
   });
+
+  test('Test C: non-TTY env override resolves otherwise-unclassified prompt-user actions', () => {
+    const result = {
+      blocked: [
+        {
+          type: 'prompt-user',
+          relPath: 'skills/gsd-custom/SKILL.toml',
+          reason: 'custom skill metadata requires user decision',
+          choices: ['keep', 'remove'],
+        },
+      ],
+      plan: {
+        actions: [],
+        blocked: [
+          {
+            type: 'prompt-user',
+            relPath: 'skills/gsd-custom/SKILL.toml',
+            reason: 'custom skill metadata requires user decision',
+            choices: ['keep', 'remove'],
+          },
+        ],
+      },
+    };
+
+    const resolved = resolveInstallerMigrationPromptsForNonTty(result, {
+      isTty: false,
+      env: { GSD_INSTALLER_MIGRATION_RESOLVE: 'keep' },
+    });
+
+    assert.equal(resolved.resolutions.length, 1, 'env override resolves prompt-user action');
+    assert.equal(resolved.resolutions[0].choice, 'keep');
+    assert.equal(resolved.resolutions[0].source, 'GSD_INSTALLER_MIGRATION_RESOLVE');
+    assert.equal(resolved.resolutions[0].category, 'operator-override');
+    assert.equal((resolved.result.blocked || []).length, 0);
+    assert.equal((resolved.result.plan.blocked || []).length, 0);
+    assert.equal((resolved.result.plan.actions || []).length, 1);
+    assert.equal(resolved.result.plan.actions[0].type, 'baseline-preserve-user');
+  });
 });

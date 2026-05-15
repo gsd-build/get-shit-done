@@ -140,6 +140,20 @@ function materializeResolution(action, choice) {
   return { ...base, type: 'backup-and-remove', backupRelPath: null };
 }
 
+function normalizeResolutionChoice(rawValue) {
+  if (typeof rawValue !== 'string') return null;
+  const normalized = rawValue.trim().toLowerCase();
+  return VALID_CHOICES.includes(normalized) ? normalized : null;
+}
+
+function actionSupportsChoice(action, choice) {
+  if (!action || !choice) return false;
+  if (!Array.isArray(action.choices) || action.choices.length === 0) {
+    return VALID_CHOICES.includes(choice);
+  }
+  return action.choices.includes(choice);
+}
+
 // Resolve prompt-user actions when stdin is not a TTY. Mutates the
 // passed result so:
 //   - resolved actions are appended to plan.actions in their concrete
@@ -164,14 +178,34 @@ function resolveInstallerMigrationPromptsForNonTty(result, options = {}) {
     return { result, resolutions: [] };
   }
 
+  const env =
+    options && options.env && typeof options.env === 'object'
+      ? options.env
+      : process.env;
+  const envChoice = normalizeResolutionChoice(env && env[RESOLUTION_ENV_VAR]);
   const resolutions = [];
   const unresolved = [];
 
   for (const action of blocked) {
     if (action && action.type === 'prompt-user') {
-      const classification = classifyPromptUserAction(action);
-      if (classification) {
-        const resolved = materializeResolution(action, classification.choice);
+      let category = null;
+      let choice = null;
+      let source = null;
+      if (envChoice && actionSupportsChoice(action, envChoice)) {
+        category = 'operator-override';
+        choice = envChoice;
+        source = RESOLUTION_ENV_VAR;
+      } else {
+        const classification = classifyPromptUserAction(action);
+        if (classification) {
+          category = classification.category;
+          choice = classification.choice;
+          source = 'non-tty-default';
+        }
+      }
+
+      if (choice) {
+        const resolved = materializeResolution(action, choice);
         // Inject the concrete action into plan.actions so the apply
         // step picks it up.
         if (result.plan && Array.isArray(result.plan.actions)) {
@@ -179,11 +213,11 @@ function resolveInstallerMigrationPromptsForNonTty(result, options = {}) {
         }
         resolutions.push({
           relPath: action.relPath,
-          category: classification.category,
-          choice: classification.choice,
+          category,
+          choice,
           reason: action.reason,
           resolvedActionType: resolved.type,
-          source: 'non-tty-default',
+          source,
         });
         continue;
       }
