@@ -57,6 +57,31 @@ function transformContent(src, cmdNames) {
   return src.replace(pattern, (_, cmd) => `/gsd:${cmd}`);
 }
 
+/**
+ * Mirror of `buildPattern` for the opposite direction. Matches canonical
+ * `/gsd:<cmd>` references so they can be rewritten to `/gsd-<cmd>` at
+ * install time for runtimes that surface skills under their hyphen-form
+ * `name:` (Claude global skills, Qwen, Hermes). Same word-boundary
+ * discipline and same empty-roster short-circuit as `buildPattern`.
+ */
+function buildColonPattern(cmdNames) {
+  if (!Array.isArray(cmdNames) || cmdNames.length === 0) return null;
+  const sorted = [...cmdNames].sort((a, b) => b.length - a.length);
+  return new RegExp(`/gsd:(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
+}
+
+/**
+ * Pure transform: rewrite canonical `/gsd:<cmd>` to `/gsd-<cmd>` for the
+ * given command names. Inverse of `transformContent`. Used by install-time
+ * adapters that emit SKILL.md bodies for runtimes whose slash-command
+ * surface is hyphen-formed (see #3583).
+ */
+function transformColonToHyphen(src, cmdNames) {
+  const pattern = buildColonPattern(cmdNames);
+  if (!pattern) return src;
+  return src.replace(pattern, (_, cmd) => `/gsd-${cmd}`);
+}
+
 function readCmdNames() {
   return fs.readdirSync(COMMANDS_DIR)
     .filter(f => f.endsWith('.md'))
@@ -103,4 +128,10 @@ if (require.main === module) {
   console.log('Done.');
 }
 
-module.exports = { transformContent, buildPattern, SKIP_DIRS };
+module.exports = {
+  transformContent,
+  buildPattern,
+  transformColonToHyphen,
+  buildColonPattern,
+  SKIP_DIRS,
+};

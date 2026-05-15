@@ -20,6 +20,10 @@ const {
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
+const {
+  transformColonToHyphen,
+} = require('../scripts/fix-slash-commands.cjs');
+
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -1664,6 +1668,13 @@ function skillFrontmatterName(skillDirName) {
  * preserve allowed-tools as YAML multiline list, preserve argument-hint.
  * Emits `name: gsd-<cmd>` (hyphen) so Skill(skill="gsd-<cmd>") calls and
  * tab autocomplete use the canonical command namespace.
+ *
+ * Body conversion (#3583): the installed skill is invoked through its
+ * hyphen-form `name:` (e.g. `/gsd-plan-phase` in the slash picker), so any
+ * `/gsd:<cmd>` references in the body would be unresolvable for the end
+ * user. Rewrite them to `/gsd-<cmd>` using the roster-checked transformer
+ * shared with the source-side guard. Mirrors the body rewrite the Copilot
+ * adapter applies via `convertClaudeToCopilotContent`.
  */
 function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
@@ -1694,7 +1705,8 @@ function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
   if (toolsBlock) fm += toolsBlock;
   fm += '---';
 
-  return `${fm}\n${body}`;
+  const transformedBody = transformColonToHyphen(body, Array.from(getGsdCommandRoster()));
+  return `${fm}\n${transformedBody}`;
 }
 
 /**

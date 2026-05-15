@@ -147,6 +147,45 @@ describe('slash-command namespace invariant (#3443)', () => {
     });
   });
 
+  describe('transformColonToHyphen — install-time inverse (#3583)', () => {
+    const {
+      transformColonToHyphen,
+    } = require(path.join(ROOT, 'scripts', 'fix-slash-commands.cjs'));
+    const liveCmdNames = cmdNames;
+
+    test('rewrites /gsd:<cmd> to /gsd-<cmd>', () => {
+      const out = transformColonToHyphen('Run /gsd:plan-phase next.', liveCmdNames);
+      assert.ok(out.includes('/gsd-plan-phase'), `expected /gsd-plan-phase, got: ${out}`);
+      assert.ok(!out.includes('/gsd:plan-phase'), `colon form must not survive, got: ${out}`);
+    });
+
+    test('rewrites multiple occurrences in one pass', () => {
+      const out = transformColonToHyphen(
+        'First /gsd:discuss-phase 1 then /gsd:plan-phase 1.', liveCmdNames);
+      assert.ok(out.includes('/gsd-discuss-phase'));
+      assert.ok(out.includes('/gsd-plan-phase'));
+      assert.ok(!out.match(/\/gsd:[a-z]/), `no colon form may remain, got: ${out}`);
+    });
+
+    test('idempotent on already-hyphenated input', () => {
+      const input = 'Run /gsd-plan-phase next.';
+      assert.strictEqual(transformColonToHyphen(input, liveCmdNames), input,
+        'transformer must be a no-op when input is already hyphenated');
+    });
+
+    test('respects word boundary — does not rewrite /gsd:plan-phase-extra', () => {
+      const out = transformColonToHyphen('/gsd:plan-phase-extra', liveCmdNames);
+      assert.strictEqual(out, '/gsd:plan-phase-extra',
+        'word-boundary lookahead must prevent partial matches in colon direction');
+    });
+
+    test('no-ops on empty roster (guards against broad rewrite)', () => {
+      const input = 'Run /gsd:plan-phase next.';
+      assert.strictEqual(transformColonToHyphen(input, []), input,
+        'empty roster must short-circuit, never produce a stray /gsd-');
+    });
+  });
+
   test('transformer leaves non-command identifiers untouched', () => {
     const { transformContent } = require(path.join(ROOT, 'scripts', 'fix-slash-commands.cjs'));
     const sample = 'Use /gsd-sdk query and node bin/gsd-tools.cjs';
