@@ -61,6 +61,7 @@
     "build:hooks": "node scripts/build-hooks.js",
     "build:sdk": "cd sdk && npm ci && npm run build",
     "check:alias-drift": "cd sdk && npm run check:alias-drift",
+    "check:state-document-fresh": "cd sdk && npm run check:state-document-fresh",
     "prepublishOnly": "npm run build:hooks && npm run build:sdk",
     "pretest": "npm run build:sdk && npm run lint:skill-deps",
     "pretest:coverage": "npm run build:sdk",

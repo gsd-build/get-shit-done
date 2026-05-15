@@ -26,7 +26,7 @@ Adapter Module that satisfies native query dispatch at the Dispatch Policy seam,
 Module owning projection from dispatch results/errors to CLI `{ exitCode, stdoutChunks, stderrLines }` output contract.
 
 ### STATE.md Document Module
-Shared CJS/SDK pure transform Module owning STATE.md parse, field extraction, field replacement, status normalization, and frontmatter reconstruction. It does not scan `.planning/phases` and does not own persistence or locking; phase/plan/summary counts arrive from inventory/progress Modules as inputs, and CJS/SDK read-modify-write paths remain Adapters.
+Shared CJS/SDK pure transform Module owning STATE.md parse, field extraction, field replacement, status normalization, and frontmatter reconstruction. It does not scan `.planning/phases` and does not own persistence or locking; phase/plan/summary counts arrive from inventory/progress Modules as inputs, and CJS/SDK read-modify-write paths remain Adapters. Source of truth: `sdk/src/query/state-document.ts`; CJS callers consume the generator-emitted `get-shit-done/bin/lib/state-document.generated.cjs` via the thin re-export at `get-shit-done/bin/lib/state-document.cjs`.
 
 ### Query Execution Policy Module
 Module owning query transport routing policy projection (`preferNative`, fallback policy, workstream subprocess forcing) at execution seam.

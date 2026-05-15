@@ -4,3 +4,7 @@ set -euo pipefail
 if git diff --cached --name-only | grep -Eq "^sdk/src/query/command-manifest\.|^sdk/src/query/command-aliases\.generated\.ts$|^get-shit-done/bin/lib/command-aliases\.generated\.cjs$|^sdk/scripts/gen-command-aliases\.ts$"; then
   npm run check:alias-drift
 fi
+
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/state-document\.|^get-shit-done/bin/lib/state-document\.generated\.cjs$|^sdk/scripts/gen-state-document\.ts$"; then
+  npm run check:state-document-fresh
+fi

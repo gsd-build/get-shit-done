@@ -36,6 +36,8 @@
   "scripts": {
     "build": "tsc",
     "check:alias-drift": "npm run build && node scripts/check-command-aliases-fresh.mjs",
+    "gen:state-document": "npm run build && npx tsx scripts/gen-state-document.ts",
+    "check:state-document-fresh": "npm run build && node scripts/check-state-document-fresh.mjs",
     "prepublishOnly": "rm -rf dist && tsc && chmod +x dist/cli.js",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
@@ -48,6 +50,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
+    "tsx": "^4.22.0",
     "typescript": "^5.7.0",
     "vitest": "^3.1.1"
   }

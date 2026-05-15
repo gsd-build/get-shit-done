@@ -103,6 +103,11 @@ jobs:
         shell: bash
         run: node sdk/scripts/check-command-aliases-fresh.mjs
 
+      - name: SDK generated state-document artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-state-document-fresh.mjs
+
       - name: Run tests with coverage
         shell: bash
         run: npm run test:coverage
