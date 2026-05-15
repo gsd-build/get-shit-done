@@ -78,14 +78,16 @@ const INTERNAL_COMPONENT_SLUGS = new Set([
   'tools',
 
   // Hook scripts — internal runtime hooks, not user-invocable slash commands.
-  //   hooks/gsd-statusline.js      — session statusline hook
-  //   hooks/gsd-context-monitor.js — context-window monitor hook
-  //   hooks/gsd-update-banner.js   — update-available banner hook
+  //   hooks/gsd-statusline.js       — session statusline hook
+  //   hooks/gsd-context-monitor.js  — context-window monitor hook
+  //   hooks/gsd-update-banner.js    — update-available banner hook
+  //   hooks/gsd-graphify-update.sh  — knowledge-graph auto-update PostToolUse hook (#3347)
   // These appear in docs as file-path references (e.g. "gsd-statusline.js reads
   // the cache"), not as command invocations.
   'statusline',
   'context-monitor',
   'update-banner',
+  'graphify-update',
 
   // gsd-update-check.json — background update-check CACHE FILE, not a slash command.
   // ARCHITECTURE.md references "~/.cache/gsd/gsd-update-check.json" as a path;
