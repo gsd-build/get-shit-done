@@ -13,10 +13,13 @@ process.env.GSD_TEST_MODE = '1';
  *
  *   1. Fresh install writes canonical `[features].hooks = true` and never
  *      emits `codex_hooks` (section, root-dotted, or block-fallback forms).
- *   2. Reinstall over a section-form legacy `[features].codex_hooks = true`
- *      migrates forward to `[features].hooks = true` (legacy line removed).
- *   3. Reinstall over a root-dotted legacy `features.codex_hooks = true`
- *      migrates forward to `features.hooks = true`.
+ *   2. Reinstall over a GSD-owned section-form legacy
+ *      `[features].codex_hooks = true` migrates forward to
+ *      `[features].hooks = true` (legacy line removed); user-owned legacy
+ *      entries are preserved per #2760.
+ *   3. Reinstall over a GSD-owned root-dotted legacy
+ *      `features.codex_hooks = true` migrates forward to
+ *      `features.hooks = true`; user-owned legacy entries are preserved.
  *   4. Reinstall over a user-owned `[features].hooks = true` (no GSD
  *      ownership marker) preserves the user line; no double-write, no
  *      ownership stamp.
