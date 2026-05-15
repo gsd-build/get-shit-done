@@ -621,12 +621,16 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
       }
 
       const diskPhases = new Set<string>();
+      const activeDiskPhases = new Set<string>();
       try {
         const entries = await readdir(phasesDir, { withFileTypes: true });
         for (const e of entries) {
           if (e.isDirectory()) {
             const dm = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
-            if (dm) diskPhases.add(dm[1]);
+            if (dm) {
+              diskPhases.add(dm[1]);
+              activeDiskPhases.add(dm[1]);
+            }
           }
         }
       } catch { /* intentionally empty */ }
@@ -655,7 +659,7 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
         }
       }
 
-      for (const p of diskPhases) {
+      for (const p of activeDiskPhases) {
         const variants = phaseVariants(p);
         if (![...variants].some((variant) => roadmapPhaseVariants.has(variant))) {
           addIssue('warning', 'W007', `Phase ${p} exists on disk but not in ROADMAP.md`, 'Add to roadmap or remove directory');
