@@ -54,6 +54,9 @@ function extractFunctionFromSource(source: string, name: string): string {
       if (depth === 0) break;
     }
   }
+  if (depth !== 0) {
+    throw new Error(`Could not find closing brace for function ${name}`);
+  }
   // Return from `function name(` through the closing `}`
   return source.slice(start, i + 1);
 }

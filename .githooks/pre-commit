@@ -5,6 +5,6 @@ if git diff --cached --name-only | grep -Eq "^sdk/src/query/command-manifest\.|^
   npm run check:alias-drift
 fi
 
-if git diff --cached --name-only | grep -Eq "^sdk/src/query/state-document\.|^get-shit-done/bin/lib/state-document\.generated\.cjs$|^sdk/scripts/gen-state-document\.ts$"; then
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/state-document\.|^get-shit-done/bin/lib/state-document\.generated\.cjs$|^sdk/scripts/gen-state-document\.ts$|^sdk/scripts/check-state-document-fresh\.mjs$"; then
   npm run check:state-document-fresh
 fi

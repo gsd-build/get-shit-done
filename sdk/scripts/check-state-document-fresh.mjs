@@ -44,6 +44,9 @@ function extractFunctionFromSource(source, name) {
     if (source[i] === '{') depth++;
     else if (source[i] === '}') { depth--; if (depth === 0) break; }
   }
+  if (depth !== 0) {
+    throw new Error(`Could not find closing brace for function ${name}`);
+  }
   return source.slice(start, i + 1);
 }
 
