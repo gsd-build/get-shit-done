@@ -1,5 +1,11 @@
 'use strict';
 
+// allow-test-rule: structural source assertion — verifies that sdk/src/query/config-schema.ts
+// is a re-export shell (no inline literals) rather than a redeclared Set. Runtime/IR comparison
+// cannot distinguish a re-export from a redeclared `new Set([...])` with identical contents
+// because both would deep-equal the manifest set; only source-shape inspection catches drift
+// back to inline literals. See test "SDK config-schema.ts re-exports from configuration module".
+
 /**
  * CJS↔SDK config-schema parity (#2653).
  *
