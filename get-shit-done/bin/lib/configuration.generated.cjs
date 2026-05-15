@@ -27,8 +27,7 @@ function loadConfigurationManifest(fileName) {
       return require(candidate);
     } catch (err) {
       const isMissingCandidate =
-        (err && err.code === 'MODULE_NOT_FOUND' && String(err.message || '').includes(candidate)) ||
-        (err && err.code === 'ENOENT');
+        err && err.code === 'MODULE_NOT_FOUND' && String(err.message || '').includes(candidate);
       if (!isMissingCandidate) throw err;
       lastErr = err;
     }
