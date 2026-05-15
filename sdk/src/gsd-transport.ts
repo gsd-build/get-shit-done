@@ -28,7 +28,7 @@ export interface TransportPolicyLike {
 
 export interface TransportDecision {
   dispatchMode: 'native' | 'subprocess';
-  reason?: 'workstream_forced' | 'native_not_preferred' | 'native_unregistered' | 'native_failure_fallback';
+  reason?: 'native_not_preferred' | 'native_unregistered' | 'native_failure_fallback';
 }
 
 export class GSDTransport {
@@ -80,7 +80,7 @@ export class GSDTransport {
     if (!this.registry.has(request.registryCommand)) return 'native_unregistered';
 
     throw new Error(
-      `Unexpected subprocess reason state for command '${request.registryCommand}' with preferNative=${String(policy.preferNative)} and workstream=${String(request.workstream)}`,
+      `Unexpected subprocess reason state for command '${request.registryCommand}' with preferNative=${String(policy.preferNative)}`,
     );
   }
 
