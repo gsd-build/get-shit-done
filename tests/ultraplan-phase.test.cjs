@@ -91,6 +91,10 @@ describe('ultraplan-phase workflow runtime gate', () => {
       content.includes('CLAUDECODE') || content.includes('CLAUDE_CODE_ENTRYPOINT'),
       'workflow must gate on Claude Code runtime marker env vars'
     );
+    assert.ok(
+      !content.includes('CLAUDE_CODE_VERSION'),
+      'workflow must not gate on CLAUDE_CODE_VERSION'
+    );
   });
 
   test('error message references /gsd-plan-phase as local alternative', () => {
