@@ -81,6 +81,11 @@
       "opus": null,
       "sonnet": null,
       "haiku": null
+    },
+    "grok": {
+      "opus":   { "model": "grok-4" },
+      "sonnet": { "model": "grok-3" },
+      "haiku":  { "model": "grok-3-mini" }
     }
   },
   "agents": {

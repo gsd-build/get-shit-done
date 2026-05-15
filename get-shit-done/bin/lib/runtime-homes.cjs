@@ -58,6 +58,10 @@ function getGlobalConfigDir(runtime) {
     case 'gemini':
       return env.GEMINI_CONFIG_DIR ? expandTilde(env.GEMINI_CONFIG_DIR) : path.join(home, '.gemini');
 
+    // ── Grok Build ───────────────────────────────────────────────────────────
+    case 'grok':
+      return env.GROK_CONFIG_DIR ? expandTilde(env.GROK_CONFIG_DIR) : path.join(home, '.grok');
+
     // ── Codex ────────────────────────────────────────────────────────────────
     case 'codex':
       return env.CODEX_HOME ? expandTilde(env.CODEX_HOME) : path.join(home, '.codex');
