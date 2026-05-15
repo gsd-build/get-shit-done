@@ -17,6 +17,7 @@
  * ```
  */
 
+import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
@@ -231,23 +232,15 @@ export const findPhase: QueryHandler = async (args, projectDir, workstream) => {
   const phasesDir = planningPaths(projectDir, workstream).phases;
   const normalized = normalizePhaseName(phase);
 
-  const notFound: PhaseInfo = {
-    found: false,
-    directory: null,
-    phase_number: null,
-    phase_name: null,
-    phase_slug: null,
-    plans: [],
-    summaries: [],
-    incomplete_plans: [],
-    has_research: false,
-    has_context: false,
-    has_verification: false,
-    has_reviews: false,
-  };
+  // Track every directory we actually probed so the not-found payload can
+  // surface them to the caller for diagnostics (#3164 acceptance criterion).
+  const searchedDirectories: string[] = [];
 
   // Search current phases first
   const relPhasesDir = relPlanningPath(workstream) + '/phases';
+  if (existsSync(phasesDir)) {
+    searchedDirectories.push(relPhasesDir);
+  }
   const current = await searchPhaseInDir(phasesDir, relPhasesDir, normalized);
   if (current) return { data: current };
 
@@ -266,6 +259,7 @@ export const findPhase: QueryHandler = async (args, projectDir, workstream) => {
       const version = versionMatch ? versionMatch[1] : archiveName;
       const archivePath = join(milestonesDir, archiveName);
       const relBase = '.planning/milestones/' + archiveName;
+      searchedDirectories.push(relBase);
       const result = await searchPhaseInDir(archivePath, relBase, normalized);
       if (result) {
         result.archived = version;
@@ -274,6 +268,21 @@ export const findPhase: QueryHandler = async (args, projectDir, workstream) => {
     }
   } catch { /* milestones dir doesn't exist */ }
 
+  const notFound: PhaseInfo & { searched_directories: string[] } = {
+    found: false,
+    directory: null,
+    phase_number: null,
+    phase_name: null,
+    phase_slug: null,
+    plans: [],
+    summaries: [],
+    incomplete_plans: [],
+    has_research: false,
+    has_context: false,
+    has_verification: false,
+    has_reviews: false,
+    searched_directories: searchedDirectories,
+  };
   return { data: notFound };
 };
 
