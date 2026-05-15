@@ -3,16 +3,15 @@
 const { STATE_SUBCOMMANDS } = require('./command-aliases.generated.cjs');
 const { routeCjsCommandFamily } = require('./cjs-command-router-adapter.cjs');
 const { output } = require('./core.cjs');
-const { tryLoadSdk: tryLoadSdkBridge, getExecuteForCjs, getSdkModule } = require('./cjs-sdk-bridge.cjs');
+const {
+  tryLoadSdk,
+  getExecuteForCjs,
+  getFormatStateLoadRawStdout,
+} = require('./cjs-sdk-bridge.cjs');
 
-// state.load --raw needs the SDK's `formatStateLoadRawStdout` helper in
-// addition to executeForCjs. This wrapper also checks that the helper is
-// available on the loaded module before returning success.
-function tryLoadSdk() {
-  if (!tryLoadSdkBridge()) return false;
-  const sdk = getSdkModule();
-  return sdk && typeof sdk.formatStateLoadRawStdout === 'function';
-}
+// The bridge loader verifies both `executeForCjs` and `formatStateLoadRawStdout`
+// are present before returning success, so this router can call `tryLoadSdk()`
+// directly without an additional capability check.
 
 /**
  * Dispatch a subcommand via the SDK sync bridge.
@@ -31,12 +30,19 @@ function tryLoadSdk() {
 function dispatchViaSdk(registryCommand, registryArgs, legacyArgs, cwd, raw, error, rawFormatter) {
   if (!tryLoadSdk()) return false;
 
+  // When a CJS-side rawFormatter is supplied (e.g. state.load --raw → key=value
+  // lines), always request 'json' from the bridge so the SDK returns the typed
+  // data object. Passing mode: 'raw' would make the bridge pre-render to a
+  // string and the formatter would no-op. For subcommands without a rawFormatter,
+  // honor the user's --raw flag and let the bridge do default rendering.
+  const bridgeMode = rawFormatter ? 'json' : (raw ? 'raw' : 'json');
+
   const result = getExecuteForCjs()({
     registryCommand,
     registryArgs,
     legacyCommand: 'state',
     legacyArgs,
-    mode: raw ? 'raw' : 'json',
+    mode: bridgeMode,
     projectDir: cwd,
     // Phase 6 fix: workstream is now threaded through to the native handler.
     // GSDTransport no longer forces subprocess for workstream-scoped requests —
@@ -115,10 +121,11 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
         'state.load',
         [],
         args.slice(1),
-        // Resolved lazily — getSdkModule() is null until tryLoadSdk() runs
-        // inside dispatchViaSdk; sdkHandler only calls this formatter when
-        // SDK dispatch succeeds, so by then the SDK module is loaded.
-        (...formatterArgs) => getSdkModule().formatStateLoadRawStdout(...formatterArgs),
+        // Resolved lazily — the formatter getter returns null until
+        // tryLoadSdk() runs inside dispatchViaSdk. sdkHandler only invokes
+        // this formatter when SDK dispatch succeeds, so by then the bridge
+        // has cached the formatter and the getter returns the real function.
+        (...formatterArgs) => getFormatStateLoadRawStdout()(...formatterArgs),
         () => state.cmdStateLoad(cwd, raw),
       ),
       json: sdkHandler(
