@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 0
+---
+**Executor agents are now forbidden from running any `git stash` subcommand inside worktree isolation** — git stores stashes at `refs/stash` in the parent `.git/` directory, so the stash list is shared across the main checkout and every linked worktree. A `git stash pop` inside an executor's worktree silently applied WIP pushed from a prior sibling-worktree session, producing UU/UD merge-conflict states and phantom untracked files that violated the `isolation="worktree"` invariant. The `<destructive_git_prohibition>` block in `agents/gsd-executor.md` now lists the full `git stash` family alongside `--no-verify`, `--hard`, and `git update-ref`, with sanctioned alternatives (commit to a throwaway branch you own, or read-only `git show <ref>:<path>` / `git diff <ref> -- <path>`). The orchestrator-side post-wave-hook helper in `execute-phase.md` continues to use stash deliberately and is now annotated to make the single-checkout precondition explicit. Closes #3542.
