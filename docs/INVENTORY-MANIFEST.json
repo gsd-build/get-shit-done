@@ -264,6 +264,7 @@
       "artifacts.cjs",
       "audit.cjs",
       "cjs-command-router-adapter.cjs",
+      "cjs-sdk-bridge.cjs",
       "clusters.cjs",
       "command-aliases.generated.cjs",
       "commands.cjs",

@@ -59,8 +59,10 @@ function parseDecisions(content) {
     let inDiscretion = false;
     // Bullet line: `- **D-NN[ [tags]]:** text`
     // Phase 6 (#3575): aligned to CJS regex — accepts alphanumeric IDs (D-01, D-INFRA-01, D-FOO_BAR)
-    // in addition to numeric-only IDs (D-42). CJS callers consume {id, text} and ignore extras.
-    const bulletRe = /^\s*-\s+\*\*D-([A-Za-z0-9_-]+)(?:\s*\[([^\]]+)\])?\s*:\*\*\s*(.*)$/;
+    // in addition to numeric-only IDs (D-42). The first character after `D-` must
+    // be alphanumeric, so malformed shapes like `D--foo` or `D-_bar` are rejected.
+    // CJS callers consume {id, text} and ignore the optional extras.
+    const bulletRe = /^\s*-\s+\*\*D-([A-Za-z0-9][A-Za-z0-9_-]*)(?:\s*\[([^\]]+)\])?\s*:\*\*\s*(.*)$/;
     let current = null;
     const flush = () => {
         if (current) {

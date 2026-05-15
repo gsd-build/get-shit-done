@@ -201,6 +201,40 @@ describe('lint-shared-module-handsync: allowlist entry honored', () => {
     }
   });
 
+  // Regression guard: the lint matches on the (cjs, ts) PAIR, not on the
+  // cjs path alone. An allowlist entry whose ts points to a different path
+  // than the actual ts sibling on disk must NOT silently pass the pair.
+  test('rejects pair when TS path differs from allowlist entry', () => {
+    const cjsName = 'foo-wrong-ts';
+    const tsName = 'foo-wrong-ts';
+    const tmpDir = createFixture({
+      cjsName,
+      tsName,
+      tsInQuery: true, // creates sdk/src/query/foo-wrong-ts.ts on disk
+      allowlistExtra: {
+        cooperatingSiblings: [
+          {
+            cjs: `get-shit-done/bin/lib/${cjsName}.cjs`,
+            // Allowlist points at sdk/src/<name>.ts — different location.
+            // Lint must reject because the on-disk pair is unauthorized.
+            ts: `sdk/src/${tsName}.ts`,
+            classification: 'cooperating-sibling',
+            justification: 'Test: validates pair-aware matching enforces ts path.',
+          },
+        ],
+      },
+    });
+    try {
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(status, 1, 'must fail when ts path mismatches');
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, false);
+      assert.strictEqual(payload.reason, 'unauthorized_pairs');
+    } finally {
+      cleanupFixture(tmpDir);
+    }
+  });
+
   test('exits 0 (no error) when pair is in migrateMeBacklog allowlist', () => {
     const cjsName = 'qux-backlog';
     const tsName = 'qux-backlog';

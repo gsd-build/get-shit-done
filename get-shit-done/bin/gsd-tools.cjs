@@ -207,18 +207,11 @@ const { routeRoadmapCommand } = require('./lib/roadmap-command-router.cjs');
 // NOTE: migrate-config, detect-custom-files, config-path, and find-phase
 // are CJS-native special cases; see comments inline.
 
-let _gsdToolsExecuteForCjs = null;
-
-function _tryLoadSdkBridge() {
-  if (_gsdToolsExecuteForCjs !== null) return true;
-  try {
-    const bridgeModule = require('@gsd-build/sdk/dist/runtime-bridge-sync/index.js');
-    _gsdToolsExecuteForCjs = bridgeModule.executeForCjs;
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Shared loader for the synchronous SDK runtime bridge; see
+// `bin/lib/cjs-sdk-bridge.cjs`. All canonical-command CJS dispatchers (the
+// per-family routers and the non-family helper below) consume the same loader
+// so a change to the SDK-load contract lands in one place.
+const { tryLoadSdk: _tryLoadSdkBridge, getExecuteForCjs } = require('./lib/cjs-sdk-bridge.cjs');
 
 /**
  * Attempt SDK dispatch for a non-family command.
@@ -239,7 +232,7 @@ function _tryLoadSdkBridge() {
  */
 function _dispatchNonFamily({ registryCommand, registryArgs, legacyCommand, legacyArgs, cwd, raw, error, output }) {
   if (!_tryLoadSdkBridge()) return false;
-  const result = _gsdToolsExecuteForCjs({
+  const result = getExecuteForCjs()({
     registryCommand,
     registryArgs,
     legacyCommand,

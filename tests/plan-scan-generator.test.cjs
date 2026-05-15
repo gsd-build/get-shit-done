@@ -14,6 +14,22 @@ const { createRequire } = require('node:module');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const crypto = require('crypto');
+
+/**
+ * Build a unique-to-this-run path that is guaranteed not to exist. Hardcoded
+ * `/tmp/...` paths are a flake source on shared CI runners where the path can
+ * be left over from a prior run. We synthesize a random suffix under
+ * `os.tmpdir()` and force-remove the path first.
+ */
+function uniqueMissingPath(prefix = 'gsd-missing') {
+  const suffix = `${prefix}-${process.pid}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
+  const p = path.join(os.tmpdir(), suffix);
+  // The probability of collision is negligible, but force-clean anyway to make
+  // the precondition explicit. Errors swallowed (path didn't exist — desired).
+  try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* noop */ }
+  return p;
+}
 
 const requireFromRoot = createRequire(__filename);
 
@@ -123,7 +139,7 @@ describe('plan-scan-generator parity: scanPhasePlans (non-existent dir)', async 
   const sdk = await import('../sdk/dist/query/plan-scan.js');
 
   test('returns zero counts for non-existent directory', () => {
-    const nonExistent = '/tmp/__gsd_test_nonexistent_dir_xyz__';
+    const nonExistent = uniqueMissingPath('gsd-plan-scan-nonexistent');
     const sdkResult = sdk.scanPhasePlans(nonExistent);
     const cjsResult = cjs.scanPhasePlans(nonExistent);
     assert.deepStrictEqual(sdkResult, {
@@ -167,7 +183,7 @@ describe('plan-scan-generator parity: module.exports call style', async () => {
     // CJS callers do: const scanPhasePlans = require('./plan-scan.cjs')
     // then call it directly: scanPhasePlans(phaseDir)
     assert.strictEqual(typeof cjs, 'function', 'default export is a function');
-    const result = cjs('/tmp/__nonexistent_gsd_test__');
+    const result = cjs(uniqueMissingPath('gsd-plan-scan-cjs-default'));
     assert.deepStrictEqual(result, {
       planCount: 0,
       summaryCount: 0,

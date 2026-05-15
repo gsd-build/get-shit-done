@@ -4,19 +4,8 @@ const { PHASES_SUBCOMMANDS } = require('./command-aliases.generated.cjs');
 const { routeCjsCommandFamily } = require('./cjs-command-router-adapter.cjs');
 const { output } = require('./core.cjs');
 
-// ─── SDK bridge (Phase 6) ────────────────────────────────────────────────────
-let _executeForCjs = null;
-
-function tryLoadSdk() {
-  if (_executeForCjs !== null) return true;
-  try {
-    const bridgeModule = require('@gsd-build/sdk/dist/runtime-bridge-sync/index.js');
-    _executeForCjs = bridgeModule.executeForCjs;
-    return true;
-  } catch {
-    return false;
-  }
-}
+// ─── SDK bridge (Phase 6) — shared loader via cjs-sdk-bridge.cjs ──────────────
+const { tryLoadSdk, getExecuteForCjs } = require('./cjs-sdk-bridge.cjs');
 
 /**
  * Manifest-backed phases subcommand router.
@@ -42,7 +31,7 @@ function routePhasesCommand({ phase, milestone, args, cwd, raw, error }) {
   function sdkHandler(registryCommand, registryArgs, legacyArgs, cjsFallback) {
     if (!sdkAvailable) return cjsFallback;
     return () => {
-      const result = _executeForCjs({
+      const result = getExecuteForCjs()({
         registryCommand,
         registryArgs,
         legacyCommand: 'phases',

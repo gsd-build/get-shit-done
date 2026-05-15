@@ -3,28 +3,15 @@
 const { STATE_SUBCOMMANDS } = require('./command-aliases.generated.cjs');
 const { routeCjsCommandFamily } = require('./cjs-command-router-adapter.cjs');
 const { output } = require('./core.cjs');
+const { tryLoadSdk: tryLoadSdkBridge, getExecuteForCjs, getSdkModule } = require('./cjs-sdk-bridge.cjs');
 
-// ─── SDK bridge (Phase 5.1) ─────────────────────────────────────────────────
-// executeForCjs is loaded lazily from the SDK public package export so this
-// router does not rely on private dist subpaths that are not exported.
-let _executeForCjs = null;
-let _formatStateLoadRawStdout = null;
-
+// state.load --raw needs the SDK's `formatStateLoadRawStdout` helper in
+// addition to executeForCjs. This wrapper also checks that the helper is
+// available on the loaded module before returning success.
 function tryLoadSdk() {
-  if (_executeForCjs !== null) return true;
-  try {
-    const sdkModule = require('@gsd-build/sdk');
-    _executeForCjs = sdkModule.executeForCjs;
-    _formatStateLoadRawStdout = sdkModule.formatStateLoadRawStdout;
-    if (typeof _executeForCjs !== 'function' || typeof _formatStateLoadRawStdout !== 'function') {
-      _executeForCjs = null;
-      _formatStateLoadRawStdout = null;
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  if (!tryLoadSdkBridge()) return false;
+  const sdk = getSdkModule();
+  return sdk && typeof sdk.formatStateLoadRawStdout === 'function';
 }
 
 /**
@@ -44,7 +31,7 @@ function tryLoadSdk() {
 function dispatchViaSdk(registryCommand, registryArgs, legacyArgs, cwd, raw, error, rawFormatter) {
   if (!tryLoadSdk()) return false;
 
-  const result = _executeForCjs({
+  const result = getExecuteForCjs()({
     registryCommand,
     registryArgs,
     legacyCommand: 'state',
@@ -128,7 +115,10 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
         'state.load',
         [],
         args.slice(1),
-        _formatStateLoadRawStdout,
+        // Resolved lazily — getSdkModule() is null until tryLoadSdk() runs
+        // inside dispatchViaSdk; sdkHandler only calls this formatter when
+        // SDK dispatch succeeds, so by then the SDK module is loaded.
+        (...formatterArgs) => getSdkModule().formatStateLoadRawStdout(...formatterArgs),
         () => state.cmdStateLoad(cwd, raw),
       ),
       json: sdkHandler(
