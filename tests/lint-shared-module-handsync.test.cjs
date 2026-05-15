@@ -4,12 +4,17 @@
  * Tests for scripts/lint-shared-module-handsync.cjs — Phase 6 of #3524 (#3575).
  *
  * Three cases:
- *   1. No new drift pair: lint exits 0 on the current repo tree (all 14 cooperating
- *      siblings are on the allowlist; 8 migrateMeBacklog pairs do not fail).
- *   2. Intentional new drift: synthesize a temp fixture tree with an unlisted
- *      foo-test.cjs / foo-test.ts pair, assert exit 1 with informative error output.
+ *   1. No new drift pair: lint exits 0 on the current repo tree (all cooperating
+ *      siblings on the allowlist; migrateMeBacklog pairs do not fail).
+ *   2. Intentional new drift: synthesize a fixture tree with an unlisted
+ *      foo-test.cjs / foo-test.ts pair, assert exit 1 + typed error JSON.
  *   3. Allowlist entry honored: same pair as case 2, but with a cooperatingSiblings
  *      allowlist entry present, assert exit 0.
+ *
+ * Assertions use the lint's --json mode: the production code emits a typed IR
+ * (ok / reason / errors / warnings / counts), and tests parse and assert on
+ * structured fields rather than substring-matching stderr/stdout (per
+ * CONTRIBUTING.md "Prohibited: Raw Text Matching on Test Outputs").
  */
 
 const { test, describe } = require('node:test');
@@ -24,13 +29,22 @@ const ALLOWLIST_PATH = path.join(__dirname, '..', 'scripts', 'shared-module-hand
 const REPO_ROOT = path.join(__dirname, '..');
 
 // ---------------------------------------------------------------------------
-// Helper: run the lint script with optional overrides
+// Helper: run the lint script in --json mode and parse the result.
+// Returns { status, payload } where payload is the parsed JSON IR (or null
+// if the lint emitted no JSON, which would be a test-infrastructure bug).
 // ---------------------------------------------------------------------------
-function runLint(extraArgs = []) {
-  return spawnSync(process.execPath, [LINT_SCRIPT, ...extraArgs], {
+function runLintJson(extraArgs = []) {
+  const result = spawnSync(process.execPath, [LINT_SCRIPT, '--json', ...extraArgs], {
     encoding: 'utf8',
     cwd: REPO_ROOT,
   });
+  let payload = null;
+  try {
+    payload = JSON.parse(result.stdout.trim());
+  } catch {
+    // Leave payload as null; tests assert on payload presence.
+  }
+  return { status: result.status, payload };
 }
 
 // ---------------------------------------------------------------------------
@@ -46,7 +60,6 @@ function runLint(extraArgs = []) {
 function createFixture({ cjsName, tsName, tsInQuery = true, allowlistExtra = {} }) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-lint-handsync-'));
 
-  // Create directory structure
   const cjsDir = path.join(tmpDir, 'get-shit-done', 'bin', 'lib');
   fs.mkdirSync(cjsDir, { recursive: true });
 
@@ -55,15 +68,12 @@ function createFixture({ cjsName, tsName, tsInQuery = true, allowlistExtra = {} 
     : path.join(tmpDir, 'sdk', 'src');
   fs.mkdirSync(tsDir, { recursive: true });
 
-  // Also create the scripts dir for the allowlist
   const scriptsDir = path.join(tmpDir, 'scripts');
   fs.mkdirSync(scriptsDir, { recursive: true });
 
-  // Write the pair files
   fs.writeFileSync(path.join(cjsDir, `${cjsName}.cjs`), `'use strict';\n// fixture cjs\n`);
   fs.writeFileSync(path.join(tsDir, `${tsName}.ts`), `// fixture ts\nexport {};\n`);
 
-  // Write the allowlist (start from the real one, then merge fixture additions)
   const realAllowlist = JSON.parse(fs.readFileSync(ALLOWLIST_PATH, 'utf8'));
   const fixtureAllowlist = {
     cooperatingSiblings: [
@@ -92,80 +102,54 @@ function cleanupFixture(dir) {
 // ---------------------------------------------------------------------------
 describe('lint-shared-module-handsync: current repo tree', () => {
   test('exits 0 with the real allowlist and current repo tree', () => {
-    const result = runLint();
-    assert.strictEqual(
-      result.status,
-      0,
-      `Expected exit 0 on current repo, got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
-    );
+    const { status, payload } = runLintJson();
+    assert.strictEqual(status, 0);
+    assert.ok(payload, 'expected JSON payload on stdout');
+    assert.strictEqual(payload.ok, true);
   });
 
-  test('prints ok message on success', () => {
-    const result = runLint();
-    assert.ok(
-      result.stdout.includes('ok lint-shared-module-handsync'),
-      `Expected "ok lint-shared-module-handsync" in stdout:\n${result.stdout}`
-    );
-  });
-
-  test('no unauthorized pairs reported in current tree', () => {
-    const result = runLint();
-    assert.ok(
-      !result.stderr.includes('ERROR lint-shared-module-handsync'),
-      `Unexpected ERROR in stderr:\n${result.stderr}`
-    );
+  test('reports cooperating sibling count and zero unauthorized pairs', () => {
+    const { payload } = runLintJson();
+    assert.ok(payload);
+    assert.strictEqual(typeof payload.cooperatingCount, 'number');
+    assert.ok(payload.cooperatingCount > 0, 'expected at least one cooperating sibling');
+    // No errors field on success — only warnings (backlog) may be present
+    assert.strictEqual(payload.ok, true);
   });
 
   test('script has no syntax errors', () => {
     const result = spawnSync(process.execPath, ['--check', LINT_SCRIPT], { encoding: 'utf8' });
-    assert.strictEqual(result.status, 0, `Syntax error in lint script:\n${result.stderr}`);
+    assert.strictEqual(result.status, 0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Case 2: Intentional new drift — exits 1 with informative error
+// Case 2: Intentional new drift — exits 1 with informative typed error
 // ---------------------------------------------------------------------------
 describe('lint-shared-module-handsync: intentional new drift pair', () => {
   test('exits 1 when an unlisted cjs/ts pair exists', () => {
     const tmpDir = createFixture({ cjsName: 'foo-test', tsName: 'foo-test', tsInQuery: true });
     try {
-      const result = runLint(['--root', tmpDir]);
-      assert.strictEqual(
-        result.status,
-        1,
-        `Expected exit 1 for unlisted pair, got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
-      );
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(status, 1);
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, false);
+      assert.strictEqual(payload.reason, 'unauthorized_pairs');
     } finally {
       cleanupFixture(tmpDir);
     }
   });
 
-  test('error output names the unauthorized pair files', () => {
+  test('typed error payload names the unauthorized pair', () => {
     const tmpDir = createFixture({ cjsName: 'foo-test', tsName: 'foo-test', tsInQuery: true });
     try {
-      const result = runLint(['--root', tmpDir]);
-      assert.ok(
-        result.stderr.includes('foo-test'),
-        `Expected "foo-test" in error output:\n${result.stderr}`
-      );
-      assert.ok(
-        result.stderr.includes('ERROR lint-shared-module-handsync'),
-        `Expected ERROR prefix in stderr:\n${result.stderr}`
-      );
-    } finally {
-      cleanupFixture(tmpDir);
-    }
-  });
-
-  test('error output explains remediation options', () => {
-    const tmpDir = createFixture({ cjsName: 'foo-test', tsName: 'foo-test', tsInQuery: true });
-    try {
-      const result = runLint(['--root', tmpDir]);
-      // Should explain both paths: migrate or add to allowlist
-      assert.ok(
-        result.stderr.includes('Shared Module') || result.stderr.includes('allowlist'),
-        `Expected remediation guidance in error output:\n${result.stderr}`
-      );
+      const { payload } = runLintJson(['--root', tmpDir]);
+      assert.ok(payload && Array.isArray(payload.errors));
+      assert.strictEqual(payload.errors.length, 1);
+      const [entry] = payload.errors;
+      assert.match(entry.relCjs, /foo-test\.cjs$/);
+      assert.ok(Array.isArray(entry.tsPaths));
+      assert.ok(entry.tsPaths.some((p) => /foo-test\.ts$/.test(p)));
     } finally {
       cleanupFixture(tmpDir);
     }
@@ -174,12 +158,11 @@ describe('lint-shared-module-handsync: intentional new drift pair', () => {
   test('exits 1 for unlisted pair in sdk/src/<name>.ts (non-query) position', () => {
     const tmpDir = createFixture({ cjsName: 'bar-test', tsName: 'bar-test', tsInQuery: false });
     try {
-      const result = runLint(['--root', tmpDir]);
-      assert.strictEqual(
-        result.status,
-        1,
-        `Expected exit 1 for unlisted top-level pair, got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
-      );
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(status, 1);
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, false);
+      assert.strictEqual(payload.reason, 'unauthorized_pairs');
     } finally {
       cleanupFixture(tmpDir);
     }
@@ -209,12 +192,10 @@ describe('lint-shared-module-handsync: allowlist entry honored', () => {
       },
     });
     try {
-      const result = runLint(['--root', tmpDir]);
-      assert.strictEqual(
-        result.status,
-        0,
-        `Expected exit 0 for allowlisted pair, got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
-      );
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(status, 0);
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, true);
     } finally {
       cleanupFixture(tmpDir);
     }
@@ -240,11 +221,15 @@ describe('lint-shared-module-handsync: allowlist entry honored', () => {
       },
     });
     try {
-      const result = runLint(['--root', tmpDir]);
-      assert.strictEqual(
-        result.status,
-        0,
-        `Expected exit 0 for backlog pair (warn, not fail), got ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(status, 0);
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, true);
+      // The backlog pair should be reported in warnings (not errors)
+      assert.ok(Array.isArray(payload.warnings));
+      assert.ok(
+        payload.warnings.some((w) => /qux-backlog\.cjs$/.test(w.relCjs)),
+        'expected qux-backlog in warnings'
       );
     } finally {
       cleanupFixture(tmpDir);
@@ -252,7 +237,6 @@ describe('lint-shared-module-handsync: allowlist entry honored', () => {
   });
 
   test('generated .cjs files are excluded from pair detection', () => {
-    // A .generated.cjs file should never be flagged even without an allowlist entry
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-lint-gen-'));
     try {
       const cjsDir = path.join(tmpDir, 'get-shit-done', 'bin', 'lib');
@@ -262,22 +246,19 @@ describe('lint-shared-module-handsync: allowlist entry honored', () => {
       const scriptsDir = path.join(tmpDir, 'scripts');
       fs.mkdirSync(scriptsDir, { recursive: true });
 
-      // Write a .generated.cjs + matching TS — should NOT trigger lint error
+      // A .generated.cjs file + matching TS — should NOT trigger lint error
       fs.writeFileSync(path.join(cjsDir, 'my-module.generated.cjs'), `'use strict';\n`);
       fs.writeFileSync(path.join(tsDir, 'my-module.ts'), `export {};\n`);
 
-      // Empty allowlist (no entries for the generated file)
       fs.writeFileSync(
         path.join(scriptsDir, 'shared-module-handsync-allowlist.json'),
         JSON.stringify({ cooperatingSiblings: [], migrateMeBacklog: [] }, null, 2)
       );
 
-      const result = runLint(['--root', tmpDir]);
-      assert.strictEqual(
-        result.status,
-        0,
-        `Expected exit 0 — generated files must be excluded:\n${result.stderr}`
-      );
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(status, 0);
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, true);
     } finally {
       cleanupFixture(tmpDir);
     }

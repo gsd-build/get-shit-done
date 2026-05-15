@@ -34,6 +34,7 @@ let CJS_DIR = null;          // resolved below
 let SDK_SRC = null;          // resolved below
 let ALLOWLIST_OVERRIDE = null; // resolved below
 let WARN_ALL = false;
+let JSON_OUTPUT = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--root' && args[i + 1]) {
@@ -46,6 +47,8 @@ for (let i = 0; i < args.length; i++) {
     ALLOWLIST_OVERRIDE = path.resolve(args[++i]);
   } else if (args[i] === '--warn-all') {
     WARN_ALL = true;
+  } else if (args[i] === '--json') {
+    JSON_OUTPUT = true;
   }
 }
 
@@ -164,20 +167,32 @@ function scanCjsFiles(cjsDir) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+function emitJson(payload) {
+  process.stdout.write(JSON.stringify(payload) + '\n');
+}
+
 function main() {
   // Check that the directories exist
   if (!fs.existsSync(CJS_DIR)) {
-    process.stderr.write(
-      `lint-shared-module-handsync: CJS dir not found: ${CJS_DIR}\n` +
-        `  Pass --root <repo-root> or --cjs-dir <path> to override.\n`
-    );
+    if (JSON_OUTPUT) {
+      emitJson({ ok: false, reason: 'cjs_dir_missing', path: CJS_DIR });
+    } else {
+      process.stderr.write(
+        `lint-shared-module-handsync: CJS dir not found: ${CJS_DIR}\n` +
+          `  Pass --root <repo-root> or --cjs-dir <path> to override.\n`
+      );
+    }
     process.exit(1);
   }
   if (!fs.existsSync(SDK_SRC)) {
-    process.stderr.write(
-      `lint-shared-module-handsync: SDK src dir not found: ${SDK_SRC}\n` +
-        `  Pass --root <repo-root> or --sdk-src <path> to override.\n`
-    );
+    if (JSON_OUTPUT) {
+      emitJson({ ok: false, reason: 'sdk_src_missing', path: SDK_SRC });
+    } else {
+      process.stderr.write(
+        `lint-shared-module-handsync: SDK src dir not found: ${SDK_SRC}\n` +
+          `  Pass --root <repo-root> or --sdk-src <path> to override.\n`
+      );
+    }
     process.exit(1);
   }
 
@@ -212,36 +227,51 @@ function main() {
     errors.push({ relCjs, tsPaths });
   }
 
+  const cooperatingCount = cjsFiles.filter((f) => {
+    const rel = path.relative(ROOT, f.absPath).replace(/\\/g, '/');
+    return cooperatingSet.has(rel);
+  }).length;
+
   // -------------------------------------------------------------------------
   // Report errors (exit 1)
   // -------------------------------------------------------------------------
   if (errors.length > 0) {
-    process.stderr.write(
-      `\nERROR lint-shared-module-handsync: ${errors.length} unauthorized hand-sync pair(s) found.\n\n`
-    );
-    for (const { relCjs, tsPaths } of errors) {
-      process.stderr.write(`  CJS: ${relCjs}\n`);
-      for (const ts of tsPaths) {
-        process.stderr.write(`   TS: ${ts}\n`);
+    if (JSON_OUTPUT) {
+      emitJson({
+        ok: false,
+        reason: 'unauthorized_pairs',
+        errors,
+        warnings,
+        cooperatingCount,
+      });
+    } else {
+      process.stderr.write(
+        `\nERROR lint-shared-module-handsync: ${errors.length} unauthorized hand-sync pair(s) found.\n\n`
+      );
+      for (const { relCjs, tsPaths } of errors) {
+        process.stderr.write(`  CJS: ${relCjs}\n`);
+        for (const ts of tsPaths) {
+          process.stderr.write(`   TS: ${ts}\n`);
+        }
+        process.stderr.write('\n');
       }
-      process.stderr.write('\n');
+      process.stderr.write(
+        'To resolve, choose one of:\n' +
+          '  1. Migrate to a Shared Module (preferred): create sdk/src/<name>/index.ts as the\n' +
+          '     source-of-truth, write a generator script (sdk/scripts/gen-<name>.mjs), add a\n' +
+          '     freshness check, and update CI. See docs/agents/cjs-sdk-seam.md for the pattern.\n' +
+          '  2. Add an explicit allowlist entry to scripts/shared-module-handsync-allowlist.json\n' +
+          '     with a justification explaining why this pair is a legitimate cooperating sibling\n' +
+          '     rather than a drift anti-pattern. Requires maintainer review via CODEOWNERS.\n\n'
+      );
     }
-    process.stderr.write(
-      'To resolve, choose one of:\n' +
-        '  1. Migrate to a Shared Module (preferred): create sdk/src/<name>/index.ts as the\n' +
-        '     source-of-truth, write a generator script (sdk/scripts/gen-<name>.mjs), add a\n' +
-        '     freshness check, and update CI. See docs/agents/cjs-sdk-seam.md for the pattern.\n' +
-        '  2. Add an explicit allowlist entry to scripts/shared-module-handsync-allowlist.json\n' +
-        '     with a justification explaining why this pair is a legitimate cooperating sibling\n' +
-        '     rather than a drift anti-pattern. Requires maintainer review via CODEOWNERS.\n\n'
-    );
     process.exit(1);
   }
 
   // -------------------------------------------------------------------------
   // Report warnings (no exit code change)
   // -------------------------------------------------------------------------
-  if (warnings.length > 0 && WARN_ALL) {
+  if (warnings.length > 0 && WARN_ALL && !JSON_OUTPUT) {
     process.stderr.write(
       `\nWARNING lint-shared-module-handsync: ${warnings.length} known drift anti-pattern pair(s) in migrateMeBacklog.\n` +
         `These are tracked for future Shared Module migration but do not block CI.\n\n`
@@ -259,15 +289,19 @@ function main() {
   // -------------------------------------------------------------------------
   // Success
   // -------------------------------------------------------------------------
-  const cooperatingCount = cjsFiles.filter((f) => {
-    const rel = path.relative(ROOT, f.absPath).replace(/\\/g, '/');
-    return cooperatingSet.has(rel);
-  }).length;
-
-  process.stdout.write(
-    `ok lint-shared-module-handsync: no unauthorized hand-sync pairs found` +
-      ` (${cooperatingCount} cooperating sibling(s), ${warnings.length} backlog pair(s))\n`
-  );
+  if (JSON_OUTPUT) {
+    emitJson({
+      ok: true,
+      cooperatingCount,
+      backlogCount: warnings.length,
+      warnings,
+    });
+  } else {
+    process.stdout.write(
+      `ok lint-shared-module-handsync: no unauthorized hand-sync pairs found` +
+        ` (${cooperatingCount} cooperating sibling(s), ${warnings.length} backlog pair(s))\n`
+    );
+  }
   process.exit(0);
 }
 
