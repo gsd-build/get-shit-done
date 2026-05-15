@@ -1012,6 +1012,7 @@ function cmdCheckCommit(cwd, raw) {
 }
 
 module.exports = {
+  determinePhaseStatus,
   cmdGenerateSlug,
   cmdCurrentTimestamp,
   cmdListTodos,

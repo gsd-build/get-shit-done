@@ -443,6 +443,54 @@ describe('initPlanPhase', () => {
     expect(data.error).toBeDefined();
   });
 
+  // #3569: init.plan-phase must surface a phase_status field so the
+  // /gsd-plan-phase workflow can short-circuit on closed phases instead of
+  // happily replanning over shipped code. Reuses the project-wide phase
+  // lifecycle vocabulary from determinePhaseStatus (Pending | Planned |
+  // In Progress | Executed | Complete | Needs Review).
+  describe('phase_status (#3569)', () => {
+    it('reports "Complete" when summaries match plans and VERIFICATION.md status: passed', async () => {
+      // Phase 9 fixture already has 1 plan + 1 summary; add a passing VERIFICATION.
+      await writeFile(
+        join(tmpDir, '.planning', 'phases', '09-foundation', '09-VERIFICATION.md'),
+        ['---', 'phase: 09', 'status: passed', 'score: 100', 'verified: true', '---', '# Verification'].join('\n'),
+      );
+
+      const result = await initPlanPhase(['9'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Complete');
+    });
+
+    it('reports "Planned" when plans exist but no summaries written', async () => {
+      // Phase 10 has no plan files in the beforeEach fixture. Add a plan to flip
+      // it from "Pending" (no plans) to "Planned" (plans, no summaries).
+      await writeFile(
+        join(tmpDir, '.planning', 'phases', '10-read-only-queries', '10-01-PLAN.md'),
+        ['---', 'phase: 10-read-only-queries', 'plan: 01', '---', '<objective>x</objective>'].join('\n'),
+      );
+
+      const result = await initPlanPhase(['10'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Planned');
+    });
+
+    it('reports "Pending" when phase has no plans yet', async () => {
+      const result = await initPlanPhase(['10'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Pending');
+    });
+
+    it('reports "Executed" when summaries match plans but VERIFICATION.md is absent', async () => {
+      // Phase 9 fixture: 1 plan, 1 summary, no VERIFICATION yet — executed but
+      // not closed. This is the regression hot zone: pre-fix, init.plan-phase
+      // gave no signal here, so the workflow couldn't distinguish this from
+      // an already-closed phase either.
+      const result = await initPlanPhase(['9'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Executed');
+    });
+  });
+
   // #2769: extractReqIds must accept all bold/colon variants of the
   // Requirements header. The forms render identically in markdown but differ
   // textually; the previous regex only matched **Requirements**: (colon
