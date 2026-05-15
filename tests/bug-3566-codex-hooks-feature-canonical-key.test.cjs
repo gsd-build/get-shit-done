@@ -9,7 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-const { install, uninstall } = require('../bin/install.js');
+const { install, uninstall, parseTomlToObject } = require('../bin/install.js');
 
 const BUILD_HOOKS_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 
@@ -60,6 +60,9 @@ describe('#3566 — Codex installer uses canonical features.hooks key', () => {
     withCodexHome(codexHome, () => install(true, 'codex'));
 
     const content = readConfig(codexHome);
+    const parsed = parseTomlToObject(content);
+    assert.strictEqual(parsed.features?.hooks, true);
+    assert.ok(!('codex_hooks' in (parsed.features || {})));
     assert.match(content, /^\[features\]\nhooks = true$/m);
     assert.doesNotMatch(content, /codex_hooks/);
   });
@@ -74,6 +77,9 @@ describe('#3566 — Codex installer uses canonical features.hooks key', () => {
     withCodexHome(codexHome, () => install(true, 'codex'));
 
     const content = readConfig(codexHome);
+    const parsed = parseTomlToObject(content);
+    assert.strictEqual(parsed.features?.hooks, true);
+    assert.ok(!('codex_hooks' in (parsed.features || {})));
     assert.match(content, /^\[features\]\nhooks = true$/m);
     assert.doesNotMatch(content, /codex_hooks/);
   });
@@ -92,6 +98,10 @@ describe('#3566 — Codex installer uses canonical features.hooks key', () => {
     });
 
     const content = readConfig(codexHome);
+    const parsed = parseTomlToObject(content);
+    assert.strictEqual(parsed.features?.hooks, true);
+    assert.strictEqual(parsed.features?.user_feature, true);
+    assert.ok(!('codex_hooks' in (parsed.features || {})));
     assert.match(content, /^\[features\]\nhooks = true$/m);
     assert.match(content, /^user_feature = true$/m);
     assert.doesNotMatch(content, /GSD hooks ownership/);
