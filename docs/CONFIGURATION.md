@@ -187,6 +187,7 @@ API key fields accept a string value (the key itself). They can also be set to t
 | `review.models.codex` | string | `null` | Command for Codex review, e.g. `"codex exec --model gpt-5"` |
 | `review.models.gemini` | string | `null` | Command for Gemini review, e.g. `"gemini -m gemini-2.5-pro"` |
 | `review.models.opencode` | string | `null` | Command for OpenCode review, e.g. `"opencode run --model claude-sonnet-4"` |
+| `review.models.grok` | string | `null` | Command for Grok Build review, e.g. `"grok -p 'perform a thorough code review' --output-format json --model grok-4"` |
 
 The `<cli>` slug is validated against `[a-zA-Z0-9_-]+`. Empty or path-containing slugs are rejected by `config-set`.
 
@@ -694,6 +695,7 @@ Configure per-CLI model selection for `/gsd-review`. When set, overrides the CLI
 | `review.models.claude` | string | (CLI default) | Model used when `--claude` reviewer is invoked |
 | `review.models.codex` | string | (CLI default) | Model used when `--codex` reviewer is invoked |
 | `review.models.opencode` | string | (CLI default) | Model used when `--opencode` reviewer is invoked |
+| `review.models.grok` | string | (CLI default) | Model used when `--grok` reviewer is invoked (falls back to current Grok session model if unset) |
 | `review.models.qwen` | string | (CLI default) | Model used when `--qwen` reviewer is invoked |
 | `review.models.cursor` | string | (CLI default) | Model used when `--cursor` reviewer is invoked |
 | `review.models.ollama` | string | (server default) | Model name passed to Ollama when `--ollama` reviewer is invoked. If unset, the first available model reported by the server is used (e.g. `llama3`). Set to a specific tag: `gsd config-set review.models.ollama codellama` |

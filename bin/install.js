@@ -1008,6 +1008,88 @@ function removeCodexHooksJsonSessionStart(targetDir) {
   return reconcileCodexHooksJsonSessionStart(targetDir, { managedCommand: null });
 }
 
+// ── Grok Build hook JSON manifests (Phase 3) ─────────────────────────────────
+// Grok discovers hooks from ~/.grok/hooks/*.json (and project .grok/hooks/*.json).
+// Each small JSON owns one GSD hook registration so uninstall can clean precisely.
+// Commands use absolute node/bash + absolute script path for reliability across
+// GUI launches and minimal-PATH environments (consistent with #2979).
+
+/**
+ * Write (or overwrite) GSD-owned *.json hook manifests in the target hooks/ dir.
+ * Only creates manifests for hooks that actually exist on disk (defensive).
+ * Returns {wrote: boolean, count: number}
+ */
+function writeGrokHookManifests(targetDir, opts = {}) {
+  const hooksDir = path.join(targetDir, 'hooks');
+  if (!fs.existsSync(hooksDir)) {
+    return { wrote: false, count: 0 };
+  }
+  const hookConfigs = [
+    { file: 'gsd-prompt-guard.js', event: 'PreToolUse', matcher: 'Write|Edit|MultiEdit' },
+    { file: 'gsd-read-guard.js', event: 'PreToolUse', matcher: 'Write|Edit|MultiEdit' },
+    { file: 'gsd-read-injection-scanner.js', event: 'PostToolUse', matcher: 'Read' },
+    { file: 'gsd-workflow-guard.js', event: 'PreToolUse', matcher: 'Write|Edit|MultiEdit' },
+    { file: 'gsd-session-state.sh', event: 'SessionStart' },
+    { file: 'gsd-update-banner.js', event: 'SessionStart' },
+    { file: 'gsd-context-monitor.js', event: 'PostToolUse' },
+    { file: 'gsd-check-update.js', event: 'SessionStart' },
+    // Additional sh hooks for full parity (PostToolUse on Bash etc.)
+    { file: 'gsd-phase-boundary.sh', event: 'PostToolUse', matcher: 'Bash' },
+    { file: 'gsd-validate-commit.sh', event: 'PreToolUse', matcher: 'Bash' },
+    { file: 'gsd-graphify-update.sh', event: 'PostToolUse', matcher: 'Bash' },
+  ];
+
+  let wroteCount = 0;
+  for (const cfg of hookConfigs) {
+    const hookPath = path.join(hooksDir, cfg.file);
+    if (!fs.existsSync(hookPath)) continue;
+
+    // Use the hook file itself (has shebang +x) as command — Grok will exec it directly.
+    // Absolute path ensures it works regardless of cwd when hook fires.
+    const scriptAbs = path.resolve(hookPath).replace(/\\/g, '/');
+    const entry = {
+      hooks: [{ type: 'command', command: scriptAbs }]
+    };
+    if (cfg.matcher) {
+      entry.matcher = cfg.matcher;
+    }
+    const manifest = { hooks: { [cfg.event]: [entry] } };
+
+    const jsonName = cfg.file.replace(/\.(js|sh)$/, '.json');
+    const jsonPath = path.join(hooksDir, jsonName);
+    fs.writeFileSync(jsonPath, JSON.stringify(manifest, null, 2) + '\n');
+    wroteCount++;
+  }
+
+  if (wroteCount > 0) {
+    console.log(`  ${green}✓${reset} Installed ${wroteCount} Grok hook manifests (JSON)`);
+  }
+  return { wrote: wroteCount > 0, count: wroteCount };
+}
+
+/**
+ * Remove GSD-owned *.json hook manifests from the target hooks/ dir.
+ * @returns {number} count removed
+ */
+function removeGrokHookManifests(targetDir) {
+  const hooksDir = path.join(targetDir, 'hooks');
+  if (!fs.existsSync(hooksDir)) return 0;
+  const jsonNames = [
+    'gsd-prompt-guard.json', 'gsd-read-guard.json', 'gsd-read-injection-scanner.json',
+    'gsd-workflow-guard.json', 'gsd-session-state.json', 'gsd-update-banner.json',
+    'gsd-context-monitor.json', 'gsd-check-update.json',
+    'gsd-phase-boundary.json', 'gsd-validate-commit.json', 'gsd-graphify-update.json'
+  ];
+  let removed = 0;
+  for (const name of jsonNames) {
+    const p = path.join(hooksDir, name);
+    if (fs.existsSync(p)) {
+      try { fs.unlinkSync(p); removed++; } catch { /* ignore */ }
+    }
+  }
+  return removed;
+}
+
 /**
  * Build a hook command path using forward slashes for cross-platform compatibility.
  * On Windows, $HOME is not expanded by cmd.exe/PowerShell, so we use the actual path.
@@ -7029,7 +7111,7 @@ function uninstall(isGlobal, runtime = 'claude') {
     }
   }
 
-  // 4. Remove GSD hooks
+  // 4. Remove GSD hooks (JS + SH + Grok JSON manifests)
   const hooksDir = path.join(targetDir, 'hooks');
   if (fs.existsSync(hooksDir)) {
     const gsdHooks = ['gsd-statusline.js', 'gsd-check-update.js', 'gsd-context-monitor.js', 'gsd-prompt-guard.js', 'gsd-read-guard.js', 'gsd-read-injection-scanner.js', 'gsd-update-banner.js', 'gsd-workflow-guard.js', 'gsd-session-state.sh', 'gsd-validate-commit.sh', 'gsd-phase-boundary.sh', 'gsd-graphify-update.sh'];
@@ -7041,6 +7123,9 @@ function uninstall(isGlobal, runtime = 'claude') {
         hookCount++;
       }
     }
+    // Grok-specific JSON manifests (Phase 3)
+    const jsonRemoved = removeGrokHookManifests(targetDir);
+    hookCount += jsonRemoved;
     if (hookCount > 0) {
       removedCount++;
       console.log(`  ${green}✓${reset} Removed ${hookCount} GSD hooks`);
@@ -7660,7 +7745,7 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
     const hooksDir = path.join(configDir, 'hooks');
     if (fs.existsSync(hooksDir)) {
       for (const file of fs.readdirSync(hooksDir)) {
-        if (file.startsWith('gsd-') && (file.endsWith('.js') || file.endsWith('.sh'))) {
+        if (file.startsWith('gsd-') && (file.endsWith('.js') || file.endsWith('.sh') || file.endsWith('.json'))) {
           manifest.files['hooks/' + file] = fileHash(path.join(hooksDir, file));
         }
       }
@@ -9308,6 +9393,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   if (isGrok) {
     // Grok Build: skills/ + agents/ + hooks/*.json manifests (no settings.json; hooks via JSON)
     // Hook JS files are copied by the shared hooks/ path (Grok not in the skip list).
+    writeGrokHookManifests(targetDir);
     persistActiveProfileMarker();
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
@@ -9864,6 +9950,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'augment') program = 'Augment';
   if (runtime === 'trae') program = 'Trae';
   if (runtime === 'cline') program = 'Cline';
+  if (runtime === 'grok') program = 'Grok Build';
   if (runtime === 'qwen') program = 'Qwen Code';
   if (runtime === 'hermes') program = 'Hermes Agent';
 
@@ -9879,6 +9966,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   if (runtime === 'augment') command = '/gsd-new-project';
   if (runtime === 'trae') command = '/gsd-new-project';
   if (runtime === 'cline') command = '/gsd-new-project';
+  if (runtime === 'grok') command = '/gsd-new-project';
   if (runtime === 'qwen') command = '/gsd-new-project';
   if (runtime === 'hermes') command = '/gsd-new-project';
 

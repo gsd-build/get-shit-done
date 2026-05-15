@@ -39,7 +39,10 @@ Replace `--claude` with the flag for your runtime:
 | Copilot | `--copilot` |
 | Cursor | `--cursor` |
 | Windsurf | `--windsurf` |
+| Grok Build | `--grok` |
 | Augment | `--augment` |
+| Trae | `--trae` |
+| Cline | `--cline` |
 | All runtimes | `--all` |
 
 Use `--local` instead of `--global` for a project-scoped install.

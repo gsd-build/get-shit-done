@@ -497,6 +497,7 @@ User-facing entry point: `/gsd-graphify` (see [Command Reference](COMMANDS.md#gs
 gsd-sdk query config-set review.models.codex    "codex exec --model gpt-5"
 gsd-sdk query config-set review.models.gemini   "gemini -m gemini-2.5-pro"
 gsd-sdk query config-set review.models.opencode "opencode run --model claude-sonnet-4"
+gsd-sdk query config-set review.models.grok     "grok -p 'perform a thorough code review' --output-format json"
 gsd-sdk query config-set review.models.claude   ""   # clear — fall back to session model
 ```
 

@@ -161,6 +161,7 @@ AskUserQuestion([
       { label: "Codex", description: "review.models.codex — e.g. 'codex exec --model gpt-5'" },
       { label: "Gemini", description: "review.models.gemini — e.g. 'gemini -m gemini-2.5-pro'" },
       { label: "OpenCode", description: "review.models.opencode — e.g. 'opencode run --model claude-sonnet-4'" },
+      { label: "Grok", description: "review.models.grok — e.g. 'grok -p ... --output-format json' (falls back to session model)" },
       { label: "Done", description: "Skip — finish this section" }
     ]
   }

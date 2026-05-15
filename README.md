@@ -4,7 +4,7 @@
 
 **English** · [Português](README.pt-BR.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)
 
-**A light-weight meta-prompting, context engineering, and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, and more.**
+**A light-weight meta-prompting, context engineering, and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, Grok Build, and more.**
 
 **Solves context rot — the quality degradation that happens as your AI fills its context window.**
 
@@ -134,7 +134,7 @@ Loop discuss → plan → execute → verify → ship until the milestone is don
 npx get-shit-done-cc@latest
 ```
 
-The installer prompts for your runtime (Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, and more) and whether to install globally or locally.
+The installer prompts for your runtime (Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, Grok Build, and more) and whether to install globally or locally.
 
 ```bash
 claude --dangerously-skip-permissions

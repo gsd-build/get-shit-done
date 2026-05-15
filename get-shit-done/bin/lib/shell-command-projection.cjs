@@ -126,6 +126,16 @@ const MANAGED_HOOK_COMMAND_BASENAMES_BY_SURFACE = {
   'codex-hooks-json': new Set([
     'gsd-check-update.js',
   ]),
+  'grok-hooks-json': new Set([
+    'gsd-prompt-guard.js',
+    'gsd-read-guard.js',
+    'gsd-read-injection-scanner.js',
+    'gsd-workflow-guard.js',
+    'gsd-session-state.sh',
+    'gsd-update-banner.js',
+    'gsd-context-monitor.js',
+    'gsd-check-update.js',
+  ]),
 };
 
 const LEGACY_MANAGED_HOOK_ALIASES_BY_SURFACE = {

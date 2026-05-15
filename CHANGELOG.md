@@ -6,6 +6,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.42.1...HEAD)
 
+### Added
+
+- **Grok Build (`--grok`) as a first-class runtime** — native skills in `~/.grok/skills/gsd-*`, agents in `~/.grok/agents/`, and hook JSON manifests in `~/.grok/hooks/gsd-*.json` (SessionStart, PreToolUse, PostToolUse) for prompt/read/workflow guards, session state, update banner, and context monitor. Full conversion layer (frontmatter, paths, branding "Claude Code" → "Grok Build", AGENTS.md). `GROK_CONFIG_DIR` honored. Core GSD loop (new-project → discuss → plan → execute + verification) works end-to-end with guardrails active. See `docs/grok-build-support/`.
+
 ## [1.42.1](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...v1.42.1) - 2026-05-15
 
 ### Fixed
