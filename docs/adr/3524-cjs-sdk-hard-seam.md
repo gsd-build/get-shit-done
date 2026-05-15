@@ -68,7 +68,7 @@ Drift is blocked at three layers, each modeled on an existing in-repo script:
 
 1. **Per-Module freshness check** — `sdk/scripts/check-<module>-fresh.mjs`, one per Shared Module in the table. Precedent: `check-command-aliases-fresh.mjs`.
 2. **Per-Module drift lint** (when invariants are not pure file-equality) — `scripts/lint-<module>-drift.cjs`, one per data-manifest-backed Module. Precedent: `lint-shell-command-projection-drift.cjs`.
-3. **Hand-sync pair lint** — `scripts/lint-shared-module-handsync.cjs` rejects any pair of files at `get-shit-done/bin/lib/<name>.cjs` and `sdk/src/query/<name>.ts` (or `sdk/src/<name>.ts`) that are not generated artifacts and not on an explicit allow-list. This blocks the #3523 anti-pattern at PR time.
+3. **Hand-sync pair lint** — `scripts/lint-shared-module-handsync.cjs` rejects any pair of files at `get-shit-done/bin/lib/<name>.cjs` and `sdk/src/query/<name>.ts` (or `sdk/src/<name>.ts`) that are neither generated artifacts nor on an explicit allow-list. This blocks the #3523 anti-pattern at PR time.
 
 CODEOWNERS extends to `sdk/src/<module>/` for each Shared Module. Architecture-team review is required for changes to a source of truth.
 

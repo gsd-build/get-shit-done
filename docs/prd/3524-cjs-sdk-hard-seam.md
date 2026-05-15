@@ -52,7 +52,7 @@ For each Shared Module being migrated:
 5. Wire the freshness check into CI.
 6. Once green for one release cycle, delete the now-unreferenced hand-authored content from history's view by removing dead re-exports.
 
-A separate, standing CI lint (`scripts/lint-shared-module-handsync.cjs`, introduced in Phase 5) blocks any new hand-synced pair from being merged.
+A separate, standing CI lint (`scripts/lint-shared-module-handsync.cjs`, introduced in Phase 6) blocks any new hand-synced pair from being merged.
 
 ## Phased plan
 
