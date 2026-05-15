@@ -34,6 +34,7 @@ import {
 import { extractFrontmatter } from './frontmatter.js';
 import { extractCurrentMilestone } from './roadmap.js';
 import { getMilestonePhaseFilter } from './state.js';
+import { isCanonicalPlanFile, describeNonCanonicalPlans } from './phase.js';
 import {
   acquireStateLock,
   readModifyWriteStateMdFull,
@@ -86,27 +87,43 @@ export { readModifyWriteRoadmapMd, replaceInCurrentMilestone };
  */
 export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
   // ── Flag parsing ────────────────────────────────────────────────────────
-  // Separate recognized flags from positional args. Any unrecognized --flag
-  // is rejected immediately so it is never silently absorbed into positional slots.
-  const RECOGNIZED_FLAGS = new Set(['--dry-run']);
+  // Mirrors the CJS phase add router (phase-command-router.cjs): recognise
+  // --dry-run and --id <value>; reject every other --flag; ignore --raw so it
+  // never leaks into the description; join the remaining positional tokens
+  // with a single space so multi-word descriptions like `phase add User
+  // Dashboard` produce description "User Dashboard". customId comes from the
+  // --id flag, never from positional[1].
   let dryRun = false;
+  let customIdArg: string | null = null;
   const positional: string[] = [];
 
-  for (const arg of args) {
-    if (arg.startsWith('--')) {
-      if (!RECOGNIZED_FLAGS.has(arg)) {
-        throw new GSDError(
-          `Unknown flag ${arg} for phase.add`,
-          ErrorClassification.Validation,
-        );
-      }
-      if (arg === '--dry-run') dryRun = true;
-    } else {
-      positional.push(arg);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === '--raw') {
+      // CJS router strips --raw before invoking the handler; preserve parity
+      // so a stray --raw never poisons the description.
+      continue;
     }
+    if (arg === '--dry-run') {
+      dryRun = true;
+      continue;
+    }
+    if (arg === '--id') {
+      const id = args[i + 1];
+      if (!id || id.startsWith('--')) {
+        throw new GSDError('--id requires a value', ErrorClassification.Validation);
+      }
+      customIdArg = id;
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      throw new GSDError(`phase add does not support ${arg}`, ErrorClassification.Validation);
+    }
+    positional.push(arg);
   }
 
-  const description = positional[0];
+  const description = positional.join(' ').trim();
   if (!description) {
     throw new GSDError('description required for phase add', ErrorClassification.Validation);
   }
@@ -119,8 +136,9 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
   } catch { /* use defaults */ }
 
   const slug = generatePhaseSlug(description);
-  // positional[1] is the optional customId — flags are already stripped
-  const customId = positional[1] || null;
+  // customId always comes from the --id flag; positional tokens are reserved
+  // for the description (which is joined above).
+  const customId = customIdArg;
 
   // Optional project code prefix (e.g., 'CK' -> 'CK-01-foundation')
   const projectCode = (config.project_code as string) || '';
@@ -227,17 +245,25 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
 export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) => {
   let descriptions: string[];
   const descIdx = args.indexOf('--descriptions');
-  if (descIdx !== -1 && args[descIdx + 1] !== undefined) {
-    try {
-      const parsed = JSON.parse(args[descIdx + 1]) as unknown;
-      if (!Array.isArray(parsed)) {
-        throw new GSDError('--descriptions must be a JSON array', ErrorClassification.Validation);
-      }
-      descriptions = parsed.map((x) => String(x));
-    } catch (e) {
-      if (e instanceof GSDError) throw e;
-      throw new GSDError('--descriptions must be a valid JSON array', ErrorClassification.Validation);
+  if (descIdx !== -1) {
+    // CJS router parity (phase-command-router.cjs): a dangling --descriptions
+    // or one whose value is another flag must surface the same JSON-array error
+    // string, not silently fall through to positional parsing or throw a
+    // different "valid JSON" variant.
+    const rawValue = args[descIdx + 1];
+    if (rawValue === undefined || rawValue.startsWith('--')) {
+      throw new GSDError('--descriptions must be a JSON array', ErrorClassification.Validation);
     }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawValue);
+    } catch {
+      throw new GSDError('--descriptions must be a JSON array', ErrorClassification.Validation);
+    }
+    if (!Array.isArray(parsed)) {
+      throw new GSDError('--descriptions must be a JSON array', ErrorClassification.Validation);
+    }
+    descriptions = parsed.map((x) => String(x));
   } else {
     descriptions = args.filter((a) => a !== '--raw');
   }
@@ -345,8 +371,25 @@ export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) 
  * @returns QueryResult with { phase_number, after_phase, name, slug, directory }
  */
 export const phaseInsert: QueryHandler = async (args, projectDir, workstream) => {
-  const afterPhase = args[0];
-  const description = args[1];
+  // CJS router parity (phase-command-router.cjs): explicitly reject
+  // --dry-run (insert is destructive on disk + roadmap and has no preview
+  // path), strip --raw, and join all positional args after `afterPhase` into
+  // a single space-delimited description so `phase insert 1 Fix Critical Bug`
+  // produces description "Fix Critical Bug" instead of just "Fix".
+  const positional: string[] = [];
+  for (const arg of args) {
+    if (arg === '--dry-run') {
+      throw new GSDError('phase insert does not support --dry-run', ErrorClassification.Validation);
+    }
+    if (arg === '--raw') continue;
+    if (arg.startsWith('--')) {
+      throw new GSDError(`phase insert does not support ${arg}`, ErrorClassification.Validation);
+    }
+    positional.push(arg);
+  }
+
+  const afterPhase = positional[0];
+  const description = positional.slice(1).join(' ').trim();
 
   if (!afterPhase || !description) {
     throw new GSDError('after-phase and description required for phase insert', ErrorClassification.Validation);
@@ -367,6 +410,19 @@ export const phaseInsert: QueryHandler = async (args, projectDir, workstream) =>
     const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
     const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
     if (!targetPattern.test(content)) {
+      // Bug #3098 parity: when only the summary checklist exists for this
+      // phase (no `### Phase N:` detail section), point the user at the
+      // missing detail section rather than implying the phase is absent.
+      const checklistPattern = new RegExp(
+        `-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+0*${afterPhaseEscaped}:`,
+        'i',
+      );
+      if (checklistPattern.test(content)) {
+        throw new GSDError(
+          `Phase ${afterPhase} exists in roadmap summary but is missing a detail section (### Phase ${afterPhase}: ...).`,
+          ErrorClassification.Validation,
+        );
+      }
       throw new GSDError(`Phase ${afterPhase} not found in ROADMAP.md`, ErrorClassification.Validation);
     }
 
@@ -699,7 +755,11 @@ async function renameIntegerPhases(
       const m = dir.match(/^(\d+)([A-Z])?(?:\.(\d+))?-(.+)$/i);
       if (!m) return null;
       const dirInt = parseInt(m[1], 10);
-      if (dirInt <= removedInt) return null;
+      // CJS parity: skip backlog phases (999.x). These are parked ideas with a
+      // numbering convention that lives outside the active sequence; renumbering
+      // them would clobber the convention and corrupt downstream lookups.
+      // (bug-2434)
+      if (dirInt <= removedInt || dirInt >= 999) return null;
       return {
         dir,
         oldInt: dirInt,
@@ -743,10 +803,63 @@ async function renameIntegerPhases(
 // ─── updateRoadmapAfterPhaseRemoval ────────────────────────────────────
 
 /**
+ * Decrement integer phase number while skipping non-renumbered ranges. Mirrors
+ * `decrementRoadmapPhaseNumber` in phase.cjs lines 860-864.
+ *
+ * Skips when:
+ *   • not an integer
+ *   • num <= removedInt (already-renumbered phases stay put)
+ *   • num >= 999 (backlog/parked-idea numbering range)
+ *
+ * Returns the original raw string when the guards trip so the regex pass
+ * leaves dates and unrelated numerics intact.
+ */
+function decrementRoadmapPhaseNumber(raw: string, removedInt: number): string {
+  const num = parseInt(raw, 10);
+  if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
+  return String(num - 1);
+}
+
+/**
+ * Decrement integer or decimal phase token (e.g. "5" or "5.2"). Mirrors
+ * `decrementRoadmapPhaseToken` in phase.cjs lines 866-872 — preserves the
+ * decimal suffix when present and applies the same guards.
+ */
+function decrementRoadmapPhaseToken(raw: string, removedInt: number): string {
+  const match = String(raw).match(/^(\d+)(\.\d+)?$/);
+  if (!match) return raw;
+  const num = parseInt(match[1]!, 10);
+  if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
+  return `${num - 1}${match[2] || ''}`;
+}
+
+/**
+ * Decrement zero-padded phase number while preserving the original pad width.
+ * Mirrors `decrementRoadmapPaddedPhaseNumber` in phase.cjs lines 874-878.
+ */
+function decrementRoadmapPaddedPhaseNumber(raw: string, removedInt: number): string {
+  const num = parseInt(raw, 10);
+  if (!Number.isInteger(num) || num <= removedInt || num >= 999) return raw;
+  return String(num - 1).padStart(raw.length, '0');
+}
+
+/**
  * Remove a phase section from ROADMAP.md and renumber subsequent integer phases.
  *
- * Port of updateRoadmapAfterPhaseRemoval from phase.cjs lines 569-595.
+ * Port of updateRoadmapAfterPhaseRemoval from phase.cjs lines 880-922.
  * Uses readModifyWriteRoadmapMd for atomic writes.
+ *
+ * The renumbering pass uses **5 targeted regex replacements** (not a loop)
+ * because the loop approach is dangerous:
+ *   • It can match YYYY-MM-DD substrings and corrupt dates (bug-2435).
+ *   • It can rename backlog phases (999.x) that should stay frozen (bug-2434).
+ *   • It can renumber the same phase multiple times if the regex matches
+ *     overlap (bug-3355 — phase 7 → 6 → 5 → ...).
+ *
+ * The CJS pattern uses negative lookbehind/ahead on the padded-prefix regex
+ * to skip dates and decrement helpers that guard against `num >= 999`. Keep
+ * this implementation byte-for-byte in lockstep with phase.cjs:880-922 —
+ * deviations are how the three bugs above slipped in.
  *
  * @param projectDir - Project root directory
  * @param targetPhase - Phase identifier that was removed
@@ -765,7 +878,7 @@ async function updateRoadmapAfterPhaseRemoval(
 
     // Remove the phase section (header + body until next phase header or end)
     content = content.replace(
-      new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d|$)`, 'i'),
+      new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d+\\s*:|$)`, 'i'),
       '',
     );
 
@@ -781,46 +894,48 @@ async function updateRoadmapAfterPhaseRemoval(
       '',
     );
 
-    // For integer phase removal, renumber all subsequent phases in ROADMAP text
     if (!isDecimal) {
-      const MAX_PHASE = 99;
-      for (let oldNum = MAX_PHASE; oldNum > removedInt; oldNum--) {
-        const newNum = oldNum - 1;
-        const oldStr = String(oldNum);
-        const newStr = String(newNum);
-        const oldPad = oldStr.padStart(2, '0');
-        const newPad = newStr.padStart(2, '0');
+      // Phase headers: ### Phase N:  /  ### Phase N.M:
+      content = content.replace(
+        /(#{2,4}\s*Phase\s+)(\d+(?:\.\d+)?)(\s*:)/gi,
+        (_match, prefix: string, num: string, suffix: string) =>
+          `${prefix}${decrementRoadmapPhaseToken(num, removedInt)}${suffix}`,
+      );
 
-        // Renumber phase headers: ### Phase N:
-        content = content.replace(
-          new RegExp(`(#{2,4}\\s*Phase\\s+)${escapeRegex(oldStr)}(\\s*:)`, 'gi'),
-          `$1${newStr}$2`,
-        );
+      // Checkbox-list summary references: `- [ ] Phase N:`
+      content = content.replace(
+        /(-\s*\[[ x]\]\s*.*?Phase\s+)(\d+)(\s*:|\s+)/gi,
+        (_match, prefix: string, num: string, suffix: string) =>
+          `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`,
+      );
 
-        // Renumber inline Phase N references
-        content = content.replace(
-          new RegExp(`(Phase\\s+)${escapeRegex(oldStr)}([:\\s])`, 'g'),
-          `$1${newStr}$2`,
-        );
+      // Table-row phase numbers: `| N. ` — bare integer in a cell.
+      content = content.replace(
+        /(\|\s*)(\d+)(\.\s)/g,
+        (_match, prefix: string, num: string, suffix: string) =>
+          `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`,
+      );
 
-        // Renumber padded plan references: 07-01 -> 06-01
-        content = content.replace(
-          new RegExp(`${escapeRegex(oldPad)}-(\\d{2})`, 'g'),
-          `${newPad}-$1`,
-        );
+      // Padded plan references: NN-NN (optionally followed by -PLAN.md /
+      // -SUMMARY.md). Negative lookbehind `(?<![0-9-])` and negative
+      // lookahead `(?![0-9-])` exclude YYYY-MM-DD substrings (bug-2435).
+      content = content.replace(
+        /(?<![0-9-])(\d{2})-(\d{2})(?=(?:-(?:PLAN|SUMMARY)\.md)?(?![0-9-]))/g,
+        (_match, phaseNum: string, planNum: string) =>
+          `${decrementRoadmapPaddedPhaseNumber(phaseNum, removedInt)}-${planNum}`,
+      );
 
-        // Renumber table row phase numbers: | 7. -> | 6.
-        content = content.replace(
-          new RegExp(`(\\|\\s*)${escapeRegex(oldStr)}\\.\\s`, 'g'),
-          `$1${newStr}. `,
-        );
-
-        // Renumber depends-on references
-        content = content.replace(
-          new RegExp(`(\\*\\*Depends on:\\*\\*\\s*Phase\\s+)${escapeRegex(oldStr)}\\b`, 'gi'),
-          `$1${newStr}`,
-        );
-      }
+      // Depends-on references — two bold-colon variants in the wild.
+      content = content.replace(
+        /(\*\*Depends on\*\*\s*:\s*Phase\s+)(\d+(?:\.\d+)?)\b/gi,
+        (_match, prefix: string, num: string) =>
+          `${prefix}${decrementRoadmapPhaseToken(num, removedInt)}`,
+      );
+      content = content.replace(
+        /(Depends on:\*\*\s*Phase\s+)(\d+(?:\.\d+)?)\b/gi,
+        (_match, prefix: string, num: string) =>
+          `${prefix}${decrementRoadmapPhaseToken(num, removedInt)}`,
+      );
     }
 
     return content;
@@ -1217,6 +1332,12 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
     for (const dir of dirs) {
       const dm = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
       if (dm) {
+        // Bug #2129 parity: skip backlog phases (999.x). They are parked
+        // ideas with reserved numbering, not part of the active sequence.
+        // Without this, completing phase 2 in a project that has a 999.1
+        // backlog directory would jump next_phase to 999.1 instead of the
+        // intended Phase 3 from ROADMAP.
+        if (/^999(?:\.|$)/.test(dm[1]!)) continue;
         if (comparePhaseNum(dm[1], phaseNum) > 0) {
           nextPhaseNum = dm[1];
           nextPhaseName = dm[2] || null;
@@ -1547,13 +1668,19 @@ export const phasesList: QueryHandler = async (args, projectDir, workstream) => 
 
   if (type) {
     const files: string[] = [];
+    const warnings: string[] = [];
     for (const dir of dirs) {
       const dirPath = join(phasesDir, dir);
       if (!existsSync(dirPath)) continue;
       const dirFiles = await readdir(dirPath);
       let filtered: string[];
       if (type === 'plans') {
-        filtered = dirFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+        filtered = dirFiles.filter(isCanonicalPlanFile);
+        // #2893 parity — surface plan-shaped files the canonical filter
+        // rejected so callers (executor init, etc.) don't silently see zero
+        // plans. Per-dir prefix mirrors phase.cjs:120.
+        const w = describeNonCanonicalPlans(dirFiles, filtered);
+        if (w) warnings.push(`${dir}: ${w}`);
       } else if (type === 'summaries') {
         filtered = dirFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
       } else {
@@ -1561,7 +1688,13 @@ export const phasesList: QueryHandler = async (args, projectDir, workstream) => 
       }
       files.push(...filtered.sort());
     }
-    return { data: { files, count: files.length, phase_dir: phase ? dirs[0]?.replace(/^\d+(?:\.\d+)*-?/, '') : null } };
+    const result: Record<string, unknown> = {
+      files,
+      count: files.length,
+      phase_dir: phase ? dirs[0]?.replace(/^\d+(?:\.\d+)*-?/, '') : null,
+    };
+    if (warnings.length) result['warning'] = warnings.join(' | ');
+    return { data: result };
   }
 
   return { data: { directories: dirs, count: dirs.length } };
