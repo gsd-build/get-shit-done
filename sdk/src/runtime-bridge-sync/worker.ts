@@ -131,8 +131,23 @@ function classifyError(error: unknown): { kind: SyncErrorKind; exitCode: number;
       return { kind: 'native_timeout', exitCode: exitCode ?? 1, message };
     }
 
-    // Check if cause is a TypeError → internal_error
+    // Unwrap the cause once.  The native direct adapter wraps every non-
+    // GSDToolsError thrown by a handler in a GSDToolsError via
+    // `createNativeFailureError`, preserving the original via `cause`.
+    // Classification of validation / blocked errors therefore has to walk
+    // through to the cause — otherwise every GSDError validation surfaces
+    // as `native_failure` and callers cannot distinguish "you gave me bad
+    // input" from "the SDK crashed."  (Phase 6 / #3592 contract bug.)
     const cause = (error as NodeJS.ErrnoException & { cause?: unknown }).cause;
+    if (cause instanceof GSDError) {
+      if (
+        cause.classification === ErrorClassification.Validation ||
+        cause.classification === ErrorClassification.Blocked
+      ) {
+        return { kind: 'validation_error', exitCode: 10, message: cause.message };
+      }
+      return { kind: 'internal_error', exitCode: exitCode ?? 1, message: cause.message };
+    }
     if (cause instanceof TypeError) {
       return { kind: 'internal_error', exitCode: exitCode ?? 1, message };
     }
