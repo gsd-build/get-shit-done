@@ -30,11 +30,11 @@ Check that the session is running inside Claude Code:
 
 ```bash
 if [ "$CLAUDECODE" = "1" ] || [ -n "$CLAUDE_CODE_ENTRYPOINT" ]; then
-  CC_VERSION="$(claude --version 2>/dev/null | awk '{print $1}')"
-  if [ -n "$CC_VERSION" ] && [ "$(printf '%s\n' "2.1.91" "$CC_VERSION" | sort -V | head -n1)" != "2.1.91" ]; then
-    echo ""
+  CC_VERSION="$(claude --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+  if [ -n "$CC_VERSION" ] && [ "$(printf '%s\n' "2.1.91" "$CC_VERSION" | sort -V | head -n1)" = "2.1.91" ]; then
+    echo "claude-code:${CC_VERSION}"
   else
-    echo "claude-code:${CC_VERSION:-unknown}"
+    echo ""
   fi
 else
   echo ""
