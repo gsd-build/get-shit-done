@@ -15,7 +15,7 @@ The CJS↔SDK hard-seam migration (#3524) eliminates a class of config-schema dr
 | Phase 4 | [#3554](https://github.com/gsd-build/get-shit-done/pull/3554) | `project-root` Shared Module — source-of-truth at `sdk/src/project-root/`, generator, freshness check, CJS Adapter. |
 | Phase 5.0 | [#3558](https://github.com/gsd-build/get-shit-done/pull/3558) | `runtime-bridge-sync` worker — enables CJS-side execution of SDK native handlers; state.* family initial router delegation via `executeForCjs`. |
 | Phase 5.1 | [#3574](https://github.com/gsd-build/get-shit-done/pull/3574) | `state.*` router delegation complete — all known state subcommands delegated via `executeForCjs`; Phase 5.0 worker bug fix. |
-| Phase 6 | [#3575](https://github.com/gsd-build/get-shit-done/pull/3575) | Enforcement hardening — hand-sync drift lint (`scripts/lint-shared-module-handsync.cjs`), CODEOWNERS rules for architectural files, this reference document. |
+| Phase 6 | [#3575](https://github.com/gsd-build/get-shit-done/pull/3575) | Enforcement hardening + Final completion — hand-sync drift lint, CODEOWNERS, 6 family-router migrations, 5 Shared Module migrations (plan-scan, secrets, schema-detect, decisions, workstream-name-policy), workstream native support, parity fixes. Migration feature-complete: 22 cooperating siblings, 0 backlog pairs. |
 
 ---
 
@@ -236,45 +236,34 @@ This test enforces that the delegate and the native handler stay aligned.
 
 ---
 
+## Phase 6 Final Completion Summary
+
+Phase 6 (PR #3575) is feature-complete. The migration is done.
+
+**What shipped in Phase 6:**
+
+- **Shared Modules migrated (5 total in Phase 6):** `plan-scan`, `secrets`, `schema-detect`, `decisions`, `workstream-name-policy`. Each follows the full pattern: SDK source-of-truth, generator (`gen-<name>.mjs`), freshness check (`check-<name>-fresh.mjs`), generated CJS artifact (`<name>.generated.cjs`), CJS shim re-export, parity test, CI step, pre-commit hook, CODEOWNERS entry.
+- **Workstream native support:** The sync bridge worker now correctly threads `workstream` through to `registry.dispatch()`. `GSDTransport` no longer forces subprocess for workstream-scoped requests. Workstream-scoped state commands execute natively.
+- **State parity divergences resolved:** `state.record-metric` and `state.prune` SDK handlers now match CJS semantics exactly.
+- **MIGRATE_ME pairs resolved:** `decisions` and `workstream-name-policy` migrated from `migrateMeBacklog` to `cooperatingSiblings` as ADAPTER-OVER-MODULE.
+- **Lint final state:** 22 cooperating siblings, 0 backlog pairs.
+
+**Decisions migration specifics (B1):**
+- SDK `decisions.ts` regex aligned to CJS: `D-([A-Za-z0-9_-]+)` (alphanumeric IDs like `D-INFRA-01` accepted).
+- SDK returns richer `{id, text, category, tags, trackable}`; CJS callers using only `{id, text}` safely ignore extras.
+- Parity test: `tests/decisions-generator.test.cjs` (15 tests covering numeric IDs, alphanumeric IDs, richer schema fields).
+
+**Workstream-name-policy migration specifics (B2):**
+- Added `hasInvalidPathSegment` and `isValidActiveWorkstreamName` to SDK `workstream-name-policy.ts`.
+- `validateWorkstreamName` is now an alias for `isValidActiveWorkstreamName` (consistent with CJS semantics).
+- Parity test: `tests/workstream-name-policy-generator.test.cjs` (19 tests covering all four exports).
+
+---
+
 ## Open follow-ups
 
-These items are not scheduled for a specific phase. They are candidates for future enhancement by the maintainer.
+No migration items remain. The following are future quality candidates, not defects:
 
-### Candidate Shared Modules (migrateMeBacklog)
-
-The following 8 pairs are currently listed as known drift anti-patterns in `scripts/shared-module-handsync-allowlist.json`. They do not block CI today, but they are the highest-priority candidates for Shared Module extraction:
-
-| Name | CJS file | SDK file | Notes |
-|------|----------|----------|-------|
-| `config` | `get-shit-done/bin/lib/config.cjs` | `sdk/src/config.ts` | Root cause of bugs #1535, #2047, #2638, #2653, #2687, #2798, #3055, #3523. High priority. `sdk/shared/config-*.manifest.json` already exist. |
-| `decisions` | `get-shit-done/bin/lib/decisions.cjs` | `sdk/src/query/decisions.ts` | Parallel decision-file reading logic. |
-| `intel` | `get-shit-done/bin/lib/intel.cjs` | `sdk/src/query/intel.ts` | Parallel intel management implementations. |
-| `model-catalog` | `get-shit-done/bin/lib/model-catalog.cjs` | `sdk/src/model-catalog.ts` | `sdk/shared/model-catalog.json` manifest exists; both sides read it independently. |
-| `plan-scan` | `get-shit-done/bin/lib/plan-scan.cjs` | `sdk/src/query/plan-scan.ts` | Parallel plan-scanning implementations. |
-| `schema-detect` | `get-shit-done/bin/lib/schema-detect.cjs` | `sdk/src/query/schema-detect.ts` | Parallel schema detection logic. |
-| `secrets` | `get-shit-done/bin/lib/secrets.cjs` | `sdk/src/query/secrets.ts` | Security-sensitive path logic; divergence is high-risk. |
-| `workstream-name-policy` | `get-shit-done/bin/lib/workstream-name-policy.cjs` | `sdk/src/workstream-name-policy.ts` | Parallel naming policy validation. |
-
-### Per-family CJS router migrations (Phase 5.2+ candidates)
-
-Phase 5.1 completed `state.*` router delegation. The following families are Phase 5.2+ candidates, pending maintainer authorization:
-
-- `verify.*` — `get-shit-done/bin/lib/verify-command-router.cjs`
-- `init.*` — `get-shit-done/bin/lib/init-command-router.cjs`
-- `phase.*` — `get-shit-done/bin/lib/phase-command-router.cjs`
-- `phases.*` — `get-shit-done/bin/lib/phases-command-router.cjs`
-- `validate.*` — `get-shit-done/bin/lib/validate-command-router.cjs`
-- `roadmap.*` — `get-shit-done/bin/lib/roadmap-command-router.cjs`
-- Non-family commands — `get-shit-done/bin/lib/commands.cjs`
-- Config subcommands — routed via `get-shit-done/bin/lib/config.cjs`
-
-### Workstream support in the sync bridge
-
-`sdk/src/runtime-bridge-sync/` currently falls back to CJS for workstream-scoped queries. A dedicated workstream path inside the sync worker is a follow-up item.
-
-### Phase 5.1 documented parity divergences
-
-Phase 5.1 (PR [#3574](https://github.com/gsd-build/get-shit-done/pull/3574)) documented two subcommands with known parity gaps that were deferred:
-
-- `state.record-metric` — SDK and CJS implementations diverge in metric aggregation behavior.
-- `state.prune` — SDK prune logic does not yet match CJS pruning heuristics exactly.
+- **`config.cjs` / `sdk/src/config.ts`** — These files are CJS-CLI-ONLY (per allowlist classification). The `config.cjs` file contains only CLI command handlers that use sync CJS APIs; `sdk/src/config.ts` provides the async SDK layer. They serve disjoint surfaces. A future migration would require converting the CLI handlers to async + SDK patterns, which is a larger refactor out of scope for this migration cycle.
+- **`intel.cjs` / `sdk/src/query/intel.ts`** — Intentional architectural divergence (different file naming conventions between CJS and SDK; documented in allowlist). A future migration would require reconciling INTEL_FILES naming, which is a breaking change for existing consumers.
+- **`model-catalog.cjs` / `sdk/src/model-catalog.ts`** — Both sides read from `sdk/shared/model-catalog.json` independently (ADAPTER-OVER-MODULE pattern). This is intentional; the shared JSON is the source-of-truth. No duplication of logic between CJS and SDK consumers.

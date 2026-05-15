@@ -1,48 +1,19 @@
 'use strict';
 
 /**
- * Shared parser for CONTEXT.md `<decisions>` blocks.
+ * Decisions Module — CJS adapter.
  *
- * Used by:
- *   - gap-checker.cjs (#2493 post-planning gap analysis)
- *   - intended for #2492 (plan-phase decision gate, verify-phase decision validator)
+ * The implementation is generated from sdk/src/query/decisions.ts and
+ * lives in decisions.generated.cjs. This file is a thin re-export so
+ * that existing call sites (gap-checker.cjs, tests) can continue to
+ * require('./decisions') unchanged.
  *
- * Format produced by discuss-phase.md:
+ * Exports (from generated file):
+ *   - parseDecisions(content) — parse <decisions> blocks, returns {id, text, category, tags, trackable}[]
+ *     CJS callers using only {id, text} safely ignore the extra fields.
+ *     Accepts both numeric (D-42) and alphanumeric (D-INFRA-01) IDs.
  *
- *   <decisions>
- *   ## Implementation Decisions
- *
- *   ### Category
- *   - **D-01:** Decision text
- *   - **D-02:** Another decision
- *   </decisions>
- *
- * D-IDs outside the <decisions> block are ignored. Missing block returns [].
+ * Regenerate: cd sdk && npm run gen:decisions
  */
 
-/**
- * Parse the <decisions> section of a CONTEXT.md string.
- *
- * @param {string|null|undefined} contextMd - File contents, may be empty/missing.
- * @returns {Array<{id: string, text: string}>}
- */
-function parseDecisions(contextMd) {
-  if (!contextMd || typeof contextMd !== 'string') return [];
-  const blockMatch = contextMd.match(/<decisions>([\s\S]*?)<\/decisions>/);
-  if (!blockMatch) return [];
-  const block = blockMatch[1];
-
-  const decisionRe = /^\s*-\s*\*\*(D-[A-Za-z0-9_-]+):\*\*\s*(.+?)\s*$/gm;
-  const out = [];
-  const seen = new Set();
-  let m;
-  while ((m = decisionRe.exec(block)) !== null) {
-    const id = m[1];
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push({ id, text: m[2] });
-  }
-  return out;
-}
-
-module.exports = { parseDecisions };
+module.exports = require('./decisions.generated.cjs');

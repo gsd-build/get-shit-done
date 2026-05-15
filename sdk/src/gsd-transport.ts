@@ -69,12 +69,13 @@ export class GSDTransport {
   }
 
   private shouldUseNative(request: TransportRequest, policy: TransportPolicyLike): boolean {
-    const forceSubprocess = Boolean(request.workstream);
-    return !forceSubprocess && policy.preferNative && this.registry.has(request.registryCommand);
+    // Phase 5.0 worker fix: dispatchNative now correctly threads projectDir and
+    // workstream per-request (see worker.ts dispatchNative closure). Workstream
+    // commands no longer need to force subprocess — native dispatch handles them.
+    return policy.preferNative && this.registry.has(request.registryCommand);
   }
 
   private subprocessReason(request: TransportRequest, policy: TransportPolicyLike): TransportDecision['reason'] {
-    if (request.workstream) return 'workstream_forced';
     if (!policy.preferNative) return 'native_not_preferred';
     if (!this.registry.has(request.registryCommand)) return 'native_unregistered';
 

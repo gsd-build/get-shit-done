@@ -1147,7 +1147,12 @@ describe('statePrune current phase extraction (#3471)', () => {
     if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('uses frontmatter progress.completed_phases when body Current Phase field is absent', async () => {
+  it('reads Current Phase from body text (CJS-aligned); frontmatter progress fields are not used', async () => {
+    // Phase 6 alignment: SDK now uses stateExtractField(content, 'Current Phase')
+    // as the primary/only source, matching CJS state.cjs:1615. Frontmatter
+    // progress.completed_phases is no longer consulted.
+    // STATE.md below has progress.completed_phases:12 but no body "Current Phase:"
+    // field → currentPhase = 0 → cutoff = -3 ≤ 0 → "Only 0 phases" (no-op).
     const stateContent = `---
 gsd_state_version: 1.0
 milestone: v1.1
@@ -1171,13 +1176,18 @@ Phase 12 execution in progress.
     const result = await statePrune(['--keep-recent', '3', '--dry-run'], tmpDir);
     const data = result.data as Record<string, unknown>;
 
+    // No body "Current Phase:" field → defaults to 0 → cutoff ≤ 0 → early exit.
     expect(data.pruned).toBe(false);
-    expect(data.dry_run).toBe(true);
-    expect(data.cutoff_phase).toBe(9);
-    expect(data.reason).toBeUndefined();
+    expect(typeof data.reason).toBe('string');
+    expect(String(data.reason)).toContain('Only 0 phases');
+    expect(data.dry_run).toBeUndefined();
+    expect(data.cutoff_phase).toBeUndefined();
   });
 
   it('returns a targeted reason when no current phase source can be parsed', async () => {
+    // Phase 6 alignment: when no body "Current Phase:" field exists, currentPhase
+    // defaults to 0 (like CJS `parseInt(...) || 0`). The reason message matches
+    // CJS: "Only 0 phases — nothing to prune with --keep-recent N".
     const stateContent = `---
 gsd_state_version: 1.0
 milestone: v1.1
@@ -1193,6 +1203,8 @@ status: executing
 
     expect(data.pruned).toBe(false);
     expect(typeof data.reason).toBe('string');
-    expect(String(data.reason)).toContain('Could not determine current phase');
+    // Matches CJS: "Only 0 phases — nothing to prune with --keep-recent 3"
+    expect(String(data.reason)).toContain('Only 0 phases');
+    expect(String(data.reason)).toContain('nothing to prune');
   });
 });

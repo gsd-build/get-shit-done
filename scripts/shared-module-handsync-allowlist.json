@@ -85,64 +85,55 @@
       "ts": "sdk/src/query/workstream-inventory.ts",
       "classification": "cooperating-sibling",
       "justification": "CJS workstream-inventory.cjs is the generated Adapter for the workstream-inventory Shared Module (Phase 3/#3548). SDK workstream-inventory.ts is the source-of-truth query handler. Freshness check enforces alignment."
-    }
-  ],
-  "migrateMeBacklog": [
+    },
     {
       "cjs": "get-shit-done/bin/lib/config.cjs",
       "ts": "sdk/src/config.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Both CJS and SDK maintain independent config loading/merging logic. Candidate for Shared Module extraction (config-defaults.manifest.json + config-schema.manifest.json already exist in sdk/shared/). Root cause of bugs #1535, #2047, #2638, #2653, #2687, #2798, #3055, #3523.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
-    },
-    {
-      "cjs": "get-shit-done/bin/lib/decisions.cjs",
-      "ts": "sdk/src/query/decisions.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Parallel CJS and SDK decision-file reading logic. Candidate for Shared Module extraction.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
+      "classification": "CJS-CLI-ONLY",
+      "justification": "Phase 2 (#3536) already migrated CONFIG_DEFAULTS and loadConfig/mergeDefaults to the Configuration Module and sdk/src/config.ts. What remains in config.cjs is exclusively CLI command handlers (cmdConfigGet, cmdConfigSet, cmdConfigNewProject, cmdConfigEnsureSection, cmdConfigSetModelProfile, cmdConfigPath, cmdMigrateConfig, buildNewProjectConfig, setConfigValue, ensureConfigFile) that depend on CJS-only APIs (withPlanningLock, platformWriteSync/ReadSync/EnsureDir, sync fs ops, process.exit). sdk/src/config.ts provides only the async loadConfig/mergeDefaults SDK layer. The two files serve disjoint surfaces with no logical overlap — not a hand-sync drift anti-pattern."
     },
     {
       "cjs": "get-shit-done/bin/lib/intel.cjs",
       "ts": "sdk/src/query/intel.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Parallel CJS and SDK intel management implementations. Candidate for Shared Module extraction.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
+      "classification": "cooperating-sibling",
+      "justification": "CJS intel.cjs is the synchronous runtime implementation used by gsd-tools.cjs; sdk/src/query/intel.ts is the async QueryHandler port for the SDK query seam (explicitly documented as a port in its file header). The two files intentionally diverge on INTEL_FILES naming (CJS: file-roles.json/api-map.json/dependency-graph.json/arch-decisions.json; SDK: files.json/apis.json/deps.json/arch.md) — existing CJS tests are locked to the old naming. Not a hand-sync drift pattern; separate runtime responsibilities across the seam."
     },
     {
       "cjs": "get-shit-done/bin/lib/model-catalog.cjs",
       "ts": "sdk/src/model-catalog.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: sdk/shared/model-catalog.json is the manifest; both CJS and SDK read it independently. Candidate for unified Shared Module with a single generator and freshness check.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "Both files read from sdk/shared/model-catalog.json (ADR-0003 precedent) as independent consumers of the shared manifest. CJS exposes VALID_AGENT_TIERS, MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT, nextTier, formatAgentToModelMapAsTable for core.cjs and model-profiles.cjs consumers. SDK exposes resolveRuntimeTierDefault, runtimesWithReasoningEffort for session-runner.ts and query handlers. The shared JSON is the single source-of-truth; both adapters derive their exports from it without duplicating any logic between themselves."
     },
     {
       "cjs": "get-shit-done/bin/lib/plan-scan.cjs",
       "ts": "sdk/src/query/plan-scan.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Parallel CJS and SDK plan-scanning implementations. Candidate for Shared Module extraction.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
-    },
-    {
-      "cjs": "get-shit-done/bin/lib/schema-detect.cjs",
-      "ts": "sdk/src/query/schema-detect.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Parallel CJS and SDK schema detection logic. Candidate for Shared Module extraction.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "CJS plan-scan.cjs is the generated Adapter reading from sdk/src/query/plan-scan.ts Shared Module (Phase 6/#3575). SDK plan-scan.ts is the source-of-truth. Freshness check (check-plan-scan-fresh.mjs) enforces alignment."
     },
     {
       "cjs": "get-shit-done/bin/lib/secrets.cjs",
       "ts": "sdk/src/query/secrets.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Parallel CJS and SDK secrets-path resolution. Candidate for Shared Module extraction (high priority — security-sensitive path logic should not diverge).",
-      "trackedIn": "Phase 6 open follow-up — #3524"
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "CJS secrets.cjs is the generated Adapter reading from sdk/src/query/secrets.ts Shared Module (Phase 6/#3575). SDK secrets.ts is the source-of-truth. Freshness check (check-secrets-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/schema-detect.cjs",
+      "ts": "sdk/src/query/schema-detect.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "CJS schema-detect.cjs is the generated Adapter reading from sdk/src/query/schema-detect.ts Shared Module (Phase 6/#3575). SDK schema-detect.ts is the source-of-truth. Generated CJS adds detectSchemaOrm compat export (not in SDK) and exports SCHEMA_PATTERNS/ORM_INFO for backward compatibility. Freshness check (check-schema-detect-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/decisions.cjs",
+      "ts": "sdk/src/query/decisions.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "Phase 6 (#3575): CJS decisions.cjs is the generated Adapter reading from sdk/src/query/decisions.ts Shared Module. SDK source-of-truth; regex aligned to accept alphanumeric IDs (D-INFRA-01). CJS callers (gap-checker.cjs) use {id, text} subset; extra fields {category, tags, trackable} are present but ignored. Freshness check (check-decisions-fresh.mjs) enforces alignment."
     },
     {
       "cjs": "get-shit-done/bin/lib/workstream-name-policy.cjs",
       "ts": "sdk/src/workstream-name-policy.ts",
-      "classification": "drift-anti-pattern",
-      "justification": "MIGRATE_ME: Parallel CJS and SDK workstream naming policy validation. Candidate for Shared Module extraction.",
-      "trackedIn": "Phase 6 open follow-up — #3524"
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "Phase 6 (#3575): CJS workstream-name-policy.cjs is the generated Adapter reading from sdk/src/workstream-name-policy.ts Shared Module. SDK source-of-truth now exports all three functions used by CJS callers (toWorkstreamSlug, hasInvalidPathSegment, isValidActiveWorkstreamName) plus validateWorkstreamName alias. Freshness check (check-workstream-name-policy-fresh.mjs) enforces alignment."
     }
-  ]
+  ],
+  "migrateMeBacklog": []
 }

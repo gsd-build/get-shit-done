@@ -51,9 +51,11 @@ function dispatchViaSdk(registryCommand, registryArgs, legacyArgs, cwd, raw, err
     legacyArgs,
     mode: raw ? 'raw' : 'json',
     projectDir: cwd,
-    // workstream: not threaded here — GSDTransport forces subprocess for workstream
-    // requests and subprocess is disabled in the worker. Workstream commands fall
-    // back to the CJS path (see routeStateCommand guard below).
+    // Phase 6 fix: workstream is now threaded through to the native handler.
+    // GSDTransport no longer forces subprocess for workstream-scoped requests —
+    // the worker's dispatchNative closure correctly passes workstream to
+    // registry.dispatch() (Phase 5.1 fix), enabling native workstream dispatch.
+    workstream: process.env.GSD_WORKSTREAM || undefined,
   });
 
   if (!result.ok) {
@@ -94,12 +96,10 @@ function routeStateCommand({ state, args, cwd, raw, parseNamedArgs, error }) {
     return parsedPlans;
   };
 
-  // Workstream guard: if GSD_WORKSTREAM is set, the sync bridge worker cannot
-  // handle the request (GSDTransport.subprocessReason returns 'workstream_forced'
-  // and subprocess is disabled in the worker). Fall back to CJS path for all
-  // workstream-scoped state commands.
-  const activeWorkstream = process.env.GSD_WORKSTREAM;
-  const sdkAvailable = !activeWorkstream && tryLoadSdk();
+  // Phase 6 fix: workstream commands are now handled natively in the sync bridge
+  // worker. GSDTransport no longer forces subprocess for workstream-scoped requests;
+  // the worker threads workstream through to registry.dispatch() correctly.
+  const sdkAvailable = tryLoadSdk();
 
   // Helper: build SDK-backed handler that falls through to CJS on SDK failure.
   // cjsFallback is called when SDK is unavailable or when the subcommand has no

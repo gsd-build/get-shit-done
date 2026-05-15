@@ -476,16 +476,12 @@ describe('Golden file tests', () => {
     });
 
     it('state.prune dry-run matches gsd-tools.cjs', async () => {
-      // Prune needs a parseable current_phase. Use fresh dirs with a STATE.md
-      // whose frontmatter includes current_phase so both CJS and SDK agree.
-      // CJS extracts current phase from disk-counted phases (result: 0 phases → "Only 0 phases..."),
-      // SDK extracts from frontmatter current_phase field.
-      // Use only 2 keepRecent phases, leaving phases dir empty so CJS reports "Only 0 phases"
-      // and SDK also bails early (current_phase=10, cutoff=7, but no phases to scan → same reason).
-      // Align via a fixture that has current_phase in frontmatter AND no phases on disk.
+      // Both CJS and SDK read `Current Phase` from the STATE.md body text
+      // (CJS: stateExtractField(content, 'Current Phase'), SDK: same).
+      // MINIMAL_STATE has no `Current Phase:` field → both default to 0 →
+      // cutoff = 0 - 3 = -3 ≤ 0 → "Only 0 phases — nothing to prune with --keep-recent 3".
       const gsdDir2 = join(tmpdir(), `gsd-golden-prune-gsd-${Date.now()}`);
       const sdkDir2 = join(tmpdir(), `gsd-golden-prune-sdk-${Date.now()}`);
-      // Minimal state — no phases on disk, prune returns "Only N phases — nothing to prune"
       try {
         await setupMinimalStateProject(gsdDir2);
         await setupMinimalStateProject(sdkDir2);
@@ -493,41 +489,28 @@ describe('Golden file tests', () => {
         const gsdOutput = await captureGsdToolsOutput('state', argv, gsdDir2);
         const registry = createRegistry();
         const sdkResult = await registry.dispatch('state.prune', ['--keep-recent', '3', '--dry-run'], sdkDir2);
-        // Both should return pruned:false. Exact reason may differ (CJS: phase count from disk;
-        // SDK: phase count from frontmatter). Compare just the structural result.
-        const sdkData = sdkResult.data as Record<string, unknown>;
-        const gsdData = gsdOutput as Record<string, unknown>;
-        expect(sdkData.pruned).toBe(false);
-        expect(gsdData.pruned).toBe(false);
-        expect(typeof sdkData.reason).toBe('string');
-        expect(typeof gsdData.reason).toBe('string');
+        // Exact equality — both CJS and SDK now use the same phase extraction logic.
+        expect(sdkResult.data).toEqual(gsdOutput);
       } finally {
         await rm(gsdDir2, { recursive: true, force: true });
         await rm(sdkDir2, { recursive: true, force: true });
       }
     });
 
-    it('state.record-metric matches gsd-tools.cjs (no-metrics-section → divergence documented)', async () => {
-      // Divergence: CJS auto-creates the Performance Metrics section when absent;
-      // SDK returns { recorded: false, reason: '...' }. We test both via fresh dirs
-      // and add a metrics section to align behavior for parity.
+    it('state.record-metric matches gsd-tools.cjs (no-metrics-section → SDK auto-creates like CJS)', async () => {
+      // SDK now auto-creates the ## Performance Metrics section when absent,
+      // matching CJS DWIM behavior. Test with no pre-seeded section to exercise
+      // the auto-create path on both sides.
       const gsdDir2 = join(tmpdir(), `gsd-golden-state-metric-gsd-${Date.now()}`);
       const sdkDir2 = join(tmpdir(), `gsd-golden-state-metric-sdk-${Date.now()}`);
       try {
-        const metricsState = MINIMAL_STATE + [
-          '',
-          '## Performance Metrics',
-          '',
-          '| Phase | Plan | Duration | Notes |',
-          '|-------|------|----------|-------|',
-          '',
-        ].join('\n');
+        // Use MINIMAL_STATE (no metrics section) — both sides should auto-create it.
         await mkdir(join(gsdDir2, '.planning', 'phases'), { recursive: true });
-        await writeFile(join(gsdDir2, '.planning', 'STATE.md'), metricsState, 'utf-8');
+        await writeFile(join(gsdDir2, '.planning', 'STATE.md'), MINIMAL_STATE, 'utf-8');
         await writeFile(join(gsdDir2, '.planning', 'ROADMAP.md'), '# Roadmap\n', 'utf-8');
         await writeFile(join(gsdDir2, '.planning', 'config.json'), '{"model_profile":"balanced"}', 'utf-8');
         await mkdir(join(sdkDir2, '.planning', 'phases'), { recursive: true });
-        await writeFile(join(sdkDir2, '.planning', 'STATE.md'), metricsState, 'utf-8');
+        await writeFile(join(sdkDir2, '.planning', 'STATE.md'), MINIMAL_STATE, 'utf-8');
         await writeFile(join(sdkDir2, '.planning', 'ROADMAP.md'), '# Roadmap\n', 'utf-8');
         await writeFile(join(sdkDir2, '.planning', 'config.json'), '{"model_profile":"balanced"}', 'utf-8');
 
@@ -535,6 +518,7 @@ describe('Golden file tests', () => {
         const gsdOutput = await captureGsdToolsOutput('state', argv, gsdDir2);
         const registry = createRegistry();
         const sdkResult = await registry.dispatch('state.record-metric', ['--phase', '10', '--plan', '1', '--duration', '45m', '--tasks', '12', '--files', '8'], sdkDir2);
+        // Exact equality — SDK now auto-creates Performance Metrics section like CJS.
         expect(sdkResult.data).toEqual(gsdOutput);
       } finally {
         await rm(gsdDir2, { recursive: true, force: true });
@@ -901,6 +885,147 @@ describe('Golden file tests', () => {
       const registry = createRegistry();
       const sdkResult = await registry.dispatch('intel.update', [], REPO_ROOT);
       expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  // ─── Phase 6: verify.* parity tests ────────────────────────────────────────
+
+  describe('verify.references', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const testPhase = '9';
+      const gsdOutput = await captureGsdToolsOutput('verify', ['references', testPhase], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('verify.references', [testPhase], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('verify.commits', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const testPhase = '9';
+      const gsdOutput = await captureGsdToolsOutput('verify', ['commits', testPhase], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('verify.commits', [testPhase], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('verify.artifacts', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const testPhase = '9';
+      const gsdOutput = await captureGsdToolsOutput('verify', ['artifacts', testPhase], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('verify.artifacts', [testPhase], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('verify.key-links', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const testPhase = '9';
+      const gsdOutput = await captureGsdToolsOutput('verify', ['key-links', testPhase], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('verify.key-links', [testPhase], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('verify.schema-drift', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const testPhase = '9';
+      const gsdOutput = await captureGsdToolsOutput('verify', ['schema-drift', testPhase], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('verify.schema-drift', [testPhase], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  describe('verify.codebase-drift', () => {
+    it('SDK JSON matches gsd-tools.cjs', async () => {
+      const gsdOutput = await captureGsdToolsOutput('verify', ['codebase-drift'], REPO_ROOT);
+      const registry = createRegistry();
+      const sdkResult = await registry.dispatch('verify.codebase-drift', [], REPO_ROOT);
+      expect(sdkResult.data).toEqual(gsdOutput);
+    });
+  });
+
+  // ─── Phase 6: roadmap.* parity tests ───────────────────────────────────────
+
+  describe('roadmap.annotate-dependencies', () => {
+    it('roadmap.annotate-dependencies matches gsd-tools.cjs on fixture', async () => {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-roadmap-annotate-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-roadmap-annotate-sdk-${suffix}`);
+      try {
+        await setupPhasesFixture(gsdDir);
+        await setupPhasesFixture(sdkDir);
+        const gsdOutput = await captureGsdToolsOutput('roadmap', ['annotate-dependencies', '10'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('roadmap.annotate-dependencies', ['10'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  // ─── Phase 6: phase.* parity tests ────────────────────────────────────────
+
+  describe('phase.next-decimal', () => {
+    it('phase.next-decimal matches gsd-tools.cjs on fixture', async () => {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-phase-nd-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-phase-nd-sdk-${suffix}`);
+      try {
+        await setupMinimalStateProject(gsdDir);
+        await setupMinimalStateProject(sdkDir);
+        const gsdOutput = await captureGsdToolsOutput('phase', ['next-decimal', '10'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phase.next-decimal', ['10'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('phase.remove and phase.complete', () => {
+    it('phase.remove matches gsd-tools.cjs on fixture', async () => {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-phase-rm-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-phase-rm-sdk-${suffix}`);
+      try {
+        await setupPhasesFixture(gsdDir);
+        await setupPhasesFixture(sdkDir);
+        // Both remove phase 11 (complete in fixture, safe to remove with --force)
+        const gsdOutput = await captureGsdToolsOutput('phase', ['remove', '11', '--force'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phase.remove', ['11', '--force'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
+    });
+
+    it('phase.complete matches gsd-tools.cjs on fixture', async () => {
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const gsdDir = join(tmpdir(), `gsd-golden-phase-complete-gsd-${suffix}`);
+      const sdkDir = join(tmpdir(), `gsd-golden-phase-complete-sdk-${suffix}`);
+      try {
+        await setupPhasesFixture(gsdDir);
+        await setupPhasesFixture(sdkDir);
+        // Both complete phase 10 (which is in the fixture ROADMAP)
+        const gsdOutput = await captureGsdToolsOutput('phase', ['complete', '10'], gsdDir);
+        const registry = createRegistry();
+        const sdkResult = await registry.dispatch('phase.complete', ['10'], sdkDir);
+        expect(sdkResult.data).toEqual(gsdOutput);
+      } finally {
+        await rm(gsdDir, { recursive: true, force: true });
+        await rm(sdkDir, { recursive: true, force: true });
+      }
     });
   });
 });

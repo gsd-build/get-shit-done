@@ -126,6 +126,31 @@ jobs:
         shell: bash
         run: node sdk/scripts/check-project-root-fresh.mjs
 
+      - name: SDK generated plan-scan artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-plan-scan-fresh.mjs
+
+      - name: SDK generated secrets artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-secrets-fresh.mjs
+
+      - name: SDK generated schema-detect artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-schema-detect-fresh.mjs
+
+      - name: SDK generated decisions artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-decisions-fresh.mjs
+
+      - name: SDK generated workstream-name-policy artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-workstream-name-policy-fresh.mjs
+
       - name: Shared Module hand-sync drift check
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
         shell: bash

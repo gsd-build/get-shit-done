@@ -205,7 +205,10 @@ describe('GSDTransport', () => {
     expect(result).toBe('');
     expect(adapters.execSubprocessRaw).not.toHaveBeenCalled();
   });
-  it('forces subprocess when workstream present', async () => {
+  it('routes natively when workstream present (Phase 6 fix)', async () => {
+    // Phase 6 fix: GSDTransport no longer forces subprocess for workstream-scoped
+    // requests. The per-request dispatchNative closure (Phase 5.1) correctly
+    // threads workstream to registry.dispatch(), so native dispatch is used.
     const registry = new QueryRegistry();
     registry.register('state.load', async () => ({ data: { ok: true } }));
 
@@ -229,9 +232,10 @@ describe('GSDTransport', () => {
       allowFallbackToSubprocess: true,
     });
 
-    expect(result).toEqual({ ok: 'ws-subprocess' });
-    expect(adapters.dispatchNative).not.toHaveBeenCalled();
-    expect(adapters.execSubprocessJson).toHaveBeenCalledOnce();
+    // Native dispatch is used — subprocess is NOT called.
+    expect(result).toEqual({ ok: true });
+    expect(adapters.dispatchNative).toHaveBeenCalledOnce();
+    expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
   });
 
   it('fails when command is unregistered and subprocess fallback is disabled', async () => {
@@ -260,7 +264,9 @@ describe('GSDTransport', () => {
     expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
   });
 
-  it('forces raw subprocess path when workstream present and mode is raw', async () => {
+  it('routes natively when workstream present and mode is raw (Phase 6 fix)', async () => {
+    // Phase 6 fix: workstream no longer forces subprocess. Native dispatch is used
+    // even in raw mode — formatNativeRaw (if set) handles the output projection.
     const registry = new QueryRegistry();
     registry.register('commit', async () => ({ data: { hash: 'abc' } }));
 
@@ -284,9 +290,10 @@ describe('GSDTransport', () => {
       allowFallbackToSubprocess: true,
     });
 
-    expect(result).toBe('raw-subprocess');
-    expect(adapters.dispatchNative).not.toHaveBeenCalled();
-    expect(adapters.execSubprocessRaw).toHaveBeenCalledOnce();
+    // Native dispatch is used — toRaw serializes data to JSON.
+    expect(typeof result).toBe('string');
+    expect(adapters.dispatchNative).toHaveBeenCalledOnce();
+    expect(adapters.execSubprocessRaw).not.toHaveBeenCalled();
     expect(adapters.execSubprocessJson).not.toHaveBeenCalled();
   });
 });

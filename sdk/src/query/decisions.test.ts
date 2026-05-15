@@ -97,9 +97,12 @@ describe('parseDecisions (#2492)', () => {
   });
 
   it('does not crash on malformed bullet lines', () => {
+    // Phase 6 (#3575): regex now accepts alphanumeric IDs (D-[A-Za-z0-9_-]+).
+    // D-bogus IS now valid (pure alpha segment); only truly malformed patterns
+    // (no D- prefix, wrong bullet syntax) are rejected.
     const malformed = `<decisions>
 - not a decision (no D-NN)
-- **D-bogus:** wrong id format
+- **D-bogus:** alphanumeric id — now accepted since Phase 6
 - **D-7:** single digit allowed
 - **D-10:** ten
 </decisions>`;
@@ -107,7 +110,10 @@ describe('parseDecisions (#2492)', () => {
     const ids = decisions.map((d) => d.id);
     expect(ids).toContain('D-7');
     expect(ids).toContain('D-10');
-    expect(ids).not.toContain('D-bogus');
+    // D-bogus IS now accepted — alphanumeric IDs are valid since Phase 6 (#3575)
+    expect(ids).toContain('D-bogus');
+    // Pure non-bullet text is still not parsed as a decision
+    expect(ids).not.toContain('D-NN');
   });
 
   it('preserves multi-line decision text continuations', () => {

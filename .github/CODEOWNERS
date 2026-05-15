@@ -17,3 +17,5 @@
 /sdk/src/query/query-runtime-bridge.ts            @glittercowboy
 /scripts/lint-shared-module-handsync.cjs          @glittercowboy
 /scripts/shared-module-handsync-allowlist.json    @glittercowboy
+/sdk/src/query/decisions.ts                       @glittercowboy
+/sdk/src/workstream-name-policy.ts                @glittercowboy

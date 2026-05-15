@@ -632,13 +632,15 @@ export const stateRecordMetric: QueryHandler = async (args, projectDir, workstre
   }
 
   let recorded = false;
+  let created = false;
   await readModifyWriteStateMd(projectDir, (content) => {
     const metricsPattern = /(##\s*Performance Metrics[\s\S]*?\n\|[^\n]+\n\|[-|\s]+\n)([\s\S]*?)(?=\n##|\n$|$)/i;
     const metricsMatch = content.match(metricsPattern);
 
+    const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks} tasks | ${files} files |`;
+
     if (metricsMatch) {
       let tableBody = metricsMatch[2].trimEnd();
-      const newRow = `| Phase ${phase} P${plan} | ${duration} | ${tasks} tasks | ${files} files |`;
 
       if (tableBody.trim() === '' || tableBody.includes('None yet')) {
         tableBody = newRow;
@@ -648,14 +650,28 @@ export const stateRecordMetric: QueryHandler = async (args, projectDir, workstre
 
       content = content.replace(metricsPattern, (_match, header: string) => `${header}${tableBody}\n`);
       recorded = true;
+    } else {
+      // Section absent — DWIM: auto-create canonical ## Performance Metrics scaffold,
+      // then append the row. Matches CJS state.cjs DWIM behavior.
+      const scaffold = [
+        '',
+        '## Performance Metrics',
+        '',
+        '| Phase | Plan | Duration | Notes |',
+        '|-------|------|----------|-------|',
+        newRow,
+        '',
+      ].join('\n');
+      content = content.trimEnd() + '\n' + scaffold;
+      recorded = true;
+      created = true;
     }
     return content;
   }, workstream);
 
-  if (recorded) {
-    return { data: { recorded: true, phase, plan, duration } };
-  }
-  return { data: { recorded: false, reason: 'Performance Metrics section not found in STATE.md' } };
+  const result: Record<string, unknown> = { recorded: true, phase, plan, duration };
+  if (created) result.created = true;
+  return { data: result };
 };
 
 /**
@@ -1621,32 +1637,10 @@ export const statePrune: QueryHandler = async (args, projectDir, workstream) => 
   }
 
   const fullContent = await readFile(statePath, 'utf-8');
-  const fm = extractFrontmatter(fullContent);
-  const fmProgress = (typeof fm.progress === 'object' && fm.progress !== null)
-    ? fm.progress as Record<string, unknown>
-    : null;
-  const phaseCandidates: unknown[] = [
-    fm.current_phase,
-    stateExtractField(fullContent, 'Current Phase'),
-    fmProgress?.completed_phases,
-    fmProgress?.total_phases,
-  ];
-  let currentPhase: number | null = null;
-  for (const candidate of phaseCandidates) {
-    const parsed = parseInt(String(candidate ?? '').trim(), 10);
-    if (Number.isInteger(parsed) && parsed > 0) {
-      currentPhase = parsed;
-      break;
-    }
-  }
-  if (currentPhase === null) {
-    return {
-      data: {
-        pruned: false,
-        reason: 'Could not determine current phase from STATE.md. Add **Current Phase:** N, frontmatter current_phase: N, progress.completed_phases, or progress.total_phases.',
-      },
-    };
-  }
+  // Align with CJS state.cjs:1615 — read Current Phase from the body text first,
+  // fall back to 0 (same as CJS `parseInt(..., 10) || 0`).
+  const currentPhaseRaw = stateExtractField(fullContent, 'Current Phase');
+  const currentPhase = parseInt(String(currentPhaseRaw ?? '').trim(), 10) || 0;
   const cutoff = currentPhase - keepRecent;
 
   if (cutoff <= 0) {

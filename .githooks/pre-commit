@@ -20,3 +20,23 @@ fi
 if git diff --cached --name-only | grep -Eq "^sdk/src/project-root/|^get-shit-done/bin/lib/project-root\.generated\.cjs$|^sdk/scripts/gen-project-root\.mjs$|^sdk/scripts/check-project-root-fresh\.mjs$"; then
   npm run check:project-root-fresh
 fi
+
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/plan-scan\.ts$|^get-shit-done/bin/lib/plan-scan\.generated\.cjs$|^sdk/scripts/gen-plan-scan\.mjs$|^sdk/scripts/check-plan-scan-fresh\.mjs$"; then
+  npm run check:plan-scan-fresh
+fi
+
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/secrets\.ts$|^get-shit-done/bin/lib/secrets\.generated\.cjs$|^sdk/scripts/gen-secrets\.mjs$|^sdk/scripts/check-secrets-fresh\.mjs$"; then
+  npm run check:secrets-fresh
+fi
+
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/schema-detect\.ts$|^get-shit-done/bin/lib/schema-detect\.generated\.cjs$|^sdk/scripts/gen-schema-detect\.mjs$|^sdk/scripts/check-schema-detect-fresh\.mjs$"; then
+  npm run check:schema-detect-fresh
+fi
+
+if git diff --cached --name-only | grep -Eq "^sdk/src/query/decisions\.ts$|^get-shit-done/bin/lib/decisions\.generated\.cjs$|^sdk/scripts/gen-decisions\.mjs$|^sdk/scripts/check-decisions-fresh\.mjs$"; then
+  npm run check:decisions-fresh
+fi
+
+if git diff --cached --name-only | grep -Eq "^sdk/src/workstream-name-policy\.ts$|^get-shit-done/bin/lib/workstream-name-policy\.generated\.cjs$|^sdk/scripts/gen-workstream-name-policy\.mjs$|^sdk/scripts/check-workstream-name-policy-fresh\.mjs$"; then
+  npm run check:workstream-name-policy-fresh
+fi

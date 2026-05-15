@@ -199,6 +199,67 @@ const { routePhasesCommand } = require('./lib/phases-command-router.cjs');
 const { routeValidateCommand } = require('./lib/validate-command-router.cjs');
 const { routeRoadmapCommand } = require('./lib/roadmap-command-router.cjs');
 
+// ─── SDK bridge (Phase 6 inline family / non-family delegation) ───────────────
+// For inline case blocks that have SDK counterparts (frontmatter, config, and
+// non-family commands), we attempt to dispatch via executeForCjs (the sync
+// bridge). CJS handlers are retained as fallback when SDK is unavailable.
+//
+// NOTE: migrate-config, detect-custom-files, config-path, and find-phase
+// are CJS-native special cases; see comments inline.
+
+let _gsdToolsExecuteForCjs = null;
+
+function _tryLoadSdkBridge() {
+  if (_gsdToolsExecuteForCjs !== null) return true;
+  try {
+    const bridgeModule = require('@gsd-build/sdk/dist/runtime-bridge-sync/index.js');
+    _gsdToolsExecuteForCjs = bridgeModule.executeForCjs;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Attempt SDK dispatch for a non-family command.
+ *
+ * Returns true when the SDK was available and handled the command (success or
+ * typed error). Returns false when the SDK is unavailable, signalling the
+ * caller to fall through to the CJS handler.
+ *
+ * @param {object} opts
+ * @param {string} opts.registryCommand - canonical command name in the SDK registry
+ * @param {string[]} opts.registryArgs - args to pass to the SDK handler
+ * @param {string} opts.legacyCommand - original gsd-tools command name (for error messages)
+ * @param {string[]} opts.legacyArgs - original args (for error messages)
+ * @param {string} opts.cwd - project dir
+ * @param {boolean} opts.raw - raw output mode
+ * @param {Function} opts.error - error reporter
+ * @param {Function} opts.output - output emitter (core.output)
+ */
+function _dispatchNonFamily({ registryCommand, registryArgs, legacyCommand, legacyArgs, cwd, raw, error, output }) {
+  if (!_tryLoadSdkBridge()) return false;
+  const result = _gsdToolsExecuteForCjs({
+    registryCommand,
+    registryArgs,
+    legacyCommand,
+    legacyArgs,
+    mode: raw ? 'raw' : 'json',
+    projectDir: cwd,
+    workstream: process.env.GSD_WORKSTREAM || undefined,
+  });
+  if (!result.ok) {
+    error(
+      result.errorDetails && result.errorDetails.message
+        ? result.errorDetails.message
+        : `${legacyCommand} (${registryCommand}) failed (${result.errorKind})`,
+    );
+    return true; // handled (error reported)
+  }
+  output(result.data, raw);
+  return true;
+}
+
 // ─── Arg parsing helpers ──────────────────────────────────────────────────────
 
 /**
@@ -524,7 +585,19 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     }
 
     case 'find-phase': {
-      phase.cmdFindPhase(cwd, args[1], raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      // SDK handler: findPhase in sdk/src/query/phase.ts.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'find-phase',
+        registryArgs: args.slice(1),
+        legacyCommand: 'find-phase',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) phase.cmdFindPhase(cwd, args[1], raw);
       break;
     }
 
@@ -590,8 +663,31 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     }
 
     case 'frontmatter': {
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      // SDK handler: sdk/src/query/frontmatter.ts + frontmatter-mutation.ts.
+      // CJS fallback: frontmatter.cjs (cooperating sibling).
       const subcommand = args[1];
       const file = args[2];
+      const FRONTMATTER_SDK_MAP = {
+        get: 'frontmatter.get',
+        set: 'frontmatter.set',
+        merge: 'frontmatter.merge',
+        validate: 'frontmatter.validate',
+      };
+      if (subcommand in FRONTMATTER_SDK_MAP) {
+        const handled = _dispatchNonFamily({
+          registryCommand: FRONTMATTER_SDK_MAP[subcommand],
+          registryArgs: args.slice(2),
+          legacyCommand: 'frontmatter',
+          legacyArgs: args.slice(1),
+          cwd,
+          raw,
+          error,
+          output: core.output,
+        });
+        if (handled) break;
+      }
+      // CJS fallback (SDK unavailable or unknown subcommand)
       if (subcommand === 'get') {
         frontmatter.cmdFrontmatterGet(cwd, file, parseNamedArgs(args, ['field']).field, raw);
       } else if (subcommand === 'set') {
@@ -619,12 +715,36 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     }
 
     case 'generate-slug': {
-      commands.cmdGenerateSlug(args[1], raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      // SDK handler: generateSlug in sdk/src/query/utils.ts.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'generate-slug',
+        registryArgs: args.slice(1),
+        legacyCommand: 'generate-slug',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) commands.cmdGenerateSlug(args[1], raw);
       break;
     }
 
     case 'current-timestamp': {
-      commands.cmdCurrentTimestamp(args[1] || 'full', raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      // SDK handler: currentTimestamp in sdk/src/query/utils.ts.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'current-timestamp',
+        registryArgs: args.slice(1),
+        legacyCommand: 'current-timestamp',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) commands.cmdCurrentTimestamp(args[1] || 'full', raw);
       break;
     }
 
@@ -639,38 +759,107 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     }
 
     case 'config-ensure-section': {
-      config.cmdConfigEnsureSection(cwd, raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'config-ensure-section',
+        registryArgs: args.slice(1),
+        legacyCommand: 'config-ensure-section',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) config.cmdConfigEnsureSection(cwd, raw);
       break;
     }
 
     case 'config-set': {
-      config.cmdConfigSet(cwd, args[1], args[2], raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'config-set',
+        registryArgs: args.slice(1),
+        legacyCommand: 'config-set',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) config.cmdConfigSet(cwd, args[1], args[2], raw);
       break;
     }
 
     case "config-set-model-profile": {
-      config.cmdConfigSetModelProfile(cwd, args[1], raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'config-set-model-profile',
+        registryArgs: args.slice(1),
+        legacyCommand: 'config-set-model-profile',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) config.cmdConfigSetModelProfile(cwd, args[1], raw);
       break;
     }
 
     case 'config-get': {
-      config.cmdConfigGet(cwd, args[1], raw, defaultValue);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      // The SDK handler supports --default via the registry args (args.slice(1)
+      // contains the key; defaultValue is handled by the SDK via the --default
+      // flag which was already stripped from args and held in defaultValue).
+      // Pass the full original args.slice(1) so the SDK sees the key; the
+      // defaultValue from the flag is in the global defaultValue variable above.
+      // Since the SDK handler reads --default from registryArgs, re-inject it.
+      const configGetSdkArgs = defaultValue !== undefined
+        ? [args[1], '--default', defaultValue]
+        : args.slice(1);
+      const handled = _dispatchNonFamily({
+        registryCommand: 'config-get',
+        registryArgs: configGetSdkArgs,
+        legacyCommand: 'config-get',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) config.cmdConfigGet(cwd, args[1], raw, defaultValue);
       break;
     }
 
     case 'config-new-project': {
-      config.cmdConfigNewProject(cwd, args[1], raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'config-new-project',
+        registryArgs: args.slice(1),
+        legacyCommand: 'config-new-project',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) config.cmdConfigNewProject(cwd, args[1], raw);
       break;
     }
 
     case 'config-path': {
+      // CJS-native: config-path returns the filesystem path to config.json.
+      // The SDK handler (configPath) also exists but requires a projectDir that
+      // is already resolved. Both produce identical output; keeping CJS here is
+      // simpler and avoids sync-bridge overhead for a trivial path lookup.
       config.cmdConfigPath(cwd, raw);
       break;
     }
 
     case 'migrate-config': {
-      // Explicit on-disk migration of legacy config keys to canonical shape (#3536).
-      // Wraps Configuration Module migrateOnDisk(); idempotent. async — must await.
+      // CJS-native: migrate-config wraps the Configuration Module migrateOnDisk()
+      // which is async and mutates the filesystem. No SDK counterpart exists in
+      // the command registry (it's a one-shot migration utility). Must await.
       await config.cmdMigrateConfig(cwd, raw);
       break;
     }
@@ -1077,7 +1266,19 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     // ─── Documentation ────────────────────────────────────────────────────
 
     case 'docs-init': {
-      docs.cmdDocsInit(cwd, raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs when available.
+      // SDK handler: docsInit in sdk/src/query/docs-init.ts.
+      const handled = _dispatchNonFamily({
+        registryCommand: 'docs-init',
+        registryArgs: args.slice(1),
+        legacyCommand: 'docs-init',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) docs.cmdDocsInit(cwd, raw);
       break;
     }
 
@@ -1110,6 +1311,11 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     }
 
     // ─── detect-custom-files ───────────────────────────────────────────────
+    // CJS-native: no SDK counterpart exists in the command registry.
+    // detect-custom-files reads a gsd-file-manifest.json against the
+    // live filesystem to identify user-added files. It is installer-specific
+    // logic that has no async query equivalent in the SDK.
+    //
     // Detect user-added files inside GSD-managed directories that are not
     // tracked in gsd-file-manifest.json. Used by the update workflow to back
     // up custom files before the installer wipes those directories.

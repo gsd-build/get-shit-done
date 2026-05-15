@@ -118,19 +118,17 @@ describe('executeForCjs projectDir regression (Phase 5.0 bug)', () => {
     expect(String(data.error)).toMatch(/STATE\.md not found/i);
   });
 
-  it('workstream transport contract: GSDTransport forces subprocess for workstream requests (subprocess disabled in worker → ok:false)', () => {
-    // This test documents an architectural constraint, not a bug.
+  it('workstream support: GSDTransport routes workstream requests natively (Phase 6 fix)', () => {
+    // Phase 6 fix: GSDTransport no longer forces subprocess for workstream-scoped
+    // requests. The worker's dispatchNative closure (Phase 5.1 fix) correctly
+    // threads request.workstream through to registry.dispatch(), so native handlers
+    // route to the workstream-scoped .planning/workstreams/<ws>/ directory.
     //
-    // GSDTransport.subprocessReason() returns 'workstream_forced' when
-    // request.workstream is set (gsd-transport.ts line ~72). The worker has
-    // subprocess disabled (allowFallbackToSubprocess=false), so a workstream
-    // request always surfaces as ok:false / internal_error.
-    //
-    // This is the expected contract for the sync bridge worker: workstream
-    // scoped commands cannot run natively in the worker and must be invoked
-    // via the async bridge or gsd-tools.cjs subprocess fallback instead.
-    //
-    // This test is here to document + pin the behavior, not to assert a fix.
+    // The workstream 'some-workstream' has no separate STATE.md in tmpDir/
+    // .planning/workstreams/some-workstream/, so the handler returns a domain-level
+    // "not found" error (ok:true with {error:...}) — exactly like the nonexistent
+    // projectDir case. This confirms native dispatch was used (subprocess would
+    // have returned ok:false / errorKind).
     const result = executeForCjs({
       registryCommand: 'state.json',
       registryArgs: [],
@@ -141,11 +139,12 @@ describe('executeForCjs projectDir regression (Phase 5.0 bug)', () => {
       workstream: 'some-workstream',
     });
 
-    // Workstream forces subprocess; subprocess disabled → ok:false.
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    // The error surfaces as internal_error because 'Subprocess fallback disabled'
-    // does not match the unknown_command classifier pattern.
-    expect(['internal_error', 'unknown_command']).toContain(result.errorKind);
+    // Native dispatch used → ok:true (handler-level not-found, not a dispatch error).
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as Record<string, unknown>;
+    // Domain-level not-found: workstream's STATE.md doesn't exist in the fixture.
+    expect(data).toHaveProperty('error');
+    expect(String(data.error)).toMatch(/STATE\.md not found/i);
   });
 });
