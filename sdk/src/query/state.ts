@@ -32,6 +32,7 @@ import {
   stateExtractField,
 } from './state-document.js';
 import { getMilestoneInfo, extractCurrentMilestone } from './roadmap.js';
+import { scanPhasePlans } from './plan-scan.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
@@ -163,12 +164,14 @@ export async function buildStateFrontmatter(
     let diskCompletedPhases = 0;
 
     for (const dir of phaseDirs) {
-      const files = await readdir(join(phasesDir, dir));
-      const plans = files.filter(f => /-PLAN\.md$/i.test(f)).length;
-      const summaries = files.filter(f => /-SUMMARY\.md$/i.test(f)).length;
-      diskTotalPlans += plans;
-      diskTotalSummaries += summaries;
-      if (plans > 0 && summaries >= plans) diskCompletedPhases++;
+      // Bug #3257 parity: route through scanPhasePlans so nested plans/
+      // subdirectories (the planner default layout) get counted. The naive
+      // top-level `-PLAN.md` filter undercounts every phase that uses the
+      // canonical `phases/NN-name/plans/<NN>-PLAN-MM-slug.md` shape.
+      const { planCount, summaryCount, completed } = scanPhasePlans(join(phasesDir, dir));
+      diskTotalPlans += planCount;
+      diskTotalSummaries += summaryCount;
+      if (completed) diskCompletedPhases++;
     }
 
     totalPhases = isDirInMilestone.phaseCount > 0

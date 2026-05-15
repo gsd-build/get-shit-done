@@ -35,7 +35,8 @@ import {
   normalizeMd,
 } from './helpers.js';
 import { buildStateFrontmatter, getMilestonePhaseFilter } from './state.js';
-import { stateExtractField, stateReplaceField, stateReplaceFieldWithFallback } from './state-document.js';
+import { scanPhasePlans } from './plan-scan.js';
+import { stateExtractField, stateReplaceField, stateReplaceFieldWithFallback, computeProgressPercent } from './state-document.js';
 import type { QueryHandler } from './utils.js';
 
 const PROGRESS_FRONTMATTER_FIELDS = new Set(['Progress', 'Total Plans in Phase', 'Total Phases']);
@@ -1438,8 +1439,10 @@ export const stateValidate: QueryHandler = async (_args, projectDir, workstream)
       if (phaseDir) {
         const phaseDirPath = join(phasesDir, phaseDir.name);
         const files = readdirSync(phaseDirPath);
-        const diskPlans = files.filter(f => /-PLAN\.md$/i.test(f)).length;
-        const diskSummaries = files.filter(f => /-SUMMARY\.md$/i.test(f)).length;
+        // Bug #3257 parity: count nested plans/ subdirectory via scanPhasePlans
+        // so /executing/i status checks below see the full plan count
+        // regardless of whether the planner used the flat or nested layout.
+        const { planCount: diskPlans, summaryCount: diskSummaries } = scanPhasePlans(phaseDirPath);
 
         if (totalPlansInPhase !== null && diskPlans !== totalPlansInPhase) {
           warnings.push(
@@ -1510,16 +1513,20 @@ export const stateSync: QueryHandler = async (args, projectDir, workstream) => {
 
   let totalDiskPlans = 0;
   let totalDiskSummaries = 0;
+  let diskCompletedPhases = 0;
   let highestIncompletePhase: string | null = null;
   let highestIncompletePhaseplanCount = 0;
 
   for (const dir of entries) {
     const dirPath = join(phasesDir, dir);
-    const files = readdirSync(dirPath);
-    const plans = files.filter(f => /-PLAN\.md$/i.test(f)).length;
-    const summaries = files.filter(f => /-SUMMARY\.md$/i.test(f)).length;
+    // Bug #3257 parity: scanPhasePlans handles nested plans/ subdirectories
+    // and the extended filename forms (e.g. 5-PLAN-01-setup.md). Without
+    // this, state.sync sees 0 plans for canonical nested layouts and emits
+    // bogus "Total Plans in Phase 0 -> 0" sync updates.
+    const { planCount: plans, summaryCount: summaries, completed } = scanPhasePlans(dirPath);
     totalDiskPlans += plans;
     totalDiskSummaries += summaries;
+    if (completed) diskCompletedPhases++;
 
     const phaseMatch = dir.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
     if (phaseMatch && plans > 0 && summaries < plans) {
@@ -1527,6 +1534,12 @@ export const stateSync: QueryHandler = async (args, projectDir, workstream) => {
       highestIncompletePhaseplanCount = plans;
     }
   }
+
+  // CJS parity: total_phases for the percent calculation is the count of
+  // phase directories in the active milestone (or the actual count on disk
+  // if no milestone filter is configured). Required so the phase-fraction
+  // cap in computeProgressPercent (#3242 Bug B) sees the right denominator.
+  const syncTotalPhases = entries.length;
 
   const runModifier = (modified: string): string => {
     let m = modified;
@@ -1539,7 +1552,17 @@ export const stateSync: QueryHandler = async (args, projectDir, workstream) => {
       }
     }
 
-    const percent = totalDiskPlans > 0 ? Math.min(100, Math.round((totalDiskSummaries / totalDiskPlans) * 100)) : 0;
+    // Use min(plan_fraction, phase_fraction) so ROADMAP-declared-but-
+    // unrealized future phases cap the reported percent (CJS bug #3242 Bug B
+    // parity). Fall back to 0 when computeProgressPercent returns null
+    // (totalDiskPlans === 0 case).
+    const computedPercent = computeProgressPercent(
+      totalDiskSummaries,
+      totalDiskPlans,
+      diskCompletedPhases,
+      syncTotalPhases,
+    );
+    const percent = computedPercent !== null ? computedPercent : 0;
     const currentProgress = stateExtractField(m, 'Progress');
     if (currentProgress) {
       const currentPercent = parseInt(currentProgress.replace(/[^\d]/g, ''), 10);
