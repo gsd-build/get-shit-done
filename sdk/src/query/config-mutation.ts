@@ -294,6 +294,23 @@ export const configSet: QueryHandler = async (args, projectDir, workstream) => {
     validateShipPrBodySections(parsedValue);
   }
 
+  // CJS parity (config.cjs:430-441): boolean-only keys must reject non-boolean
+  // input.  Without this, `config-set git.create_tag maybe` silently writes
+  // "maybe" to disk under SDK dispatch even though the CJS path correctly
+  // rejects it.  Bug #3086.
+  if (keyPath === 'workflow.post_planning_gaps' && typeof parsedValue !== 'boolean') {
+    throw new GSDError(
+      `Invalid workflow.post_planning_gaps '${rawValue}'. Must be a boolean (true or false).`,
+      ErrorClassification.Validation,
+    );
+  }
+  if (keyPath === 'git.create_tag' && typeof parsedValue !== 'boolean') {
+    throw new GSDError(
+      `Invalid git.create_tag '${rawValue}'. Must be a boolean (true or false).`,
+      ErrorClassification.Validation,
+    );
+  }
+
   // D6: Lock protection for read-modify-write (match CJS config.cjs:296)
   const paths = planningPaths(projectDir, workstream);
   const lockPath = await acquireStateLock(paths.config);
