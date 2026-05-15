@@ -237,4 +237,4 @@ Phase 5 specifically preserves the in-process model: `QueryRuntimeBridge.execute
 
 ## Done when
 
-#3524 is closed when all six phases have shipped, each with its own merged PR closing its own phase issue, and the Phase 6 retrospective confirms every historical drift bug from the recurring list would have been blocked by one of the five enforcement layers (handsync lint, freshness check, manifest data isolation, per-Module drift lint, runtime-bridge delegation).
+`#3524` is closed when all six phases have shipped, each with its own merged PR closing its own phase issue, and the Phase 6 retrospective confirms every historical drift bug from the recurring list would have been blocked by one of the five enforcement layers (handsync lint, freshness check, manifest data isolation, per-Module drift lint, runtime-bridge delegation).
