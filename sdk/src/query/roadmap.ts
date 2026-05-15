@@ -309,6 +309,15 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
     const matchedVersion = m[1];
     // Skip headings that reference the same version (e.g. "## v2.0 Phase Details").
     if (matchedVersion && currentVersionStr && matchedVersion === currentVersionStr) continue;
+    // Bug #2787: skip "heading-like" lines that sit inside a fenced code
+    // block.  GFM fences toggle on a line starting with ``` or ~~~ (with
+    // optional info string); the closing fence must be the same char with
+    // no info string.  Walk forward from the start of restContent up to
+    // the match index, toggling fenceChar.  If we're inside a fence at the
+    // match, ignore this match and continue scanning.  Without this, a
+    // line like `# Ops runbook — v1.0 compat` inside ```bash truncates the
+    // milestone slice and hides every phase that follows.
+    if (isInsideFencedCodeBlock(restContent, m.index)) continue;
     sectionEnd = sectionStart + sectionMatch[0].length + m.index;
     break;
   }
@@ -364,6 +373,46 @@ export async function extractCurrentMilestone(content: string, projectDir: strin
   // generic Phase Details block discovered above (#3493) so detail-section
   // lookups for the active milestone succeed.
   return content.slice(sectionStart, sectionEnd) + phaseDetailsTail;
+}
+
+/**
+ * Return true when `offset` falls inside an open GFM fenced code block
+ * within the provided `content`.
+ *
+ * GFM fence semantics (bug #2787):
+ *   - Opening fence: a line starting with at least 3 backticks or 3 tildes,
+ *     optionally followed by an info string (e.g. ```bash, ~~~markdown).
+ *   - Closing fence: a line starting with at least 3 of the SAME char as
+ *     the opener, with NO info string — so ```js inside an open ```text
+ *     fence does NOT close it.
+ *
+ * We walk lines from the start of `content` to `offset`, toggling a
+ * `fenceChar` cursor on each fence boundary.  Returns true when the
+ * cursor is non-null at `offset`.
+ */
+function isInsideFencedCodeBlock(content: string, offset: number): boolean {
+  let fenceChar: '`' | '~' | null = null;
+  let lineStart = 0;
+  for (let i = 0; i <= offset; i++) {
+    if (i === content.length || content[i] === '\n') {
+      const line = content.slice(lineStart, i);
+      const openMatch = line.match(/^(`{3,}|~{3,})(\s*)([^\n]*)$/);
+      if (openMatch) {
+        const fenceRun = openMatch[1]!;
+        const ch = fenceRun[0] === '`' ? '`' : '~';
+        const info = openMatch[3]!.trim();
+        if (fenceChar === null) {
+          // Opening fence — info string allowed.
+          fenceChar = ch;
+        } else if (ch === fenceChar && info.length === 0) {
+          // Closing fence must match opener and carry no info string.
+          fenceChar = null;
+        }
+      }
+      lineStart = i + 1;
+    }
+  }
+  return fenceChar !== null;
 }
 
 // ─── Next-milestone helpers (issue #2497) ─────────────────────────────────

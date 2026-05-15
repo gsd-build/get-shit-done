@@ -642,16 +642,13 @@ export const initManager: QueryHandler = async (_args, projectDir, workstream) =
     }
   }
 
-  // Sliding window: only first undiscussed phase is available to discuss
-  let foundNextToDiscuss = false;
+  // Bug #2268: mark EVERY undiscussed phase as is_next_to_discuss, not just
+  // the first one.  Multiple independent phases can be discussed in parallel
+  // — the sliding-window pattern made the manager only recommend one
+  // discuss action even when callers had free capacity to discuss several.
   for (const phase of phases) {
     const status = phase.disk_status as string;
-    if (!foundNextToDiscuss && (status === 'empty' || status === 'no_directory')) {
-      phase.is_next_to_discuss = true;
-      foundNextToDiscuss = true;
-    } else {
-      phase.is_next_to_discuss = false;
-    }
+    phase.is_next_to_discuss = (status === 'empty' || status === 'no_directory');
   }
 
   // Check WAITING.json signal

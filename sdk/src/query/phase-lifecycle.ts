@@ -1285,12 +1285,15 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
         const sectionText = phaseSectionMatch ? phaseSectionMatch[1] : '';
         const reqMatch = sectionText.match(/\*\*Requirements\*?\*?:?\s*([^\n]+)/i);
 
+        let reqContent = await readFile(reqPath, 'utf-8');
+        let reqContentChanged = false;
+
         if (reqMatch) {
           const reqIds = reqMatch[1].replace(/[[\]]/g, '').split(/[,\s]+/).map(r => r.trim()).filter(Boolean);
-          let reqContent = await readFile(reqPath, 'utf-8');
 
           for (const reqId of reqIds) {
             const reqEscaped = escapeRegex(reqId);
+            const before = reqContent;
             // Update checkbox: - [ ] **REQ-ID** -> - [x] **REQ-ID**
             reqContent = reqContent.replace(
               new RegExp(`(-\\s*\\[)[ ](\\]\\s*\\*\\*${reqEscaped}\\*\\*)`, 'gi'),
@@ -1301,8 +1304,42 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
               new RegExp(`(\\|\\s*${reqEscaped}\\s*\\|[^|]+\\|)\\s*(?:Pending|In Progress)\\s*(\\|)`, 'gi'),
               '$1 Complete $2',
             );
+            if (reqContent !== before) reqContentChanged = true;
           }
+        }
 
+        // Bug #2526 parity (phase.cjs:1140-1167): independent of whether the
+        // roadmap declared a Requirements: line, scan the REQUIREMENTS.md
+        // body for `**REQ-ID**` references and compare against the IDs that
+        // actually appear in the Traceability table.  Surface every body
+        // ID that has no traceability row so the operator can keep the
+        // table in sync.
+        const bodyReqIds: string[] = [];
+        const bodyReqPattern = /\*\*([A-Z][A-Z0-9]*-\d+)\*\*/g;
+        let bodyMatch: RegExpExecArray | null;
+        while ((bodyMatch = bodyReqPattern.exec(reqContent)) !== null) {
+          if (!bodyReqIds.includes(bodyMatch[1]!)) bodyReqIds.push(bodyMatch[1]!);
+        }
+
+        const traceabilityHeadingMatch = reqContent.match(/^#{1,6}\s+Traceability\b/im);
+        const traceabilitySection = traceabilityHeadingMatch
+          ? reqContent.slice(traceabilityHeadingMatch.index!)
+          : '';
+        const tableReqIds = new Set<string>();
+        const tableRowPattern = /^\|\s*([A-Z][A-Z0-9]*-\d+)\s*\|/gm;
+        let tableMatch: RegExpExecArray | null;
+        while ((tableMatch = tableRowPattern.exec(traceabilitySection)) !== null) {
+          tableReqIds.add(tableMatch[1]!);
+        }
+
+        const unregistered = bodyReqIds.filter((id) => !tableReqIds.has(id));
+        if (unregistered.length > 0) {
+          warnings.push(
+            `REQUIREMENTS.md: ${unregistered.length} REQ-ID(s) found in body but missing from Traceability table: ${unregistered.join(', ')} — add them manually to keep traceability in sync`,
+          );
+        }
+
+        if (reqContentChanged) {
           await writeFile(reqPath, reqContent, 'utf-8');
           requirementsUpdated = true;
         }
