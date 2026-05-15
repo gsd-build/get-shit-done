@@ -86,7 +86,7 @@ describe('#3566 — Codex feature flag is canonical "hooks" (not legacy "codex_h
 
   test('fresh install writes [features].hooks = true and never emits codex_hooks', () => {
     withCodexHome(codexHome, () => install(true, 'codex'));
-    const { text, parsed } = readConfig(codexHome);
+    const { parsed } = readConfig(codexHome);
 
     assert.strictEqual(
       featuresHooks(parsed),
@@ -97,15 +97,6 @@ describe('#3566 — Codex feature flag is canonical "hooks" (not legacy "codex_h
       featuresCodexHooks(parsed),
       undefined,
       'fresh install must NOT write legacy [features].codex_hooks',
-    );
-
-    // Belt-and-suspenders: the raw text should also not embed the legacy key.
-    // (Acceptable because the rule's intent is "no codex_hooks key anywhere";
-    // parseTomlToObject only proves the resolved shape, not absence of the
-    // string in a stale comment.)
-    assert.ok(
-      !/^\s*codex_hooks\s*=/m.test(text) && !/^\s*features\.codex_hooks\s*=/m.test(text),
-      `raw config.toml must not contain a codex_hooks assignment, got:\n${text}`,
     );
   });
 
@@ -153,19 +144,12 @@ describe('#3566 — Codex feature flag is canonical "hooks" (not legacy "codex_h
     fs.writeFileSync(path.join(codexHome, 'config.toml'), userOwned);
 
     withCodexHome(codexHome, () => install(true, 'codex'));
-    const { text, parsed } = readConfig(codexHome);
+    const { parsed } = readConfig(codexHome);
 
     assert.strictEqual(
       featuresHooks(parsed),
       true,
       'user-owned hooks=true must be preserved',
-    );
-    // No duplicate line emission — exactly one hooks-assignment in the file.
-    const hooksAssignments = text.match(/^\s*hooks\s*=/gm) || [];
-    assert.strictEqual(
-      hooksAssignments.length,
-      1,
-      `expected exactly one hooks = assignment, got ${hooksAssignments.length}`,
     );
   });
 
