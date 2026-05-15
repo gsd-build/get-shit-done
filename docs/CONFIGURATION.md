@@ -1090,6 +1090,7 @@ This resolves `gsd-planner` → `gpt-5.4` (xhigh), `gsd-executor` → `gpt-5.3-c
 | Variable | Purpose |
 |----------|---------|
 | `CLAUDE_CONFIG_DIR` | Override default config directory (`~/.claude/`) |
+| `GROK_CONFIG_DIR` | Override default config directory (`~/.grok/`) for Grok Build installs |
 | `GEMINI_API_KEY` | Detected by context monitor to switch hook event name |
 | `WSL_DISTRO_NAME` | Detected by installer for WSL path handling |
 | `GSD_SKIP_SCHEMA_CHECK` | Skip schema drift detection during execute-phase (v1.31) |

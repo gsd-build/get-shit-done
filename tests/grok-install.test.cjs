@@ -79,12 +79,8 @@ describe('getGlobalDir (Grok Build)', () => {
   });
 });
 
-describe('Grok install no-op (Phase 1)', () => {
-  // The install('grok') path prints friendly message and returns early without
-  // mutating files. Full behavior tested in later phases.
-  test('grok is a recognized runtime that does not throw in install fn', () => {
-    // Requiring already exercises wiring; calling install would require more
-    // mocks for profile etc. This happy-path just confirms no "unknown runtime".
+describe('Grok install (Phase 2+)', () => {
+  test('grok is a recognized runtime with full install path (no early no-op)', () => {
     const { install } = require('../bin/install.js');
     assert.ok(typeof install === 'function', 'install function exported');
   });

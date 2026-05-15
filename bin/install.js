@@ -64,6 +64,30 @@ const CODEX_AGENT_SANDBOX = {
   'gsd-integration-checker': 'read-only',
 };
 
+// Grok Build agent permission modes (permission_mode in agent frontmatter).
+// workspace-write: full edit capability; plan: propose but no auto-apply; read-only: inspection only.
+const GROK_AGENT_SANDBOX = {
+  'gsd-executor': 'workspace-write',
+  'gsd-planner': 'workspace-write',
+  'gsd-phase-researcher': 'workspace-write',
+  'gsd-project-researcher': 'workspace-write',
+  'gsd-research-synthesizer': 'workspace-write',
+  'gsd-verifier': 'read-only',
+  'gsd-codebase-mapper': 'workspace-write',
+  'gsd-roadmapper': 'workspace-write',
+  'gsd-debugger': 'workspace-write',
+  'gsd-plan-checker': 'read-only',
+  'gsd-integration-checker': 'read-only',
+  'gsd-code-fixer': 'workspace-write',
+  'gsd-code-reviewer': 'read-only',
+  'gsd-security-auditor': 'read-only',
+  'gsd-ui-checker': 'read-only',
+  'gsd-ui-auditor': 'read-only',
+  'gsd-eval-auditor': 'read-only',
+  'gsd-eval-planner': 'plan',
+  'gsd-debug-session-manager': 'workspace-write',
+};
+
 // Copilot tool name mapping — Claude Code tools to GitHub Copilot tools
 // Tool mapping applies ONLY to agents, NOT to skills (per CONTEXT.md decision)
 const claudeToCopilotTools = {
@@ -2419,6 +2443,70 @@ function convertClaudeAgentToClineAgent(content) {
 }
 
 // ── End Cline converters ─────────────────────────────────────────────────────
+
+// --- Grok Build converters ---
+// Grok uses SKILL.md + agents/*.md with YAML frontmatter featuring:
+// - name (hyphen form gsd-xxx)
+// - description: > (folded block)
+// - metadata: { short-description: "..." } for skills
+// - For agents: prompt_mode, model, permission_mode, agents_md: true
+// Path rewriting (~/.claude → ~/.grok) happens in copy* + agent loop before conversion.
+// Brand: "Claude Code" → "Grok Build"; project rules CLAUDE.md → AGENTS.md in prose.
+
+function convertClaudeToGrokMarkdown(content) {
+  let converted = content;
+  // Keep gsd: in prose for docs consistency (UI surfaces as /gsd:help); dir names use gsd-
+  // No colon→hyphen replace here (unlike Windsurf); frontmatter name uses hyphen from skillName.
+  // Replace tool mentions only if Grok diverges (currently aligns with Claude tools).
+  // Brand substitutions
+  converted = converted.replace(/\bClaude Code\b/g, 'Grok Build');
+  converted = converted.replace(/\bClaude\b(?! [Cc]ode)/g, 'Grok'); // avoid over-replacing "Claude Code"
+  // Project rules file: prefer AGENTS.md for Grok-native experience (Grok reads it first in priority)
+  converted = converted.replace(/`CLAUDE\.md`/g, '`AGENTS.md`');
+  converted = converted.replace(/\bCLAUDE\.md\b/g, 'AGENTS.md');
+  converted = converted.replace(/\.\/CLAUDE\.md/g, './AGENTS.md');
+  // .claude path rewrites are performed by the caller (copy*Skills / agent loop) using runtime pathPrefix
+  // Remove any Claude-specific bug workaround notes that don't apply
+  converted = converted.replace(/\*\*Known Claude Code bug \(classifyHandoffIfNeeded\):\*\*[^\n]*\n/g, '');
+  converted = converted.replace(/- \*\*classifyHandoffIfNeeded false failure:\*\*[^\n]*\n/g, '');
+  return converted;
+}
+
+function convertClaudeCommandToGrokSkill(content, skillName) {
+  const converted = convertClaudeToGrokMarkdown(content);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  let description = `Run GSD workflow ${skillName}.`;
+  if (frontmatter) {
+    const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+    if (maybeDescription) {
+      description = maybeDescription;
+    }
+  }
+  description = toSingleLine(description);
+  const shortDescription = description.length > 180 ? `${description.slice(0, 177)}...` : description;
+
+  // Grok SKILL.md frontmatter: folded description + metadata.short-description
+  // name uses hyphen form (gsd-help) matching dir name gsd-help/
+  return `---\nname: ${yamlIdentifier(skillName)}\ndescription: >\n  ${shortDescription}\nmetadata:\n  short-description: ${yamlQuote(shortDescription)}\n---\n\n${body.trimStart()}`;
+}
+
+function convertClaudeAgentToGrokAgent(content) {
+  let converted = convertClaudeToGrokMarkdown(content);
+
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+  const baseName = name.replace(/\.md$/, '');
+  const permissionMode = GROK_AGENT_SANDBOX[baseName] || 'workspace-write';
+
+  const cleanFrontmatter = `---\nname: ${yamlIdentifier(name)}\ndescription: >\n  ${toSingleLine(description)}\nprompt_mode: full\nmodel: inherit\npermission_mode: ${permissionMode}\nagents_md: true\n---`;
+
+  return `${cleanFrontmatter}\n${body}`;
+}
+
+// --- Codex converters (continued) ---
 
 function convertSlashCommandsToCodexSkillMentions(content) {
   // Convert colon-style skill invocations to Codex $ prefix
@@ -5780,6 +5868,70 @@ function copyCommandsAsTraeSkills(srcDir, skillsDir, prefix, pathPrefix, runtime
 }
 
 /**
+ * Copy Claude commands as Grok Build skills — one folder per skill with SKILL.md.
+ * Grok uses converted frontmatter (name, folded description + metadata.short-description).
+ * Path prefix resolves to ~/.grok/ or ./.grok/ ; reuses same profile staging.
+ */
+function copyCommandsAsGrokSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      const globalClaudeRegex = /~\/\.claude\//g;
+      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
+      const localClaudeRegex = /\.\/\.claude\//g;
+      const bareGlobalClaudeRegex = /~\/\.claude\b/g;
+      const bareGlobalClaudeHomeRegex = /\$HOME\/\.claude\b/g;
+      const bareLocalClaudeRegex = /\.\/\.claude\b/g;
+      const grokDirRegex = /~\/\.grok\//g;
+      const normalizedPathPrefix = pathPrefix.replace(/\/$/, '');
+      content = content.replace(globalClaudeRegex, pathPrefix);
+      content = content.replace(globalClaudeHomeRegex, pathPrefix);
+      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
+      content = content.replace(bareGlobalClaudeRegex, normalizedPathPrefix);
+      content = content.replace(bareGlobalClaudeHomeRegex, normalizedPathPrefix);
+      content = content.replace(bareLocalClaudeRegex, `./${getDirName(runtime)}`);
+      content = content.replace(grokDirRegex, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeCommandToGrokSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+    }
+  }
+
+  recurse(srcDir, prefix);
+}
+
+/**
  * Copy Claude commands as CodeBuddy skills — one folder per skill with SKILL.md.
  * CodeBuddy uses the same tool names as Claude Code, but has its own config directory structure.
  */
@@ -6195,6 +6347,7 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
   const isQwen = runtime === 'qwen';
   const isHermes = runtime === 'hermes';
   const isCline = runtime === 'cline';
+  const isGrok = runtime === 'grok';
   const dirName = getDirName(runtime);
 
   // Clean install: remove existing destination to prevent orphaned files
@@ -6262,6 +6415,9 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       } else if (isTrae) {
         content = convertClaudeToTraeMarkdown(content);
         fs.writeFileSync(destPath, content);
+      } else if (isGrok) {
+        content = convertClaudeToGrokMarkdown(content);
+        fs.writeFileSync(destPath, content);
       } else if (isCline) {
         content = convertClaudeToCliineMarkdown(content);
         fs.writeFileSync(destPath, content);
@@ -6312,6 +6468,11 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       jsContent = jsContent.replace(/\.claude\/skills\//g, '.trae/skills/');
       jsContent = jsContent.replace(/CLAUDE\.md/g, '.trae/rules/');
       jsContent = jsContent.replace(/\bClaude Code\b/g, 'Trae');
+      fs.writeFileSync(destPath, jsContent);
+    } else if (isGrok && (entry.name.endsWith('.cjs') || entry.name.endsWith('.js'))) {
+      let jsContent = fs.readFileSync(srcPath, 'utf8');
+      jsContent = convertClaudeToGrokMarkdown(jsContent);
+      // Grok payload JS: paths mostly runtime-resolved; brand + AGENTS.md fixes applied
       fs.writeFileSync(destPath, jsContent);
     } else if (isCline && (entry.name.endsWith('.cjs') || entry.name.endsWith('.js'))) {
       let jsContent = fs.readFileSync(srcPath, 'utf8');
@@ -6495,6 +6656,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   const isQwen = runtime === 'qwen';
   const isHermes = runtime === 'hermes';
   const isCodebuddy = runtime === 'codebuddy';
+  const isGrok = runtime === 'grok';
   const dirName = getDirName(runtime);
 
   // Get the target directory based on runtime and install type
@@ -6520,6 +6682,7 @@ function uninstall(isGlobal, runtime = 'claude') {
   if (runtime === 'qwen') runtimeLabel = 'Qwen Code';
   if (runtime === 'hermes') runtimeLabel = 'Hermes Agent';
   if (runtime === 'codebuddy') runtimeLabel = 'CodeBuddy';
+  if (runtime === 'grok') runtimeLabel = 'Grok Build';
 
   console.log(`  Uninstalling GSD from ${cyan}${runtimeLabel}${reset} at ${cyan}${locationLabel}${reset}\n`);
 
@@ -6552,8 +6715,8 @@ function uninstall(isGlobal, runtime = 'claude') {
       }
       console.log(`  ${green}✓${reset} Removed GSD commands from command/`);
     }
-  } else if (isCodex || isCursor || isWindsurf || isTrae || isCodebuddy) {
-    // Codex/Cursor/Windsurf/Trae/CodeBuddy: remove skills/gsd-*/SKILL.md skill directories
+  } else if (isCodex || isCursor || isWindsurf || isTrae || isCodebuddy || isGrok) {
+    // Codex/Cursor/Windsurf/Trae/CodeBuddy/Grok: remove skills/gsd-*/SKILL.md skill directories
     const skillsDir = path.join(targetDir, 'skills');
     if (fs.existsSync(skillsDir)) {
       let skillCount = 0;
@@ -7866,14 +8029,6 @@ function install(isGlobal, runtime = 'claude', options = {}) {
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
-  if (isGrok) {
-    console.log(`  ${yellow}⚠ Grok Build native support is not yet fully implemented (Phase 1 — data & minimal runtime only).${reset}`);
-    console.log(`  ${dim}The --grok flag is now recognized and will not crash the installer or SDK.${reset}`);
-    console.log(`  ${dim}Full installer + skill/agent conversion + hooks will land in Phases 2–3. For now, use --claude (Grok reads CLAUDE.md/AGENTS.md and ~/.claude/skills/ as a fallback).${reset}\n`);
-    persistActiveProfileMarker();
-    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
-  }
-
   // Track installation failures
   const failures = [];
   let installerMigrationResult = null;
@@ -8231,6 +8386,16 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     } else {
       failures.push('skills/gsd-*');
     }
+  } else if (isGrok) {
+    const skillsDir = path.join(targetDir, 'skills');
+    const gsdSrc = _stageSkills(_commandsDir);
+    copyCommandsAsGrokSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
+    const installedSkillNames = listCodexSkillNames(skillsDir);
+    if (installedSkillNames.length > 0) {
+      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
+    } else {
+      failures.push('skills/gsd-*');
+    }
   } else if (isQwen) {
     const skillsDir = path.join(targetDir, 'skills');
     const gsdSrc = _stageSkills(_commandsDir);
@@ -8573,6 +8738,8 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = convertClaudeAgentToAugmentAgent(content);
         } else if (isTrae) {
           content = convertClaudeAgentToTraeAgent(content);
+        } else if (isGrok) {
+          content = convertClaudeAgentToGrokAgent(content);
         } else if (isCodebuddy) {
           content = convertClaudeAgentToCodebuddyAgent(content);
         } else if (isCline) {
@@ -9138,6 +9305,13 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
   }
 
+  if (isGrok) {
+    // Grok Build: skills/ + agents/ + hooks/*.json manifests (no settings.json; hooks via JSON)
+    // Hook JS files are copied by the shared hooks/ path (Grok not in the skip list).
+    persistActiveProfileMarker();
+    return { settingsPath: null, settings: null, statuslineCommand: null, updateBannerCommand: null, runtime, configDir: targetDir };
+  }
+
   if (isCline) {
     // Cline uses .clinerules — generate a rules file with GSD system instructions
     const clinerulesDest = path.join(targetDir, '.clinerules');
@@ -9583,8 +9757,9 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   const isWindsurf = runtime === 'windsurf';
   const isTrae = runtime === 'trae';
   const isCline = runtime === 'cline';
+  const isGrok = runtime === 'grok';
 
-  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae) {
+  if (shouldInstallStatusline && !isOpencode && !isKilo && !isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isGrok) {
     if (!isGlobal && !forceStatusline) {
       // Local installs skip statusLine by default: repo settings.json takes precedence over
       // profile-level settings.json in Claude Code, so writing here would silently clobber
@@ -9642,7 +9817,7 @@ function finishInstall(settingsPath, settings, statuslineCommand, shouldInstallS
   // {type: 'command', command: null} items that the runtime hook schema
   // rejects at parse time. validateHookFields filters those out so the file
   // we write is always schema-valid.
-  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline) {
+  if (!isCodex && !isCopilot && !isKilo && !isCursor && !isWindsurf && !isTrae && !isCline && !isGrok) {
     writeSettings(settingsPath, validateHookFields(settings));
   }
 
@@ -11158,6 +11333,11 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeCommandToTraeSkill,
     convertClaudeAgentToTraeAgent,
     copyCommandsAsTraeSkills,
+    GROK_AGENT_SANDBOX,
+    convertClaudeToGrokMarkdown,
+    convertClaudeCommandToGrokSkill,
+    convertClaudeAgentToGrokAgent,
+    copyCommandsAsGrokSkills,
     convertClaudeToCodebuddyMarkdown,
     convertClaudeCommandToCodebuddySkill,
     convertClaudeAgentToCodebuddyAgent,
