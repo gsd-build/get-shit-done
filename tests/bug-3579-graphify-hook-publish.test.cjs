@@ -45,30 +45,34 @@ const INSTALL_SCRIPT = path.join(REPO_ROOT, 'bin', 'install.js');
 
 // ─── Coverage guard ─────────────────────────────────────────────────────────
 
-describe('#3579 Gap 1: build-hooks.js HOOKS_TO_COPY covers every top-level hooks/*.sh', () => {
-  test('every top-level hooks/*.sh appears in HOOKS_TO_COPY (drift guard)', () => {
-    const buildSource = fs.readFileSync(BUILD_SCRIPT, 'utf-8');
+describe('#3579 Gap 1: build-hooks.js packages every top-level hooks/*.sh into dist', () => {
+  // Behavior-based drift guard: rather than parsing the HOOKS_TO_COPY literal
+  // out of scripts/build-hooks.js as text (a source-grep that breaks under
+  // harmless refactors and fails to catch any other reason a file might get
+  // dropped on the floor), we run the actual build and assert the actual
+  // filesystem outcome: every top-level hooks/*.sh has a corresponding file
+  // in hooks/dist/. This catches the original gap (missing allowlist entry)
+  // AND any future regression that silently drops a hook for any other
+  // reason (e.g. a copy that swallows errors, a syntax-validator bug, etc.).
+  before(() => {
+    execFileSync(process.execPath, [BUILD_SCRIPT], { encoding: 'utf-8', stdio: 'pipe' });
+  });
 
-    // Parse the HOOKS_TO_COPY literal by extracting quoted filenames inside
-    // the array. Avoids dynamic code evaluation while still being resilient
-    // to comment lines and surrounding whitespace.
-    const match = buildSource.match(/const\s+HOOKS_TO_COPY\s*=\s*\[([\s\S]*?)\]\s*;/);
-    assert.ok(match, 'expected HOOKS_TO_COPY = [...] literal in scripts/build-hooks.js');
-    const hooksToCopy = Array.from(match[1].matchAll(/['"]([^'"]+\.(?:sh|js))['"]/g)).map(
-      (m) => m[1]
-    );
-    assert.ok(hooksToCopy.length > 0, 'HOOKS_TO_COPY parsed an empty list');
-
+  test('every top-level hooks/*.sh is emitted to hooks/dist/ by the build', () => {
     const topLevelSh = fs
       .readdirSync(HOOKS_DIR, { withFileTypes: true })
       .filter((e) => e.isFile() && e.name.endsWith('.sh'))
       .map((e) => e.name);
 
-    const missing = topLevelSh.filter((sh) => !hooksToCopy.includes(sh));
+    assert.ok(topLevelSh.length > 0, 'expected at least one top-level hooks/*.sh in source');
+
+    const missing = topLevelSh.filter(
+      (sh) => !fs.existsSync(path.join(DIST_DIR, sh))
+    );
     assert.deepStrictEqual(
       missing,
       [],
-      `every top-level hooks/*.sh must be listed in HOOKS_TO_COPY; missing: ${JSON.stringify(missing)}`
+      `every top-level hooks/*.sh must be emitted to hooks/dist/ by scripts/build-hooks.js; missing from dist: ${JSON.stringify(missing)}`
     );
   });
 });
