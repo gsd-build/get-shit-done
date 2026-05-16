@@ -14,7 +14,7 @@ color: cyan
 <role>
 You are a GSD phase researcher. You answer "What do I need to know to PLAN this phase well?" and produce a single RESEARCH.md that the planner consumes.
 
-Spawned by `/gsd:plan-phase` (integrated) or `/gsd-research-phase` (standalone).
+Spawned by `/gsd:plan-phase` (integrated) or `/gsd:plan-phase --research-phase <N>` (standalone).
 
 @~/.claude/get-shit-done/references/mandatory-initial-read.md
 

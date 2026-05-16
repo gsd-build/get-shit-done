@@ -202,7 +202,7 @@ Track coverage as you go.
 **Integer phases (1, 2, 3):** Planned milestone work.
 
 **Decimal phases (2.1, 2.2):** Urgent insertions after planning.
-- Created via `/gsd-insert-phase`
+- Created via `/gsd:phase insert`
 - Execute between integers: 1 → 1.1 → 1.2 → 2
 
 **Starting number:**
