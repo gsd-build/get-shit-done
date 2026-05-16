@@ -17,6 +17,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGSDToolsRuntime } from './query-gsd-tools-runtime.js';
 import * as adapterModule from './query-native-direct-adapter.js';
+import * as registryModule from './query/index.js';
 
 describe('bug #3591: createGSDToolsRuntime forwards workstream to registry.dispatch', () => {
   it('native dispatch closure passes opts.workstream as 4th arg to registry.dispatch', async () => {
@@ -37,6 +38,12 @@ describe('bug #3591: createGSDToolsRuntime forwards workstream to registry.dispa
         } as unknown as adapterModule.QueryNativeDirectAdapter;
       });
 
+    const registry = registryModule.createRegistry();
+    const dispatchSpy = vi.spyOn(registry, 'dispatch');
+    const createRegistrySpy = vi
+      .spyOn(registryModule, 'createRegistry')
+      .mockReturnValue(registry);
+
     try {
       createGSDToolsRuntime({
         projectDir: '/tmp/3591-proj',
@@ -50,40 +57,21 @@ describe('bug #3591: createGSDToolsRuntime forwards workstream to registry.dispa
 
       expect(adapterSpy).toHaveBeenCalled();
       expect(capturedDispatch).not.toBeNull();
+      await capturedDispatch!('__bug-3591-unknown-cmd__', ['x']);
+    } catch (err) {
+      // unknown command is expected from the real registry
+      void err;
     } finally {
+      createRegistrySpy.mockRestore();
       adapterSpy.mockRestore();
     }
 
-    // The captured closure must call registry.dispatch with four args:
-    // (registryCommand, registryArgs, projectDir, workstream).
-    //
-    // We can't easily intercept the *real* registry created inside
-    // createGSDToolsRuntime, so we exercise the closure shape: the dispatch
-    // function from createGSDToolsRuntime is bound to a real registry that
-    // throws GSDError for unknown commands. Calling it with an unknown
-    // command MUST reach the registry — which proves the closure is wired —
-    // and we then verify the projectDir/workstream are passed by inspecting
-    // a `register`d probe handler.
-    //
-    // For a tighter assertion, swap in a spied registry via a second
-    // createGSDToolsRuntime call that re-uses the captured `dispatch`
-    // closure's structure: we re-build the closure inline and verify
-    // structurally.
-    //
-    // (The end-to-end "real registry, real handler" path is exercised by
-    // the existing query-runtime-seam-coverage.test.ts; here we focus on
-    // the closure-arg-forwarding contract.)
-    //
-    // Drive the closure with a unique unknown command name and assert the
-    // resulting GSDError mentions that command — proving the closure
-    // forwarded to a real registry.
-    let thrownMessage: string | null = null;
-    try {
-      await capturedDispatch!('__bug-3591-unknown-cmd__', ['x']);
-    } catch (err) {
-      thrownMessage = err instanceof Error ? err.message : String(err);
-    }
-    expect(thrownMessage).toMatch(/__bug-3591-unknown-cmd__/);
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      '__bug-3591-unknown-cmd__',
+      ['x'],
+      '/tmp/3591-proj',
+      'frontend-ws',
+    );
   });
 
   it('forwards undefined workstream when the option is omitted (back-compat)', async () => {
@@ -93,6 +81,8 @@ describe('bug #3591: createGSDToolsRuntime forwards workstream to registry.dispa
     let capturedDispatch:
       | ((command: string, args: string[]) => Promise<unknown>)
       | null = null;
+    const registry = registryModule.createRegistry();
+    const dispatchSpy = vi.spyOn(registry, 'dispatch');
     const adapterSpy = vi
       .spyOn(adapterModule, 'QueryNativeDirectAdapter')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,6 +94,10 @@ describe('bug #3591: createGSDToolsRuntime forwards workstream to registry.dispa
           dispatchRaw: vi.fn(),
         } as unknown as adapterModule.QueryNativeDirectAdapter;
       });
+
+    const createRegistrySpy = vi
+      .spyOn(registryModule, 'createRegistry')
+      .mockReturnValue(registry);
 
     try {
       createGSDToolsRuntime({
@@ -117,17 +111,21 @@ describe('bug #3591: createGSDToolsRuntime forwards workstream to registry.dispa
       });
 
       expect(capturedDispatch).not.toBeNull();
+      await capturedDispatch!('__bug-3591-unknown-cmd-2__', []);
+    } catch (err) {
+      // unknown command is expected from the real registry
+      void err;
     } finally {
+      createRegistrySpy.mockRestore();
       adapterSpy.mockRestore();
     }
 
-    let thrownMessage: string | null = null;
-    try {
-      await capturedDispatch!('__bug-3591-unknown-cmd-2__', []);
-    } catch (err) {
-      thrownMessage = err instanceof Error ? err.message : String(err);
-    }
-    expect(thrownMessage).toMatch(/__bug-3591-unknown-cmd-2__/);
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      '__bug-3591-unknown-cmd-2__',
+      [],
+      '/tmp/3591-proj',
+      undefined,
+    );
   });
 });
 
