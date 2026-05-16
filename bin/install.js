@@ -1669,6 +1669,18 @@ function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
   if (!frontmatter) return content;
 
+  // #3583: Normalize any /gsd:<cmd> or gsd:<cmd> references in the body to the
+  // canonical hyphen form (gsd-<cmd>). The monorepo sources are kept in colon
+  // form by scripts/fix-slash-commands.cjs; Claude Code (and Qwen/Hermes which
+  // reuse this converter) expect hyphen in SKILL.md bodies to match the
+  // frontmatter `name: gsd-<cmd>` and Skill(skill="gsd-...") convention (#2808).
+  // We reuse the shared bidirectional transformer (and its live cmd list) for
+  // precision and to keep the single source of truth for command names.
+  const { transformContentToHyphen, readCmdNames } =
+    require(path.join(__dirname, '..', 'scripts', 'fix-slash-commands.cjs'));
+  const cmdNames = readCmdNames();
+  const normalizedBody = transformContentToHyphen(body, cmdNames);
+
   const description = extractFrontmatterField(frontmatter, 'description') || '';
   const argumentHint = extractFrontmatterField(frontmatter, 'argument-hint');
   const agent = extractFrontmatterField(frontmatter, 'agent');
@@ -1694,7 +1706,7 @@ function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
   if (toolsBlock) fm += toolsBlock;
   fm += '---';
 
-  return `${fm}\n${body}`;
+  return `${fm}\n${normalizedBody}`;
 }
 
 /**

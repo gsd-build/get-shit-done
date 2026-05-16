@@ -1,10 +1,17 @@
 'use strict';
 /**
- * One-shot script: replace retired /gsd-<cmd> with /gsd:<cmd> for known command names.
- * Only replaces when followed by a word boundary (space, newline, quote, backtick, ), end).
+ * One-shot script + library: bidirectional GSD slash-command namespace normalizer.
  *
- * The transform is exported as a pure function so it can be unit-tested directly
- * (see tests/bug-2543-gsd-slash-namespace.test.cjs) without needing fixture files.
+ * - Default direction (transformContent): retired /gsd-<cmd> → /gsd:<cmd> (used to keep
+ *   monorepo sources/docs/workflows in the active colon form).
+ * - Reverse direction (transformContentToHyphen): /gsd:<cmd> / gsd:<cmd> → gsd-<cmd>
+ *   (used at Claude/Qwen/Hermes skill install time so generated SKILL.md bodies match
+ *   the canonical hyphen `name:` and Skill() invocation form established in #2808).
+ *
+ * Both directions only touch known commands from commands/gsd/*.md (longest-first,
+ * word-boundary safe). Non-commands (gsd-sdk, gsd-tools) are never rewritten.
+ *
+ * The transforms are pure and exported for direct use in tests and bin/install.js.
  */
 
 const fs = require('node:fs');
@@ -57,6 +64,30 @@ function transformContent(src, cmdNames) {
   return src.replace(pattern, (_, cmd) => `/gsd:${cmd}`);
 }
 
+/**
+ * Build regex for the reverse direction (colon form → hyphen form).
+ * Matches both "gsd:cmd" and "/gsd:cmd" (the leading / is preserved automatically).
+ * Uses the same longest-first + word-boundary discipline as buildPattern.
+ */
+function buildColonPattern(cmdNames) {
+  if (!Array.isArray(cmdNames) || cmdNames.length === 0) return null;
+  const sorted = [...cmdNames].sort((a, b) => b.length - a.length);
+  return new RegExp(`gsd:(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
+}
+
+/**
+ * Pure transform (reverse): rewrite `/gsd:<cmd>` / `gsd:<cmd>` to hyphen form
+ * for known GSD commands. Used at install time for Claude (and future runtime)
+ * skill bodies so they match the canonical `name: gsd-<cmd>` and Skill(skill="gsd-...")
+ * expectations (#2808, #3583).
+ * Non-command identifiers are left untouched (identical safety contract).
+ */
+function transformContentToHyphen(src, cmdNames) {
+  const pattern = buildColonPattern(cmdNames);
+  if (!pattern) return src;
+  return src.replace(pattern, (_, cmd) => `gsd-${cmd}`);
+}
+
 function readCmdNames() {
   return fs.readdirSync(COMMANDS_DIR)
     .filter(f => f.endsWith('.md'))
@@ -103,4 +134,11 @@ if (require.main === module) {
   console.log('Done.');
 }
 
-module.exports = { transformContent, buildPattern, SKIP_DIRS };
+module.exports = {
+  transformContent,
+  transformContentToHyphen,
+  buildPattern,
+  buildColonPattern,
+  readCmdNames,
+  SKIP_DIRS
+};
