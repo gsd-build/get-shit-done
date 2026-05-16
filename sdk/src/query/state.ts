@@ -71,6 +71,18 @@ export async function getMilestonePhaseFilter(projectDir: string, workstream?: s
     // Try custom ID match
     const customMatch = dirName.match(/^([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)/);
     if (customMatch && normalized.has(customMatch[1].toLowerCase())) return true;
+    // #3600: project-code-prefixed directory (`CK-01-name`) against a
+    // numeric ROADMAP heading (`### Phase 1:`). Strip the same prefix
+    // shape `normalizePhaseName` recognises (`^[A-Z]{1,6}-(?=\d)`) and
+    // retry the numeric match. This runs AFTER the custom-ID match so
+    // a roadmap that uses `Phase PROJ-42:` continues to win via the
+    // existing custom-ID path; the strip-and-retry only fires when the
+    // milestone is keyed on the bare numeric form.
+    const stripped = dirName.replace(/^[A-Z]{1,6}-(?=\d)/i, '');
+    if (stripped !== dirName) {
+      const sm = stripped.match(/^0*(\d+[A-Za-z]?(?:\.\d+)*)/);
+      if (sm && normalized.has(sm[1].toLowerCase())) return true;
+    }
     return false;
   }) as ((dirName: string) => boolean) & { phaseCount: number };
 
