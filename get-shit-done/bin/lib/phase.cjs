@@ -903,7 +903,7 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
     // The `(?!#)` negative lookahead after the backreference prevents the
     // depth-3 match from being satisfied by a depth-4+ header that starts
     // with the same three hashes.
-    content = content.replace(new RegExp(`\\n?(?<h>#{2,4})\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n\\k<h>(?!#)\\s+Phase\\s+\\d+(?:\\.\\d+)*\\s*:|$)`, 'i'), '');
+    content = content.replace(new RegExp(`\\n?(?<h>#{2,4})\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n\\k<h>(?!#)\\s+Phase\\s+[^\\n:]+\\s*:|$)`, 'i'), '');
     content = content.replace(new RegExp(`\\n?-\\s*\\[[ x]\\]\\s*.*Phase\\s+${escaped}[:\\s][^\\n]*`, 'gi'), '');
     content = content.replace(new RegExp(`\\n?\\|\\s*${escaped}\\.?\\s[^|]*\\|[^\\n]*`, 'gi'), '');
 
