@@ -106,7 +106,7 @@ function searchPhaseInContent(content, escapedPhase, phaseNum) {
 
   // Find the end of this section (next ## or ### phase header, or end of file)
   const restOfContent = content.slice(headerIndex);
-  const nextHeaderMatch = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
+  const nextHeaderMatch = restOfContent.match(/\n#{2,4}\s+Phase\s+[\w][\w.-]*/i);
   const sectionEnd = nextHeaderMatch
     ? headerIndex + nextHeaderMatch.index
     : content.length;
