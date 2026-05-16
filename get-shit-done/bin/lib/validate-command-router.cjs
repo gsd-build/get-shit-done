@@ -66,16 +66,13 @@ function routeValidateCommand({ verify, args, cwd, raw, parseNamedArgs, output: 
         args.slice(1),
         () => verify.cmdValidateConsistency(cwd, raw),
       ),
-      health: sdkHandler(
-        'validate.health',
-        args.slice(2),
-        args.slice(1),
-        () => {
-          const repairFlag = args.includes('--repair');
-          const backfillFlag = args.includes('--backfill');
-          verify.cmdValidateHealth(cwd, { repair: repairFlag, backfill: backfillFlag }, raw);
-        },
-      ),
+      // Keep health on CJS for now so fix hints are rendered via runtime-slash
+      // helpers (codex expects $gsd-* command shape).
+      health: () => {
+        const repairFlag = args.includes('--repair');
+        const backfillFlag = args.includes('--backfill');
+        verify.cmdValidateHealth(cwd, { repair: repairFlag, backfill: backfillFlag }, raw);
+      },
       agents: sdkHandler(
         'validate.agents',
         args.slice(2),

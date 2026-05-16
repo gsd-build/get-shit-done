@@ -139,12 +139,9 @@ function routeInitCommand({ init, args, cwd, raw, parseNamedArgs, error }) {
         args.slice(1),
         () => init.cmdInitProgress(cwd, raw),
       ),
-      manager: sdkHandler(
-        'init.manager',
-        args.slice(2),
-        args.slice(1),
-        () => init.cmdInitManager(cwd, raw),
-      ),
+      // Keep manager on CJS for now so runtime-specific command rendering
+      // (e.g. $gsd-* for codex) stays consistent with runtime-slash helpers.
+      manager: () => init.cmdInitManager(cwd, raw),
       'new-workspace': sdkHandler(
         'init.new-workspace',
         args.slice(2),
