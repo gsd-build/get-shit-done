@@ -249,7 +249,11 @@ export const resolveModel: QueryHandler = async (args, projectDir, workstream) =
   const runtime = typeof (config as Record<string, unknown>).runtime === 'string'
     ? ((config as Record<string, unknown>).runtime as string)
     : '';
-  if (resolveModelIds === true && runtime === 'claude' && isRuntimeTierName(tier)) {
+  // Empty/missing runtime is implicit Claude (per the resolveRuntimeTier bail-out
+  // at line ~149); without this branch the resolved-IDs path silently fell
+  // through to the alias return for projects that never set `runtime` explicitly.
+  const isClaudeRuntime = runtime === '' || runtime === 'claude';
+  if (resolveModelIds === true && isClaudeRuntime && isRuntimeTierName(tier)) {
     const claudeDefault = resolveRuntimeTierDefault('claude', tier);
     if (claudeDefault?.model) {
       return { data: { model: claudeDefault.model, profile } };
