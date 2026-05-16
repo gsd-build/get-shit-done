@@ -557,7 +557,7 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
         const entries = await readdir(phasesDir, { withFileTypes: true });
         for (const e of entries) {
           if (e.isDirectory()) {
-            const m = e.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/);
+            const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
             if (m) validPhases.add(m[1]);
           }
         }
@@ -604,7 +604,7 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
         if (!normalizedValid.has(ref) && !normalizedValid.has(padded)) {
           if (normalizedValid.size > 0) {
             addIssue('warning', 'W002',
-              `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort().join(', ')} are declared`,
+              `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} are declared`,
               'Review STATE.md manually');
           }
         }

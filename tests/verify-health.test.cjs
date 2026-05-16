@@ -247,6 +247,15 @@ describe('validate health command', () => {
     const output = JSON.parse(result.output);
     const w002s = (output.warnings || []).filter(w => w.code === 'W002');
     assert.strictEqual(w002s.length, 0, `Did not expect W002s for archived phases: ${JSON.stringify(w002s)}`);
+    // Also no W006 for the archived phases — extractCurrentMilestone strips
+    // shipped milestones before the Check 8 heading scan in the CJS path,
+    // so archived phase numbers never reach `roadmapPhases`. Pins the
+    // assumption that drove the decision NOT to mirror the W002 archive
+    // union into Check 8 on the CJS side.
+    const w006s = (output.warnings || []).filter(w =>
+      w.code === 'W006' && /Phase (?:12|19|20|21|22)\b/.test(String(w.message)),
+    );
+    assert.strictEqual(w006s.length, 0, `Did not expect W006s for archived phases: ${JSON.stringify(w006s)}`);
   });
 
   // ─── Check 5: config.json valid JSON + valid schema ───────────────────────

@@ -672,19 +672,18 @@ function cmdValidateHealth(cwd, options, raw) {
     // misses). collectDiskPhases() only scans the active archive, so
     // without this step STATE.md's narrative references to older shipped
     // phases fire false W002.
-    try {
-      const archiveDirs = listMilestoneArchiveDirs(planBase);
-      for (const archiveDir of archiveDirs) {
-        try {
-          const entries = fs.readdirSync(archiveDir, { withFileTypes: true });
-          for (const e of entries) {
-            if (!e.isDirectory()) continue;
-            const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
-            if (m) validPhases.add(m[1]);
-          }
-        } catch { /* archive dir absent/unreadable */ }
-      }
-    } catch { /* intentionally empty */ }
+    // listMilestoneArchiveDirs swallows its own ENOENT/EACCES into [], so the
+    // outer loop never throws — only the per-archive readdir needs a catch.
+    for (const archiveDir of listMilestoneArchiveDirs(planBase)) {
+      try {
+        const entries = fs.readdirSync(archiveDir, { withFileTypes: true });
+        for (const e of entries) {
+          if (!e.isDirectory()) continue;
+          const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
+          if (m) validPhases.add(m[1]);
+        }
+      } catch { /* archive dir absent/unreadable */ }
+    }
     // Compare canonical full phase tokens. Also accept a leading-zero variant
     // on the integer prefix only (e.g. "03" matching "3", "03.1" matching
     // "3.1") so historic STATE.md formatting still validates. Suffix tokens
@@ -711,7 +710,7 @@ function cmdValidateHealth(cwd, options, raw) {
           addIssue(
             'warning',
             'W002',
-            `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort().join(', ')} are declared`,
+            `STATE.md references phase ${ref}, but only phases ${[...validPhases].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} are declared`,
             `Review STATE.md manually before changing it; ${slash('health')} --repair will not overwrite an existing STATE.md for phase mismatches`
           );
         }
@@ -823,7 +822,12 @@ function cmdValidateHealth(cwd, options, raw) {
   } catch { /* intentionally empty — agent check is non-blocking */ }
 
   // ─── Check 8: Run existing consistency checks ─────────────────────────────
-  // Inline subset of cmdValidateConsistency
+  // Inline subset of cmdValidateConsistency. Note: unlike Check 4 (W002),
+  // this check intentionally filters ROADMAP.md through extractCurrentMilestone
+  // first — shipped milestones (whether collapsed in <details> or not) are
+  // stripped before the heading scan, so archived phase numbers never reach
+  // `roadmapPhases` and W006/W007 cannot fire for them. That is why the
+  // #3652 archive-union added to Check 4 is NOT mirrored here.
   if (fs.existsSync(roadmapPath)) {
     const roadmapContentRaw = fs.readFileSync(roadmapPath, 'utf-8');
     const roadmapContent = extractCurrentMilestone(roadmapContentRaw, cwd);
