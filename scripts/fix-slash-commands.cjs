@@ -2,16 +2,17 @@
 /**
  * One-shot script + library: bidirectional GSD slash-command namespace normalizer.
  *
- * - Default direction (transformContent): retired /gsd-<cmd> → /gsd:<cmd> (used to keep
- *   monorepo sources/docs/workflows in the active colon form).
+ * - Default direction (transformContent): retired /gsd-<cmd> → /gsd:<cmd>
+ *   (keeps monorepo sources, docs, and workflows in the active colon form).
  * - Reverse direction (transformContentToHyphen): /gsd:<cmd> / gsd:<cmd> → gsd-<cmd>
- *   (used at Claude/Qwen/Hermes skill install time so generated SKILL.md bodies match
- *   the canonical hyphen `name:` and Skill() invocation form established in #2808).
+ *   (used during skill installation for runtimes that register skills under the
+ *   canonical hyphen form established in #2808).
  *
- * Both directions only touch known commands from commands/gsd/*.md (longest-first,
- * word-boundary safe). Non-commands (gsd-sdk, gsd-tools) are never rewritten.
+ * Both directions only rewrite known commands from `commands/gsd/*.md` (longest-first
+ * matching + word-boundary safety). Non-commands (gsd-sdk, gsd-tools, etc.) are
+ * intentionally left untouched.
  *
- * The transforms are pure and exported for direct use in tests and bin/install.js.
+ * The transforms are pure and exported for use by the installer and tests.
  */
 
 const fs = require('node:fs');
@@ -77,10 +78,10 @@ function buildColonPattern(cmdNames) {
 
 /**
  * Pure transform (reverse): rewrite `/gsd:<cmd>` / `gsd:<cmd>` to hyphen form
- * for known GSD commands. Used at install time for Claude (and future runtime)
- * skill bodies so they match the canonical `name: gsd-<cmd>` and Skill(skill="gsd-...")
- * expectations (#2808, #3583).
- * Non-command identifiers are left untouched (identical safety contract).
+ * for known GSD commands.
+ *
+ * Non-command identifiers (e.g. gsd-sdk, gsd-tools) are left untouched, matching
+ * the safety contract of the forward transform.
  */
 function transformContentToHyphen(src, cmdNames) {
   const pattern = buildColonPattern(cmdNames);

@@ -91,6 +91,10 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
       // #3583 regression guard: the body must not leak retired colon-form
       // command references (e.g. /gsd:plan-phase or gsd:review). The converter
       // now uses transformContentToHyphen from the shared transformer.
+      //
+      // gsd:sdk and gsd:tools are intentionally excluded: they are not slash commands
+      // (no commands/gsd/sdk.md or tools.md exist), so the transformer correctly leaves
+      // them alone. They are benign and should not trigger this assertion.
       const colonRefs = (skillContent.match(/\bgsd:[a-z][a-z0-9-]*\b/g) || [])
         .filter(r => !/gsd:(sdk|tools)/.test(r));
       assert.strictEqual(
@@ -202,5 +206,28 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
     assert.ok(out.includes('/gsd-review'), 'another command reference must be rewritten');
     assert.ok(out.includes('gsd-sdk'), 'non-command gsd-sdk must be left untouched');
     assert.ok(!out.match(/\bgsd:[a-z]/), 'no colon-form command reference may survive');
+  });
+
+  test('respects word boundary — does not rewrite gsd:plan-phase-extra (partial match guard)', () => {
+    const transformer = require(path.join(ROOT, 'scripts', 'fix-slash-commands.cjs'));
+    const { transformContentToHyphen, readCmdNames } = transformer;
+    const liveCmdNames = readCmdNames();
+
+    const out = transformContentToHyphen('gsd:plan-phase-extra and /gsd:execute-phase-extra', liveCmdNames);
+    assert.strictEqual(out, 'gsd:plan-phase-extra and /gsd:execute-phase-extra',
+      'word-boundary lookahead must prevent partial matches on the reverse transform');
+  });
+
+  test('leaves already-hyphen-form references untouched (idempotent on output)', () => {
+    const transformer = require(path.join(ROOT, 'scripts', 'fix-slash-commands.cjs'));
+    const { transformContentToHyphen, readCmdNames } = transformer;
+    const liveCmdNames = readCmdNames();
+
+    const input = 'Run gsd-plan-phase and /gsd-execute-phase then gsd:review.'; // mixed, only colon should change
+    const out = transformContentToHyphen(input, liveCmdNames);
+    assert.ok(out.includes('gsd-plan-phase'), 'pre-existing hyphen stays');
+    assert.ok(out.includes('/gsd-execute-phase'), 'pre-existing hyphen stays');
+    assert.ok(out.includes('gsd-review'), 'colon form was normalized');
+    assert.ok(!out.includes('gsd:review'), 'no colon form remains');
   });
 });

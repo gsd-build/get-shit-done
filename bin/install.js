@@ -20,6 +20,15 @@ const {
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
+// Bidirectional GSD slash-command namespace transformer.
+// We require it at module scope (instead of inside convertClaudeCommandToClaudeSkill)
+// so the command list can be computed once per install and passed down, avoiding
+// repeated fs.readdirSync + RegExp work for every skill.
+const {
+  transformContentToHyphen,
+  readCmdNames: readGsdCommandNames
+} = require(path.join(__dirname, '..', 'scripts', 'fix-slash-commands.cjs'));
+
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -1665,21 +1674,21 @@ function skillFrontmatterName(skillDirName) {
  * Emits `name: gsd-<cmd>` (hyphen) so Skill(skill="gsd-<cmd>") calls and
  * tab autocomplete use the canonical command namespace.
  */
-function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
+function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null, cmdNames = null) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
   if (!frontmatter) return content;
 
-  // #3583: Normalize any /gsd:<cmd> or gsd:<cmd> references in the body to the
-  // canonical hyphen form (gsd-<cmd>). The monorepo sources are kept in colon
-  // form by scripts/fix-slash-commands.cjs; Claude Code (and Qwen/Hermes which
-  // reuse this converter) expect hyphen in SKILL.md bodies to match the
-  // frontmatter `name: gsd-<cmd>` and Skill(skill="gsd-...") convention (#2808).
-  // We reuse the shared bidirectional transformer (and its live cmd list) for
-  // precision and to keep the single source of truth for command names.
-  const { transformContentToHyphen, readCmdNames } =
-    require(path.join(__dirname, '..', 'scripts', 'fix-slash-commands.cjs'));
-  const cmdNames = readCmdNames();
-  const normalizedBody = transformContentToHyphen(body, cmdNames);
+  // Normalize retired colon-form command references in the body to the canonical
+  // hyphen form. Source command files (`commands/gsd/*.md`) are intentionally kept
+  // in colon form by `fix-slash-commands.cjs` (for docs + workflows), but Claude
+  // Code skills (and Qwen/Hermes, which reuse this converter) register under the
+  // hyphen `name:` established in #2808. We reuse the shared bidirectional
+  // transformer for precision and to keep command name logic in one place.
+  //
+  // `cmdNames` is optional and pre-computed by the caller for performance. Direct
+  // test calls fall back to reading the list.
+  const names = cmdNames || readGsdCommandNames();
+  const normalizedBody = transformContentToHyphen(body, names);
 
   const description = extractFrontmatterField(frontmatter, 'description') || '';
   const argumentHint = extractFrontmatterField(frontmatter, 'argument-hint');
@@ -5907,6 +5916,11 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
 
   fs.mkdirSync(skillsDir, { recursive: true });
 
+  // Compute the live command name list once for the entire install instead of
+  // inside convertClaudeCommandToClaudeSkill (called once per skill). This
+  // avoids repeated fs.readdirSync + RegExp compilation for ~67 commands.
+  const cmdNames = readGsdCommandNames();
+
   // #2973 (CR follow-up on #3003): preserve user-generated skills across the
   // wipe-and-replace. `gsd-dev-preferences/SKILL.md` is written by the user
   // via `/gsd-profile-user --refresh`; it is NOT shipped by the npm package,
@@ -5997,7 +6011,7 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
         content = content.replace(/\.claude\//g, '.hermes/');
       }
       content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime);
+      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime, cmdNames);
 
       fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
     }
