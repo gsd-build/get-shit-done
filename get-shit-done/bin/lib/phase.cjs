@@ -920,8 +920,17 @@ function updateRoadmapAfterPhaseRemoval(roadmapPath, targetPhase, isDecimal, rem
         /(\|\s*)(\d+)(\.\s)/g,
         (_match, prefix, num, suffix) => `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`
       );
+      // #3602: extend the suffix lookahead so slugged plan filenames like
+      // `07-01-cherry-pick-foundation-PLAN.md` match too. The previous
+      // pattern only allowed a compact `-(PLAN|SUMMARY).md` immediately
+      // after the plan number (or no suffix at all); a slug between the
+      // number and the `-PLAN.md` / `-SUMMARY.md` suffix made the
+      // lookahead fail and left the stale `07-01-` prefix in ROADMAP
+      // text while the on-disk file was already renamed to `06-01-…`.
+      // The slug segment `(?:-[A-Za-z][A-Za-z0-9-]*)*` allows any number
+      // of kebab-case tokens before the canonical PLAN/SUMMARY suffix.
       content = content.replace(
-        /(?<![0-9-])(\d{2})-(\d{2})(?=(?:-(?:PLAN|SUMMARY)\.md)?(?![0-9-]))/g,
+        /(?<![0-9-])(\d{2})-(\d{2})(?=(?:(?:-[A-Za-z][A-Za-z0-9-]*)*-(?:PLAN|SUMMARY)\.md)|(?![0-9-]))/g,
         (_match, phaseNum, planNum) => `${decrementRoadmapPaddedPhaseNumber(phaseNum, removedInt)}-${planNum}`
       );
       content = content.replace(
