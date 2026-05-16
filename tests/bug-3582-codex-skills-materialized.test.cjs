@@ -13,33 +13,21 @@
  * The current installer (#3562 / current main) calls
  * `copyCommandsAsCodexSkills()` to materialize one SKILL.md per
  * commands/gsd/*.md, with Claude-flavored command frontmatter rewritten
- * into Codex skill frontmatter (name, description, and the
- * `<codex_skill_adapter>` body).
+ * into Codex skill frontmatter and the `<codex_skill_adapter>` body
+ * produced by `getCodexSkillAdapterHeader()`.
  *
  * This test locks the install contract so the 1.42.2 regression cannot
- * silently come back:
- *
- *   1. A Codex global install populates `<CODEX_HOME>/skills/` with one
- *      `gsd-<name>/SKILL.md` per shipped command.
- *   2. Each generated SKILL.md is non-empty, has YAML frontmatter, and
- *      declares the canonical hyphen-form `name:` matching its directory.
- *   3. The installer never prints "Skipped Codex skill-copy generation"
- *      while reporting a successful install.
- *   4. At least the commands the issue reporter and triage explicitly
- *      named (`gsd-map-codebase`, `gsd-execute-phase`, `gsd-plan-phase`,
- *      `gsd-new-project`) are present — proves the representative
- *      surface, not just an arbitrary count.
- *
- * Test invokes `install(isGlobal=true, runtime='codex')` directly with
- * `CODEX_HOME` pointing at a temp dir so no developer config is touched.
+ * silently come back. It asserts the full expected skill-name set
+ * (deepStrictEqual, not just count), the full adapter block (using
+ * the exported `getCodexSkillAdapterHeader` IR as the expected value,
+ * not raw substring search), and the success/skip log invariant.
  */
 
 'use strict';
 
-// GSD_TEST_MODE neutralizes side-effecting branches (auto-detection,
-// VS Code launches, etc.). Must be set BEFORE requiring bin/install.js;
-// scoped to module load only so downstream tests in the same process
-// don't see it. Mirrors the bug-2760 codex install harness.
+// GSD_TEST_MODE neutralizes side-effecting branches (auto-detection, etc.).
+// Must be set BEFORE requiring bin/install.js; scoped to module load only
+// so downstream tests don't see it. Mirrors the bug-2760 codex harness.
 const previousGsdTestMode = process.env.GSD_TEST_MODE;
 process.env.GSD_TEST_MODE = '1';
 
@@ -49,7 +37,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { install } = require('../bin/install.js');
+const { install, getCodexSkillAdapterHeader } = require('../bin/install.js');
+const { parseFrontmatter, createTempDir, cleanup } = require('./helpers.cjs');
 
 if (previousGsdTestMode === undefined) {
   delete process.env.GSD_TEST_MODE;
@@ -58,13 +47,42 @@ if (previousGsdTestMode === undefined) {
 }
 
 const ROOT = path.join(__dirname, '..');
+const COMMANDS_DIR = path.join(ROOT, 'commands', 'gsd');
+
+// Strip ANSI color codes so log assertions don't depend on TTY detection.
+function stripAnsi(s) {
+  return s.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+/**
+ * Walk commands/gsd/**\/*.md and return the set of skill names the installer
+ * is contractually obligated to produce. Naming rule mirrors
+ * `copyCommandsAsCodexSkills` in bin/install.js: nested dirs collapse to
+ * `gsd-<dir>-<file>` with the .md stripped.
+ */
+function expectedSkillNames() {
+  const names = new Set();
+  function recurse(dir, prefix) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        recurse(path.join(dir, entry.name), `${prefix}-${entry.name}`);
+      } else if (entry.name.endsWith('.md')) {
+        const base = entry.name.slice(0, -3);
+        names.add(`${prefix}-${base}`);
+      }
+    }
+  }
+  recurse(COMMANDS_DIR, 'gsd');
+  return names;
+}
 
 /**
  * Run a Codex global install into a temp CODEX_HOME and capture stdout/stderr.
- * Returns { codexHome, logs, warnings }. Caller is responsible for cleanup.
+ * Cleans up codexHome on throw so a partial-install failure never leaks
+ * temp directories.
  */
 function runCodexInstallCaptured() {
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3582-codex-'));
+  const codexHome = createTempDir('gsd-3582-codex-');
   const logs = [];
   const warnings = [];
   const origLog = console.log;
@@ -79,6 +97,12 @@ function runCodexInstallCaptured() {
   try {
     process.chdir(ROOT);
     install(true, 'codex');
+    return { codexHome, logs, warnings };
+  } catch (err) {
+    // Always reclaim the temp dir if install throws — otherwise the
+    // describe-level afterEach can't see codexHome and it leaks.
+    try { cleanup(codexHome); } catch { /* best-effort */ }
+    throw err;
   } finally {
     process.chdir(previousCwd);
     console.log = origLog;
@@ -94,46 +118,11 @@ function runCodexInstallCaptured() {
       process.env.GSD_TEST_MODE = previousGsdTestMode;
     }
   }
-  return { codexHome, logs, warnings };
 }
 
-// Strip ANSI color codes so log assertions don't depend on TTY detection.
-function stripAnsi(s) {
-  return s.replace(/\x1b\[[0-9;]*m/g, '');
-}
-
-// Parse SKILL.md frontmatter into a flat key→value map. Mirrors the shape
-// used by tests/helpers.cjs and the install.js converters (single-line
-// scalars only; the Codex converter does not emit block scalars).
-function parseFrontmatter(content) {
-  const lines = content.split('\n');
-  if (lines[0].trim() !== '---') {
-    throw new Error('expected --- on first line');
-  }
-  let end = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === '---') { end = i; break; }
-  }
-  if (end === -1) {
-    throw new Error('frontmatter not closed');
-  }
-  const fm = {};
-  for (let i = 1; i < end; i++) {
-    const line = lines[i];
-    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
-    if (!m) continue;
-    let val = m[2].trim();
-    if (/^".*"$/.test(val)) {
-      try { val = JSON.parse(val); } catch { /* fall through */ }
-    } else if (/^'.*'$/.test(val)) {
-      val = val.slice(1, -1);
-    }
-    fm[m[1]] = val;
-  }
-  return fm;
-}
-
-describe('bug-3582: Codex global install materializes the skill surface', () => {
+// concurrency:false — harness mutates console.* / process.env / process.cwd().
+// Matches the convention used by tests/bug-3562-codex-install-skill-surface.test.cjs.
+describe('bug-3582: Codex global install materializes the skill surface', { concurrency: false }, () => {
   let installRun;
 
   beforeEach(() => {
@@ -142,53 +131,36 @@ describe('bug-3582: Codex global install materializes the skill surface', () => 
 
   afterEach(() => {
     if (installRun && installRun.codexHome) {
-      fs.rmSync(installRun.codexHome, { recursive: true, force: true });
+      cleanup(installRun.codexHome);
     }
   });
 
-  test('writes ~/.codex/skills/gsd-*/SKILL.md for every shipped command', () => {
+  test('writes the exact expected set of gsd-*/SKILL.md skills (deepEqual on name set)', () => {
     const skillsDir = path.join(installRun.codexHome, 'skills');
     assert.ok(
       fs.existsSync(skillsDir),
       `Codex install must create ${skillsDir} (the 1.42.2 regression skipped this entirely)`,
     );
 
-    const skillDirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+    const actualNames = fs.readdirSync(skillsDir, { withFileTypes: true })
       .filter(e => e.isDirectory() && e.name.startsWith('gsd-'))
       .map(e => e.name);
 
-    assert.ok(
-      skillDirs.length > 0,
-      `expected at least one gsd-* skill directory under ${skillsDir}, got none`,
+    // deepStrictEqual on the sorted full set — not just count — so a
+    // partial install that drops a real command and substitutes a bogus
+    // same-count `gsd-*` directory cannot pass.
+    const expected = [...expectedSkillNames()].sort();
+    assert.deepStrictEqual(
+      [...actualNames].sort(),
+      expected,
+      `installed Codex skills must exactly match commands/gsd/**/*.md (one skill per command)`,
     );
 
-    // Source-of-truth count: number of commands/gsd/*.md in the repo. Every
-    // command must produce a corresponding skill (recursing into subdirs).
-    const commandsDir = path.join(ROOT, 'commands', 'gsd');
-    function countCommandMd(dir) {
-      let n = 0;
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.isDirectory()) {
-          n += countCommandMd(path.join(dir, entry.name));
-        } else if (entry.name.endsWith('.md')) {
-          n += 1;
-        }
-      }
-      return n;
-    }
-    const expectedCount = countCommandMd(commandsDir);
-    assert.strictEqual(
-      skillDirs.length,
-      expectedCount,
-      `expected one skill per commands/gsd/*.md (${expectedCount}), got ${skillDirs.length}`,
-    );
-
-    // Every skill dir contains a SKILL.md file. Empty dirs or skill bodies
-    // would defeat Codex's slash-command registration as silently as the
-    // 1.42.2 "skipped" branch did.
-    for (const name of skillDirs) {
+    // Every skill dir contains a non-empty SKILL.md file. Empty dirs or
+    // empty SKILL.md bodies would defeat Codex's slash-command
+    // registration as silently as the 1.42.2 "skipped" branch did.
+    for (const name of actualNames) {
       const skillMd = path.join(skillsDir, name, 'SKILL.md');
-      assert.ok(fs.existsSync(skillMd), `missing SKILL.md for ${name}`);
       const stat = fs.statSync(skillMd);
       assert.ok(stat.isFile(), `${skillMd} must be a regular file`);
       assert.ok(stat.size > 0, `${skillMd} must not be empty`);
@@ -206,6 +178,8 @@ describe('bug-3582: Codex global install materializes the skill surface', () => 
         path.join(skillsDir, name, 'SKILL.md'),
         'utf-8',
       );
+      // Uses the shared `parseFrontmatter` from tests/helpers.cjs per the
+      // CONTRIBUTING.md "tests parse, never grep" convention.
       const fm = parseFrontmatter(content);
       assert.strictEqual(
         fm.name,
@@ -216,20 +190,49 @@ describe('bug-3582: Codex global install materializes the skill surface', () => 
         typeof fm.description === 'string' && fm.description.length > 0,
         `SKILL.md description must be a non-empty string for ${name}`,
       );
-      // Codex 0.130.0+ skill body must include the adapter header so the
-      // skill knows to map `$gsd-<cmd>` → workflow execution.
+    }
+  });
+
+  test('SKILL.md body contains the full <codex_skill_adapter> block produced by the exported builder', () => {
+    // Structural check against the production builder's output — NOT a
+    // raw substring grep on the rendered file. `getCodexSkillAdapterHeader`
+    // is the typed IR exported by bin/install.js (#3582 PR #3609 codex
+    // review); the file on disk must contain its full output verbatim
+    // (open tag, body, closing `</codex_skill_adapter>`). A truncated,
+    // empty, or missing-closing-tag adapter cannot satisfy this assertion.
+    const skillsDir = path.join(installRun.codexHome, 'skills');
+    const skillDirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+      .filter(e => e.isDirectory() && e.name.startsWith('gsd-'))
+      .map(e => e.name);
+
+    for (const name of skillDirs) {
+      const expectedAdapter = getCodexSkillAdapterHeader(name);
+      // Sanity: the builder itself must produce a closed block for the
+      // assertion below to be meaningful.
       assert.ok(
-        content.includes('<codex_skill_adapter>'),
-        `${name}/SKILL.md must contain the <codex_skill_adapter> body so Codex can route $gsd-<cmd>`,
+        expectedAdapter.startsWith('<codex_skill_adapter>'),
+        `getCodexSkillAdapterHeader(${name}) must start with the opening tag`,
+      );
+      assert.ok(
+        expectedAdapter.trimEnd().endsWith('</codex_skill_adapter>'),
+        `getCodexSkillAdapterHeader(${name}) must end with the closing tag`,
+      );
+
+      const content = fs.readFileSync(
+        path.join(skillsDir, name, 'SKILL.md'),
+        'utf-8',
+      );
+      assert.ok(
+        content.includes(expectedAdapter),
+        `${name}/SKILL.md must contain the full adapter block produced by getCodexSkillAdapterHeader(${name}); Codex routes $${name} via this exact body`,
       );
     }
   });
 
   test('representative skills named in the issue report are present', () => {
     // The bug report and triage explicitly named these. Locking them as a
-    // representative set so a future regression that touches dispatch
-    // logic (filtering, profile resolution, etc.) cannot drop just the
-    // commands the original user was trying to run.
+    // representative set so a future dispatch / filter / profile change
+    // cannot drop just the commands the original user was trying to run.
     const representative = [
       'gsd-map-codebase',     // the literal command from the bug report
       'gsd-execute-phase',
@@ -248,23 +251,22 @@ describe('bug-3582: Codex global install materializes the skill surface', () => 
   });
 
   test('installer success log mentions skills/ — never claims success while skipping', () => {
-    // Lock the contract that the 1.42.2 user-visible failure mode
-    // ("Skipped Codex skill-copy generation") can NEVER coexist with a
-    // success indicator. The fix in main prints "✓ Installed N skills";
-    // the broken 1.42.2 branch printed "Skipped Codex skill-copy
-    // generation (Codex discovers official skills directly)" while
-    // leaving the user with no entrypoints.
+    // The 1.42.2 user-visible failure mode was a successful install that
+    // printed "Skipped Codex skill-copy generation (Codex discovers
+    // official skills directly)" while leaving the user with no
+    // entrypoints. Lock that the broken strings can NEVER coexist with a
+    // success indicator. Current main prints "✓ Installed N skills".
     const cleanLogs = installRun.logs.map(stripAnsi);
     const cleanWarnings = installRun.warnings.map(stripAnsi);
     const allOutput = [...cleanLogs, ...cleanWarnings].join('\n');
 
     assert.ok(
       !/Skipped Codex skill-copy generation/i.test(allOutput),
-      `installer must never print "Skipped Codex skill-copy generation" (the 1.42.2 failure mode). Output:\n${allOutput}`,
+      `installer must never print "Skipped Codex skill-copy generation" (1.42.2 failure). Output:\n${allOutput}`,
     );
     assert.ok(
       !/Codex discovers official skills directly/i.test(allOutput),
-      `installer must never claim "Codex discovers official skills directly" (the 1.42.2 incorrect assumption). Output:\n${allOutput}`,
+      `installer must never claim "Codex discovers official skills directly" (1.42.2 incorrect assumption). Output:\n${allOutput}`,
     );
 
     // Positive proof — at least one log line acknowledges the skills install.
@@ -273,25 +275,5 @@ describe('bug-3582: Codex global install materializes the skill surface', () => 
       hasSkillsInstalledLog,
       `installer must print a success line of the form "Installed N skills to skills/". Logs:\n${cleanLogs.join('\n')}`,
     );
-  });
-
-  test('every generated SKILL.md file is on a Codex-discoverable path', () => {
-    // Codex 0.130.0 reads from CODEX_HOME/skills/<name>/SKILL.md. Any
-    // other path (e.g. CODEX_HOME/get-shit-done/workflows/*.md) is
-    // invisible to slash-command registration. Lock the literal layout
-    // here so a future "skills root" refactor cannot accidentally
-    // re-introduce the 1.42.2 "wrong directory" failure mode.
-    const skillsDir = path.join(installRun.codexHome, 'skills');
-    const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
-      .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
-
-    for (const dirent of entries) {
-      const expectedSkillMd = path.join(skillsDir, dirent.name, 'SKILL.md');
-      const stat = fs.statSync(expectedSkillMd);
-      assert.ok(
-        stat.isFile() && stat.size > 0,
-        `Codex requires SKILL.md at exact path ${expectedSkillMd}; got ${stat.isFile() ? 'file size ' + stat.size : 'non-file'}`,
-      );
-    }
   });
 });
