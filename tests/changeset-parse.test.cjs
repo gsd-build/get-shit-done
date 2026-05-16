@@ -120,6 +120,38 @@ describe('changeset parse: docs-exempt extraction (#3213)', () => {
     assert.match(r.fragment.body, /docs-exempt/);
   });
 
+  test('CRLF-authored fragments: marker is stripped cleanly without residual \\r (Codex finding)', () => {
+    // Codex's exact repro from the second review pass:
+    //   Feature.\r\n\r\n<!-- docs-exempt: x -->\r\n
+    // Before the fix this parsed to body `Feature.\r\n\r\n\r`, which made
+    // serializeChangelog emit `- Feature.\r\n\r\n\r (#1)` — the PR suffix
+    // landed on a blank line instead of attached to the visible bullet.
+    const src = '---\r\ntype: Added\r\npr: 1\r\n---\r\nFeature.\r\n\r\n<!-- docs-exempt: x -->\r\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, true);
+    assert.equal(r.fragment.docsExempt, 'x');
+    assert.doesNotMatch(r.fragment.body, /[\r]/);  // no residual CR characters
+    assert.doesNotMatch(r.fragment.body, /docs-exempt/);
+    // End-to-end: the rendered bullet has the suffix on the visible body line.
+    const { serializeChangelog } = require(path.join(__dirname, '..', 'scripts', 'changeset', 'serialize.cjs'));
+    const out = serializeChangelog({
+      releaseHeader: { version: '1.0.0', date: '2026-01-01' },
+      sections: [{ type: 'Added', bullets: [{ pr: r.fragment.pr, body: r.fragment.body }] }],
+      priorChangelog: null,
+    });
+    const lines = out.split('\n');
+    const bulletLine = lines.find((l) => l.startsWith('-'));
+    assert.match(bulletLine, /Feature\.\s+\(#1\)$/);
+  });
+
+  test('CRLF-authored fragment without marker: no stripping needed, body unchanged in semantics', () => {
+    const src = '---\r\ntype: Fixed\r\npr: 5\r\n---\r\nbug fix.\r\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, true);
+    assert.equal(r.fragment.docsExempt, null);
+    assert.match(r.fragment.body, /bug fix\./);
+  });
+
   test('marker on its own line trailing a fragment body still wins (real-marker positive case)', () => {
     const src =
       '---\ntype: Added\npr: 3213\n---\n' +

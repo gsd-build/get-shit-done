@@ -41,22 +41,29 @@ const ALLOWED_TYPES = new Set(['Added', 'Changed', 'Deprecated', 'Removed', 'Fix
 // syntax examples in documentation) are not matched — they cannot
 // accidentally exempt a fragment.
 //
-// Bounded character class `[^\n>]` keeps the regex linear-time — no
+// The trailing `\r?` consumes the CR character of a CRLF line terminator,
+// which the `$` boundary (multiline mode) does not — so Windows-authored
+// fragments produce the same `body` shape as LF-authored ones. The reason
+// character class `[^\r\n>]` excludes `\r` for the same reason: a CRLF
+// fragment's reason text never carries a trailing `\r`.
+//
+// Bounded character class `[^\r\n>]` also keeps the regex linear-time — no
 // catastrophic backtracking on adversarial input.
-const DOCS_EXEMPT_RE = /^[ \t]*<!--[ \t]*docs-exempt[ \t]*(?::[ \t]*([^\n>]*?))?[ \t]*-->[ \t]*$/im;
+const DOCS_EXEMPT_RE = /^[ \t]*<!--[ \t]*docs-exempt[ \t]*(?::[ \t]*([^\r\n>]*?))?[ \t]*-->[ \t]*\r?$/im;
 
 function extractDocsExempt(body) {
   const m = body.match(DOCS_EXEMPT_RE);
   if (!m) return { docsExempt: null, body };
   const reason = (m[1] || '').trim();
-  // Strip the matched comment plus any single trailing newline so collapsed
-  // bodies don't accumulate blank-line padding. Collapse 3+ consecutive
-  // newlines down to the two-newline paragraph break Keep-a-Changelog uses.
+  // Strip the marker line and tidy up the surrounding whitespace. The cleanup
+  // is CRLF-aware so Windows-authored fragments don't leave residual `\r`
+  // characters that would shift the `(#NNNN)` PR suffix to a blank line in
+  // the rendered CHANGELOG.md / GitHub release-notes bullet.
   const cleaned = body
     .replace(DOCS_EXEMPT_RE, '')
-    .replace(/[ \t]+$/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/\n+$/, '');
+    .replace(/[ \t\r]+$/gm, '')             // strip trailing \r/spaces on each line
+    .replace(/(?:\r?\n){3,}/g, '\n\n')      // collapse 3+ blank lines (CRLF-aware)
+    .replace(/[\r\n]+$/, '');               // strip every trailing line terminator
   return { docsExempt: reason, body: cleaned };
 }
 
@@ -82,10 +89,16 @@ function parseFragment(src) {
   }
   // Use trim() only for the emptiness check; preserve the body verbatim
   // (including significant leading/trailing whitespace, code blocks, etc.)
-  // so render → serialize round-trips exactly. Strip only a single trailing
-  // newline added by editors so byte-equality holds for typical fragments.
+  // so render → serialize round-trips exactly. Strip the single trailing
+  // line terminator added by editors so byte-equality holds for typical
+  // fragments. CRLF-aware: a Windows-authored fragment trims `\r\n` so the
+  // marker line in extractDocsExempt does not leave residual `\r` characters
+  // for downstream serializers to attach `(#NNNN)` to (#3213).
   if (!body.trim()) return { ok: false, reason: FRAGMENT_ERROR.EMPTY_BODY };
-  const verbatimBody = body.endsWith('\n') ? body.slice(0, -1) : body;
+  let verbatimBody;
+  if (body.endsWith('\r\n')) verbatimBody = body.slice(0, -2);
+  else if (body.endsWith('\n')) verbatimBody = body.slice(0, -1);
+  else verbatimBody = body;
   const { docsExempt, body: visibleBody } = extractDocsExempt(verbatimBody);
   if (!visibleBody.trim()) return { ok: false, reason: FRAGMENT_ERROR.EMPTY_BODY };
 
