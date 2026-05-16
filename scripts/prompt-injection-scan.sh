@@ -77,13 +77,15 @@ ALLOWLIST=(
   'hooks/gsd-prompt-guard.js'
   'hooks/gsd-read-injection-scanner.js'
   'tests/read-injection-scanner.test.cjs'
+  'tests/security-prompt-injection.test.cjs'
+  'tests/fixtures/adversarial/security/'
   'SECURITY.md'
 )
 
 is_allowlisted() {
   local file="$1"
   for allowed in "${ALLOWLIST[@]}"; do
-    if [[ "$file" == *"$allowed" ]]; then
+    if [[ "$file" == *"$allowed"* ]]; then
       return 0
     fi
   done
