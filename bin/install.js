@@ -20,6 +20,14 @@ const {
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
+// #3583: install-time inverse of the source-side slash-namespace guard.
+// Rewrites retired /gsd:<cmd> colon references to the canonical gsd-<cmd>
+// hyphen form for runtimes that register skills/agents under their hyphen
+// `name:` (#2808), where the colon namespace is unroutable.
+const {
+  transformColonToHyphen,
+} = require('../scripts/fix-slash-commands.cjs');
+
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -8577,6 +8585,23 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(/CLAUDE\.md/g, 'HERMES.md');
           content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
           content = content.replace(/\.claude\//g, '.hermes/');
+        }
+        // #3583 (agent surface): runtimes that register skills/agents under
+        // the canonical hyphen `name:` (#2808) must not ship retired
+        // /gsd:<cmd> colon references in agent bodies — they are unroutable
+        // on those installs (Claude rejects `/gsd:execute-phase` with
+        // "Did you mean /gsd-execute-phase?"). This mirrors the SKILL.md
+        // body rewrite for the same Claude/Qwen/Hermes set. The other
+        // runtimes are deliberately excluded: their convertClaudeAgentTo*
+        // adapters already convert command namespaces (Copilot CONV-07,
+        // Codex `$gsd-`, etc.), and Gemini intentionally keeps the colon
+        // form because its slash commands are colon-namespaced.
+        const isHyphenNameAgentRuntime =
+          !isOpencode && !isKilo && !isGemini && !isCodex && !isCopilot &&
+          !isAntigravity && !isCursor && !isWindsurf && !isAugment &&
+          !isTrae && !isCodebuddy && !isCline;
+        if (isHyphenNameAgentRuntime) {
+          content = transformColonToHyphen(content, Array.from(getGsdCommandRoster()));
         }
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);

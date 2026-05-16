@@ -1,10 +1,19 @@
 'use strict';
 /**
- * One-shot script: replace retired /gsd-<cmd> with /gsd:<cmd> for known command names.
- * Only replaces when followed by a word boundary (space, newline, quote, backtick, ), end).
+ * One-shot script + library: bidirectional GSD slash-command namespace
+ * normalizer, scoped to known command names with word-boundary safety.
  *
- * The transform is exported as a pure function so it can be unit-tested directly
- * (see tests/bug-2543-gsd-slash-namespace.test.cjs) without needing fixture files.
+ *   - transformContent       : retired /gsd-<cmd> → canonical /gsd:<cmd>
+ *                              (the one-shot source/docs guard; CLI entrypoint)
+ *   - transformColonToHyphen : canonical /gsd:<cmd> | gsd:<cmd> → gsd-<cmd>
+ *                              (install-time, for hyphen-name skill/agent
+ *                              runtimes where the colon namespace is
+ *                              unroutable — see #2808 / #3583)
+ *
+ * Non-command identifiers (gsd-sdk, gsd-tools) are left untouched in both
+ * directions. The transforms are pure and exported so they can be unit-tested
+ * directly (see tests/bug-2543-gsd-slash-namespace.test.cjs and
+ * tests/bug-3583-claude-agent-body-transform.test.cjs) without fixture files.
  */
 
 const fs = require('node:fs');
@@ -57,6 +66,36 @@ function transformContent(src, cmdNames) {
   return src.replace(pattern, (_, cmd) => `/gsd:${cmd}`);
 }
 
+/**
+ * Build the reverse-direction pattern: canonical `/gsd:<cmd>` (and the bare
+ * `gsd:<cmd>` shorthand) → hyphen form. The leading `/` is intentionally
+ * outside the match so it round-trips untouched (`/gsd:plan` → `/gsd-plan`);
+ * the negative lookbehind only rejects word characters so an identifier like
+ * `mygsd:foo` is left alone, while still matching after `/`, space, or
+ * backtick. Mirrors the boundary discipline of the forward `buildPattern`
+ * (longest-first ordering, roster-gated, empty-roster short-circuit).
+ */
+function buildColonPattern(cmdNames) {
+  if (!Array.isArray(cmdNames) || cmdNames.length === 0) return null;
+  const sorted = [...cmdNames].sort((a, b) => b.length - a.length); // longest first
+  return new RegExp(`(?<![a-zA-Z0-9_-])gsd:(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
+}
+
+/**
+ * Pure transform (inverse of `transformContent`): rewrite canonical
+ * `/gsd:<cmd>` / `gsd:<cmd>` to the hyphen form `gsd-<cmd>` for known
+ * commands. Used by install-time adapters that materialize bodies for
+ * runtimes whose slash-command surface is registered under the hyphen
+ * `name:` form (#2808) — Claude global skills, Qwen, Hermes — where the
+ * colon namespace is unroutable (#3583). Non-command identifiers
+ * (`gsd-sdk`, `gsd-tools`) are left untouched.
+ */
+function transformColonToHyphen(src, cmdNames) {
+  const pattern = buildColonPattern(cmdNames);
+  if (!pattern) return src;
+  return src.replace(pattern, (_, cmd) => `gsd-${cmd}`);
+}
+
 function readCmdNames() {
   return fs.readdirSync(COMMANDS_DIR)
     .filter(f => f.endsWith('.md'))
@@ -103,4 +142,11 @@ if (require.main === module) {
   console.log('Done.');
 }
 
-module.exports = { transformContent, buildPattern, SKIP_DIRS };
+module.exports = {
+  transformContent,
+  buildPattern,
+  transformColonToHyphen,
+  buildColonPattern,
+  readCmdNames,
+  SKIP_DIRS,
+};
