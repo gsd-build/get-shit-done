@@ -220,28 +220,28 @@ function main() {
     const relCjs = path.relative(ROOT, absPath).replace(/\\/g, '/');
     const tsPaths = sdkIndex.get(name).map((p) => path.relative(ROOT, p).replace(/\\/g, '/'));
 
-    // Pair-aware matching: an allowlist entry covers a specific (cjs, ts)
-    // pair only. If multiple ts candidates exist for the same name, each
-    // is checked independently against the allowlist; unmatched siblings
-    // still raise an error.
-    const matchedCooperating = tsPaths.some((relTs) =>
-      cooperatingPairs.has(`${relCjs}::${relTs}`)
-    );
-    if (matchedCooperating) {
-      // Explicitly allowed — silent pass
-      continue;
+    // Pair-aware matching, per ts sibling. Each ts candidate is classified
+    // independently against the allowlist so a partially-allowlisted set of
+    // siblings still surfaces the unauthorized ones. See #3632.
+    const unauthorizedTs = [];
+    const backlogTsForCjs = [];
+    for (const relTs of tsPaths) {
+      const pairKey = `${relCjs}::${relTs}`;
+      if (cooperatingPairs.has(pairKey)) continue;
+      if (migrateMap.has(pairKey)) {
+        backlogTsForCjs.push(relTs);
+        continue;
+      }
+      unauthorizedTs.push(relTs);
     }
 
-    const backlogTs = tsPaths.find((relTs) => migrateMap.has(`${relCjs}::${relTs}`));
-    if (backlogTs) {
-      // Known drift anti-pattern — warn (not fail)
-      const entry = migrateMap.get(`${relCjs}::${backlogTs}`);
-      warnings.push({ relCjs, tsPaths, entry });
-      continue;
+    if (unauthorizedTs.length > 0) {
+      errors.push({ relCjs, tsPaths: unauthorizedTs });
     }
-
-    // Unlisted pair — this is a new drift anti-pattern
-    errors.push({ relCjs, tsPaths });
+    if (backlogTsForCjs.length > 0) {
+      const entry = migrateMap.get(`${relCjs}::${backlogTsForCjs[0]}`);
+      warnings.push({ relCjs, tsPaths: backlogTsForCjs, entry });
+    }
   }
 
   // Count cjs files whose pair identity (cjs+ts) is on cooperatingSiblings.

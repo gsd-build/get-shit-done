@@ -270,6 +270,75 @@ describe('lint-shared-module-handsync: allowlist entry honored', () => {
     }
   });
 
+  // Regression guard for #3632: when a cjs has TWO ts siblings sharing the
+  // same basename (e.g. sdk/src/foo.ts AND sdk/src/query/foo.ts) and only
+  // ONE pair is allowlisted, the unallowlisted sibling must still be reported.
+  // Prior bug: .some() at the cjs level returned true on the allowlisted
+  // pair, short-circuiting and silently dropping the unallowlisted sibling.
+  test('reports unallowlisted ts sibling when another ts sibling for the same cjs IS allowlisted (#3632)', () => {
+    const cjsName = 'multi-sibling';
+    const tsName = 'multi-sibling';
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-lint-multi-'));
+    try {
+      const cjsDir = path.join(tmpDir, 'get-shit-done', 'bin', 'lib');
+      fs.mkdirSync(cjsDir, { recursive: true });
+      const tsDirRoot = path.join(tmpDir, 'sdk', 'src');
+      const tsDirQuery = path.join(tmpDir, 'sdk', 'src', 'query');
+      fs.mkdirSync(tsDirQuery, { recursive: true });
+      const scriptsDir = path.join(tmpDir, 'scripts');
+      fs.mkdirSync(scriptsDir, { recursive: true });
+
+      // One cjs, two ts siblings on disk (same basename, different paths).
+      fs.writeFileSync(path.join(cjsDir, `${cjsName}.cjs`), `'use strict';\n`);
+      fs.writeFileSync(path.join(tsDirRoot, `${tsName}.ts`), `export {};\n`);
+      fs.writeFileSync(path.join(tsDirQuery, `${tsName}.ts`), `export {};\n`);
+
+      // Allowlist ONLY the sdk/src/<name>.ts pair. The sdk/src/query/<name>.ts
+      // sibling is intentionally NOT allowlisted and must be reported.
+      fs.writeFileSync(
+        path.join(scriptsDir, 'shared-module-handsync-allowlist.json'),
+        JSON.stringify(
+          {
+            cooperatingSiblings: [
+              {
+                cjs: `get-shit-done/bin/lib/${cjsName}.cjs`,
+                ts: `sdk/src/${tsName}.ts`,
+                classification: 'cooperating-sibling',
+                justification: 'Test: only the non-query sibling is allowlisted.',
+              },
+            ],
+            migrateMeBacklog: [],
+          },
+          null,
+          2
+        )
+      );
+
+      const { status, payload } = runLintJson(['--root', tmpDir]);
+      assert.strictEqual(
+        status,
+        1,
+        'must fail: the sdk/src/query/<name>.ts sibling is not allowlisted'
+      );
+      assert.ok(payload);
+      assert.strictEqual(payload.ok, false);
+      assert.strictEqual(payload.reason, 'unauthorized_pairs');
+      assert.ok(Array.isArray(payload.errors) && payload.errors.length >= 1);
+      const reportedTs = payload.errors.flatMap((e) => e.tsPaths);
+      assert.ok(
+        reportedTs.some((p) => /sdk\/src\/query\/multi-sibling\.ts$/.test(p)),
+        `expected query sibling in errors, got: ${JSON.stringify(reportedTs)}`
+      );
+      // The allowlisted sibling must NOT appear in errors.
+      assert.ok(
+        !reportedTs.some((p) => /^sdk\/src\/multi-sibling\.ts$/.test(p)),
+        `allowlisted sibling sdk/src/multi-sibling.ts must not be flagged, got: ${JSON.stringify(reportedTs)}`
+      );
+    } finally {
+      cleanupFixture(tmpDir);
+    }
+  });
+
   test('generated .cjs files are excluded from pair detection', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-lint-gen-'));
     try {
