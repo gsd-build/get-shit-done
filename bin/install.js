@@ -20,6 +20,15 @@ const {
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
+// Bidirectional GSD slash-command namespace transformer (#3583).
+// Required at module scope so the command list can be computed once per install
+// and passed down to convertClaudeCommandToClaudeSkill, avoiding repeated
+// fs.readdirSync + RegExp work for every skill.
+const {
+  transformContentToHyphen,
+  readCmdNames: readGsdCommandNames,
+} = require(path.join(__dirname, '..', 'scripts', 'fix-slash-commands.cjs'));
+
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -1669,9 +1678,17 @@ function skillFrontmatterName(skillDirName) {
  * Emits `name: gsd-<cmd>` (hyphen) so Skill(skill="gsd-<cmd>") calls and
  * tab autocomplete use the canonical command namespace.
  */
-function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
+function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null, cmdNames = null) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
   if (!frontmatter) return content;
+
+  // #3583: rewrite any /gsd:<cmd> or gsd:<cmd> in the body to the canonical
+  // hyphen form (gsd-<cmd>) so installed SKILL.md bodies match the hyphen
+  // `name:` Claude Code (and Qwen/Hermes) register under (#2808). `cmdNames`
+  // is optional and pre-computed by the caller for performance; direct test
+  // calls fall back to reading the list.
+  const names = cmdNames || readGsdCommandNames();
+  const normalizedBody = transformContentToHyphen(body, names);
 
   const description = extractFrontmatterField(frontmatter, 'description') || '';
   const argumentHint = extractFrontmatterField(frontmatter, 'argument-hint');
@@ -1698,7 +1715,7 @@ function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
   if (toolsBlock) fm += toolsBlock;
   fm += '---';
 
-  return `${fm}\n${body}`;
+  return `${fm}\n${normalizedBody}`;
 }
 
 /**
@@ -5899,6 +5916,11 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
 
   fs.mkdirSync(skillsDir, { recursive: true });
 
+  // Live command names for the colon→hyphen body transform (#3583), computed
+  // once per install instead of inside convertClaudeCommandToClaudeSkill where
+  // it would re-scan commands/gsd for every skill.
+  const cmdNames = readGsdCommandNames();
+
   // #2973 (CR follow-up on #3003): preserve user-generated skills across the
   // wipe-and-replace. `gsd-dev-preferences/SKILL.md` is written by the user
   // via `/gsd-profile-user --refresh`; it is NOT shipped by the npm package,
@@ -5989,7 +6011,7 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
         content = content.replace(/\.claude\//g, '.hermes/');
       }
       content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime);
+      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime, cmdNames);
 
       fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
     }
@@ -9033,6 +9055,17 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(/'\.claude'/g, configDirReplacement);
           content = content.replace(/\/\.claude\//g, `/${getDirName(runtime)}/`);
           content = content.replace(/\.claude\//g, `${getDirName(runtime)}/`);
+          content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+          fs.writeFileSync(destFile, content);
+          try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
+        } else if (entry.endsWith('.sh')) {
+          // #2136: any .sh hook reaching this loop must have {{GSD_VERSION}}
+          // stamped so installed scripts carry a concrete version header and
+          // stale-hook detection keeps working across upgrades. The current
+          // CODEX_HOOKS_TO_COPY allowlist excludes .sh files, so this branch
+          // is defensive — it preserves the invariant if the allowlist is
+          // extended later (e.g. to ship gsd-graphify-update.sh for Codex).
+          let content = fs.readFileSync(srcFile, 'utf8');
           content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
           fs.writeFileSync(destFile, content);
           try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
