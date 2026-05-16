@@ -140,7 +140,11 @@ describe('docs-required lint: pure verdict (#3213)', () => {
     assert.deepEqual(verdict.triggering, ['.changeset/a.md']);
   });
 
-  test('docsExempt with empty reason still counts as exempt (parser preserved the marker)', () => {
+  test('docsExempt empty string does NOT exempt — defense-in-depth (CodeRabbit finding)', () => {
+    // parse.cjs no longer produces empty-string docsExempt (the marker regex
+    // requires a non-empty reason). evaluateLint defends against any caller
+    // that constructs a fragment with `docsExempt: ''` directly — empty or
+    // whitespace-only reasons are not a valid audit trail.
     const verdict = evaluateLint({
       changedFiles: ['.changeset/a.md', 'bin/install.js'],
       fragments: [
@@ -148,7 +152,19 @@ describe('docs-required lint: pure verdict (#3213)', () => {
       ],
       labels: [],
     });
-    assert.equal(verdict.reason, LINT_REASON.OK_FRAGMENTS_EXEMPT);
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.reason, LINT_REASON.FAIL_DOCS_MISSING);
+  });
+
+  test('docsExempt whitespace-only does NOT exempt — defense-in-depth', () => {
+    const verdict = evaluateLint({
+      changedFiles: ['.changeset/a.md', 'bin/install.js'],
+      fragments: [
+        { path: '.changeset/a.md', type: 'Added', body: 'foo', docsExempt: '   \t' },
+      ],
+      labels: [],
+    });
+    assert.equal(verdict.reason, LINT_REASON.FAIL_DOCS_MISSING);
   });
 
   test('partial exemption fails — one un-marked triggering fragment is enough to require docs', () => {
@@ -244,9 +260,12 @@ describe('docs-required lint: helpers', () => {
     assert.equal(isDocsFile('README.md'), false);
   });
 
-  test('isExemptFragment checks docsExempt field, not body content', () => {
+  test('isExemptFragment checks docsExempt is a non-empty string, not body content', () => {
     assert.equal(isExemptFragment({ docsExempt: 'reason' }), true);
-    assert.equal(isExemptFragment({ docsExempt: '' }), true);
+    assert.equal(isExemptFragment({ docsExempt: 'a' }), true);
+    // Empty/whitespace-only reason → no audit trail → not exempt.
+    assert.equal(isExemptFragment({ docsExempt: '' }), false);
+    assert.equal(isExemptFragment({ docsExempt: '   \t' }), false);
     assert.equal(isExemptFragment({ docsExempt: null }), false);
     assert.equal(isExemptFragment({ docsExempt: undefined }), false);
     assert.equal(isExemptFragment({}), false);

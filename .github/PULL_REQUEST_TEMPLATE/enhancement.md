@@ -70,7 +70,7 @@ Closes #
 
 > CI enforces this — `lint:docs` fails any PR with an `Added` / `Changed` / `Deprecated` / `Removed`
 > changeset fragment that does not also touch at least one file under `docs/`.
-> See [CONTRIBUTING.md → Documentation Updates](../../CONTRIBUTING.md#documentation-updates--update-the-relevant-docs).
+> See [CONTRIBUTING.md → Documentation Updates](../../CONTRIBUTING.md#documentation-updates-update-the-relevant-docs).
 
 - [ ] Updated the relevant file(s) under `docs/` to reflect this change
   - Behavior or output change → `docs/USER-GUIDE.md` and/or `docs/COMMANDS.md`

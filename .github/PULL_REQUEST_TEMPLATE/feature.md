@@ -91,7 +91,7 @@ Closes #
 > CI enforces this — `lint:docs` fails any PR with an `Added` / `Changed` / `Deprecated` / `Removed`
 > changeset fragment that does not also touch at least one file under `docs/`. Features almost
 > always trigger `Added`. See
-> [CONTRIBUTING.md → Documentation Updates](../../CONTRIBUTING.md#documentation-updates--update-the-relevant-docs).
+> [CONTRIBUTING.md → Documentation Updates](../../CONTRIBUTING.md#documentation-updates-update-the-relevant-docs).
 
 - [ ] Updated the relevant file(s) under `docs/` to reflect this feature
   - New command or flag → `docs/COMMANDS.md` and `docs/FEATURES.md`

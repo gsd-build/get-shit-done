@@ -42,10 +42,12 @@ function isDocsFile(file) {
 }
 
 // Per-fragment escape hatch: parse.cjs extracts `<!-- docs-exempt: <reason> -->`
-// from the body into `fragment.docsExempt` (a string reason, possibly empty).
-// `null` means no marker was present.
+// from the body into `fragment.docsExempt` (a non-empty reason string when the
+// marker was present and well-formed; `null` otherwise). A non-empty audit
+// trail is required — the lint defends in depth here too: even if a caller
+// constructs a fragment with `docsExempt: ''`, that does not count as exempt.
 function isExemptFragment(fragment) {
-  return fragment.docsExempt != null;
+  return typeof fragment.docsExempt === 'string' && fragment.docsExempt.trim().length > 0;
 }
 
 /**

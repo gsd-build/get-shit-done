@@ -34,7 +34,10 @@ const FRAGMENT_ERROR = Object.freeze({
 const ALLOWED_TYPES = new Set(['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security']);
 
 // HTML comment marking a fragment as exempt from the docs-required lint (#3213).
-// Form: `<!-- docs-exempt: <reason> -->`. Reason is the human paper trail.
+// Form: `<!-- docs-exempt: <reason> -->`. The reason is the *required* human
+// audit trail — without it the exemption has no paper-trail value, so a bare
+// `<!-- docs-exempt -->` or empty `<!-- docs-exempt: -->` is intentionally
+// rejected (the colon and a non-whitespace first reason char are mandatory).
 //
 // Anchored with `^...$` + `m` flag so the marker only counts when it occupies
 // its own line. Inline mentions inside paragraphs (e.g. backtick-wrapped
@@ -47,9 +50,12 @@ const ALLOWED_TYPES = new Set(['Added', 'Changed', 'Deprecated', 'Removed', 'Fix
 // character class `[^\r\n>]` excludes `\r` for the same reason: a CRLF
 // fragment's reason text never carries a trailing `\r`.
 //
-// Bounded character class `[^\r\n>]` also keeps the regex linear-time — no
-// catastrophic backtracking on adversarial input.
-const DOCS_EXEMPT_RE = /^[ \t]*<!--[ \t]*docs-exempt[ \t]*(?::[ \t]*([^\r\n>]*?))?[ \t]*-->[ \t]*\r?$/im;
+// Bounded character class `[^\r\n>]` keeps the regex linear-time — no
+// catastrophic backtracking on adversarial input. The leading `\S` anchor
+// inside the capture group forces at least one non-whitespace character in
+// the reason; trailing whitespace before `-->` is consumed by the outer
+// `[ \t]*-->` and is not part of the captured reason.
+const DOCS_EXEMPT_RE = /^[ \t]*<!--[ \t]*docs-exempt[ \t]*:[ \t]*(\S[^\r\n>]*?)[ \t]*-->[ \t]*\r?$/im;
 
 function extractDocsExempt(body) {
   const m = body.match(DOCS_EXEMPT_RE);

@@ -69,10 +69,23 @@ describe('changeset parse: docs-exempt extraction (#3213)', () => {
     assert.match(out.body, /feature note\./);
   });
 
-  test('extractDocsExempt handles marker with no reason (just <!-- docs-exempt -->)', () => {
+  test('extractDocsExempt REJECTS bare marker without colon — reason is required (CodeRabbit finding)', () => {
+    // A bare `<!-- docs-exempt -->` provides no audit trail; intentionally
+    // not extracted so the lint requires either docs/ updates or a marker
+    // with a real reason.
     const out = extractDocsExempt('body\n<!-- docs-exempt -->');
-    assert.equal(out.docsExempt, '');
-    assert.doesNotMatch(out.body, /docs-exempt/);
+    assert.equal(out.docsExempt, null);
+    assert.match(out.body, /docs-exempt/);  // unchanged — bare marker stays in body
+  });
+
+  test('extractDocsExempt REJECTS marker with empty reason (<!-- docs-exempt: -->)', () => {
+    const out = extractDocsExempt('body\n<!-- docs-exempt: -->');
+    assert.equal(out.docsExempt, null);
+  });
+
+  test('extractDocsExempt REJECTS marker with whitespace-only reason', () => {
+    const out = extractDocsExempt('body\n<!-- docs-exempt:    -->');
+    assert.equal(out.docsExempt, null);
   });
 
   test('extractDocsExempt is case-insensitive on the marker token', () => {
@@ -99,10 +112,14 @@ describe('changeset parse: docs-exempt extraction (#3213)', () => {
     assert.equal(r.reason, FRAGMENT_ERROR.EMPTY_BODY);
   });
 
-  test('DOCS_EXEMPT_RE is exposed and matches the documented shape', () => {
+  test('DOCS_EXEMPT_RE is exposed and matches the documented shape (colon + non-empty reason required)', () => {
     assert.ok(DOCS_EXEMPT_RE instanceof RegExp);
     assert.match('<!-- docs-exempt: x -->', DOCS_EXEMPT_RE);
+    assert.match('<!-- docs-exempt: bootstrap reason with spaces -->', DOCS_EXEMPT_RE);
     assert.doesNotMatch('docs-exempt: not in a comment', DOCS_EXEMPT_RE);
+    assert.doesNotMatch('<!-- docs-exempt -->', DOCS_EXEMPT_RE);       // no colon
+    assert.doesNotMatch('<!-- docs-exempt: -->', DOCS_EXEMPT_RE);      // empty reason
+    assert.doesNotMatch('<!-- docs-exempt:   -->', DOCS_EXEMPT_RE);    // whitespace-only reason
   });
 
   test('inline mention inside backticks does NOT count as a marker (false-positive guard)', () => {
