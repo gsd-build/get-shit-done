@@ -240,5 +240,21 @@ export const resolveModel: QueryHandler = async (args, projectDir, workstream) =
     return { data: { model: '', profile } };
   }
 
+  // #3643: runtime:claude bails out of resolveRuntimeTier (line 149) because
+  // Claude is the implicit/default runtime, but consumers that asked for
+  // resolved model IDs still need the full ID (e.g. "claude-sonnet-4-6"), not
+  // the tier alias. Mirror the CJS branch at get-shit-done/bin/lib/core.cjs
+  // (`if (config.resolve_model_ids) return MODEL_ALIAS_MAP[alias] || alias;`)
+  // by consulting the catalog's claude runtime defaults for the resolved tier.
+  const runtime = typeof (config as Record<string, unknown>).runtime === 'string'
+    ? ((config as Record<string, unknown>).runtime as string)
+    : '';
+  if (resolveModelIds === true && runtime === 'claude' && isRuntimeTierName(tier)) {
+    const claudeDefault = resolveRuntimeTierDefault('claude', tier);
+    if (claudeDefault?.model) {
+      return { data: { model: claudeDefault.model, profile } };
+    }
+  }
+
   return { data: { model: alias, profile } };
 };

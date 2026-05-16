@@ -259,6 +259,111 @@ describe('resolveModel', () => {
     expect(planner).not.toHaveProperty('reasoning_effort');
   });
 
+  // ─── #3643: runtime:claude + resolve_model_ids:true must return full IDs ──
+  // Symptom: aliases (opus/sonnet/haiku) leaked through to consumers that asked
+  // for resolved model IDs because resolveRuntimeTier bails for runtime:claude
+  // and the alias-return fall-through ignored resolve_model_ids. CJS branch at
+  // get-shit-done/bin/lib/core.cjs:1348-1350 has the missing guard.
+  it('#3643: runtime:claude + resolve_model_ids:true + balanced returns full sonnet id', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        runtime: 'claude',
+        resolve_model_ids: true,
+      }),
+    );
+    const result = await resolveModel(['gsd-executor'], tmpDir);
+    expect(result.data).toEqual({ model: 'claude-sonnet-4-6', profile: 'balanced' });
+  });
+
+  it('#3643: runtime:claude + resolve_model_ids:true + quality returns full opus id', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'quality',
+        runtime: 'claude',
+        resolve_model_ids: true,
+      }),
+    );
+    const result = await resolveModel(['gsd-planner'], tmpDir);
+    expect(result.data).toEqual({ model: 'claude-opus-4-7', profile: 'quality' });
+  });
+
+  it('#3643: runtime:claude + resolve_model_ids:true + budget returns full haiku id', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'budget',
+        runtime: 'claude',
+        resolve_model_ids: true,
+      }),
+    );
+    // gsd-verifier maps to 'haiku' under budget profile per model-catalog.json.
+    const result = await resolveModel(['gsd-verifier'], tmpDir);
+    expect(result.data).toEqual({ model: 'claude-haiku-4-5', profile: 'budget' });
+  });
+
+  it('#3643: phase-type tier override (models.execution=opus) wins under claude+resolve_model_ids', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'budget',
+        runtime: 'claude',
+        resolve_model_ids: true,
+        models: { execution: 'opus' },
+      }),
+    );
+    const result = await resolveModel(['gsd-executor'], tmpDir);
+    expect(result.data).toEqual({ model: 'claude-opus-4-7', profile: 'budget' });
+  });
+
+  it('#3643 regression-guard: runtime:claude WITHOUT resolve_model_ids still returns alias', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        runtime: 'claude',
+      }),
+    );
+    const result = await resolveModel(['gsd-executor'], tmpDir);
+    expect(result.data).toEqual({ model: 'sonnet', profile: 'balanced' });
+  });
+
+  it('#3643 regression-guard: runtime:claude + resolve_model_ids:"omit" still wins over alias mapping', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        runtime: 'claude',
+        resolve_model_ids: 'omit',
+      }),
+    );
+    const result = await resolveModel(['gsd-executor'], tmpDir);
+    expect(result.data).toEqual({ model: '', profile: 'balanced' });
+  });
+
+  it('#3643 regression-guard: model_overrides[agent] beats claude+resolve_model_ids:true', async () => {
+    const { resolveModel } = await import('./config-query.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        model_profile: 'balanced',
+        runtime: 'claude',
+        resolve_model_ids: true,
+        model_overrides: { 'gsd-executor': 'custom-anthropic-id' },
+      }),
+    );
+    const result = await resolveModel(['gsd-executor'], tmpDir);
+    expect((result.data as Record<string, unknown>).model).toBe('custom-anthropic-id');
+  });
+
   it('resolveModel uses workstream config when --ws is specified', async () => {
     const { resolveModel } = await import('./config-query.js');
     // Root config: balanced profile → gsd-executor resolves to 'sonnet'
