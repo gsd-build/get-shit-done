@@ -652,7 +652,11 @@ describe('validateHealth', () => {
     await writeFile(join(planning, 'ROADMAP.md'), [
       '# Roadmap', '',
       '<details><summary>v2.0: Shipped</summary>', '',
-      '- CK-64 archived', '',
+      // `#### Phase 64:` lives inside <details> so the heading-scan
+      // picks it up but the on-disk active phases scan does NOT. The W006
+      // archive scan must recognise `CK-64-prior-shipped` to suppress the
+      // warning — proving the shared regex is in use.
+      '#### Phase 64: Prior shipped', '',
       '</details>', '',
       '## v2.1: Current', '',
       '### Phase 65: Current', '**Goal:** stuff', '',
@@ -673,6 +677,13 @@ describe('validateHealth', () => {
     const warnings = data.warnings as Array<Record<string, unknown>>;
     const w002s = warnings.filter(w => w.code === 'W002');
     expect(w002s).toEqual([]);
+    // Same prefixed-archive recognition must also suppress W006 for any
+    // ROADMAP heading that points at the CK-prefixed archived phase, so the
+    // pre-existing W006 archive scan doesn't regress to the old ad-hoc regex.
+    const w006sForArchived = warnings.filter(
+      w => w.code === 'W006' && String(w.message).includes('Phase 64'),
+    );
+    expect(w006sForArchived).toEqual([]);
   });
 
   it('returns warning W005 for bad phase directory naming', async () => {
