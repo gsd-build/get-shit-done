@@ -50,9 +50,14 @@ function auditProductionVulns(cwd) {
     }
   }
   const parsed = JSON.parse(out);
-  return parsed.metadata && parsed.metadata.vulnerabilities
-    ? parsed.metadata.vulnerabilities
-    : null;
+  // `null` is reserved for the "node_modules missing → skip" signal above.
+  // Any other unexpected JSON shape is a real failure of the audit harness
+  // (npm changed its output format, audit aborted before metadata, etc.) —
+  // throw so the test fails loudly instead of skipping silently.
+  if (parsed && parsed.metadata && parsed.metadata.vulnerabilities) {
+    return parsed.metadata.vulnerabilities;
+  }
+  throw new Error(`Unexpected npm audit JSON shape in ${cwd}: missing metadata.vulnerabilities`);
 }
 
 describe('#3588: npm audit --omit=dev reports zero advisories', () => {
