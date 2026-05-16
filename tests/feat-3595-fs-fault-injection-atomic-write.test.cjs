@@ -323,7 +323,10 @@ test('platformWriteSync REPLACES a symlink with a regular file rather than follo
   // This test pins that property so a future refactor (e.g. switching
   // to `fs.writeFileSync(linkPath, ...)` which follows symlinks) is a
   // visible regression.
-  if (process.platform === 'win32') return; // symlinks on Win32 need admin
+  if (process.platform === 'win32') {
+    t.skip('symlinks on Win32 need admin');
+    return;
+  }
 
   const dir = mkScratch('symlink-replace');
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -349,7 +352,10 @@ test('platformWriteSync REPLACES a symlink with a regular file rather than follo
 });
 
 test('platformWriteSync against a broken symlink replaces it with the intended file', (t) => {
-  if (process.platform === 'win32') return;
+  if (process.platform === 'win32') {
+    t.skip('symlinks on Win32 need admin');
+    return;
+  }
   const dir = mkScratch('symlink-broken');
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const link = path.join(dir, 'dangling.json');
@@ -381,8 +387,14 @@ test('platformWriteSync survives a concurrent collision on the same target path'
   // First write completes normally.
   platformWriteSync(file, '{"writer":"first"}\n');
   // Second write: inject a transient rename failure on the first
-  // attempt, then succeed via fallback.
+  // attempt, then succeed via fallback. Capture the real renameSync
+  // BEFORE installing the mock so subsequent calls (defensive — the
+  // fallback path bypasses rename, so the second call shouldn't fire)
+  // delegate to the real implementation. The previous form referenced
+  // a non-existent `fs.renameSync.wrapped` property — that branch
+  // would silently no-op instead of delegating.
   let renameCalls = 0;
+  const originalRename = fs.renameSync;
   const renameMock = mock.method(fs, 'renameSync', (src, dest) => {
     renameCalls++;
     if (renameCalls === 1) {
@@ -390,9 +402,7 @@ test('platformWriteSync survives a concurrent collision on the same target path'
       err.code = 'EBUSY';
       throw err;
     }
-    // Restore default behavior for subsequent calls (which shouldn't
-    // happen given the fallback path bypasses rename, but be safe).
-    return fs.renameSync.wrapped ? fs.renameSync.wrapped(src, dest) : undefined;
+    return originalRename.call(fs, src, dest);
   });
   t.after(() => renameMock.mock.restore());
 
