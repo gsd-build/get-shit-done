@@ -367,7 +367,7 @@ jobs:
                 if [ -n "$NON_SHIPPED_SKIPPED" ]; then
                   echo "### Skipped — touches no shipped paths (informational)"
                   echo ""
-                  echo "These fix/chore/test commits don't touch any path in the npm tarball's \`files\` whitelist (or \`package.json\`), so they cannot change the published package's behavior. CI / test / docs / planning-only changes belong on \`main\`, not in a hotfix. No action needed."
+                  echo "These fix/chore/test commits don't touch any path the hotfix CI cares about — neither the npm tarball's \`files\` whitelist (or \`package.json\`) nor a CI-gating test under \`tests/\` or \`sdk/src/**\` vitest specs (#3621). CI / docs / planning-only changes belong on \`main\`, not in a hotfix. No action needed."
                   echo ""
                   echo "$NON_SHIPPED_SKIPPED"
                 fi
