@@ -20,15 +20,6 @@ const {
   projectCodexHookTomlCommand,
 } = require('../get-shit-done/bin/lib/shell-command-projection.cjs');
 
-// Bidirectional GSD slash-command namespace transformer.
-// We require it at module scope (instead of inside convertClaudeCommandToClaudeSkill)
-// so the command list can be computed once per install and passed down, avoiding
-// repeated fs.readdirSync + RegExp work for every skill.
-const {
-  transformContentToHyphen,
-  readCmdNames: readGsdCommandNames
-} = require(path.join(__dirname, '..', 'scripts', 'fix-slash-commands.cjs'));
-
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -58,6 +49,10 @@ function isCodexHooksFeatureKey(key) {
 // Copilot instructions marker constants
 const GSD_COPILOT_INSTRUCTIONS_MARKER = '<!-- GSD Configuration \u2014 managed by get-shit-done installer -->';
 const GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER = '<!-- /GSD Configuration -->';
+
+// GSD-managed files under hooks/lib/ (helpers required by gsd-*.sh hooks).
+// git-cmd.js does not start with "gsd-" (shared classifier for #3129), gsd-graphify-rebuild.sh does.
+const GSD_HOOK_LIB_FILES = ['git-cmd.js', 'gsd-graphify-rebuild.sh'];
 
 const CODEX_AGENT_SANDBOX = {
   'gsd-executor': 'workspace-write',
@@ -140,7 +135,6 @@ const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasKilo = args.includes('--kilo');
 const hasCodex = args.includes('--codex');
-const hasGrok = args.includes('--grok');
 const hasCopilot = args.includes('--copilot');
 const hasAntigravity = args.includes('--antigravity');
 const hasCursor = args.includes('--cursor');
@@ -188,7 +182,7 @@ if (hasSdk && hasNoSdk) {
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'grok', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline'];
+  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -197,7 +191,6 @@ if (hasAll) {
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasKilo) selectedRuntimes.push('kilo');
   if (hasCodex) selectedRuntimes.push('codex');
-  if (hasGrok) selectedRuntimes.push('grok');
   if (hasCopilot) selectedRuntimes.push('copilot');
   if (hasAntigravity) selectedRuntimes.push('antigravity');
   if (hasCursor) selectedRuntimes.push('cursor');
@@ -251,7 +244,6 @@ function getDirName(runtime) {
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'kilo') return '.kilo';
   if (runtime === 'codex') return '.codex';
-  if (runtime === 'grok') return '.agents';
   if (runtime === 'antigravity') return '.agent';
   if (runtime === 'cursor') return '.cursor';
   if (runtime === 'windsurf') return '.windsurf';
@@ -285,7 +277,6 @@ function getConfigDirFromHome(runtime, isGlobal) {
   if (runtime === 'gemini') return "'.gemini'";
   if (runtime === 'kilo') return "'.config', 'kilo'";
   if (runtime === 'codex') return "'.codex'";
-  if (runtime === 'grok') return "'.agents'";
   if (runtime === 'antigravity') {
     if (!isGlobal) return "'.agent'";
     return "'.gemini', 'antigravity'";
@@ -393,19 +384,6 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.CODEX_HOME);
     }
     return path.join(os.homedir(), '.codex');
-  }
-
-  if (runtime === 'grok') {
-    // Grok Build: --config-dir > GROK_AGENTS_HOME > ~/.agents
-    // Uses the unified agents layout for skills, agents, and the GSD engine.
-    // This is the primary layout for Grok Build + Codex-style harnesses.
-    if (explicitDir) {
-      return expandTilde(explicitDir);
-    }
-    if (process.env.GROK_AGENTS_HOME) {
-      return expandTilde(process.env.GROK_AGENTS_HOME);
-    }
-    return path.join(os.homedir(), '.agents');
   }
 
   if (runtime === 'copilot') {
@@ -538,7 +516,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, Gemini, Kilo, Codex, Grok Build, Copilot, Antigravity, Cursor, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, Cline and CodeBuddy by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Antigravity, Cursor, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, Cline and CodeBuddy by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {
@@ -1691,21 +1669,9 @@ function skillFrontmatterName(skillDirName) {
  * Emits `name: gsd-<cmd>` (hyphen) so Skill(skill="gsd-<cmd>") calls and
  * tab autocomplete use the canonical command namespace.
  */
-function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null, cmdNames = null) {
+function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null) {
   const { frontmatter, body } = extractFrontmatterAndBody(content);
   if (!frontmatter) return content;
-
-  // Normalize retired colon-form command references in the body to the canonical
-  // hyphen form. Source command files (`commands/gsd/*.md`) are intentionally kept
-  // in colon form by `fix-slash-commands.cjs` (for docs + workflows), but Claude
-  // Code skills (and Qwen/Hermes, which reuse this converter) register under the
-  // hyphen `name:` established in #2808. We reuse the shared bidirectional
-  // transformer for precision and to keep command name logic in one place.
-  //
-  // `cmdNames` is optional and pre-computed by the caller for performance. Direct
-  // test calls fall back to reading the list.
-  const names = cmdNames || readGsdCommandNames();
-  const normalizedBody = transformContentToHyphen(body, names);
 
   const description = extractFrontmatterField(frontmatter, 'description') || '';
   const argumentHint = extractFrontmatterField(frontmatter, 'argument-hint');
@@ -1732,7 +1698,7 @@ function convertClaudeCommandToClaudeSkill(content, skillName, runtime = null, c
   if (toolsBlock) fm += toolsBlock;
   fm += '---';
 
-  return `${fm}\n${normalizedBody}`;
+  return `${fm}\n${body}`;
 }
 
 /**
@@ -5933,11 +5899,6 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
 
   fs.mkdirSync(skillsDir, { recursive: true });
 
-  // Compute the live command name list once for the entire install instead of
-  // inside convertClaudeCommandToClaudeSkill (called once per skill). This
-  // avoids repeated fs.readdirSync + RegExp compilation for ~67 commands.
-  const cmdNames = readGsdCommandNames();
-
   // #2973 (CR follow-up on #3003): preserve user-generated skills across the
   // wipe-and-replace. `gsd-dev-preferences/SKILL.md` is written by the user
   // via `/gsd-profile-user --refresh`; it is NOT shipped by the npm package,
@@ -6028,7 +5989,7 @@ function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runti
         content = content.replace(/\.claude\//g, '.hermes/');
       }
       content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime, cmdNames);
+      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime);
 
       fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
     }
@@ -6910,6 +6871,33 @@ function uninstall(isGlobal, runtime = 'claude') {
       removedCount++;
       console.log(`  ${green}✓${reset} Removed ${hookCount} GSD hooks`);
     }
+
+    // Remove only the GSD-managed files from hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh).
+    // hooks/lib/ lives inside the user's runtime hooks directory (shared space) and
+    // may contain user-owned custom helpers. We must not recursively delete the dir.
+    const hooksLibDir = path.join(hooksDir, 'lib');
+    if (fs.existsSync(hooksLibDir)) {
+      let removedLibFiles = 0;
+      for (const file of GSD_HOOK_LIB_FILES) {
+        const filePath = path.join(hooksLibDir, file);
+        try {
+          fs.unlinkSync(filePath);
+          removedLibFiles++;
+        } catch (_) {
+          // Ignore missing files (best effort, non-fatal)
+        }
+      }
+      // Only remove the directory itself if it is now empty (preserve any user files)
+      try {
+        fs.rmdirSync(hooksLibDir);
+      } catch (_) {
+        // Directory not empty or other error — leave it alone
+      }
+      if (removedLibFiles > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${removedLibFiles} hooks/lib/ helper(s)`);
+      }
+    }
   }
 
   // 5. Remove GSD package.json (CommonJS mode marker)
@@ -7529,6 +7517,16 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
           manifest.files['hooks/' + file] = fileHash(path.join(hooksDir, file));
         }
       }
+      // Track hooks/lib/ helpers so saveLocalPatches() can back up user edits
+      // to git-cmd.js (validate-commit classifier) and gsd-graphify-rebuild.sh.
+      const hooksLibDir = path.join(hooksDir, 'lib');
+      if (fs.existsSync(hooksLibDir)) {
+        for (const file of fs.readdirSync(hooksLibDir)) {
+          if (GSD_HOOK_LIB_FILES.includes(file)) {
+            manifest.files['hooks/lib/' + file] = fileHash(path.join(hooksLibDir, file));
+          }
+        }
+      }
     }
   }
 
@@ -7791,6 +7789,32 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const isCline = runtime === 'cline';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
+
+  // Reusable helper to copy hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh).
+  // Defined early so it is visible to both the main and Codex code paths.
+  const copyLibDir = (sDir, dDir) => {
+    for (const entry of fs.readdirSync(sDir)) {
+      const s = path.join(sDir, entry);
+      const d = path.join(dDir, entry);
+      let st;
+      try { st = fs.lstatSync(s); } catch (_) { continue; }
+      if (st.isSymbolicLink()) continue; // defense-in-depth
+      if (st.isDirectory()) {
+        fs.mkdirSync(d, { recursive: true });
+        copyLibDir(s, d);
+      } else if (entry.endsWith('.sh')) {
+        let content = fs.readFileSync(s, 'utf8');
+        content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+        fs.writeFileSync(d, content);
+        try { fs.chmodSync(d, 0o755); } catch (_) { /* Windows */ }
+      } else {
+        fs.copyFileSync(s, d);
+        if (entry.endsWith('.js')) {
+          try { fs.chmodSync(d, 0o755); } catch (_) { /* Windows */ }
+        }
+      }
+    }
+  };
 
   // Get the target directory based on runtime and install type.
   // Cline local installs write to the project root (like Claude Code) — .clinerules
@@ -8721,6 +8745,14 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   }
 
+  const hooksLibSrc = path.join(src, 'hooks', 'lib');
+  if (fs.existsSync(hooksLibSrc)) {
+    const hooksLibDest = path.join(targetDir, 'hooks', 'lib');
+    fs.mkdirSync(hooksLibDest, { recursive: true });
+    copyLibDir(hooksLibSrc, hooksLibDest);
+    console.log(`  ${green}✓${reset} Installed hooks/lib/ helpers (git-cmd, graphify-rebuild, ...)`);
+  }
+
   // Clear stale update cache so next session re-evaluates hook versions
   // Cache lives at ~/.cache/gsd/ (see hooks/gsd-check-update.js line 35-36)
   const updateCacheFile = path.join(os.homedir(), '.cache', 'gsd', 'gsd-update-check.json');
@@ -8981,15 +9013,18 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       console.log(`  ${dim}↳${reset} Skipping Codex agent config generation (minimal install)`);
     }
 
-    // Copy hook files that are referenced by Codex hook configuration (#2153)
-    // The main hook-copy block is gated to non-Codex runtimes, but Codex registers
-    // gsd-check-update.js through hooks config — the file must physically exist.
+    // Copy only the hook files that Codex actually registers via its hook configuration (#2153).
+    // Codex primarily needs gsd-check-update.js for the SessionStart update-check hook.
+    // We deliberately do *not* copy gsd-graphify-update.sh or hooks/lib/ for Codex
+    // in this change (graphify auto-update support for Codex is out of scope for #3579).
+    const CODEX_HOOKS_TO_COPY = ['gsd-check-update.js'];
     const codexHooksSrc = path.join(src, 'hooks', 'dist');
     if (fs.existsSync(codexHooksSrc)) {
       const codexHooksDest = path.join(targetDir, 'hooks');
       fs.mkdirSync(codexHooksDest, { recursive: true });
       const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
       for (const entry of fs.readdirSync(codexHooksSrc)) {
+        if (!CODEX_HOOKS_TO_COPY.includes(entry)) continue;
         const srcFile = path.join(codexHooksSrc, entry);
         if (!fs.statSync(srcFile).isFile()) continue;
         const destFile = path.join(codexHooksDest, entry);
@@ -9001,18 +9036,9 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
           fs.writeFileSync(destFile, content);
           try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
-        } else {
-          if (entry.endsWith('.sh')) {
-            let content = fs.readFileSync(srcFile, 'utf8');
-            content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-            fs.writeFileSync(destFile, content);
-            try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
-          } else {
-            fs.copyFileSync(srcFile, destFile);
-          }
         }
       }
-      console.log(`  ${green}✓${reset} Installed hooks`);
+      console.log(`  ${green}✓${reset} Installed hooks (Codex)`);
     }
 
     // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
