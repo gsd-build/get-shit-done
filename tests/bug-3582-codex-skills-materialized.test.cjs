@@ -22,6 +22,9 @@
  * the exported `getCodexSkillAdapterHeader` IR as the expected value,
  * not raw substring search), and the success/skip log invariant.
  */
+// allow-test-rule: source-text-is-the-product
+// This assertion validates the generated adapter block that is shipped to
+// users in SKILL.md; matching exact emitted text is the contract under test.
 
 'use strict';
 
