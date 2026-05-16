@@ -42,7 +42,6 @@ export const VERIFY_COMMAND_ALIASES: readonly FamilyCommandAlias[] = [
   { canonical: 'verify.artifacts', aliases: ['verify artifacts'], subcommand: 'artifacts', mutation: false },
   { canonical: 'verify.key-links', aliases: ['verify key-links'], subcommand: 'key-links', mutation: false },
   { canonical: 'verify.schema-drift', aliases: ['verify schema-drift'], subcommand: 'schema-drift', mutation: false },
-  { canonical: 'verify.codebase-drift', aliases: ['verify codebase-drift'], subcommand: 'codebase-drift', mutation: false },
 ] as const;
 
 export const INIT_COMMAND_ALIASES: readonly FamilyCommandAlias[] = [
@@ -122,8 +121,6 @@ export const NON_FAMILY_COMMAND_ALIASES: readonly NonFamilyCommandAlias[] = [
   { canonical: 'generate-claude-md', aliases: [], mutation: true },
   { canonical: 'generate-claude-profile', aliases: [], mutation: true },
   { canonical: 'generate-dev-preferences', aliases: [], mutation: true },
-  { canonical: 'intel.patch-meta', aliases: ['intel patch-meta'], mutation: true },
-  { canonical: 'intel.snapshot', aliases: ['intel snapshot'], mutation: true },
   { canonical: 'learnings.copy', aliases: ['learnings copy'], mutation: true },
   { canonical: 'learnings.delete', aliases: ['learnings delete'], mutation: true },
   { canonical: 'learnings.prune', aliases: ['learnings prune'], mutation: true },

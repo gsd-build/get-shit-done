@@ -6,7 +6,7 @@ error here MUST fall through and continue to `verify_phase_goal`. The phase
 is never failed by this gate.
 
 ```bash
-DRIFT=$(gsd-sdk query verify.codebase-drift 2>/dev/null || echo '{"skipped":true,"reason":"sdk-failed"}')
+DRIFT=$(gsd-tools verify codebase-drift 2>/dev/null || echo '{"skipped":true,"reason":"sdk-failed"}')
 ```
 
 Parse JSON for: `skipped`, `reason`, `action_required`, `directive`,

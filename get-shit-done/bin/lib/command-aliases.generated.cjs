@@ -230,14 +230,6 @@ const VERIFY_COMMAND_ALIASES = [
     ],
     "subcommand": "schema-drift",
     "mutation": false
-  },
-  {
-    "canonical": "verify.codebase-drift",
-    "aliases": [
-      "verify codebase-drift"
-    ],
-    "subcommand": "codebase-drift",
-    "mutation": false
   }
 ];
 
@@ -649,20 +641,6 @@ const NON_FAMILY_COMMAND_ALIASES = [
   {
     "canonical": "generate-dev-preferences",
     "aliases": [],
-    "mutation": true
-  },
-  {
-    "canonical": "intel.patch-meta",
-    "aliases": [
-      "intel patch-meta"
-    ],
-    "mutation": true
-  },
-  {
-    "canonical": "intel.snapshot",
-    "aliases": [
-      "intel snapshot"
-    ],
     "mutation": true
   },
   {
