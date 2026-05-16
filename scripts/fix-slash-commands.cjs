@@ -67,13 +67,15 @@ function transformContent(src, cmdNames) {
 
 /**
  * Build regex for the reverse direction (colon form → hyphen form).
- * Matches both "gsd:cmd" and "/gsd:cmd" (the leading / is preserved automatically).
- * Uses the same longest-first + word-boundary discipline as buildPattern.
+ * Matches both "gsd:cmd" and "/gsd:cmd" (the leading / is preserved automatically
+ * because it is not part of the match). Uses longest-first ordering plus
+ * bidirectional word-boundary safety (negative lookbehind on the left, lookahead
+ * on the right) so matches only occur at token boundaries.
  */
 function buildColonPattern(cmdNames) {
   if (!Array.isArray(cmdNames) || cmdNames.length === 0) return null;
   const sorted = [...cmdNames].sort((a, b) => b.length - a.length);
-  return new RegExp(`gsd:(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
+  return new RegExp(`(?<![a-zA-Z0-9_-])gsd:(${sorted.join('|')})(?=[^a-zA-Z0-9_-]|$)`, 'g');
 }
 
 /**

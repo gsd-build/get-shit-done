@@ -88,14 +88,19 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
         `${cmd}: SKILL.md name should start with gsd-, got "${name}"`
       );
 
-      // #3583 regression guard: the body must not leak retired colon-form
+      // #3583 regression guard: the *body* must not leak retired colon-form
       // command references (e.g. /gsd:plan-phase or gsd:review). The converter
       // now uses transformContentToHyphen from the shared transformer.
+      //
+      // We explicitly scope to the body (after stripping the leading frontmatter
+      // block) so that descriptions or other frontmatter fields containing example
+      // gsd: references do not cause spurious failures.
       //
       // gsd:sdk and gsd:tools are intentionally excluded: they are not slash commands
       // (no commands/gsd/sdk.md or tools.md exist), so the transformer correctly leaves
       // them alone. They are benign and should not trigger this assertion.
-      const colonRefs = (skillContent.match(/\bgsd:[a-z][a-z0-9-]*\b/g) || [])
+      const bodyContent = skillContent.replace(/^---\n[\s\S]*?\n---\n?/, '');
+      const colonRefs = (bodyContent.match(/\bgsd:[a-z][a-z0-9-]*\b/g) || [])
         .filter(r => !/gsd:(sdk|tools)/.test(r));
       assert.strictEqual(
         colonRefs.length, 0,
@@ -216,6 +221,16 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
     const out = transformContentToHyphen('gsd:plan-phase-extra and /gsd:execute-phase-extra', liveCmdNames);
     assert.strictEqual(out, 'gsd:plan-phase-extra and /gsd:execute-phase-extra',
       'word-boundary lookahead must prevent partial matches on the reverse transform');
+  });
+
+  test('respects left word boundary — does not rewrite inside larger tokens (e.g. mygsd:cmd)', () => {
+    const transformer = require(path.join(ROOT, 'scripts', 'fix-slash-commands.cjs'));
+    const { transformContentToHyphen, readCmdNames } = transformer;
+    const liveCmdNames = readCmdNames();
+
+    const input = 'See mygsd:plan-phase or prefix-gsd:execute in the docs.';
+    const out = transformContentToHyphen(input, liveCmdNames);
+    assert.strictEqual(out, input, 'negative lookbehind must prevent left-side in-word matches');
   });
 
   test('leaves already-hyphen-form references untouched (idempotent on output)', () => {
