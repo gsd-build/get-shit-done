@@ -8661,6 +8661,27 @@ function install(isGlobal, runtime = 'claude', options = {}) {
               fs.copyFileSync(srcFile, destFile);
             }
           }
+        } else if (fs.statSync(srcFile).isDirectory()) {
+          // #3579: recurse one level into hook subdirs (lib/ etc.). The
+          // graphify auto-update hook's rebuild helper lives at
+          // hooks/dist/lib/gsd-graphify-rebuild.sh and must land at the
+          // mirrored target path so the hook's REBUILD_SCRIPT lookup resolves.
+          const subDest = path.join(hooksDest, entry);
+          fs.mkdirSync(subDest, { recursive: true });
+          const subEntries = fs.readdirSync(srcFile);
+          for (const subEntry of subEntries) {
+            const subSrcFile = path.join(srcFile, subEntry);
+            if (!fs.statSync(subSrcFile).isFile()) continue;
+            const subDestFile = path.join(subDest, subEntry);
+            if (subEntry.endsWith('.sh')) {
+              let content = fs.readFileSync(subSrcFile, 'utf8');
+              content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+              fs.writeFileSync(subDestFile, content);
+              try { fs.chmodSync(subDestFile, 0o755); } catch (e) { /* Windows */ }
+            } else {
+              fs.copyFileSync(subSrcFile, subDestFile);
+            }
+          }
         }
       }
       if (verifyInstalled(hooksDest, 'hooks')) {
