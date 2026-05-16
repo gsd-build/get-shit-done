@@ -201,7 +201,7 @@ describe('validate health command', () => {
     assert.strictEqual(w002.repairable, false, 'W002 should not be auto-repairable');
   });
 
-  // Regression: #3652 — after /gsd-complete-milestone, phase dirs move into
+  // Regression: #3652 — after /gsd:complete-milestone, phase dirs move into
   // milestones/vX.Y-phases/ and their `#### Phase N:` headings in ROADMAP.md
   // get collapsed inside <details> blocks. The heading-scan regex misses
   // collapsed phases and collectDiskPhases() only walks the active archive,

@@ -77,6 +77,28 @@ async function getActiveMilestoneArchiveDir(planBase: string): Promise<string | 
 }
 
 /**
+ * Walk every milestone archive directory and call `onPhase` with the phase
+ * token (e.g. `64`, `64A`, `64.1`) extracted from each archived phase dir's
+ * name. Used by Check 4 (W002) and Check 8 (W006) so both treat archived
+ * phases as valid on-disk locations — bug #3652.
+ */
+async function forEachArchivedPhaseToken(
+  planBase: string,
+  onPhase: (token: string) => void,
+): Promise<void> {
+  for (const archiveDir of await listMilestoneArchiveDirs(planBase)) {
+    try {
+      const entries = await readdir(archiveDir, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory()) continue;
+        const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
+        if (m) onPhase(m[1]);
+      }
+    } catch { /* archive dir absent/unreadable */ }
+  }
+}
+
+/**
  * Collect the active phase roots to validate against.  When the flat
  * `.planning/phases/` directory exists, it counts.  When an active
  * milestone archive (e.g. `.planning/milestones/v1.7-phases/`) exists, it
@@ -551,23 +573,13 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
       } catch { /* intentionally empty */ }
 
       // Bug #3652 — STATE.md body retains historical phase references across
-      // milestones. After /gsd-complete-milestone, phases are moved into
+      // milestones. After /gsd:complete-milestone, phases are moved into
       // `milestones/vX.Y-phases/` and their `#### Phase N:` headings in
       // ROADMAP.md are collapsed (e.g. inside <details> blocks), so neither
       // the on-disk phases dir nor the ROADMAP heading scan picks them up.
       // Treat any phase directory present in any archived milestone as a
-      // valid phase reference. PHASE_TOKEN_FROM_DIR_RE matches
-      // project-code-prefixed dirs (e.g. `CK-12-foo`).
-      for (const archiveDir of await listMilestoneArchiveDirs(planBase)) {
-        try {
-          const archivedPhaseEntries = await readdir(archiveDir, { withFileTypes: true });
-          for (const archivedPhase of archivedPhaseEntries) {
-            if (!archivedPhase.isDirectory()) continue;
-            const dm = archivedPhase.name.match(PHASE_TOKEN_FROM_DIR_RE);
-            if (dm) validPhases.add(dm[1]);
-          }
-        } catch { /* archive dir absent/unreadable */ }
-      }
+      // valid phase reference.
+      await forEachArchivedPhaseToken(planBase, (token) => validPhases.add(token));
 
       // Compare canonical full phase tokens. Also accept a leading-zero
       // variant on the integer prefix only (e.g. "03" → "3", "03.1" → "3.1")
@@ -735,19 +747,9 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
           }
         }
       } catch { /* intentionally empty */ }
-      // Include archived milestone phase directories as valid on-disk locations
-      // for historical ROADMAP phases. Uses the shared helper + token regex so
-      // project-code-prefixed dirs (e.g. `CK-64-foo`) are recognised.
-      for (const archiveDir of await listMilestoneArchiveDirs(planBase)) {
-        try {
-          const archivedPhaseEntries = await readdir(archiveDir, { withFileTypes: true });
-          for (const archivedPhase of archivedPhaseEntries) {
-            if (!archivedPhase.isDirectory()) continue;
-            const dm = archivedPhase.name.match(PHASE_TOKEN_FROM_DIR_RE);
-            if (dm) diskPhases.add(dm[1]);
-          }
-        } catch { /* archive dir absent/unreadable */ }
-      }
+      // Include archived milestone phase directories as valid on-disk
+      // locations for historical ROADMAP phases.
+      await forEachArchivedPhaseToken(planBase, (token) => diskPhases.add(token));
 
       for (const p of roadmapPhases) {
         const variants = phaseVariants(p);

@@ -593,7 +593,7 @@ describe('validateHealth', () => {
     expect(w002s).toEqual([]);
   });
 
-  // Regression: #3652 — after /gsd-complete-milestone, STATE.md body retains
+  // Regression: #3652 — after /gsd:complete-milestone, STATE.md body retains
   // historical phase references across milestones while their `#### Phase N:`
   // headings in ROADMAP.md are collapsed into <details> blocks and the phase
   // dirs are moved to `milestones/vX.Y-phases/`. The heading-scan regex misses

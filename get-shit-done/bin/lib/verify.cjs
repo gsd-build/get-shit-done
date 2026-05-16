@@ -666,7 +666,7 @@ function cmdValidateHealth(cwd, options, raw) {
       }
     } catch { /* intentionally empty */ }
     // Bug #3652 — also union phases from every milestone archive, not only
-    // the active one. After /gsd-complete-milestone, historical phase dirs
+    // the active one. After /gsd:complete-milestone, historical phase dirs
     // live under milestones/vX.Y-phases/ and their `#### Phase N:` headings
     // get collapsed inside <details> blocks (which the heading regex above
     // misses). collectDiskPhases() only scans the active archive, so
