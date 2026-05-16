@@ -12,6 +12,12 @@
  *   - package.json (always included by `npm pack`, regardless of `files`)
  *   - every entry in package.json `files`, treated as either an exact
  *     file match or a directory prefix (matching `npm pack` semantics).
+ *   - CI-gating test paths: `tests/<anything>` plus
+ *     `sdk/src/<anything>/<name>.test.<ts|cjs|mjs|js>` and `.spec.` variants
+ *     — these don't ship in the tarball, but they gate the hotfix-branch
+ *     test job. A test fixture update that aligns with a cherry-picked
+ *     production fix MUST be pickable or CI fails on the hotfix run.
+ *     #3621 — root cause of the v1.42.3 hotfix red CI.
  *
  * `package-lock.json` is intentionally NOT considered shipped — `npm pack`
  * excludes it from the tarball unless it's explicitly in `files`, and at
@@ -48,12 +54,38 @@ function loadShipPrefixes(pkgPath) {
   return ['package.json', ...files];
 }
 
+// #3621: paths that gate hotfix-branch CI even though they don't appear
+// in the npm tarball. When a cherry-picked production fix changes behavior
+// that an existing test on the v1.42.2 base asserts against, the matching
+// test fixture from `main` must also be cherry-picked or CI fails on the
+// hotfix run (exactly what happened on v1.42.3 — production fix(3562) was
+// picked, the bundled test-fixture correction in commit 08848df8 was not).
+// Combined with the `test:` prefix being added to the candidate-loop regex
+// in release-sdk.yml, this lets `test(####):` fixture-alignment commits be
+// cherry-picked alongside their production counterparts.
+function isCiGating(diffPath) {
+  if (diffPath.startsWith('tests/')) return true;
+  // SDK vitest specs live next to source. Production source ships via
+  // sdk/dist/ (already in package.json `files`); the test files are what's
+  // missing from that surface.
+  if (diffPath.startsWith('sdk/src/') && /\.(test|spec)\.(ts|cjs|mjs|js)$/.test(diffPath)) return true;
+  return false;
+}
+
 function isShipped(diffPath, shipPrefixes) {
   // Normalize Windows-style separators just in case (git always emits
   // forward slashes, but a developer running this locally on a different
   // tool's output shouldn't get a false negative).
   const p = diffPath.replace(/\\/g, '/');
   return shipPrefixes.some((s) => p === s || p.startsWith(s + '/'));
+}
+
+// #2980: commits that touch `.github/workflows/*` cannot be cherry-picked
+// onto a hotfix branch because the default GITHUB_TOKEN lacks the
+// `workflow` permission and the push step fails. Detect them upfront so a
+// `test:`-eligible commit bundling a workflow edit still gets skipped.
+function isPushBlocking(diffPath) {
+  return diffPath.replace(/\\/g, '/').startsWith('.github/workflows/');
 }
 
 function fail(message, err) {
@@ -86,8 +118,22 @@ function main() {
   process.stdin.on('end', () => {
     try {
       const paths = buf.split('\n').map((s) => s.trim()).filter(Boolean);
-      const hit = paths.some((p) => isShipped(p, shipPrefixes));
-      process.exit(hit ? EXIT_SHIPPED : EXIT_NOT_SHIPPED);
+      // #2980 still wins over #3621: any commit touching .github/workflows/*
+      // is unpickable regardless of other content because the push step
+      // fails on workflow scope rejection. Check this first.
+      if (paths.some(isPushBlocking)) {
+        process.exit(EXIT_NOT_SHIPPED);
+      }
+      if (paths.some((p) => isShipped(p, shipPrefixes))) {
+        process.exit(EXIT_SHIPPED);
+      }
+      // #3621: a commit whose only relevant paths are CI-gating tests is
+      // still pickable — it can change whether the hotfix CI passes even
+      // though it doesn't change what the npm tarball ships.
+      if (paths.some(isCiGating)) {
+        process.exit(EXIT_SHIPPED);
+      }
+      process.exit(EXIT_NOT_SHIPPED);
     } catch (err) {
       fail('classification failed', err);
     }
@@ -98,4 +144,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { loadShipPrefixes, isShipped, EXIT_SHIPPED, EXIT_NOT_SHIPPED, EXIT_ERROR };
+module.exports = { loadShipPrefixes, isShipped, isCiGating, isPushBlocking, EXIT_SHIPPED, EXIT_NOT_SHIPPED, EXIT_ERROR };

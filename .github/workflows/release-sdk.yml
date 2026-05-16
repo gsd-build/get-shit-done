@@ -199,7 +199,7 @@ jobs:
               while IFS= read -r SHA; do
                 [ -z "$SHA" ] && continue
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
-                if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
+                if echo "$SUBJECT" | grep -qE '^(fix|chore|test)(\([^)]+\))?!?: '; then
                   # Merge commits with fix:/chore: titles can't be cherry-picked
                   # without `-m <parent>` and we can't pick the parent
                   # automatically. They fail BEFORE entering cherry-pick state
