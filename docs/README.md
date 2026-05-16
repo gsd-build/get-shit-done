@@ -11,6 +11,7 @@ Language versions: [English](README.md) · [Português (pt-BR)](pt-BR/README.md)
 | [Architecture](ARCHITECTURE.md) | Contributors, advanced users | System architecture, agent model, data flow, and internal design |
 | [Installer Migrations](installer-migrations.md) | Contributors | Architecture for safe install-time migrations, cleanup, preservation, dry-run planning, and rollback |
 | [Feature Reference](FEATURES.md) | All users | Feature narratives and requirements for released features (see [CHANGELOG](../CHANGELOG.md) for latest additions) |
+| [v1.42.3 Release Notes](RELEASE-v1.42.3.md) | All users | Hotfix release notes for 1.42.3 — Codex CLI 0.130.0 install routability and 11 other fixes |
 | [v1.42.1 Release Notes](RELEASE-v1.42.1.md) | All users | Stable release notes for the 1.42.1 release |
 | [Command Reference](COMMANDS.md) | All users | Stable commands with syntax, flags, options, and examples |
 | [Configuration Reference](CONFIGURATION.md) | All users | Full config schema, workflow toggles, model profiles, git branching |
@@ -26,7 +27,7 @@ Language versions: [English](README.md) · [Português (pt-BR)](pt-BR/README.md)
 
 ## Quick Links
 
-- **What's new:** see [v1.42.1 Release Notes](RELEASE-v1.42.1.md), [CHANGELOG](../CHANGELOG.md), and upstream [README](../README.md) for release highlights
+- **What's new:** see [v1.42.3 Release Notes](RELEASE-v1.42.3.md) (latest hotfix), [v1.42.1 Release Notes](RELEASE-v1.42.1.md), [CHANGELOG](../CHANGELOG.md), and upstream [README](../README.md) for release highlights
 - **Canary preview:** [`docs/CANARY.md`](CANARY.md) — opt into the early-preview stream from `dev`. Active cut: [`v1.50.0-canary.1`](RELEASE-v1.50.0-canary.1.md)
 - **Getting started:** [README](../README.md) → install → `/gsd-new-project`
 - **Full workflow walkthrough:** [User Guide](USER-GUIDE.md)
