@@ -7766,7 +7766,12 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // and shadows the `gsd-sdk` shim this installer wires up. Only meaningful
   // for global installs (the shim collision lives in the global node_modules
   // bin dir). Guarded by GSD_SKIP_STALE_SDK_CHECK so CI/tests can silence it.
-  if (isGlobal && !process.env.GSD_SKIP_STALE_SDK_CHECK) {
+  // #3406 CR: opt-out only on explicit "1" / "true" / "yes" rather than any
+  // non-empty value. Without this guard `GSD_SKIP_STALE_SDK_CHECK=0` and
+  // `GSD_SKIP_STALE_SDK_CHECK=false` would silently disable the check.
+  const skipRaw = process.env.GSD_SKIP_STALE_SDK_CHECK;
+  const skipStaleCheck = skipRaw === '1' || skipRaw === 'true' || skipRaw === 'yes';
+  if (isGlobal && !skipStaleCheck) {
     try {
       const { execFileSync } = require('child_process');
       const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -10565,6 +10570,12 @@ function detectStaleStandaloneSdk(runNpmLs) {
   const entry = deps['@gsd-build/sdk'];
   if (!entry || typeof entry !== 'object') return { stale: false };
   const version = typeof entry.version === 'string' ? entry.version : '(unknown)';
+  // #3406 CR: scope stale detection to the known-bad version (0.1.0). Any
+  // newer @gsd-build/sdk version is an intentional install (or a future
+  // republish) and should not be flagged as a shim shadow. Without this
+  // narrowing, a maintainer's local-link or a legitimate future publish
+  // would trigger a misleading "stale shadow" warning on every install.
+  if (version !== '0.1.0') return { stale: false };
   return { stale: true, version };
 }
 

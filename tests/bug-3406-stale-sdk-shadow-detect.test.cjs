@@ -84,6 +84,17 @@ describe('#3406: detectStaleStandaloneSdk', () => {
     assert.deepStrictEqual(resultNull, { stale: false });
     assert.deepStrictEqual(resultUndef, { stale: false });
   });
+
+  test('returns { stale: false } for non-0.1.0 versions (CR #3406)', () => {
+    // Only 0.1.0 is the known-bad shadow. Any newer or unrelated published
+    // version is an intentional install (or a future republish) and must
+    // NOT be flagged. Without this gate, every maintainer with a local-link
+    // or any future publish would trigger a misleading warning on install.
+    const stubNewer = () => JSON.stringify({ dependencies: { '@gsd-build/sdk': { version: '1.50.0-canary.0' } } });
+    const stubFuture = () => JSON.stringify({ dependencies: { '@gsd-build/sdk': { version: '2.0.0' } } });
+    assert.deepStrictEqual(detectStaleStandaloneSdk(stubNewer), { stale: false });
+    assert.deepStrictEqual(detectStaleStandaloneSdk(stubFuture), { stale: false });
+  });
 });
 
 describe('#3406: install-time wiring stays silent when no stale package is found', () => {
