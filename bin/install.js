@@ -2457,6 +2457,11 @@ function getCodexSkillAdapterHeader(skillName) {
 ## B. AskUserQuestion → request_user_input Mapping
 GSD workflows use \`AskUserQuestion\` (Claude Code syntax). Translate to Codex \`request_user_input\`:
 
+Call shape:
+- Use one \`request_user_input\` call with a top-level object: \`{ questions: [...] }\`
+- Each \`questions[]\` entry must include: \`header\`, \`id\`, \`question\`, and \`options\`
+- Each \`options[]\` entry must include: \`label\` and \`description\`
+
 Parameter mapping:
 - \`header\` → \`header\`
 - \`question\` → \`question\`
@@ -2491,10 +2496,14 @@ Direct mapping:
   inherited, or unsupported values; do not invent one-off effort literals in
   workflow prose.
 - \`fork_context: false\` by default — GSD agents load their own context via \`<files_to_read>\` blocks
-- \`Task(isolation="worktree")\` / \`Agent(isolation="worktree")\` → no direct Codex mapping.
-  Codex \`spawn_agent\` does not create or bind a git worktree automatically.
-  Workflows that require this isolation must fail closed or use an explicit
-  manual worktree protocol before spawning (#3360).
+- \`Task(isolation="worktree")\` / \`Agent(isolation="worktree")\` → treat as a request for
+  Codex-managed subagent workspace isolation. Codex \`spawn_agent\` does not expose
+  Claude Code's literal \`isolation\` parameter or \`worktree-agent-*\` branch naming,
+  but Codex desktop-managed subagent workspaces preserve the GSD contract that
+  executor agents do not edit the orchestrator's main checkout directly.
+  Do not fail closed solely because \`runtime=codex\` and \`workflow.use_worktrees=true\`.
+  If a Codex runtime exposes no managed workspace/subagent tool, stop before dispatch
+  and ask for a recovery path instead of silently editing the main checkout (#3360).
 
 Spawn restriction:
 - Codex restricts \`spawn_agent\` to cases where the user has explicitly

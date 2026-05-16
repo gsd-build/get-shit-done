@@ -139,6 +139,8 @@ describe('getCodexSkillAdapterHeader', () => {
   test('section B maps AskUserQuestion parameters', () => {
     const result = getCodexSkillAdapterHeader('gsd-discuss-phase');
     assert.ok(result.includes('request_user_input'), 'maps to request_user_input');
+    assert.ok(result.includes('{ questions: [...] }'), 'documents top-level questions payload');
+    assert.ok(result.includes('questions[]'), 'documents batched questions array');
     assert.ok(result.includes('header'), 'maps header parameter');
     assert.ok(result.includes('question'), 'maps question parameter');
     assert.ok(result.includes('label'), 'maps options label');

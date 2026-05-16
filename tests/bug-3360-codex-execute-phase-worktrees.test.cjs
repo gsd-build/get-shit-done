@@ -1,10 +1,11 @@
 /**
  * Regression test for bug #3360.
  *
- * Codex does not have a direct equivalent of Claude Code's
- * `Agent(... isolation="worktree")`. The execute-phase workflow must fail
- * closed for Codex + workflow.use_worktrees=true instead of spawning
- * workspace-write executors in the main checkout.
+ * Codex does not expose Claude Code's literal
+ * `Agent(... isolation="worktree")` parameter, but Codex-managed subagent
+ * workspaces preserve the contract that executors do not edit the
+ * orchestrator checkout. The execute-phase workflow must not fail closed
+ * solely because runtime=codex and workflow.use_worktrees=true.
  */
 
 'use strict';
@@ -27,7 +28,9 @@ function parseWorkflowSteps(content) {
       return {
         name: match[1],
         readsRuntimeConfig: body.includes('RUNTIME=$(gsd-sdk query config-get runtime --default claude'),
-        codexWorktreeGuard: body.includes('Codex execute-phase worktree isolation is unsupported'),
+        hasStaleCodexWorktreeGuard: body.includes('Codex execute-phase worktree isolation is unsupported'),
+        codexManagedWorkspaceGuidance: body.includes('Codex-managed subagent workspace isolation'),
+        codexNoMainCheckoutFallback: body.includes('If a future Codex session does not expose `spawn_agent`'),
         worktreeDispatchGuidance: body.includes('isolation="worktree"'),
       };
     });
@@ -43,26 +46,33 @@ function executePhaseWorktreeContract(content) {
   const initialize = steps[initializeIndex];
   return {
     initializeReadsRuntimeConfig: initialize.readsRuntimeConfig,
-    initializeHasCodexWorktreeGuard: initialize.codexWorktreeGuard,
+    initializeHasStaleCodexWorktreeGuard: initialize.hasStaleCodexWorktreeGuard,
+    initializeHasCodexManagedWorkspaceGuidance: initialize.codexManagedWorkspaceGuidance,
+    initializeHasCodexNoMainCheckoutFallback: initialize.codexNoMainCheckoutFallback,
     guardStepPrecedesWorktreeDispatch: initializeIndex <= firstWorktreeDispatchIndex,
   };
 }
 
-describe('#3360 — Codex execute-phase fails closed for unsupported worktree isolation', () => {
-  test('execute-phase reads runtime before worktree dispatch and blocks Codex worktree mode', () => {
+describe('#3360 — Codex execute-phase preserves worktree-mode subagent isolation', () => {
+  test('execute-phase reads runtime before worktree dispatch and allows Codex managed workspaces', () => {
     const workflow = fs.readFileSync(EXECUTE_PHASE, 'utf8');
     const contract = executePhaseWorktreeContract(workflow);
 
     assert.deepEqual(contract, {
       initializeReadsRuntimeConfig: true,
-      initializeHasCodexWorktreeGuard: true,
+      initializeHasStaleCodexWorktreeGuard: false,
+      initializeHasCodexManagedWorkspaceGuidance: true,
+      initializeHasCodexNoMainCheckoutFallback: true,
       guardStepPrecedesWorktreeDispatch: true,
     });
   });
 
-  test('Codex adapter documents that worktree isolation has no direct spawn_agent mapping', () => {
+  test('Codex adapter maps worktree isolation to managed subagent workspaces', () => {
     const header = getCodexSkillAdapterHeader('gsd-execute-phase');
     assert.match(header, /isolation="worktree"/);
-    assert.match(header, /no direct Codex mapping/i);
+    assert.match(header, /Codex-managed subagent workspace isolation/i);
+    assert.match(header, /Do not fail closed solely because `runtime=codex`/);
+    assert.match(header, /no managed workspace\/subagent tool/i);
+    assert.doesNotMatch(header, /no direct Codex mapping/i);
   });
 });

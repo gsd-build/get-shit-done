@@ -42,11 +42,12 @@ visible in your runtime (Claude Code's `/context` slash command output, or the
 model's own session telemetry). If the runtime exposes neither, prompt the user
 once via AskUserQuestion for both numbers.
 
-**TEXT_MODE fallback:** when `text_mode` is true (config or `--text` flag) the
-runtime is non-Claude (Codex, Gemini, etc.) and `AskUserQuestion` is not
-available — replace the prompt with a plain-text two-question sequence
-("Approximate tokens used? Context window size?") and read the answers as
-plain text from the user's response.
+**TEXT_MODE fallback:** when `text_mode` is true (config or `--text` flag),
+replace the prompt with a plain-text two-question sequence ("Approximate tokens
+used? Context window size?") and read the answers as plain text from the user's
+response. Codex should use `request_user_input` when available; use this
+fallback only in explicit text mode or after the runtime tool is unavailable or
+rejected.
 
 ```bash
 gsd-sdk query validate.context \

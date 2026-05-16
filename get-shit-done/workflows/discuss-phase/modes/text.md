@@ -12,7 +12,10 @@ type their choice number. Free-text input maps to the "Other" branch of
 the equivalent AskUserQuestion call.
 
 This is required for Claude Code remote sessions (`/rc` mode) where the
-Claude App cannot forward TUI menu selections back to the host.
+Claude App cannot forward TUI menu selections back to the host. Codex should
+use `request_user_input` when that tool is available; it supports a top-level
+`questions` array for batched GSD questions, so this overlay is only the
+fallback for explicit text mode or an actual tool rejection.
 
 ## Activation
 

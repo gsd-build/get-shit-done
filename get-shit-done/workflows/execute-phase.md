@@ -77,20 +77,15 @@ Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelizat
 
 **If `response_language` is set:** Include `response_language: {value}` in all spawned subagent prompts so any user-facing output stays in the configured language.
 
-Read runtime/worktree config and fail closed before any executor dispatch:
+Read runtime/worktree config and validate worktree mode before any executor dispatch:
 
 ```bash
 RUNTIME=$(gsd-sdk query config-get runtime --default claude 2>/dev/null || echo "claude")
 USE_WORKTREES=$(gsd-sdk query config-get workflow.use_worktrees 2>/dev/null || echo "true")
 EXECUTOR_STALL_INTERVAL_MINUTES=$(gsd-sdk query config-get executor.stall_detect_interval_minutes 2>/dev/null || echo "5")
 EXECUTOR_STALL_THRESHOLD_MINUTES=$(gsd-sdk query config-get executor.stall_threshold_minutes 2>/dev/null || echo "10")
-
-if [ "$RUNTIME" = "codex" ] && [ "$USE_WORKTREES" != "false" ]; then
-  echo "FATAL: Codex execute-phase worktree isolation is unsupported. Set workflow.use_worktrees=false or use a runtime with Agent isolation=\"worktree\" support." >&2
-  exit 1
-fi
 ```
-Codex maps subagents to `spawn_agent`, which has no direct Codex mapping for Claude Code's `isolation="worktree"` parameter. Failing closed prevents main-checkout edits while the workflow believes agents are isolated.
+Codex maps subagents to `spawn_agent`. When `runtime=codex` and `workflow.use_worktrees` is not `false`, treat Claude Code's `isolation="worktree"` request as Codex-managed subagent workspace isolation: Codex does not expose Claude Code's literal `isolation` parameter or `worktree-agent-*` branch naming, but desktop-managed subagent workspaces preserve the GSD contract that executor agents do not edit the orchestrator's main checkout directly. Do not fail closed solely because the runtime is Codex. If a future Codex session does not expose `spawn_agent` or an equivalent managed subagent workspace tool, stop before dispatch and ask the user for the recovery path instead of silently running isolated plans on the main checkout.
 
 If the project uses git submodules, worktree isolation is unsafe **only when a plan touches a submodule path** — the executor commit protocol cannot correctly handle submodule commits inside isolated worktrees. The previous behavior unconditionally disabled worktree isolation whenever `.gitmodules` existed, which penalised every plan in a submodule project even when the plan was nowhere near a submodule. Compute submodule paths once and intersect them per-plan with the plan's declared `files_modified` frontmatter.
 

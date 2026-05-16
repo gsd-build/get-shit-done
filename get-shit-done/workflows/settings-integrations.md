@@ -80,7 +80,9 @@ plaintext to stdout, stderr, or any log.
 
 **Text mode (`workflow.text_mode: true` or `--text` flag):** Set
 `TEXT_MODE=true` and replace every `AskUserQuestion` call with a plain-text
-numbered list. Required for non-Claude runtimes.
+numbered list. Codex should use `request_user_input` when available and only
+use this fallback in explicit text mode or after the runtime tool is unavailable
+or rejected.
 
 Ask the user what they want to do for each search API key. For keys that are
 already set, show `**** already set` and offer Leave / Replace / Clear. For
