@@ -139,6 +139,14 @@ const INTERNAL_COMPONENT_SLUGS = new Set([
   // a belt-and-suspenders guard against the pattern returning in other locale docs.
   'alternative-1',
   'alternative-2',
+
+  // gsd-sync-skills — installed Claude skill directory name (also a workflow
+  // under get-shit-done/workflows/sync-skills.md), but NOT a registered
+  // slash command (no commands/gsd/sync-skills.md). Docs reference it as a
+  // filesystem path component, e.g. "~/.agents/skills/gsd-sync-skills/" in
+  // docs/discussions/grok-build-support-2026-05.md. The regex captures
+  // "/gsd-sync-skills" from the path. Invoked via Skill(skill="gsd-sync-skills").
+  'sync-skills',
 ]);
 
 /**
