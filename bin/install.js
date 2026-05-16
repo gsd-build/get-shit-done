@@ -6872,16 +6872,30 @@ function uninstall(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Removed ${hookCount} GSD hooks`);
     }
 
-    // Also remove hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh etc.).
-    // These are now installed as part of the gsd-*.sh hook surface (#3579).
+    // Remove only the GSD-managed files from hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh).
+    // hooks/lib/ lives inside the user's runtime hooks directory (shared space) and
+    // may contain user-owned custom helpers. We must not recursively delete the dir.
     const hooksLibDir = path.join(hooksDir, 'lib');
     if (fs.existsSync(hooksLibDir)) {
+      let removedLibFiles = 0;
+      for (const file of GSD_HOOK_LIB_FILES) {
+        const filePath = path.join(hooksLibDir, file);
+        try {
+          fs.unlinkSync(filePath);
+          removedLibFiles++;
+        } catch (_) {
+          // Ignore missing files (best effort, non-fatal)
+        }
+      }
+      // Only remove the directory itself if it is now empty (preserve any user files)
       try {
-        fs.rmSync(hooksLibDir, { recursive: true, force: true });
-        removedCount++;
-        console.log(`  ${green}✓${reset} Removed hooks/lib/ helpers`);
+        fs.rmdirSync(hooksLibDir);
       } catch (_) {
-        // Non-fatal; best effort cleanup.
+        // Directory not empty or other error — leave it alone
+      }
+      if (removedLibFiles > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${removedLibFiles} hooks/lib/ helper(s)`);
       }
     }
   }
