@@ -413,6 +413,26 @@ function listMilestoneArchiveDirs(planBase) {
   }
 }
 
+/**
+ * Walk every milestone archive directory and call `onPhase` with the phase
+ * token (e.g. `64`, `64A`, `64.1`) extracted from each archived phase dir's
+ * name. Mirrors `forEachArchivedPhaseToken` in sdk/src/query/validate.ts so
+ * Check 4 (W002) on the CJS side has the same archive-walking primitive.
+ * Bug #3652.
+ */
+function forEachArchivedPhaseToken(planBase, onPhase) {
+  for (const archiveDir of listMilestoneArchiveDirs(planBase)) {
+    try {
+      const entries = fs.readdirSync(archiveDir, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory()) continue;
+        const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
+        if (m) onPhase(m[1]);
+      }
+    } catch { /* archive dir absent/unreadable */ }
+  }
+}
+
 function getActiveMilestoneArchiveDir(planBase) {
   const archiveDirs = listMilestoneArchiveDirs(planBase);
   if (archiveDirs.length === 0) return null;
@@ -672,18 +692,7 @@ function cmdValidateHealth(cwd, options, raw) {
     // misses). collectDiskPhases() only scans the active archive, so
     // without this step STATE.md's narrative references to older shipped
     // phases fire false W002.
-    // listMilestoneArchiveDirs swallows its own ENOENT/EACCES into [], so the
-    // outer loop never throws — only the per-archive readdir needs a catch.
-    for (const archiveDir of listMilestoneArchiveDirs(planBase)) {
-      try {
-        const entries = fs.readdirSync(archiveDir, { withFileTypes: true });
-        for (const e of entries) {
-          if (!e.isDirectory()) continue;
-          const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
-          if (m) validPhases.add(m[1]);
-        }
-      } catch { /* archive dir absent/unreadable */ }
-    }
+    forEachArchivedPhaseToken(planBase, (token) => validPhases.add(token));
     // Compare canonical full phase tokens. Also accept a leading-zero variant
     // on the integer prefix only (e.g. "03" matching "3", "03.1" matching
     // "3.1") so historic STATE.md formatting still validates. Suffix tokens
