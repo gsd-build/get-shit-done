@@ -7814,8 +7814,12 @@ function install(isGlobal, runtime = 'claude', options = {}) {
 
   // Reusable helper to copy hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh).
   // Defined early so it is visible to both the main and Codex code paths.
-  const copyLibDir = (sDir, dDir) => {
+  // `allowlist` (when non-empty) restricts copying to the named top-level entries,
+  // keeping install scope aligned with GSD_HOOK_LIB_FILES (which uninstall/manifest manage).
+  const copyLibDir = (sDir, dDir, allowlist = []) => {
+    const allowed = allowlist.length > 0 ? new Set(allowlist) : null;
     for (const entry of fs.readdirSync(sDir)) {
+      if (allowed && !allowed.has(entry)) continue;
       const s = path.join(sDir, entry);
       const d = path.join(dDir, entry);
       let st;
@@ -8767,11 +8771,15 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   }
 
+  // Gate hooks/lib/ install on the same runtimes that receive hooks (see line ~8702).
+  // Codex/Copilot/Cursor/Windsurf/Trae/Cline skip hooks entirely, so they must not
+  // receive the hooks/lib/ helpers either — otherwise the Codex comment downstream
+  // ("we deliberately do *not* copy hooks/lib/ for Codex") is contradicted in practice.
   const hooksLibSrc = path.join(src, 'hooks', 'lib');
-  if (fs.existsSync(hooksLibSrc)) {
+  if (!isCodex && !isCopilot && !isCursor && !isWindsurf && !isTrae && !isCline && fs.existsSync(hooksLibSrc)) {
     const hooksLibDest = path.join(targetDir, 'hooks', 'lib');
     fs.mkdirSync(hooksLibDest, { recursive: true });
-    copyLibDir(hooksLibSrc, hooksLibDest);
+    copyLibDir(hooksLibSrc, hooksLibDest, GSD_HOOK_LIB_FILES);
     console.log(`  ${green}✓${reset} Installed hooks/lib/ helpers (git-cmd, graphify-rebuild, ...)`);
   }
 
