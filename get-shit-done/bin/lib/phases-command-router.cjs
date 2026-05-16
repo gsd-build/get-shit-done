@@ -36,11 +36,12 @@ function routePhasesCommand({ phase, milestone, args, cwd, raw, error }) {
         registryArgs,
         legacyCommand: 'phases',
         legacyArgs,
-        // Always request typed JSON from the bridge; CJS `output(data, raw)` handles
-        // user-facing rendering. Passing `mode: 'raw'` would make the bridge
-        // pre-render result.data to a JSON string that the CJS output path then
-        // double-stringifies (returning a JSON string of a JSON string).
-        mode: 'json',
+        // #3631: under --raw, request mode:'raw' so the bridge runs the SDK's
+        // raw projection (formatQueryRawOutput) and returns the scalar string
+        // CJS callers used to print. We then bypass output()'s JSON-stringify
+        // path by passing rawValue (the third positional). With mode:'json',
+        // output() emits the JSON IR as before.
+        mode: raw ? 'raw' : 'json',
         projectDir: cwd,
       });
       if (!result.ok) {
@@ -49,7 +50,11 @@ function routePhasesCommand({ phase, milestone, args, cwd, raw, error }) {
           : `phases ${registryCommand} failed (${result.errorKind})`);
         return;
       }
-      output(result.data);
+      if (raw) {
+        output(null, true, typeof result.data === 'string' ? result.data : String(result.data ?? ''));
+      } else {
+        output(result.data);
+      }
     };
   }
 

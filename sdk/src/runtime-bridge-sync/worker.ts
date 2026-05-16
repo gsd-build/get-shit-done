@@ -21,6 +21,7 @@ import { QueryRuntimeBridge } from '../query-runtime-bridge.js';
 import { GSDToolsError } from '../gsd-tools-error.js';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { createQueryNativeErrorFactory } from '../query-tools-error-factory.js';
+import { formatQueryRawOutput } from '../query-raw-output-projection.js';
 import type { RuntimeBridgeExecuteInput } from '../query-runtime-bridge.js';
 import type { RuntimeBridgeSyncResult, SyncErrorKind } from './index.js';
 
@@ -57,6 +58,12 @@ function getBridge(): QueryRuntimeBridge {
         request.registryArgs,
       );
     },
+    // #3631: forward raw-mode projection so mode:'raw' returns the per-command
+    // scalar string (next-decimal token, get-phase section, etc.) instead of
+    // falling back to generic JSON-stringify. Without this, family-router
+    // sdkHandlers requesting mode:'raw' under --raw receive a stringified
+    // JSON IR — the regression #3577 introduced for every family router.
+    formatNativeRaw: (registryCommand, data) => formatQueryRawOutput(registryCommand, data),
     // Subprocess fallback stubs — never called because allowFallbackToSubprocess=false
     execSubprocessJson: () =>
       Promise.reject(new Error('Subprocess fallback disabled in sync bridge worker')),

@@ -89,6 +89,10 @@ function dispatchViaSdk(registryCommand, registryArgs, legacyArgs, cwd, raw, err
     const rawText = rawFormatter(result.data);
     const fs = require('fs');
     fs.writeSync(1, rawText);
+  } else if (raw) {
+    // #3631: bridge was called with mode:'raw', so result.data is the scalar
+    // string the CJS path would have printed. Bypass output()'s JSON path.
+    output(null, true, typeof result.data === 'string' ? result.data : String(result.data ?? ''));
   } else {
     output(result.data);
   }
