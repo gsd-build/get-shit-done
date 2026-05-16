@@ -209,11 +209,11 @@ function assertFreshInstallContract(runtime, targetDir) {
   );
 
   if (contract.surface === 'flat-skills') {
-    if (runtime === 'codex') {
-      assertNoGsdDirectoryEntries(targetDir, 'skills');
-    } else {
-      assertHasGsdDirectory(targetDir, 'skills');
-    }
+    // Pre-#3562: codex was special-cased to expect zero gsd-* skill dirs
+    // (assumption: Codex auto-discovers from workflows). That assumption
+    // does not hold for Codex CLI 0.130.0 — fresh installs now materialize
+    // the same flat-skills surface as the other runtimes.
+    assertHasGsdDirectory(targetDir, 'skills');
   } else if (contract.surface === 'hermes-skills') {
     assertHasGsdDirectory(targetDir, path.join('skills', 'gsd'));
     assert.ok(

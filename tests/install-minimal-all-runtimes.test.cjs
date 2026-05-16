@@ -180,8 +180,12 @@ function expectedSkillSet() {
 }
 
 function expectedManifestSkillSet(runtime) {
-  // Codex no longer materializes gsd-* skill files in minimal mode.
-  if (runtime === 'codex') return new Set();
+  // Codex CLI 0.130.0 does not auto-discover commands from workflow / agent
+  // files (#3562) — it only registers commands from skills/<name>/SKILL.md.
+  // Codex installs therefore materialize the same minimal-allowlist skill
+  // surface as the other runtimes; the prior "Codex discovers official
+  // skills directly" assumption (which led to an empty Codex skill set
+  // here) does not hold in practice.
   return expectedSkillSet();
 }
 
