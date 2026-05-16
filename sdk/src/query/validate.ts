@@ -554,6 +554,26 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
         for (const m of all) validPhases.add(m[1]);
       } catch { /* intentionally empty */ }
 
+      // Bug #3652 — STATE.md body retains historical phase references across
+      // milestones. After /gsd-complete-milestone, phases are moved into
+      // `milestones/vX.Y-phases/` and their `#### Phase N:` headings in
+      // ROADMAP.md are collapsed (e.g. inside <details> blocks), so neither
+      // the on-disk phases dir nor the ROADMAP heading scan picks them up.
+      // Treat any phase directory present in any archived milestone as a
+      // valid phase reference. Mirrors the W006 milestone-archive lookup.
+      try {
+        const milestoneEntries = await readdir(join(planBase, 'milestones'), { withFileTypes: true });
+        for (const milestoneEntry of milestoneEntries) {
+          if (!milestoneEntry.isDirectory() || !/-phases$/i.test(milestoneEntry.name)) continue;
+          const archivedPhaseEntries = await readdir(join(planBase, 'milestones', milestoneEntry.name), { withFileTypes: true });
+          for (const archivedPhase of archivedPhaseEntries) {
+            if (!archivedPhase.isDirectory()) continue;
+            const dm = archivedPhase.name.match(/^(\d+[A-Z]?(?:\.\d+)*)/i);
+            if (dm) validPhases.add(dm[1]);
+          }
+        }
+      } catch { /* intentionally empty */ }
+
       // Compare canonical full phase tokens. Also accept a leading-zero
       // variant on the integer prefix only (e.g. "03" → "3", "03.1" → "3.1")
       // so historic STATE.md formatting still validates. Suffix tokens like
