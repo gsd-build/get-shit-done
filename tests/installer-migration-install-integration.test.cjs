@@ -306,7 +306,7 @@ describe('installer migration install integration', { concurrency: false }, () =
   });
 
   test('blocks install before materialization when baseline needs explicit user choice', () => {
-    writeFile(codexHome, 'hooks/gsd-retired-hook.js', 'old gsd hook\n');
+    writeFile(codexHome, 'hooks/gsd-retired-hook.txt', 'old gsd hook\n');
 
     assert.throws(
       () => captureConsole(() =>
@@ -315,7 +315,7 @@ describe('installer migration install integration', { concurrency: false }, () =
       /installer migration blocked/
     );
 
-    assert.equal(fs.readFileSync(path.join(codexHome, 'hooks/gsd-retired-hook.js'), 'utf8'), 'old gsd hook\n');
+    assert.equal(fs.readFileSync(path.join(codexHome, 'hooks/gsd-retired-hook.txt'), 'utf8'), 'old gsd hook\n');
     assert.equal(fs.existsSync(path.join(codexHome, 'skills')), false);
     assert.equal(fs.existsSync(path.join(codexHome, 'get-shit-done', 'VERSION')), false);
   });

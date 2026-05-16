@@ -217,10 +217,17 @@ function resolveInstallerMigrationPromptsForNonTty(result, options = {}) {
 
       if (choice) {
         const resolved = materializeResolution(action, choice);
-        // Inject the concrete action into plan.actions so the apply
-        // step picks it up.
+        // Replace the original prompt-user action in-place when present so
+        // applyInstallerMigrationPlan never sees an unsupported action type.
+        // Fallback to append only when the blocked action did not originate
+        // from plan.actions (defensive).
         if (result.plan && Array.isArray(result.plan.actions)) {
-          result.plan.actions.push(resolved);
+          const idx = result.plan.actions.indexOf(action);
+          if (idx >= 0) {
+            result.plan.actions[idx] = resolved;
+          } else {
+            result.plan.actions.push(resolved);
+          }
         }
         resolutions.push({
           relPath: action.relPath,
