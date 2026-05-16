@@ -132,16 +132,23 @@ describe('changeset parse: docs-exempt extraction (#3213)', () => {
     assert.equal(r.fragment.docsExempt, 'x');
     assert.doesNotMatch(r.fragment.body, /[\r]/);  // no residual CR characters
     assert.doesNotMatch(r.fragment.body, /docs-exempt/);
-    // End-to-end: the rendered bullet has the suffix on the visible body line.
-    const { serializeChangelog } = require(path.join(__dirname, '..', 'scripts', 'changeset', 'serialize.cjs'));
+    // End-to-end: round-trip through serialize → parse to assert on the
+    // structured changelog IR, not rendered text (CONTRIBUTING.md:
+    // "Prohibited: Raw Text Matching on Test Outputs"). The buggy pre-fix
+    // body shape (`Feature.\r\n\r\n\r`) breaks `parseChangelog`'s bullet
+    // regex — it returns an empty `bullets: []` — so this round-trip is
+    // a stronger regression check than a substring match.
+    const { serializeChangelog, parseChangelog } = require(path.join(__dirname, '..', 'scripts', 'changeset', 'serialize.cjs'));
     const out = serializeChangelog({
       releaseHeader: { version: '1.0.0', date: '2026-01-01' },
       sections: [{ type: 'Added', bullets: [{ pr: r.fragment.pr, body: r.fragment.body }] }],
       priorChangelog: null,
     });
-    const lines = out.split('\n');
-    const bulletLine = lines.find((l) => l.startsWith('-'));
-    assert.match(bulletLine, /Feature\.\s+\(#1\)$/);
+    const parsed = parseChangelog(out);
+    assert.equal(parsed.releases.length, 1);
+    assert.deepEqual(parsed.releases[0].sections, [
+      { type: 'Added', bullets: [{ body: 'Feature.', pr: 1 }] },
+    ]);
   });
 
   test('CRLF-authored fragment without marker: no stripping needed, body unchanged in semantics', () => {
