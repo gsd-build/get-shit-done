@@ -31,6 +31,7 @@ const SH_HOOKS = [
   'gsd-session-state.sh',
   'gsd-validate-commit.sh',
   'gsd-phase-boundary.sh',
+  'gsd-graphify-update.sh',
 ];
 
 // ─── Ensure hooks/dist/ is populated before any install test ────────────────

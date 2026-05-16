@@ -1,0 +1,4 @@
+---
+type: Fixed
+---
+**Graphify auto-update hook (`gsd-graphify-update.sh`) now ships in `npm publish`** — the PostToolUse hook and its detached worker (`hooks/lib/gsd-graphify-rebuild.sh`) landed in #3347 along with installer wiring in `bin/install.js`, but the packaging pipeline was missed: `scripts/build-hooks.js` `HOOKS_TO_COPY` never included the .sh, and the installer only copied flat files from `hooks/dist/` (never recursed `hooks/lib/`). Published tarballs therefore omitted the files; fresh installs would log a warning and silently skip the `graphify.auto_update` configuration. Also ensures `hooks/lib/git-cmd.js` (used by validate-commit since #3129) is reliably present. The "files" whitelist already covered `hooks/`, so only the build step + installer copy were required. Fixes #3579.

@@ -36,7 +36,8 @@ const HOOKS_TO_COPY = [
   // Community hooks (bash, opt-in via .planning/config.json hooks.community)
   'gsd-session-state.sh',
   'gsd-validate-commit.sh',
-  'gsd-phase-boundary.sh'
+  'gsd-phase-boundary.sh',
+  'gsd-graphify-update.sh'
 ];
 
 // Sync millisecond sleep using Atomics.wait on a throwaway SharedArrayBuffer.
