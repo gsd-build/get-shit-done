@@ -50,6 +50,10 @@ function isCodexHooksFeatureKey(key) {
 const GSD_COPILOT_INSTRUCTIONS_MARKER = '<!-- GSD Configuration \u2014 managed by get-shit-done installer -->';
 const GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER = '<!-- /GSD Configuration -->';
 
+// GSD-managed files under hooks/lib/ (helpers required by gsd-*.sh hooks).
+// git-cmd.js does not start with "gsd-" (shared classifier for #3129), gsd-graphify-rebuild.sh does.
+const GSD_HOOK_LIB_FILES = ['git-cmd.js', 'gsd-graphify-rebuild.sh'];
+
 const CODEX_AGENT_SANDBOX = {
   'gsd-executor': 'workspace-write',
   'gsd-planner': 'workspace-write',
@@ -6867,6 +6871,19 @@ function uninstall(isGlobal, runtime = 'claude') {
       removedCount++;
       console.log(`  ${green}✓${reset} Removed ${hookCount} GSD hooks`);
     }
+
+    // Also remove hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh etc.).
+    // These are now installed as part of the gsd-*.sh hook surface (#3579).
+    const hooksLibDir = path.join(hooksDir, 'lib');
+    if (fs.existsSync(hooksLibDir)) {
+      try {
+        fs.rmSync(hooksLibDir, { recursive: true, force: true });
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed hooks/lib/ helpers`);
+      } catch (_) {
+        // Non-fatal; best effort cleanup.
+      }
+    }
   }
 
   // 5. Remove GSD package.json (CommonJS mode marker)
@@ -7484,6 +7501,16 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
       for (const file of fs.readdirSync(hooksDir)) {
         if (file.startsWith('gsd-') && (file.endsWith('.js') || file.endsWith('.sh'))) {
           manifest.files['hooks/' + file] = fileHash(path.join(hooksDir, file));
+        }
+      }
+      // Track hooks/lib/ helpers so saveLocalPatches() can back up user edits
+      // to git-cmd.js (validate-commit classifier) and gsd-graphify-rebuild.sh.
+      const hooksLibDir = path.join(hooksDir, 'lib');
+      if (fs.existsSync(hooksLibDir)) {
+        for (const file of fs.readdirSync(hooksLibDir)) {
+          if (GSD_HOOK_LIB_FILES.includes(file)) {
+            manifest.files['hooks/lib/' + file] = fileHash(path.join(hooksLibDir, file));
+          }
         }
       }
     }
