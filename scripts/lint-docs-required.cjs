@@ -5,7 +5,7 @@
  * Docs-required lint (#3213).
  *
  * Mirrors scripts/changeset/lint.cjs. Pure verdict function
- * evaluateLint({ changedFiles, fragments, labels }) returns
+ * evaluateLint({ changedFiles, fragments, labels, malformed }) returns
  * { ok, reason, triggering } using the LINT_REASON enum. The CLI wrapper
  * reads the PR diff (`git diff --name-only origin/${base}...HEAD`), parses
  * each touched `.changeset/*.md` fragment, then calls evaluateLint.
@@ -13,7 +13,7 @@
  * Tests assert on the structured verdict, never on free text.
  */
 
-const { parseFragment } = require('./changeset/parse.cjs');
+const { parseFragment, FRAGMENT_ERROR } = require('./changeset/parse.cjs');
 
 const LINT_REASON = Object.freeze({
   OK_NO_TRIGGERING_FRAGMENTS: 'ok_no_triggering_fragments',
@@ -21,6 +21,7 @@ const LINT_REASON = Object.freeze({
   OK_OPT_OUT_LABEL: 'ok_opt_out_label',
   OK_FRAGMENTS_EXEMPT: 'ok_fragments_exempt',
   FAIL_DOCS_MISSING: 'fail_docs_missing',
+  FAIL_MALFORMED_FRAGMENT: 'fail_malformed_fragment',
 });
 
 const OPT_OUT_LABEL = 'no-docs';
@@ -32,12 +33,6 @@ const TRIGGERING_TYPES = new Set(['Added', 'Changed', 'Deprecated', 'Removed']);
 
 const DOCS_PREFIX = 'docs/';
 
-// Per-fragment escape hatch: any HTML comment of the form
-// `<!-- docs-exempt: <reason> -->` inside the fragment body marks that
-// fragment as not requiring docs. All triggering fragments must carry
-// the marker for the PR to pass via this route — a paper trail per fragment.
-const EXEMPT_MARKER_RE = /<!--\s*docs-exempt\b[^>]*-->/i;
-
 function isFragmentPath(file) {
   return /^\.changeset\/[^/]+\.md$/.test(file) && !file.endsWith('/README.md');
 }
@@ -46,21 +41,40 @@ function isDocsFile(file) {
   return file.startsWith(DOCS_PREFIX);
 }
 
+// Per-fragment escape hatch: parse.cjs extracts `<!-- docs-exempt: <reason> -->`
+// from the body into `fragment.docsExempt` (a string reason, possibly empty).
+// `null` means no marker was present.
 function isExemptFragment(fragment) {
-  return EXEMPT_MARKER_RE.test(fragment.body || '');
+  return fragment.docsExempt != null;
 }
 
 /**
  * Pure verdict — no fs, no git.
  *
+ * Malformed fragments fail closed: a triggering fragment with bad frontmatter
+ * cannot silently bypass docs enforcement. The changeset-required lint only
+ * checks fragment _presence_, not _validity_, so docs lint takes responsibility
+ * for any fragment it tries to consume.
+ *
  * @param {object} args
  * @param {string[]} args.changedFiles  - file paths changed in the PR
- * @param {Array<{ path: string, type: string, body: string }>} args.fragments
- *   - parsed records for `.changeset/*.md` files in `changedFiles`
+ * @param {Array<{ path: string, type: string, body: string, docsExempt: string|null }>} args.fragments
+ *   - parsed records for well-formed `.changeset/*.md` files in `changedFiles`
+ * @param {Array<{ path: string, reason: string }>} [args.malformed]
+ *   - records for `.changeset/*.md` files that failed `parseFragment`
  * @param {string[]} args.labels        - PR labels
- * @returns {{ ok: boolean, reason: string, triggering: string[] }}
+ * @returns {{ ok: boolean, reason: string, triggering: string[], malformed?: Array<{path:string,reason:string}> }}
  */
-function evaluateLint({ changedFiles, fragments, labels }) {
+function evaluateLint({ changedFiles, fragments, labels, malformed = [] }) {
+  if (malformed.length > 0) {
+    return {
+      ok: false,
+      reason: LINT_REASON.FAIL_MALFORMED_FRAGMENT,
+      triggering: [],
+      malformed,
+    };
+  }
+
   const triggering = fragments.filter((f) => TRIGGERING_TYPES.has(f.type));
   const triggeringPaths = triggering.map((f) => f.path);
 
@@ -88,7 +102,8 @@ function evaluateLint({ changedFiles, fragments, labels }) {
 function readFragmentsFromDisk(changedFiles, rootDir) {
   const fs = require('node:fs');
   const path = require('node:path');
-  const out = [];
+  const fragments = [];
+  const malformed = [];
   for (const rel of changedFiles) {
     if (!isFragmentPath(rel)) continue;
     const abs = path.join(rootDir, rel);
@@ -96,18 +111,23 @@ function readFragmentsFromDisk(changedFiles, rootDir) {
     let src;
     try {
       src = fs.readFileSync(abs, 'utf8');
-    } catch {
+    } catch (e) {
+      malformed.push({ path: rel, reason: 'read_error', detail: e.code || e.message });
       continue;
     }
     const parsed = parseFragment(src);
-    if (!parsed.ok) continue; // malformed — changeset lint handles it
-    out.push({
+    if (!parsed.ok) {
+      malformed.push({ path: rel, reason: parsed.reason, detail: parsed.detail || null });
+      continue;
+    }
+    fragments.push({
       path: rel,
       type: parsed.fragment.type,
       body: parsed.fragment.body,
+      docsExempt: parsed.fragment.docsExempt,
     });
   }
-  return out;
+  return { fragments, malformed };
 }
 
 function main() {
@@ -143,15 +163,26 @@ function main() {
     process.exit(2);
   }
 
-  const fragments = readFragmentsFromDisk(changedFiles, rootDir);
-  const verdict = evaluateLint({ changedFiles, fragments, labels });
+  const { fragments, malformed } = readFragmentsFromDisk(changedFiles, rootDir);
+  const verdict = evaluateLint({ changedFiles, fragments, labels, malformed });
 
   if (process.argv.includes('--json')) {
     process.stdout.write(
-      JSON.stringify({ ...verdict, changedFiles, fragments, labels }, null, 2) + '\n',
+      JSON.stringify({ ...verdict, changedFiles, fragments, malformed, labels }, null, 2) + '\n',
     );
   } else if (verdict.ok) {
     process.stdout.write(`ok docs-lint: ${verdict.reason}\n`);
+  } else if (verdict.reason === LINT_REASON.FAIL_MALFORMED_FRAGMENT) {
+    process.stderr.write(`\nERROR docs-lint: ${verdict.reason}\n`);
+    process.stderr.write(
+      `${malformed.length} changeset fragment(s) failed to parse — docs lint cannot consume them:\n`,
+    );
+    for (const m of malformed) {
+      process.stderr.write(`  ${m.path}  (reason: ${m.reason}${m.detail ? `, detail: ${m.detail}` : ''})\n`);
+    }
+    process.stderr.write(
+      `\nFix the fragment frontmatter (\`type:\` + \`pr:\`) before this PR can pass.\n`,
+    );
   } else {
     process.stderr.write(`\nERROR docs-lint: ${verdict.reason}\n`);
     process.stderr.write(
@@ -182,7 +213,8 @@ module.exports = {
   LINT_REASON,
   OPT_OUT_LABEL,
   TRIGGERING_TYPES,
-  EXEMPT_MARKER_RE,
+  FRAGMENT_ERROR,
   isFragmentPath,
   isDocsFile,
+  isExemptFragment,
 };

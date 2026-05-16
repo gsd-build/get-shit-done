@@ -5,7 +5,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const { parseFragment, FRAGMENT_ERROR } = require(path.join(__dirname, '..', 'scripts', 'changeset', 'parse.cjs'));
+const { parseFragment, extractDocsExempt, FRAGMENT_ERROR, DOCS_EXEMPT_RE } = require(path.join(__dirname, '..', 'scripts', 'changeset', 'parse.cjs'));
 
 describe('changeset parse: fragment file → typed record (#2975)', () => {
   test('returns { ok: true, fragment } for a well-formed fragment', () => {
@@ -16,6 +16,7 @@ describe('changeset parse: fragment file → typed record (#2975)', () => {
       type: 'Fixed',
       pr: 2975,
       body: 'fix the thing.',
+      docsExempt: null,
     });
   });
 
@@ -53,4 +54,85 @@ describe('changeset parse: fragment file → typed record (#2975)', () => {
       assert.equal(r.reason, FRAGMENT_ERROR[expectedReason]);
     });
   }
+});
+
+describe('changeset parse: docs-exempt extraction (#3213)', () => {
+  test('extractDocsExempt returns { docsExempt: null, body } when no marker present', () => {
+    const out = extractDocsExempt('plain body text');
+    assert.deepEqual(out, { docsExempt: null, body: 'plain body text' });
+  });
+
+  test('extractDocsExempt captures the reason and strips the marker from body', () => {
+    const out = extractDocsExempt('feature note.\n\n<!-- docs-exempt: internal-only -->');
+    assert.equal(out.docsExempt, 'internal-only');
+    assert.doesNotMatch(out.body, /docs-exempt/);
+    assert.match(out.body, /feature note\./);
+  });
+
+  test('extractDocsExempt handles marker with no reason (just <!-- docs-exempt -->)', () => {
+    const out = extractDocsExempt('body\n<!-- docs-exempt -->');
+    assert.equal(out.docsExempt, '');
+    assert.doesNotMatch(out.body, /docs-exempt/);
+  });
+
+  test('extractDocsExempt is case-insensitive on the marker token', () => {
+    const out = extractDocsExempt('body\n<!-- DOCS-EXEMPT: shouty reason -->');
+    assert.equal(out.docsExempt, 'shouty reason');
+  });
+
+  test('parseFragment surfaces docsExempt on the fragment record', () => {
+    const src = '---\ntype: Added\npr: 3213\n---\nbootstrap.\n\n<!-- docs-exempt: bootstrap -->\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, true);
+    assert.equal(r.fragment.docsExempt, 'bootstrap');
+    // Marker must not appear in the rendered body. CHANGELOG and GitHub
+    // release-notes serializers append `(#NNNN)` to the body's last line;
+    // a trailing comment line would attach the suffix to the wrong content.
+    assert.doesNotMatch(r.fragment.body, /docs-exempt/);
+    assert.match(r.fragment.body, /bootstrap\./);
+  });
+
+  test('parseFragment fails EMPTY_BODY when the body is only a docs-exempt marker', () => {
+    const src = '---\ntype: Added\npr: 1\n---\n<!-- docs-exempt: nothing else -->\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, FRAGMENT_ERROR.EMPTY_BODY);
+  });
+
+  test('DOCS_EXEMPT_RE is exposed and matches the documented shape', () => {
+    assert.ok(DOCS_EXEMPT_RE instanceof RegExp);
+    assert.match('<!-- docs-exempt: x -->', DOCS_EXEMPT_RE);
+    assert.doesNotMatch('docs-exempt: not in a comment', DOCS_EXEMPT_RE);
+  });
+
+  test('inline mention inside backticks does NOT count as a marker (false-positive guard)', () => {
+    // Fragment body documents the marker syntax inline as part of release notes.
+    // Without the line-anchor, the regex would mis-identify this as an actual
+    // exemption and strip release-note content.
+    const src =
+      '---\ntype: Added\npr: 3213\n---\n' +
+      'New escape hatch: `<!-- docs-exempt: <reason> -->` on its own line at the end of a fragment body exempts that fragment from docs lint.\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, true);
+    assert.equal(r.fragment.docsExempt, null);
+    // The literal syntax example must remain in the rendered body — it is
+    // legitimate release-note content explaining the new feature.
+    assert.match(r.fragment.body, /docs-exempt/);
+  });
+
+  test('marker on its own line trailing a fragment body still wins (real-marker positive case)', () => {
+    const src =
+      '---\ntype: Added\npr: 3213\n---\n' +
+      'New escape hatch: `<!-- docs-exempt: <reason> -->` documents the syntax.\n' +
+      '\n' +
+      '<!-- docs-exempt: bootstrap of the lint itself -->\n';
+    const r = parseFragment(src);
+    assert.equal(r.ok, true);
+    assert.equal(r.fragment.docsExempt, 'bootstrap of the lint itself');
+    // The trailing real-marker line is stripped — the "bootstrap" reason
+    // should not appear anywhere in the rendered body.
+    assert.doesNotMatch(r.fragment.body, /bootstrap of the lint itself/);
+    // … but the inline syntax example is preserved.
+    assert.match(r.fragment.body, /docs-exempt: <reason>/);
+  });
 });
