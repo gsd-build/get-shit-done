@@ -754,6 +754,12 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir, workstream
     const dependsMatch = section.match(/\*\*Depends on(?::\*\*|\*\*:)\s*([^\n]+)/i);
     const depends_on = dependsMatch ? dependsMatch[1].trim() : null;
 
+    // **Mode:** field — vertical-MVP slice flag per CONTEXT.md "MVP Mode"
+    // glossary. Pattern mirrors the roadmapGetPhase extraction above so the
+    // analyze output surfaces the same value the get-phase handler returns.
+    const modeMatchPhase = section.match(/\*\*Mode(?::\*\*|\*\*:)\s*([^\n]+)/i);
+    const mode = modeMatchPhase ? modeMatchPhase[1].trim().toLowerCase() : null;
+
     // Check completion on disk
     const normalized = normalizePhaseName(phaseNum);
     let diskStatus = 'no_directory';
@@ -798,6 +804,7 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir, workstream
       name: phaseName,
       goal,
       depends_on,
+      mode,
       plan_count: planCount,
       summary_count: summaryCount,
       has_context: hasContext,

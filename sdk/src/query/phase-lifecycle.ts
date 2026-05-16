@@ -1605,6 +1605,24 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
     }
   }
 
+  // Step F2: Auto-prune STATE.md decisions when `workflow.auto_prune_state`
+  // is true. Mirrors CJS cmdPhaseComplete (bin/lib/phase.cjs:1378-1390) which
+  // calls cmdStatePrune({keepRecent:'3', dryRun:false, silent:true}). Without
+  // this, completing phase N with auto_prune_state=true leaves stale [Phase
+  // 1..N-3] decisions in STATE.md forever. (#2087)
+  let autoPruned = false;
+  try {
+    if (existsSync(paths.config)) {
+      const rawConfig = JSON.parse(await readFile(paths.config, 'utf-8')) as Record<string, unknown>;
+      const wf = rawConfig.workflow as Record<string, unknown> | undefined;
+      if (wf && wf.auto_prune_state === true && existsSync(paths.state)) {
+        const { statePrune } = await import('./state-mutation.js');
+        await statePrune(['--keep-recent', '3', '--silent'], projectDir, workstream);
+        autoPruned = true;
+      }
+    }
+  } catch { /* best-effort, matches CJS */ }
+
   // Step G: Return result
   return {
     data: {
@@ -1618,6 +1636,7 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
       roadmap_updated: existsSync(paths.roadmap),
       state_updated: stateUpdated,
       requirements_updated: requirementsUpdated,
+      auto_pruned: autoPruned,
       warnings,
       has_warnings: warnings.length > 0,
     },

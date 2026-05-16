@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { VALID_PROFILES, getAgentToModelMapForProfile } from './config-query.js';
 import { VALID_CONFIG_KEYS, RUNTIME_STATE_KEYS, DYNAMIC_KEY_PATTERNS } from './config-schema.js';
+import { CONFIG_DEFAULTS } from '../configuration/index.js';
 import { planningPaths } from './helpers.js';
 import { acquireStateLock, releaseStateLock } from './state-mutation.js';
 import { maskIfSecret } from './secrets.js';
@@ -318,6 +319,106 @@ export const configSet: QueryHandler = async (args, projectDir, workstream) => {
     );
   }
 
+  // Codebase drift detector value validation — port of config.cjs:430-437. (#2003)
+  const VALID_DRIFT_ACTIONS = ['warn', 'auto-remap'];
+  if (keyPath === 'workflow.drift_action' && !VALID_DRIFT_ACTIONS.includes(String(parsedValue))) {
+    throw new GSDError(
+      `Invalid workflow.drift_action '${rawValue}'. Valid values: ${VALID_DRIFT_ACTIONS.join(', ')}`,
+      ErrorClassification.Validation,
+    );
+  }
+  if (keyPath === 'workflow.drift_threshold') {
+    if (typeof parsedValue !== 'number' || !Number.isInteger(parsedValue) || parsedValue < 1) {
+      throw new GSDError(
+        `Invalid workflow.drift_threshold '${rawValue}'. Must be a positive integer.`,
+        ErrorClassification.Validation,
+      );
+    }
+  }
+
+  // Human verification checkpoint mode (#3309) — port of config.cjs:457-460.
+  const VALID_HUMAN_VERIFY_MODES = ['mid-flight', 'end-of-phase'];
+  if (keyPath === 'workflow.human_verify_mode' && !VALID_HUMAN_VERIFY_MODES.includes(String(parsedValue))) {
+    throw new GSDError(
+      `Invalid workflow.human_verify_mode '${rawValue}'. Valid values: ${VALID_HUMAN_VERIFY_MODES.join(', ')}`,
+      ErrorClassification.Validation,
+    );
+  }
+
+  // Context position enum validation (#2937) — port of config.cjs:463-466.
+  const VALID_CONTEXT_POSITIONS = ['front', 'end'];
+  if (keyPath === 'statusline.context_position' && !VALID_CONTEXT_POSITIONS.includes(String(parsedValue))) {
+    throw new GSDError(
+      `Invalid statusline.context_position '${rawValue}'. Valid values: ${VALID_CONTEXT_POSITIONS.join(', ')}`,
+      ErrorClassification.Validation,
+    );
+  }
+
+  // Fallow scope + profile enum validation (#3424) — port of config.cjs:469-477.
+  const VALID_FALLOW_SCOPES = ['phase', 'repo'];
+  if (keyPath === 'code_quality.fallow.scope' && !VALID_FALLOW_SCOPES.includes(String(parsedValue))) {
+    throw new GSDError(
+      `Invalid code_quality.fallow.scope '${rawValue}'. Valid values: ${VALID_FALLOW_SCOPES.join(', ')}`,
+      ErrorClassification.Validation,
+    );
+  }
+  const VALID_FALLOW_PROFILES = ['minimal', 'standard', 'strict'];
+  if (keyPath === 'code_quality.fallow.profile' && !VALID_FALLOW_PROFILES.includes(String(parsedValue))) {
+    throw new GSDError(
+      `Invalid code_quality.fallow.profile '${rawValue}'. Valid values: ${VALID_FALLOW_PROFILES.join(', ')}`,
+      ErrorClassification.Validation,
+    );
+  }
+
+  // review.default_reviewers (#3079) — port of normalizeConfiguredDefaultReviewers
+  // from bin/lib/review-reviewer-selection.cjs. Validates array shape, rejects
+  // empties, requires string slugs matching ^[a-zA-Z0-9_-]+$, and normalizes to
+  // lowercase-unique order. `parsedValue` is rewritten in place so the persisted
+  // value carries the normalized form (matching CJS config.cjs:479-483 behavior).
+  let normalizedValue: unknown = parsedValue;
+  if (keyPath === 'review.default_reviewers') {
+    if (parsedValue === null || parsedValue === undefined) {
+      throw new GSDError(
+        'review.default_reviewers must be a JSON array of reviewer slugs',
+        ErrorClassification.Validation,
+      );
+    }
+    if (!Array.isArray(parsedValue)) {
+      throw new GSDError(
+        'review.default_reviewers must be a JSON array of reviewer slugs',
+        ErrorClassification.Validation,
+      );
+    }
+    if (parsedValue.length === 0) {
+      throw new GSDError(
+        'review.default_reviewers cannot be empty',
+        ErrorClassification.Validation,
+      );
+    }
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const item of parsedValue) {
+      if (typeof item !== 'string') {
+        throw new GSDError(
+          'review.default_reviewers must contain only string slugs',
+          ErrorClassification.Validation,
+        );
+      }
+      if (!/^[a-zA-Z0-9_-]+$/.test(item)) {
+        throw new GSDError(
+          `invalid reviewer slug in review.default_reviewers: ${item}`,
+          ErrorClassification.Validation,
+        );
+      }
+      const slug = item.toLowerCase();
+      if (!seen.has(slug)) {
+        seen.add(slug);
+        normalized.push(slug);
+      }
+    }
+    normalizedValue = normalized;
+  }
+
   // D6: Lock protection for read-modify-write (match CJS config.cjs:296)
   const paths = planningPaths(projectDir, workstream);
   const lockPath = await acquireStateLock(paths.config);
@@ -332,7 +433,7 @@ export const configSet: QueryHandler = async (args, projectDir, workstream) => {
     }
 
     previousValue = getValueAtPath(config, keyPath);
-    setConfigValue(config, keyPath, parsedValue);
+    setConfigValue(config, keyPath, normalizedValue);
     await atomicWriteConfig(paths.config, config);
   } finally {
     await releaseStateLock(lockPath);
@@ -466,48 +567,30 @@ export const configNewProject: QueryHandler = async (args, projectDir, workstrea
   const hasFirecrawl = !!(process.env.FIRECRAWL_API_KEY || existsSync(join(homeDir, '.gsd', 'firecrawl_api_key')));
   const hasExaSearch = !!(process.env.EXA_API_KEY || existsSync(join(homeDir, '.gsd', 'exa_api_key')));
 
-  // Build default config. Values mirror sdk/shared/config-defaults.manifest.json
-  // and the CJS `buildNewProjectConfig` `hardcoded` block.
+  // Build default config. Single source of truth is the canonical Configuration
+  // Module manifest at sdk/shared/config-defaults.manifest.json, exported as
+  // CONFIG_DEFAULTS from sdk/src/configuration/index.ts. The previous hardcoded
+  // duplicate was an instance of DEFECT.PORT-DRIFT.cjs-sdk — it omitted
+  // workflow.{ai_integration_phase, tdd_mode, human_verify_mode, pattern_mapper,
+  // plan_bounce*, auto_prune_state, subagent_timeout, security_*, etc.} and
+  // git.create_tag, claude_md_path, planning.*, graphify.*. Sourcing from the
+  // manifest closes the drift and keeps configNewProject in sync with the rest
+  // of the Configuration Module by construction.
+  //
+  // Runtime API-key detection overrides the manifest's `false` defaults for the
+  // three search providers — manifest comment explicitly notes this contract.
+  const manifestDefaults = CONFIG_DEFAULTS as Record<string, unknown>;
+  // Strip the metadata-only "_comment" key before it gets persisted.
+  const { _comment: _ignoredComment, ...sanitizedManifest } = manifestDefaults;
+  void _ignoredComment;
   const defaults: Record<string, unknown> = {
-    model_profile: 'balanced',
-    commit_docs: true,
-    parallelization: true,
-    search_gitignored: false,
+    ...sanitizedManifest,
     brave_search: hasBraveSearch,
     firecrawl: hasFirecrawl,
     exa_search: hasExaSearch,
-    git: {
-      branching_strategy: 'none',
-      phase_branch_template: 'gsd/phase-{phase}-{slug}',
-      milestone_branch_template: 'gsd/{milestone}-{slug}',
-      quick_branch_template: null,
-    },
-    workflow: {
-      research: true,
-      plan_check: true,
-      verifier: true,
-      nyquist_validation: true,
-      auto_advance: false,
-      node_repair: true,
-      node_repair_budget: 2,
-      ui_phase: true,
-      ui_safety_gate: true,
-      text_mode: false,
-      research_before_questions: false,
-      discuss_mode: 'discuss',
-      skip_discuss: false,
-      code_review: true,
-      code_review_depth: 'standard',
-    },
-    ship: {
-      pr_body_sections: [],
-    },
-    hooks: {
-      context_warnings: true,
-    },
-    project_code: null,
-    phase_naming: 'sequential',
-    agent_skills: {},
+    // CJS `buildNewProjectConfig` includes `features: {}` as a hardcoded
+    // top-level slot; the manifest doesn't yet — keep parity until the
+    // manifest is amended in a separate enhancement.
     features: {},
   };
 

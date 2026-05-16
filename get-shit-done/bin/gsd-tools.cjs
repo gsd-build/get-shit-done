@@ -774,16 +774,23 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     }
 
     case 'config-ensure-section': {
-      // Phase 6 (#3575) carve-out: the SDK `configEnsureSection` handler was
-      // added with single-section semantics (requires args[0]=sectionName) but
-      // every real CLI caller invokes the no-arg form, expecting full default
-      // `config.json` initialization (legacy `cmdConfigEnsureSection` →
-      // `ensureConfigFile` → `buildNewProjectConfig`). Routing through the SDK
-      // bridge produces "Usage: config-ensure-section <section>" for the
-      // legacy contract. Until the SDK port is reconciled (CJS
-      // `buildNewProjectConfig` defaults vs SDK `configNewProject` defaults
-      // are also drifted — separate issue), keep dispatch on the CJS handler.
-      config.cmdConfigEnsureSection(cwd, raw);
+      // Phase 6 (#3575): dispatch via SDK executeForCjs. The catalog rebinds
+      // 'config-ensure-section' to configNewProject in
+      // sdk/src/query/command-static-catalog-foundation.ts, restoring the
+      // legacy "no-arg full default init" contract on the SDK path
+      // (configEnsureSection itself stays available as an unbound single-
+      // section helper for future SDK callers).
+      const handled = _dispatchNonFamily({
+        registryCommand: 'config-ensure-section',
+        registryArgs: args.slice(1),
+        legacyCommand: 'config-ensure-section',
+        legacyArgs: args.slice(1),
+        cwd,
+        raw,
+        error,
+        output: core.output,
+      });
+      if (!handled) config.cmdConfigEnsureSection(cwd, raw);
       break;
     }
 

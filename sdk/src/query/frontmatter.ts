@@ -376,7 +376,12 @@ export const frontmatterGet: QueryHandler = async (args, projectDir) => {
   }
 
   const fm = extractFrontmatter(content);
-  const field = args[1];
+  // CLI invocation is `frontmatter get <file> --field <name>`; the CJS router
+  // passes args.slice(2) = [file, '--field', name] to the SDK. Previously the
+  // handler treated args[1] as the field name and saw `'--field'`. Parse the
+  // flag so both invocation shapes work (positional second arg AND --field).
+  const fieldFlagIdx = args.indexOf('--field');
+  const field = fieldFlagIdx >= 0 ? args[fieldFlagIdx + 1] : args[1];
 
   if (field) {
     const value = fm[field];

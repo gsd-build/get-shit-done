@@ -22,6 +22,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, basename } from 'node:path';
 import { execSync } from 'node:child_process';
 import { homedir } from 'node:os';
+import { GSDError, ErrorClassification } from '../errors.js';
 
 import { loadConfig, type GSDConfig } from '../config.js';
 import { resolveModel, MODEL_PROFILES } from './config-query.js';
@@ -370,6 +371,13 @@ export const initExecutePhase: QueryHandler = async (args, projectDir, workstrea
     return { data: { error: 'phase required for init execute-phase' } };
   }
 
+  // --tdd is a boolean override of config.workflow.tdd_mode — matches the CJS
+  // path's parseNamedArgs(args, [], ['validate', 'tdd']) projection
+  // (bin/lib/init-command-router.cjs handler block) which passes options.tdd
+  // through to cmdInitExecutePhase. Without parsing here, `gsd-tools init
+  // execute-phase 1 --tdd` would never override a false config value.
+  const tddFlag = args.includes('--tdd');
+
   const config = await loadConfig(projectDir);
   const paths = planningPaths(projectDir, workstream);
   const planningDir = paths.planning;
@@ -397,7 +405,7 @@ export const initExecutePhase: QueryHandler = async (args, projectDir, workstrea
   const result: Record<string, unknown> = {
     executor_model: executorModel,
     verifier_model: verifierModel,
-    tdd_mode: config.workflow.tdd_mode ?? false,
+    tdd_mode: tddFlag || (config.workflow.tdd_mode ?? false),
     commit_docs: config.commit_docs,
     sub_repos: (config as Record<string, unknown>).sub_repos ?? [],
     parallelization: config.parallelization,
@@ -453,6 +461,10 @@ export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) 
     return { data: { error: 'phase required for init plan-phase' } };
   }
 
+  // --tdd boolean override (parity with CJS router's parseNamedArgs + the
+  // legacy cmdInitPlanPhase `options.tdd || config.tdd_mode || false`).
+  const tddFlag = args.includes('--tdd');
+
   const config = await loadConfig(projectDir);
   const paths = planningPaths(projectDir, workstream);
   const planningDir = paths.planning;
@@ -490,7 +502,7 @@ export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) 
     researcher_model: researcherModel,
     planner_model: plannerModel,
     checker_model: checkerModel,
-    tdd_mode: config.workflow.tdd_mode ?? false,
+    tdd_mode: tddFlag || (config.workflow.tdd_mode ?? false),
     research_enabled: config.workflow.research,
     plan_checker_enabled: config.workflow.plan_check,
     nyquist_validation_enabled: config.workflow.nyquist_validation,
@@ -1049,7 +1061,12 @@ export const initMapCodebase: QueryHandler = async (_args, projectDir) => {
     commit_docs: config.commit_docs,
     search_gitignored: config.search_gitignored,
     parallelization: config.parallelization,
-    subagent_timeout: (config as Record<string, unknown>).subagent_timeout ?? undefined,
+    // subagent_timeout lives at workflow.subagent_timeout per the canonical
+    // Configuration manifest (sdk/shared/config-defaults.manifest.json). Reading
+    // the top-level config.subagent_timeout returned undefined, so the workflow
+    // step that consumes this value had to invent its own fallback. Default to
+    // 300000 (5 min) per the manifest. (#1472)
+    subagent_timeout: (((config as Record<string, unknown>).workflow as Record<string, unknown> | undefined)?.subagent_timeout as number | undefined) ?? 300000,
     date: now.toISOString().split('T')[0],
     timestamp: now.toISOString(),
     codebase_dir: '.planning/codebase',
@@ -1171,12 +1188,18 @@ export const initListWorkspaces: QueryHandler = async (_args, _projectDir) => {
 export const initRemoveWorkspace: QueryHandler = async (args, _projectDir) => {
   const name = args[0];
   if (!name) {
-    return { data: { error: 'workspace name required for init remove-workspace' } };
+    // Throw so the CLI dispatcher projects a non-zero exit + writes the message
+    // to stderr — returning `{ data: { error } }` was treated as success by
+    // the CLI output path, hiding the validation failure from callers.
+    throw new GSDError('workspace name required for init remove-workspace', ErrorClassification.Validation);
   }
 
   // T-14-01: Reject path traversal attempts
   if (name.includes('/') || name.includes('\\') || name.includes('..')) {
-    return { data: { error: `Invalid workspace name: ${name} (path separators not allowed)` } };
+    throw new GSDError(
+      `Invalid workspace name: ${name} (path separators not allowed)`,
+      ErrorClassification.Validation,
+    );
   }
 
   const home = process.env.HOME || homedir();
@@ -1185,7 +1208,7 @@ export const initRemoveWorkspace: QueryHandler = async (args, _projectDir) => {
   const manifestPath = join(wsPath, 'WORKSPACE.md');
 
   if (!existsSync(wsPath)) {
-    return { data: { error: `Workspace not found: ${wsPath}` } };
+    throw new GSDError(`Workspace not found: ${wsPath}`, ErrorClassification.Validation);
   }
 
   const repos: Array<Record<string, unknown>> = [];

@@ -55,7 +55,15 @@ export const MUTATION_SURFACES_STATIC_CATALOG: ReadonlyArray<readonly [string, Q
   ['config-set', configSet],
   ['config-set-model-profile', configSetModelProfile],
   ['config-new-project', configNewProject],
-  ['config-ensure-section', configEnsureSection],
+  // Legacy contract: `config-ensure-section` (no positional arg) initialises
+  // the full default .planning/config.json — semantically identical to
+  // `config-new-project` with empty userChoices. Phase 6 originally bound
+  // this to the `configEnsureSection` single-section-ensure handler, which
+  // requires args[0]=sectionName the CLI never passes. Re-binding to
+  // configNewProject restores the legacy contract on the SDK path.
+  // `configEnsureSection` itself remains exported for any future SDK caller
+  // that wants the single-section semantics.
+  ['config-ensure-section', configNewProject],
   ['commit', commit],
   ['check-commit', checkCommit],
   ['template.fill', templateFill],

@@ -107,12 +107,12 @@ function routeVerifyCommand({ verify, args, cwd, raw, error }) {
           verify.cmdVerifySchemaDrift(cwd, phaseArg, skipFlag, raw);
         },
       ),
-      'codebase-drift': sdkHandler(
-        'verify.codebase-drift',
-        args.slice(2),
-        args.slice(1),
-        () => verify.cmdVerifyCodebaseDrift(cwd, raw),
-      ),
+      // verify codebase-drift dispatches direct to CJS — drift is out-of-seam
+      // per ADR/PRD 3524 §3 / L160 (CJS-only by design). Routing through
+      // sdkHandler would re-enter the SDK bridge, and Phase 6's removed
+      // verifyCodebaseDrift stub used to execFileSync back to the CLI,
+      // creating an infinite spawn loop.
+      'codebase-drift': () => verify.cmdVerifyCodebaseDrift(cwd, raw),
     },
   });
 }

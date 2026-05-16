@@ -71,8 +71,9 @@ export const NON_FAMILY_COMMAND_MANIFEST: readonly NonFamilyCommandManifestEntry
   { canonical: 'learnings.prune', aliases: ['learnings prune'], mutation: true, outputMode: 'json' },
   { canonical: 'learnings.delete', aliases: ['learnings delete'], mutation: true, outputMode: 'json' },
 
-  { canonical: 'intel.snapshot', aliases: ['intel snapshot'], mutation: true, outputMode: 'json' },
-  { canonical: 'intel.patch-meta', aliases: ['intel patch-meta'], mutation: true, outputMode: 'json' },
+  // intel.* entries intentionally NOT in this manifest — intel is out-of-seam
+  // (CJS-only) per ADR/PRD 3524 §3 / L160. Dispatch is direct from
+  // get-shit-done/bin/gsd-tools.cjs `case 'intel':` to bin/lib/intel.cjs.
 
   { canonical: 'write-profile', aliases: [], mutation: true, outputMode: 'json' },
   { canonical: 'generate-claude-profile', aliases: [], mutation: true, outputMode: 'json' },
