@@ -98,6 +98,32 @@ function summarizeInstallerMigrationResult(result) {
   };
 }
 
+// #3628: explicit whitelist of bundled hook files shipped in the npm
+// distribution under `hooks/`. The classifier-based auto-removal of these
+// files at first-time-baseline scan (added in #3610) is restricted to this
+// set — a shape regex like `^hooks/gsd-[^/]+\.(?:js|sh|cjs|mjs)$` also
+// matches user-authored custom hooks and retired bundled hooks from prior
+// versions, and auto-removing those is silent data loss.
+//
+// The bug-3628 regression guard asserts this Set stays aligned with the
+// on-disk `hooks/` directory in both directions: whitelist-but-missing
+// AND shipped-but-not-whitelisted both fail CI.
+const BUNDLED_GSD_HOOK_FILES = Object.freeze(new Set([
+  'hooks/gsd-check-update-worker.js',
+  'hooks/gsd-check-update.js',
+  'hooks/gsd-context-monitor.js',
+  'hooks/gsd-graphify-update.sh',
+  'hooks/gsd-phase-boundary.sh',
+  'hooks/gsd-prompt-guard.js',
+  'hooks/gsd-read-guard.js',
+  'hooks/gsd-read-injection-scanner.js',
+  'hooks/gsd-session-state.sh',
+  'hooks/gsd-statusline.js',
+  'hooks/gsd-update-banner.js',
+  'hooks/gsd-validate-commit.sh',
+  'hooks/gsd-workflow-guard.js',
+]));
+
 // Classify a blocked prompt-user action into one of the safe-default
 // categories. Returns null when no safe default applies — caller must
 // fall back to the hard assertion / interactive prompt for those.
@@ -115,15 +141,14 @@ function classifyPromptUserAction(action) {
   if (/^skills\/gsd-[^/]+\/SKILL\.md$/.test(relPath)) {
     return { category: 'user-facing-skill', choice: 'keep' };
   }
-  // #3610: bundled GSD hooks at hooks/gsd-<name>.<ext>. These are part of
-  // the npm distribution (`hooks/gsd-*.{js,sh,cjs,mjs}` shipped in the
-  // package), NOT user-owned files. When a first-time-baseline scan finds
-  // them on disk without manifest entries — the case for any upgrade from
-  // a pre-manifest-baseline release — the safe default is to remove them
-  // so the installer can write the fresh bundled versions in their place.
-  // Restricted to top-level files (`hooks/gsd-X.ext`) so nested user
-  // directories like `hooks/gsd-helpers/...` do NOT auto-classify.
-  if (/^hooks\/gsd-[^/]+\.(?:js|sh|cjs|mjs)$/.test(relPath)) {
+  // #3610 / #3628: bundled GSD hooks shipped under `hooks/`. The whitelist
+  // is the explicit set of filenames in the npm distribution — files that
+  // match the shape but are NOT in the whitelist (user-authored hooks,
+  // retired hooks from prior versions) fall through to the block-or-prompt
+  // flow so the user retains control. On a first-time-baseline scan the
+  // installer can safely remove whitelisted hooks because it is about to
+  // write the fresh bundled versions in their place.
+  if (BUNDLED_GSD_HOOK_FILES.has(relPath)) {
     return { category: 'bundled-gsd-hook', choice: 'remove' };
   }
   return null;
@@ -321,6 +346,7 @@ function assertInstallerMigrationsUnblocked(result) {
 
 module.exports = {
   RESOLUTION_ENV_VAR,
+  BUNDLED_GSD_HOOK_FILES,
   assertInstallerMigrationsUnblocked,
   classifyPromptUserAction,
   resolveInstallerMigrationPromptsForNonTty,

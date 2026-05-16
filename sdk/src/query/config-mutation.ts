@@ -269,6 +269,13 @@ export const configSet: QueryHandler = async (args, projectDir, workstream) => {
   if (!keyPath) {
     throw new GSDError('Usage: config-set <key.path> <value>', ErrorClassification.Validation);
   }
+  // #3593: parity with CJS cmdConfigSet — reject `config-set <key>` invocations
+  // that omit the value. Without this guard parsedValue stays undefined and the
+  // write either silently strips the key (JSON.stringify drops undefined) or
+  // persists a corrupt entry.
+  if (rawValue === undefined) {
+    throw new GSDError('Usage: config-set <key.path> <value>', ErrorClassification.Validation);
+  }
 
   const validation = isValidConfigKey(keyPath);
   if (!validation.valid) {

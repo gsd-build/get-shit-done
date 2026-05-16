@@ -392,7 +392,17 @@ function setConfigValue(cwd, keyPath, parsedValue) {
  */
 function cmdConfigSet(cwd, keyPath, value, raw) {
   if (!keyPath) {
-    error('Usage: config-set <key.path> <value>');
+    error('Usage: config-set <key.path> <value>', ERROR_REASON.USAGE);
+  }
+  // #3593: reject the "key without value" form (e.g. `config-set
+  // model_profile` with args[2] === undefined). Without this guard the
+  // value passes through as undefined, the number/boolean/json branches
+  // all fall through, and the write either silently strips the key
+  // (JSON.stringify drops undefined values) or writes a corrupt entry.
+  // Typed reason so the negative-matrix test can assert on it instead
+  // of greppinng prose.
+  if (value === undefined) {
+    error('Usage: config-set <key.path> <value>', ERROR_REASON.USAGE);
   }
 
   validateKnownConfigKeyPath(keyPath);
