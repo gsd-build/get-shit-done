@@ -131,6 +131,7 @@ const hasClaude = args.includes('--claude');
 const hasGemini = args.includes('--gemini');
 const hasKilo = args.includes('--kilo');
 const hasCodex = args.includes('--codex');
+const hasGrok = args.includes('--grok');
 const hasCopilot = args.includes('--copilot');
 const hasAntigravity = args.includes('--antigravity');
 const hasCursor = args.includes('--cursor');
@@ -178,7 +179,7 @@ if (hasSdk && hasNoSdk) {
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline'];
+  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'grok', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -187,6 +188,7 @@ if (hasAll) {
   if (hasGemini) selectedRuntimes.push('gemini');
   if (hasKilo) selectedRuntimes.push('kilo');
   if (hasCodex) selectedRuntimes.push('codex');
+  if (hasGrok) selectedRuntimes.push('grok');
   if (hasCopilot) selectedRuntimes.push('copilot');
   if (hasAntigravity) selectedRuntimes.push('antigravity');
   if (hasCursor) selectedRuntimes.push('cursor');
@@ -240,6 +242,7 @@ function getDirName(runtime) {
   if (runtime === 'gemini') return '.gemini';
   if (runtime === 'kilo') return '.kilo';
   if (runtime === 'codex') return '.codex';
+  if (runtime === 'grok') return '.agents';
   if (runtime === 'antigravity') return '.agent';
   if (runtime === 'cursor') return '.cursor';
   if (runtime === 'windsurf') return '.windsurf';
@@ -273,6 +276,7 @@ function getConfigDirFromHome(runtime, isGlobal) {
   if (runtime === 'gemini') return "'.gemini'";
   if (runtime === 'kilo') return "'.config', 'kilo'";
   if (runtime === 'codex') return "'.codex'";
+  if (runtime === 'grok') return "'.agents'";
   if (runtime === 'antigravity') {
     if (!isGlobal) return "'.agent'";
     return "'.gemini', 'antigravity'";
@@ -380,6 +384,19 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.CODEX_HOME);
     }
     return path.join(os.homedir(), '.codex');
+  }
+
+  if (runtime === 'grok') {
+    // Grok Build: --config-dir > GROK_AGENTS_HOME > ~/.agents
+    // Uses the unified agents layout for skills, agents, and the GSD engine.
+    // This is the primary layout for Grok Build + Codex-style harnesses.
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.GROK_AGENTS_HOME) {
+      return expandTilde(process.env.GROK_AGENTS_HOME);
+    }
+    return path.join(os.homedir(), '.agents');
   }
 
   if (runtime === 'copilot') {
@@ -512,7 +529,7 @@ const banner = '\n' +
   '\n' +
   '  Get Shit Done ' + dim + 'v' + pkg.version + reset + '\n' +
   '  A meta-prompting, context engineering and spec-driven\n' +
-  '  development system for Claude Code, OpenCode, Gemini, Kilo, Codex, Copilot, Antigravity, Cursor, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, Cline and CodeBuddy by TÂCHES.\n';
+  '  development system for Claude Code, OpenCode, Gemini, Kilo, Codex, Grok Build, Copilot, Antigravity, Cursor, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, Cline and CodeBuddy by TÂCHES.\n';
 
 // Parse --config-dir argument
 function parseConfigDirArg() {

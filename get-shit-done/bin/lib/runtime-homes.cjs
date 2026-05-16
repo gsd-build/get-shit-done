@@ -62,6 +62,13 @@ function getGlobalConfigDir(runtime) {
     case 'codex':
       return env.CODEX_HOME ? expandTilde(env.CODEX_HOME) : path.join(home, '.codex');
 
+    // ── Grok Build ───────────────────────────────────────────────────────────
+    // Uses the unified ~/.agents layout (skills + agents + engine) shared with
+    // Codex-style harnesses. This is the pragmatic primary target for users
+    // running GSD inside Grok Build.
+    case 'grok':
+      return env.GROK_AGENTS_HOME ? expandTilde(env.GROK_AGENTS_HOME) : path.join(home, '.agents');
+
     // ── Copilot (VS Code) ────────────────────────────────────────────────────
     case 'copilot':
       return env.COPILOT_CONFIG_DIR ? expandTilde(env.COPILOT_CONFIG_DIR) : path.join(home, '.copilot');
