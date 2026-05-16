@@ -665,6 +665,26 @@ function cmdValidateHealth(cwd, options, raw) {
         for (const m of all) validPhases.add(m[1]);
       }
     } catch { /* intentionally empty */ }
+    // Bug #3652 — also union phases from every milestone archive, not only
+    // the active one. After /gsd-complete-milestone, historical phase dirs
+    // live under milestones/vX.Y-phases/ and their `#### Phase N:` headings
+    // get collapsed inside <details> blocks (which the heading regex above
+    // misses). collectDiskPhases() only scans the active archive, so
+    // without this step STATE.md's narrative references to older shipped
+    // phases fire false W002.
+    try {
+      const archiveDirs = listMilestoneArchiveDirs(planBase);
+      for (const archiveDir of archiveDirs) {
+        try {
+          const entries = fs.readdirSync(archiveDir, { withFileTypes: true });
+          for (const e of entries) {
+            if (!e.isDirectory()) continue;
+            const m = e.name.match(PHASE_TOKEN_FROM_DIR_RE);
+            if (m) validPhases.add(m[1]);
+          }
+        } catch { /* archive dir absent/unreadable */ }
+      }
+    } catch { /* intentionally empty */ }
     // Compare canonical full phase tokens. Also accept a leading-zero variant
     // on the integer prefix only (e.g. "03" matching "3", "03.1" matching
     // "3.1") so historic STATE.md formatting still validates. Suffix tokens

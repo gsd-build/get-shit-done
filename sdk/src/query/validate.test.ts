@@ -639,6 +639,42 @@ describe('validateHealth', () => {
     expect(w002s).toEqual([]);
   });
 
+  // Regression: #3652 — project-code-prefixed archive dirs (e.g. `CK-64-...`)
+  // must also be recognised as valid phase declarations. The shared
+  // PHASE_TOKEN_FROM_DIR_RE / MILESTONE_ARCHIVE_DIR_RE constants handle the
+  // prefix; an ad-hoc /^\d+/-style regex here would miss them.
+  it('recognises project-code-prefixed archive dirs as valid for W002 (#3652)', async () => {
+    const planning = join(tmpDir, '.planning');
+    await mkdir(join(planning, 'phases', 'CK-65-current'), { recursive: true });
+    await mkdir(join(planning, 'milestones', 'v2.0-phases', 'CK-64-prior-shipped'), { recursive: true });
+
+    await writeFile(join(planning, 'PROJECT.md'), '# Project\n\n## What This Is\n\nA project.\n\n## Core Value\n\nValue here.\n\n## Requirements\n\n- Req 1\n');
+    await writeFile(join(planning, 'ROADMAP.md'), [
+      '# Roadmap', '',
+      '<details><summary>v2.0: Shipped</summary>', '',
+      '- CK-64 archived', '',
+      '</details>', '',
+      '## v2.1: Current', '',
+      '### Phase 65: Current', '**Goal:** stuff', '',
+    ].join('\n'));
+    await writeFile(join(planning, 'STATE.md'), [
+      '---', 'milestone: v2.1', 'milestone_name: Current', 'status: executing', '---', '',
+      '# State', '',
+      '**Current Phase:** 65', '',
+      '## Recent', '- Phase 64 shipped',
+    ].join('\n'));
+    await writeFile(join(planning, 'config.json'), JSON.stringify({
+      model_profile: 'balanced',
+      workflow: { nyquist_validation: true },
+    }, null, 2));
+
+    const result = await validateHealth([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const warnings = data.warnings as Array<Record<string, unknown>>;
+    const w002s = warnings.filter(w => w.code === 'W002');
+    expect(w002s).toEqual([]);
+  });
+
   it('returns warning W005 for bad phase directory naming', async () => {
     await createHealthyPlanning();
     await mkdir(join(tmpDir, '.planning', 'phases', 'bad_name'), { recursive: true });
