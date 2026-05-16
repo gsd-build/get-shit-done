@@ -17,7 +17,7 @@ Sync managed `gsd-*` skill directories from one canonical runtime's skills root 
 
 If neither `--dry-run` nor `--apply` is specified, dry-run is the default.
 
-**Supported runtime names:** `claude`, `codex`, `copilot`, `cursor`, `windsurf`, `opencode`, `gemini`, `kilo`, `augment`, `trae`, `qwen`, `codebuddy`, `cline`, `antigravity`
+**Supported runtime names:** `claude`, `codex`, `grok`, `copilot`, `cursor`, `windsurf`, `opencode`, `gemini`, `kilo`, `augment`, `trae`, `qwen`, `codebuddy`, `cline`, `antigravity` (grok uses the `~/.agents` layout)
 
 ---
 
@@ -35,7 +35,7 @@ fi
 
 # Parse --to
 if [[ "$@" == *"--to all"* ]]; then
-  TO_RUNTIMES=(claude codex copilot cursor windsurf opencode gemini kilo augment trae qwen codebuddy cline antigravity)
+  TO_RUNTIMES=(claude codex grok copilot cursor windsurf opencode gemini kilo augment trae qwen codebuddy cline antigravity)
 elif [[ "$@" == *"--to"* ]]; then
   TO_RUNTIMES=( $(echo "$@" | grep -oP '(?<=--to )\S+') )
 fi
