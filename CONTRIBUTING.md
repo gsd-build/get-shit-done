@@ -150,6 +150,40 @@ Fragments are consolidated into `CHANGELOG.md` at release time by the release wo
 
 **Opt-out:** PRs with no user-facing impact (test refactors, lint config changes, CI tweaks, formatting-only changes) can add the `no-changelog` label. The lint honors it. When unsure whether a change is user-facing, **add the fragment**.
 
+## Documentation Updates — Update the Relevant Docs
+
+If your PR adds, changes, deprecates, or removes user-visible behavior, you **must** update the relevant documentation in `docs/`. CI will fail any PR whose changeset fragment is typed `Added`, `Changed`, `Deprecated`, or `Removed` without also modifying at least one file under `docs/` ([#3213](https://github.com/gsd-build/get-shit-done/issues/3213)).
+
+`Fixed` and `Security` fragments do not trigger this lint — bug fixes restore documented behavior, they do not introduce new behavior to document. (Edit the docs anyway if a fix corrects something the docs got wrong.)
+
+### Which docs to update
+
+| Change type | Required doc updates |
+|---|---|
+| New command or flag | `docs/COMMANDS.md`, `docs/FEATURES.md` |
+| Changed command behavior or output | `docs/USER-GUIDE.md`, `docs/COMMANDS.md` |
+| Configuration / schema change | `docs/CONFIGURATION.md` |
+| Architectural change | `docs/ARCHITECTURE.md`, `docs/adr/` |
+| Agent or skill change | `docs/AGENTS.md` |
+| Removed command, flag, or workflow | All docs that referenced it |
+
+### Language policy
+
+All content in `docs/` and the root `README.md` **must be written in English**. English is the canonical source. The translated READMEs (`README.pt-BR.md`, `README.zh-CN.md`, `README.ja-JP.md`, `README.ko-KR.md`) are community-maintained translations and do not need to be updated by every PR.
+
+### CI enforcement
+
+The `Docs Required` workflow (`scripts/lint-docs-required.cjs`) reads the changeset fragments touched in the PR diff. If any has type `Added` / `Changed` / `Deprecated` / `Removed`, it requires at least one file under `docs/` to also appear in the diff.
+
+### Opt-outs (with paper trail)
+
+When a change genuinely has no user-facing documentation impact (infrastructure rewrite, internal refactor, test-only addition, CI fix), use one of:
+
+- **Label:** add the `no-docs` label to the PR. Leave a comment explaining why no docs update was needed.
+- **Per-fragment marker:** add `<!-- docs-exempt: <reason> -->` inside the body of each triggering changeset fragment. Both routes leave a paper trail; the label is global, the marker is per-fragment for mixed PRs.
+
+When unsure whether a change is user-facing, **update the docs**.
+
 ## Testing Standards
 
 All tests use Node.js built-in test runner (`node:test`) and assertion library (`node:assert`). **Do not use Jest, Mocha, Chai, or any external test framework.**
