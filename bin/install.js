@@ -7790,6 +7790,32 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
+  // Reusable helper to copy hooks/lib/ (git-cmd.js + gsd-graphify-rebuild.sh).
+  // Defined early so it is visible to both the main and Codex code paths.
+  const copyLibDir = (sDir, dDir) => {
+    for (const entry of fs.readdirSync(sDir)) {
+      const s = path.join(sDir, entry);
+      const d = path.join(dDir, entry);
+      let st;
+      try { st = fs.lstatSync(s); } catch (_) { continue; }
+      if (st.isSymbolicLink()) continue; // defense-in-depth
+      if (st.isDirectory()) {
+        fs.mkdirSync(d, { recursive: true });
+        copyLibDir(s, d);
+      } else if (entry.endsWith('.sh')) {
+        let content = fs.readFileSync(s, 'utf8');
+        content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
+        fs.writeFileSync(d, content);
+        try { fs.chmodSync(d, 0o755); } catch (_) { /* Windows */ }
+      } else {
+        fs.copyFileSync(s, d);
+        if (entry.endsWith('.js')) {
+          try { fs.chmodSync(d, 0o755); } catch (_) { /* Windows */ }
+        }
+      }
+    }
+  };
+
   // Get the target directory based on runtime and install type.
   // Cline local installs write to the project root (like Claude Code) — .clinerules
   // lives at the root, not inside a .cline/ subdirectory.
@@ -8719,36 +8745,6 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     }
   }
 
-  // Copy hooks/lib/ (helper modules for .sh hooks: git-cmd.js for commit detection,
-  // gsd-graphify-rebuild.sh for the auto-update detached worker, etc.).
-  // These live at package/hooks/lib/ (included via "files": ["hooks"]) and are
-  // required by relative path ($HOOK_DIR/lib/...) from the installed gsd-*.sh hooks.
-  // The graphify feature (#3347) made the missing copy visible; this also fixes
-  // the pre-existing git-cmd.js dependency for validate-commit (#3129).
-  const copyLibDir = (sDir, dDir) => {
-    for (const entry of fs.readdirSync(sDir)) {
-      const s = path.join(sDir, entry);
-      const d = path.join(dDir, entry);
-      let st;
-      try { st = fs.lstatSync(s); } catch (_) { continue; }
-      if (st.isSymbolicLink()) continue; // defense-in-depth (no package-controlled symlinks today)
-      if (st.isDirectory()) {
-        fs.mkdirSync(d, { recursive: true });
-        copyLibDir(s, d);
-      } else if (entry.endsWith('.sh')) {
-        let content = fs.readFileSync(s, 'utf8');
-        content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-        fs.writeFileSync(d, content);
-        try { fs.chmodSync(d, 0o755); } catch (_) { /* Windows */ }
-      } else {
-        fs.copyFileSync(s, d);
-        if (entry.endsWith('.js')) {
-          try { fs.chmodSync(d, 0o755); } catch (_) { /* Windows */ }
-        }
-      }
-    }
-  };
-
   const hooksLibSrc = path.join(src, 'hooks', 'lib');
   if (fs.existsSync(hooksLibSrc)) {
     const hooksLibDest = path.join(targetDir, 'hooks', 'lib');
@@ -9017,15 +9013,18 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       console.log(`  ${dim}↳${reset} Skipping Codex agent config generation (minimal install)`);
     }
 
-    // Copy hook files that are referenced by Codex hook configuration (#2153)
-    // The main hook-copy block is gated to non-Codex runtimes, but Codex registers
-    // gsd-check-update.js through hooks config — the file must physically exist.
+    // Copy only the hook files that Codex actually registers via its hook configuration (#2153).
+    // Codex primarily needs gsd-check-update.js for the SessionStart update-check hook.
+    // We deliberately do *not* copy gsd-graphify-update.sh or hooks/lib/ for Codex
+    // in this change (graphify auto-update support for Codex is out of scope for #3579).
+    const CODEX_HOOKS_TO_COPY = ['gsd-check-update.js'];
     const codexHooksSrc = path.join(src, 'hooks', 'dist');
     if (fs.existsSync(codexHooksSrc)) {
       const codexHooksDest = path.join(targetDir, 'hooks');
       fs.mkdirSync(codexHooksDest, { recursive: true });
       const configDirReplacement = getConfigDirFromHome(runtime, isGlobal);
       for (const entry of fs.readdirSync(codexHooksSrc)) {
+        if (!CODEX_HOOKS_TO_COPY.includes(entry)) continue;
         const srcFile = path.join(codexHooksSrc, entry);
         if (!fs.statSync(srcFile).isFile()) continue;
         const destFile = path.join(codexHooksDest, entry);
@@ -9037,28 +9036,9 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
           fs.writeFileSync(destFile, content);
           try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
-        } else {
-          if (entry.endsWith('.sh')) {
-            let content = fs.readFileSync(srcFile, 'utf8');
-            content = content.replace(/\{\{GSD_VERSION\}\}/g, pkg.version);
-            fs.writeFileSync(destFile, content);
-            try { fs.chmodSync(destFile, 0o755); } catch (e) { /* Windows */ }
-          } else {
-            fs.copyFileSync(srcFile, destFile);
-          }
         }
       }
-      console.log(`  ${green}✓${reset} Installed hooks`);
-
-      // Also copy hooks/lib/ for Codex (same helpers as the main path).
-      // gsd-graphify-update.sh (now shipped via dist/) and gsd-validate-commit.sh
-      // both resolve $HOOK_DIR/lib/ relative to the installed hooks dir.
-      const codexHooksLibSrc = path.join(src, 'hooks', 'lib');
-      if (fs.existsSync(codexHooksLibSrc)) {
-        const codexHooksLibDest = path.join(targetDir, 'hooks', 'lib');
-        fs.mkdirSync(codexHooksLibDest, { recursive: true });
-        copyLibDir(codexHooksLibSrc, codexHooksLibDest);
-      }
+      console.log(`  ${green}✓${reset} Installed hooks (Codex)`);
     }
 
     // Add Codex hooks (SessionStart for update checking) — requires codex_hooks feature flag
