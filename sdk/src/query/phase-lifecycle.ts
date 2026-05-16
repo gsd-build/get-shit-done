@@ -876,9 +876,30 @@ async function updateRoadmapAfterPhaseRemoval(
   await readModifyWriteRoadmapMd(projectDir, (content) => {
     const escaped = escapeRegex(targetPhase);
 
-    // Remove the phase section (header + body until next phase header or end)
+    // Remove the phase section (header + body until next phase header or end).
+    //
+    // #3601: the end-of-section lookahead is DEPTH-AWARE. The named capture
+    // (?<h>#{2,4}) records the hash count of the header being removed and the
+    // lookahead requires the same depth via \k<h>(?!#). Two contracts are
+    // preserved:
+    //
+    //   (#3601 case) Remove `### Phase 2:` and stop at `### Phase 2.1:` —
+    //   Phase 2.1 is a peer-level decimal phase (depth 3) and must survive.
+    //
+    //   (#3355 case) Remove `### Phase 27:` and CONTINUE past
+    //   `#### Phase 27.1:` (depth 4 — child of Phase 27) until the next
+    //   depth-3 header. The child decimal is part of the integer phase
+    //   being removed.
+    //
+    // The `(?!#)` negative lookahead after the backreference prevents the
+    // depth-3 match from being satisfied by a depth-4+ header that starts
+    // with the same three hashes. `[^\n:]+` accepts numeric, decimal, AND
+    // custom phase IDs (PROJ-42) as terminators.
     content = content.replace(
-      new RegExp(`\\n?#{2,4}\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d+\\s*:|$)`, 'i'),
+      new RegExp(
+        `\\n?(?<h>#{2,4})\\s*Phase\\s+${escaped}\\s*:[\\s\\S]*?(?=\\n\\k<h>(?!#)\\s+Phase\\s+[^\\n:]+\\s*:|$)`,
+        'i',
+      ),
       '',
     );
 
@@ -916,11 +937,22 @@ async function updateRoadmapAfterPhaseRemoval(
           `${prefix}${decrementRoadmapPhaseNumber(num, removedInt)}${suffix}`,
       );
 
-      // Padded plan references: NN-NN (optionally followed by -PLAN.md /
-      // -SUMMARY.md). Negative lookbehind `(?<![0-9-])` and negative
-      // lookahead `(?![0-9-])` exclude YYYY-MM-DD substrings (bug-2435).
+      // Padded plan references: NN-NN (optionally followed by an arbitrary
+      // kebab-case slug, then -PLAN.md / -SUMMARY.md).
+      //
+      // #2435: negative lookbehind `(?<![0-9-])` and negative lookahead
+      // `(?![0-9-])` exclude YYYY-MM-DD substrings.
+      //
+      // #3602: the original pattern only allowed a compact `-(PLAN|SUMMARY).md`
+      // immediately after the plan number; a slug between the number and the
+      // `-PLAN.md` / `-SUMMARY.md` suffix (e.g.
+      // `07-01-cherry-pick-foundation-PLAN.md`) made the lookahead fail and
+      // left the stale `07-01-` prefix in ROADMAP text while the on-disk file
+      // was already renumbered to `06-01-…`. The slug segment
+      // `(?:-[A-Za-z][A-Za-z0-9-]*)*` allows any number of kebab-case tokens
+      // before the canonical PLAN/SUMMARY suffix.
       content = content.replace(
-        /(?<![0-9-])(\d{2})-(\d{2})(?=(?:-(?:PLAN|SUMMARY)\.md)?(?![0-9-]))/g,
+        /(?<![0-9-])(\d{2})-(\d{2})(?=(?:(?:-[A-Za-z][A-Za-z0-9-]*)*-(?:PLAN|SUMMARY)\.md)?(?![0-9-]))/g,
         (_match, phaseNum: string, planNum: string) =>
           `${decrementRoadmapPaddedPhaseNumber(phaseNum, removedInt)}-${planNum}`,
       );

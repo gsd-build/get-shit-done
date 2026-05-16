@@ -567,24 +567,51 @@ export const configNewProject: QueryHandler = async (args, projectDir, workstrea
   const hasFirecrawl = !!(process.env.FIRECRAWL_API_KEY || existsSync(join(homeDir, '.gsd', 'firecrawl_api_key')));
   const hasExaSearch = !!(process.env.EXA_API_KEY || existsSync(join(homeDir, '.gsd', 'exa_api_key')));
 
-  // Build default config. Single source of truth is the canonical Configuration
-  // Module manifest at sdk/shared/config-defaults.manifest.json, exported as
-  // CONFIG_DEFAULTS from sdk/src/configuration/index.ts. The previous hardcoded
-  // duplicate was an instance of DEFECT.PORT-DRIFT.cjs-sdk — it omitted
-  // workflow.{ai_integration_phase, tdd_mode, human_verify_mode, pattern_mapper,
-  // plan_bounce*, auto_prune_state, subagent_timeout, security_*, etc.} and
-  // git.create_tag, claude_md_path, planning.*, graphify.*. Sourcing from the
-  // manifest closes the drift and keeps configNewProject in sync with the rest
-  // of the Configuration Module by construction.
+  // Build default config. Source is the canonical Configuration Module manifest
+  // at sdk/shared/config-defaults.manifest.json (CONFIG_DEFAULTS from
+  // sdk/src/configuration/index.ts) — but ONLY a subset is materialized at
+  // init time. Legacy CJS `buildNewProjectConfig` (bin/lib/config.cjs:155-210)
+  // intentionally omits keys whose value is meaningful only when set
+  // explicitly so config-get returns "Key not found" and workflows fall back
+  // to auto-detect (e.g. git.base_branch falls back to origin/HEAD
+  // resolution). Keeping the SDK init shape aligned with CJS preserves that
+  // workflow contract while the manifest remains the schema-wide source of
+  // truth for validation and key existence (per ADR §6).
   //
-  // Runtime API-key detection overrides the manifest's `false` defaults for the
-  // three search providers — manifest comment explicitly notes this contract.
+  // Runtime API-key detection overrides the manifest's `false` defaults for
+  // the three search providers — manifest comment explicitly notes this.
   const manifestDefaults = CONFIG_DEFAULTS as Record<string, unknown>;
   // Strip the metadata-only "_comment" key before it gets persisted.
   const { _comment: _ignoredComment, ...sanitizedManifest } = manifestDefaults;
   void _ignoredComment;
+
+  // Top-level keys present in the manifest but NOT in CJS init output. Each
+  // either has its own resolution path (resolve_model_ids, context_window,
+  // mode) or lives under a non-init heading (planning.*, graphify.* are
+  // opt-in features users configure separately).
+  const TOP_LEVEL_OMITTED_FROM_INIT = new Set([
+    'resolve_model_ids', 'context_window', 'mode', 'planning', 'graphify',
+  ]);
+  // Nested git keys omitted by CJS init. `git.base_branch` triggers
+  // origin/HEAD auto-detect when absent — materializing `null` here would
+  // suppress that and break ship-ready preflight (#3079).
+  const GIT_KEYS_OMITTED_FROM_INIT = new Set(['base_branch']);
+
+  const filteredTopLevel: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(sanitizedManifest)) {
+    if (TOP_LEVEL_OMITTED_FROM_INIT.has(k)) continue;
+    filteredTopLevel[k] = v;
+  }
+  const manifestGit = (filteredTopLevel.git as Record<string, unknown>) || {};
+  const filteredGit: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(manifestGit)) {
+    if (GIT_KEYS_OMITTED_FROM_INIT.has(k)) continue;
+    filteredGit[k] = v;
+  }
+
   const defaults: Record<string, unknown> = {
-    ...sanitizedManifest,
+    ...filteredTopLevel,
+    git: filteredGit,
     brave_search: hasBraveSearch,
     firecrawl: hasFirecrawl,
     exa_search: hasExaSearch,

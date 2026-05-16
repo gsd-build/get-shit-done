@@ -553,6 +553,25 @@ export function phaseMarkdownRegexSource(phaseNum: string): string {
 }
 
 /**
+ * #3599 (parity with core.cjs phaseMarkdownRegexSourceExact, lines 691-708):
+ * when the caller passed a project-code-prefixed ID like `PROJ-42`, return
+ * the exact-escaped form so the caller can search the ROADMAP for
+ * `### Phase PROJ-42:` BEFORE falling back to the padding-tolerant numeric
+ * form. Returns null when the input has no project-code prefix — in that
+ * case `phaseMarkdownRegexSource` is the only form the caller needs.
+ *
+ * Two-pass at the call site preserves the #3537 contract (`CK-01` directory
+ * names mapping to `Phase 1:` prose) while letting `PROJ-42` resolve to its
+ * own prefixed heading without cross-matching a bare `### Phase 42:` that
+ * happens to share the trailing integer.
+ */
+export function phaseMarkdownRegexSourceExact(phaseNum: string): string | null {
+  const raw = String(phaseNum);
+  if (!/^[A-Z]{1,6}-(?=\d)/i.test(raw)) return null;
+  return escapeRegex(raw);
+}
+
+/**
  * Search for a phase section in roadmap content.
  *
  * Port of searchPhaseInContent from roadmap.cjs lines 14-73.
@@ -691,16 +710,38 @@ export const roadmapGetPhase: QueryHandler = async (args, projectDir, workstream
   }
 
   const milestoneContent = await extractCurrentMilestone(rawContent, projectDir, workstream);
+  const fullContent = stripShippedMilestones(rawContent);
+
+  // Two-pass lookup (parity with bin/lib/roadmap.cjs #3599 path): if the input
+  // carries a project-code prefix like `PROJ-42`, try the EXACT escaped form
+  // first so we match `### Phase PROJ-42:` without cross-matching `### Phase 42:`.
+  // Only fall back to the padding-tolerant numeric form (which strips the
+  // prefix per the #3537 contract for CK-01 → Phase 1 directory layout) when
+  // the exact form misses.
+  const exactEscaped = phaseMarkdownRegexSourceExact(phaseNum);
   // Padding-tolerant fragment (bug #2391): caller may pass "03" — match against
   // unpadded ROADMAP headings ("Phase 3:") without forcing the caller to normalize.
-  const escapedPhase = phaseMarkdownRegexSource(phaseNum);
+  const numericEscaped = phaseMarkdownRegexSource(phaseNum);
 
-  // Search the current milestone slice first, then fall back to full roadmap.
-  const fullContent = stripShippedMilestones(rawContent);
-  const milestoneResult = searchPhaseInContent(milestoneContent, escapedPhase, phaseNum);
+  // Try exact-prefixed match first when applicable.
+  let milestoneResult: PhaseSection | null = null;
+  let fallbackFromFullContent: PhaseSection | null = null;
+  if (exactEscaped) {
+    milestoneResult = searchPhaseInContent(milestoneContent, exactEscaped, phaseNum);
+    if (!milestoneResult || milestoneResult.error) {
+      fallbackFromFullContent = searchPhaseInContent(fullContent, exactEscaped, phaseNum);
+    }
+  }
+  // Padding-tolerant fallback (#3537) — also covers the no-prefix case.
+  if (!milestoneResult || milestoneResult.error) {
+    milestoneResult = milestoneResult || searchPhaseInContent(milestoneContent, numericEscaped, phaseNum);
+  }
+  if (!fallbackFromFullContent) {
+    fallbackFromFullContent = searchPhaseInContent(fullContent, numericEscaped, phaseNum);
+  }
   const result = (milestoneResult && !milestoneResult.error)
     ? milestoneResult
-    : searchPhaseInContent(fullContent, escapedPhase, phaseNum) || milestoneResult;
+    : fallbackFromFullContent || milestoneResult;
 
   if (!result) {
     return { data: { found: false, phase_number: phaseNum } };
