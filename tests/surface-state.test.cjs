@@ -10,9 +10,10 @@ const path = require('path');
 const os = require('os');
 
 const { readSurface, writeSurface } = require('../get-shit-done/bin/lib/surface.cjs');
+const { createTempDir, cleanup } = require('./helpers.cjs');
 
 function tmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-surface-state-'));
+  return createTempDir('gsd-surface-state-');
 }
 
 function captureWarn(fn) {
@@ -40,7 +41,7 @@ describe('readSurface / writeSurface', () => {
       const read = readSurface(dir);
       assert.deepStrictEqual(read, state);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -56,7 +57,7 @@ describe('readSurface / writeSurface', () => {
       writeSurface(dir, state);
       assert.deepStrictEqual(readSurface(dir), state);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -72,7 +73,7 @@ describe('readSurface / writeSurface', () => {
       writeSurface(dir, state);
       assert.deepStrictEqual(readSurface(dir), state);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -82,7 +83,7 @@ describe('readSurface / writeSurface', () => {
       const result = readSurface(dir);
       assert.strictEqual(result, null);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -101,7 +102,7 @@ describe('readSurface / writeSurface', () => {
       assert.strictEqual(warnings.length, 1);
       assert.match(warnings[0], /malformed JSON/);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -118,7 +119,7 @@ describe('readSurface / writeSurface', () => {
       assert.strictEqual(warnings.length, 1);
       assert.match(warnings[0], /baseProfile/);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -134,7 +135,23 @@ describe('readSurface / writeSurface', () => {
       assert.strictEqual(result, null);
       assert.match(warnings[0], /baseProfile/);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
+    }
+  });
+
+  test('JSON with whitespace-only baseProfile returns null and warns (#3662 CodeRabbit)', () => {
+    const dir = tmpDir();
+    try {
+      fs.writeFileSync(
+        path.join(dir, '.gsd-surface.json'),
+        JSON.stringify({ baseProfile: '   ', disabledClusters: [], explicitAdds: [], explicitRemoves: [] }),
+        'utf8'
+      );
+      const { result, warnings } = captureWarn(() => readSurface(dir));
+      assert.strictEqual(result, null);
+      assert.match(warnings[0], /baseProfile/);
+    } finally {
+      cleanup(dir);
     }
   });
 
@@ -146,7 +163,7 @@ describe('readSurface / writeSurface', () => {
       assert.strictEqual(result, null);
       assert.match(warnings[0], /object root/);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -167,7 +184,7 @@ describe('readSurface / writeSurface', () => {
       });
       assert.deepStrictEqual(warnings, [], 'defaulting an optional field should not warn');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -188,7 +205,7 @@ describe('readSurface / writeSurface', () => {
       });
       assert.deepStrictEqual(warnings, []);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -208,7 +225,7 @@ describe('readSurface / writeSurface', () => {
         explicitRemoves: [],
       });
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -224,11 +241,11 @@ describe('readSurface / writeSurface', () => {
         explicitRemoves: [],
       });
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
-  test('writeSurface rejects missing baseProfile (#3662 writer guard)', () => {
+  test('writeSurface rejects missing, empty, or blank baseProfile (#3662 writer guard)', () => {
     const dir = tmpDir();
     try {
       assert.throws(
@@ -236,8 +253,11 @@ describe('readSurface / writeSurface', () => {
         /baseProfile/
       );
       assert.throws(() => writeSurface(dir, { baseProfile: '' }), /baseProfile/);
+      assert.throws(() => writeSurface(dir, { baseProfile: '   ' }), /baseProfile/);
+      assert.throws(() => writeSurface(dir, { baseProfile: 42 }), /baseProfile/);
+      assert.throws(() => writeSurface(dir, null), /baseProfile/);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -253,7 +273,7 @@ describe('readSurface / writeSurface', () => {
       // The canonical file exists
       assert.ok(files.includes('.gsd-surface.json'));
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -266,7 +286,7 @@ describe('readSurface / writeSurface', () => {
       assert.strictEqual(read.baseProfile, 'standard');
       assert.deepStrictEqual(read.disabledClusters, ['utility']);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      cleanup(dir);
     }
   });
 
@@ -278,7 +298,7 @@ describe('readSurface / writeSurface', () => {
       assert.ok(fs.existsSync(nested));
       assert.ok(readSurface(nested) !== null);
     } finally {
-      fs.rmSync(base, { recursive: true, force: true });
+      cleanup(base);
     }
   });
 });

@@ -100,8 +100,8 @@ function readSurface(runtimeConfigDir) {
     console.warn(`[gsd] readSurface(${filePath}): expected JSON object root; falling back to no surface state.`);
     return null;
   }
-  if (typeof parsed.baseProfile !== 'string' || parsed.baseProfile === '') {
-    console.warn(`[gsd] readSurface(${filePath}): missing or non-string 'baseProfile'; falling back to no surface state.`);
+  if (typeof parsed.baseProfile !== 'string' || parsed.baseProfile.trim() === '') {
+    console.warn(`[gsd] readSurface(${filePath}): missing, non-string, or blank 'baseProfile'; falling back to no surface state.`);
     return null;
   }
   return normalizeSurfaceState(parsed);
@@ -119,8 +119,8 @@ function readSurface(runtimeConfigDir) {
  * @param {SurfaceState} surfaceState
  */
 function writeSurface(runtimeConfigDir, surfaceState) {
-  if (!surfaceState || typeof surfaceState.baseProfile !== 'string' || surfaceState.baseProfile === '') {
-    throw new TypeError("writeSurface: 'baseProfile' must be a non-empty string");
+  if (!surfaceState || typeof surfaceState.baseProfile !== 'string' || surfaceState.baseProfile.trim() === '') {
+    throw new TypeError("writeSurface: 'baseProfile' must be a non-blank string");
   }
   const normalized = normalizeSurfaceState(surfaceState);
   platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(normalized, null, 2) + '\n');
