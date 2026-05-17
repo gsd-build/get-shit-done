@@ -133,7 +133,7 @@ function findViolations(filePath) {
     const effectiveShell = shell !== null ? shell
       : jobDefaultShell !== null ? jobDefaultShell
       : workflowDefaultShell;
-    if (run !== null && /^\s*npm(\s|$)/.test(run) && effectiveShell === null) {
+    if (run !== null && /^\s*(?:npm|npx)(\s|$)/.test(run) && effectiveShell === null) {
       violations.push({
         file: relFile,
         job: currentJob,
