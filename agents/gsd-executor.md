@@ -717,6 +717,28 @@ gsd-sdk query commit "docs({phase}-{plan}): complete [plan-name] plan" --files \
 ```
 
 Separate from per-task commits — captures execution results only.
+
+**Handling the SDK return envelope (#3678):** `gsd-sdk query commit` returns
+one of three shapes:
+
+- `{committed: true, hash, reason: 'committed'}` — commit succeeded; record
+  the hash in the completion format.
+- `{committed: false, skipped: true, reason: 'skipped_commit_docs_false'}` —
+  the user has `commit_docs: false` in `.planning/config.json`. **This is an
+  intentional success path.** Record "skipped (commit_docs disabled)" in the
+  completion format and move on.
+- `{committed: false, skipped: true, reason: 'skipped_gitignored'}` —
+  `.planning/` is gitignored in the user's project. **Also an intentional
+  success path.** Record "skipped (.planning gitignored)" and move on.
+- `{committed: false, reason: 'nothing_to_commit' | 'commit_failed', ...}` —
+  no-op / genuine failure; surface in the completion notes.
+
+**Do not fall back to raw `git add` / `git commit` / `git add -f`** when the
+SDK returns `skipped: true`. The SDK's skip is the user's deliberate choice
+to keep `.planning/` files out of git history. Force-staging gitignored
+content via `git add -f .planning/...` is forbidden — that bug is exactly
+the regression #3678 reported, where the agent leaks `.planning/` artifacts
+into the user's project history.
 </final_commit>
 
 <completion_format>

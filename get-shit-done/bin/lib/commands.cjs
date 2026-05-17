@@ -266,15 +266,18 @@ function cmdCommit(cwd, message, files, raw, amend, noVerify) {
   const config = loadConfig(cwd);
 
   // Check commit_docs config
+  // `skipped: true` is explicit so agent prompts can match on a first-class
+  // success signal rather than inferring "skip" from "committed is missing"
+  // and improvising raw git fallbacks (#3678).
   if (!config.commit_docs) {
-    const result = { committed: false, hash: null, reason: 'skipped_commit_docs_false' };
+    const result = { committed: false, skipped: true, hash: null, reason: 'skipped_commit_docs_false' };
     output(result, raw, 'skipped');
     return;
   }
 
   // Check if .planning is gitignored
   if (isGitIgnored(cwd, '.planning')) {
-    const result = { committed: false, hash: null, reason: 'skipped_gitignored' };
+    const result = { committed: false, skipped: true, hash: null, reason: 'skipped_gitignored' };
     output(result, raw, 'skipped');
     return;
   }
