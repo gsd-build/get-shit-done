@@ -93,6 +93,24 @@ describe('readSurface / writeSurface', () => {
     assert.strictEqual(result, null);
   });
 
+  // chmod-000 unreadable file — Linux-only because Windows and root accounts
+  // ignore mode bits. Covers the EACCES branch in readSurface (#3662 Gemini).
+  test('unreadable file (EACCES) returns null and warns', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, () => {
+    const dir = tmpDir();
+    try {
+      const filePath = path.join(dir, '.gsd-surface.json');
+      fs.writeFileSync(filePath, '{"baseProfile":"standard"}', 'utf8');
+      fs.chmodSync(filePath, 0o000);
+      const { result, warnings } = captureWarn(() => readSurface(dir));
+      assert.strictEqual(result, null);
+      assert.strictEqual(warnings.length, 1);
+      assert.match(warnings[0], /unreadable/);
+      fs.chmodSync(filePath, 0o644); // restore so cleanup can rm
+    } finally {
+      cleanup(dir);
+    }
+  });
+
   test('corrupt JSON returns null and warns', () => {
     const dir = tmpDir();
     try {
@@ -282,21 +300,73 @@ describe('readSurface / writeSurface', () => {
     }
   });
 
-  test('non-array optional field is coerced to [] (#3662)', () => {
+  test('non-array optional field is coerced to [] and warns (#3662 Gemini)', () => {
     const dir = tmpDir();
     try {
       fs.writeFileSync(
         path.join(dir, '.gsd-surface.json'),
-        JSON.stringify({ baseProfile: 'standard', disabledClusters: 'utility', explicitAdds: [], explicitRemoves: [] }),
+        JSON.stringify({ baseProfile: 'standard', disabledClusters: 'utility', explicitAdds: 42, explicitRemoves: [] }),
         'utf8'
       );
-      const { result } = captureWarn(() => readSurface(dir));
+      const { result, warnings } = captureWarn(() => readSurface(dir));
       assert.deepStrictEqual(result, {
         baseProfile: 'standard',
         disabledClusters: [],
         explicitAdds: [],
         explicitRemoves: [],
       });
+      assert.strictEqual(warnings.length, 1);
+      assert.match(warnings[0], /wrong type/);
+      assert.match(warnings[0], /disabledClusters/);
+      assert.match(warnings[0], /explicitAdds/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('comma-only baseProfile is rejected (#3662 Gemini)', () => {
+    const dir = tmpDir();
+    try {
+      fs.writeFileSync(
+        path.join(dir, '.gsd-surface.json'),
+        JSON.stringify({ baseProfile: ', ,', disabledClusters: [], explicitAdds: [], explicitRemoves: [] }),
+        'utf8'
+      );
+      const { result, warnings } = captureWarn(() => readSurface(dir));
+      assert.strictEqual(result, null);
+      assert.match(warnings[0], /comma-only/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('writeSurface rejects comma-only baseProfile (#3662 Gemini)', () => {
+    const dir = tmpDir();
+    try {
+      assert.throws(() => writeSurface(dir, { baseProfile: ', ,' }), /baseProfile/);
+      assert.throws(() => writeSurface(dir, { baseProfile: ',' }), /baseProfile/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('writeSurface warns on wrong-typed optional field but still writes (#3662 Gemini)', () => {
+    const dir = tmpDir();
+    try {
+      const { warnings } = captureWarn(() => writeSurface(dir, {
+        baseProfile: 'standard',
+        disabledClusters: 'utility',
+      }));
+      const onDisk = JSON.parse(fs.readFileSync(path.join(dir, '.gsd-surface.json'), 'utf8'));
+      assert.deepStrictEqual(onDisk, {
+        baseProfile: 'standard',
+        disabledClusters: [],
+        explicitAdds: [],
+        explicitRemoves: [],
+      });
+      assert.strictEqual(warnings.length, 1);
+      assert.match(warnings[0], /wrong type/);
+      assert.match(warnings[0], /disabledClusters/);
     } finally {
       cleanup(dir);
     }
