@@ -47,41 +47,83 @@ const SURFACE_FILE_NAME = '.gsd-surface.json';
  */
 
 /**
+ * Normalize a partial SurfaceState into the full four-field shape.
+ * Missing or non-array optional fields default to []; baseProfile must already
+ * be a non-empty string (callers gate on that before normalizing).
+ *
+ * @param {Object} input
+ * @returns {SurfaceState}
+ */
+function normalizeSurfaceState(input) {
+  return {
+    baseProfile: input.baseProfile,
+    disabledClusters: Array.isArray(input.disabledClusters) ? input.disabledClusters.slice() : [],
+    explicitAdds: Array.isArray(input.explicitAdds) ? input.explicitAdds.slice() : [],
+    explicitRemoves: Array.isArray(input.explicitRemoves) ? input.explicitRemoves.slice() : [],
+  };
+}
+
+/**
  * Read the surface state from a runtime config directory.
  *
+ * Returns `null` only when there is no usable surface state:
+ *   - file is absent (silent — expected when no profile has been pinned),
+ *   - file is unreadable, malformed JSON, non-object root, or missing/invalid
+ *     `baseProfile` (each of these emits a `console.warn` diagnostic so callers
+ *     don't silently fall back to `'full'` with no explanation).
+ *
+ * Missing or wrong-typed optional array fields (`disabledClusters`,
+ * `explicitAdds`, `explicitRemoves`) default to `[]` — they are meaningfully
+ * empty and the writer/reader stayed symmetric only by accident before #3662.
+ *
  * @param {string} runtimeConfigDir
- * @returns {SurfaceState|null} null if file missing or corrupt
+ * @returns {SurfaceState|null}
  */
 function readSurface(runtimeConfigDir) {
   const filePath = path.join(runtimeConfigDir, SURFACE_FILE_NAME);
+  let raw;
   try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    // Structural validation — must have these fields with expected types
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    if (typeof parsed.baseProfile !== 'string') return null;
-    if (!Array.isArray(parsed.disabledClusters)) return null;
-    if (!Array.isArray(parsed.explicitAdds)) return null;
-    if (!Array.isArray(parsed.explicitRemoves)) return null;
-    return {
-      baseProfile: parsed.baseProfile,
-      disabledClusters: parsed.disabledClusters,
-      explicitAdds: parsed.explicitAdds,
-      explicitRemoves: parsed.explicitRemoves,
-    };
-  } catch {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return null;
+    console.warn(`[gsd] readSurface(${filePath}): unreadable (${err && (err.code || err.message)}); falling back to no surface state.`);
     return null;
   }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    console.warn(`[gsd] readSurface(${filePath}): malformed JSON (${err.message}); falling back to no surface state.`);
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    console.warn(`[gsd] readSurface(${filePath}): expected JSON object root; falling back to no surface state.`);
+    return null;
+  }
+  if (typeof parsed.baseProfile !== 'string' || parsed.baseProfile === '') {
+    console.warn(`[gsd] readSurface(${filePath}): missing or non-string 'baseProfile'; falling back to no surface state.`);
+    return null;
+  }
+  return normalizeSurfaceState(parsed);
 }
 
 /**
  * Write the surface state atomically via the platform seam (mkdir + tmp+rename).
  *
+ * Input is normalized to the full four-field shape so partial / hand-rolled
+ * objects cannot land on disk and trip readSurface later (#3662 symmetry fix).
+ * `baseProfile` is the only load-bearing field — callers must supply it as a
+ * non-empty string.
+ *
  * @param {string} runtimeConfigDir
  * @param {SurfaceState} surfaceState
  */
 function writeSurface(runtimeConfigDir, surfaceState) {
-  platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(surfaceState, null, 2) + '\n');
+  if (!surfaceState || typeof surfaceState.baseProfile !== 'string' || surfaceState.baseProfile === '') {
+    throw new TypeError("writeSurface: 'baseProfile' must be a non-empty string");
+  }
+  const normalized = normalizeSurfaceState(surfaceState);
+  platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(normalized, null, 2) + '\n');
 }
 
 // ---------------------------------------------------------------------------
