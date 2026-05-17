@@ -29,6 +29,39 @@ const {
   readCmdNames: readGsdCommandNames,
 } = require(path.join(__dirname, '..', 'scripts', 'fix-slash-commands.cjs'));
 
+/**
+ * Runtimes that register hyphen-form `name:` per #2808 AND copy agent bodies
+ * verbatim (only branding swaps, no namespace conversion), so retired
+ * `/gsd:<cmd>` colon refs leak into installed agent prose. Sibling fixes
+ * #3583 / #3629 covered SKILL.md bodies, #3584 / #3606 covered runtime
+ * emissions — this is the agent-body surface (#3677).
+ *
+ * Explicit allow-list rather than deny-list so unknown / future runtimes
+ * default to "no rewrite" (better to leak than to mangle a runtime whose
+ * namespace behavior we haven't verified).
+ */
+const HYPHEN_NAME_AGENT_RUNTIMES = new Set(['claude', 'qwen', 'hermes']);
+
+/**
+ * #3677 predicate — true when an agent body needs `/gsd:<cmd>` → `/gsd-<cmd>`
+ * normalization at install time.
+ */
+function shouldNormalizeHyphenNamespaceInAgentBody(runtime) {
+  if (typeof runtime !== 'string' || runtime === '') return false;
+  return HYPHEN_NAME_AGENT_RUNTIMES.has(runtime);
+}
+
+/**
+ * #3677 helper — applies the hyphen-namespace transform iff the predicate
+ * says so. Pure function; safe to call unconditionally from the install
+ * loop. Returns the input unchanged for runtimes that self-convert or
+ * intentionally keep colon refs.
+ */
+function normalizeAgentBodyForRuntime(content, runtime, cmdNames) {
+  if (!shouldNormalizeHyphenNamespaceInAgentBody(runtime)) return content;
+  return transformContentToHyphen(content, cmdNames);
+}
+
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -8440,6 +8473,13 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
           content = content.replace(/\.claude\//g, '.hermes/');
         }
+        // #3677 — normalize retired `/gsd:<cmd>` colon refs in the agent body
+        // to the canonical hyphen form `/gsd-<cmd>` for hyphen-`name:`
+        // runtimes (claude / qwen / hermes). Self-converting runtimes and
+        // Gemini are skipped by the predicate — see
+        // shouldNormalizeHyphenNamespaceInAgentBody above. Mirrors the
+        // SKILL.md-body fix shipped via #3629.
+        content = normalizeAgentBodyForRuntime(content, runtime, readGsdCommandNames());
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);
       }
@@ -11054,6 +11094,9 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
 // converter functions when called from within the CLI path (circular require).
 // The main() block below is gated on !GSD_TEST_MODE, as before.
 module.exports = {
+    // #3677 — hyphen-namespace normalization seam for agent bodies
+    shouldNormalizeHyphenNamespaceInAgentBody,
+    normalizeAgentBodyForRuntime,
     yamlIdentifier,
     computePathPrefix,
     getCodexSkillAdapterHeader,
