@@ -297,7 +297,7 @@ GSD ships two project disciplines side by side:
 - **Horizontal Layers** (the default; what the [End-to-End Walkthrough](#end-to-end-walkthrough) above demonstrates) — each phase ships a complete technical layer (data, API, UI). Best for infrastructure-heavy projects with well-understood domains.
 - **Vertical MVP** (this section) — each phase ships an end-to-end *user capability*: UI → API → DB for one user story per phase. Best for new products and rapid-iteration MVPs where you want a usable end-to-end slice as early as possible.
 
-You pick once at project init. Per-phase mode is stored in ROADMAP.md as `**Mode:** mvp`, so individual phases can opt in or out later via `/gsd-mvp-phase` and `/gsd-edit-phase`.
+You pick once at project init. Per-phase mode is stored in ROADMAP.md as `**Mode:** mvp`, so individual phases can opt in or out later via `/gsd-mvp-phase` and `/gsd-phase --edit`.
 
 ### When to pick MVP mode
 
@@ -364,7 +364,7 @@ This continues the same webhook-validator example from the standard walkthrough 
    **Goal:** As a backend developer, I want to validate incoming webhook signatures, so that malicious requests are rejected before reaching my handlers.]
 ```
 
-If your story is compound ("validate signatures **and** rate-limit") or too long, GSD walks you through SPIDR splitting and offers `/gsd-add-phase` invocations to break the work into multiple phases. See [`references/spidr-splitting.md`](../get-shit-done/references/spidr-splitting.md).
+If your story is compound ("validate signatures **and** rate-limit") or too long, GSD walks you through SPIDR splitting and offers `/gsd-phase` invocations to break the work into multiple phases. See [`references/spidr-splitting.md`](../get-shit-done/references/spidr-splitting.md).
 
 The command then auto-delegates to `/gsd-plan-phase 1` — the planner sees `**Mode:** mvp` in the roadmap and plans accordingly.
 
