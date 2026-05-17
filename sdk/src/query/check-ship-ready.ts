@@ -4,24 +4,48 @@
  * Consolidates git/gh checks from `ship.md` into a single structured query.
  * All subprocess calls are wrapped in try/catch — never throws on git/gh failures.
  * See `.planning/research/decision-routing-audit.md` §3.9.
+ *
+ * #3587: every subprocess call uses argv-based execFileSync — never a
+ * shell-string execSync. Git branch names are repository-controlled data
+ * and can legally contain metacharacters (`;`, `$`, backticks, etc.); a
+ * shell-string `git config --get branch.${current_branch}.merge` allowed
+ * arbitrary command injection from a malicious branch name. Passing args
+ * as argv elements means the shell is never invoked.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { GSDError, ErrorClassification } from '../errors.js';
 import { normalizePhaseName } from './helpers.js';
 import { checkVerificationStatus } from './check-verification-status.js';
 import type { QueryHandler } from './utils.js';
 
-function runSyncSafe(cmd: string, cwd: string): string | null {
+/**
+ * Run a subprocess via argv (NEVER a shell string). Returns trimmed stdout
+ * on success or null on any failure (non-zero exit, missing binary, etc.).
+ * The pre-#3587 helper used `execSync(cmd, …)` which spawned `/bin/sh -c`
+ * and parsed `cmd` as shell syntax — that path is gone.
+ */
+function runArgvSafe(file: string, args: readonly string[], cwd: string): string | null {
   try {
-    return execSync(cmd, { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    return execFileSync(file, args, {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      // #3587: pin no-shell intent explicitly. The default is already
+      // false, but spelling it out (a) documents the architectural
+      // invariant at the call site and (b) prevents a future options
+      // refactor from silently re-enabling shell parsing — e.g. on
+      // Windows where `git.cmd` shim resolution can otherwise route
+      // through cmd.exe.
+      shell: false,
+    }).trim();
   } catch {
     return null;
   }
 }
 
-function boolSyncSafe(cmd: string, cwd: string): boolean {
-  return runSyncSafe(cmd, cwd) !== null;
+function boolArgvSafe(file: string, args: readonly string[], cwd: string): boolean {
+  return runArgvSafe(file, args, cwd) !== null;
 }
 
 export const checkShipReady: QueryHandler = async (args, projectDir) => {
@@ -34,11 +58,11 @@ export const checkShipReady: QueryHandler = async (args, projectDir) => {
 
   const blockers: string[] = [];
 
-  // git checks — all wrapped in try/catch via helpers
-  const porcelain = runSyncSafe('git status --porcelain', projectDir);
+  // git checks — all wrapped in try/catch via helpers, all argv-based.
+  const porcelain = runArgvSafe('git', ['status', '--porcelain'], projectDir);
   const clean_tree = porcelain !== null && porcelain === '';
 
-  const current_branch = runSyncSafe('git rev-parse --abbrev-ref HEAD', projectDir);
+  const current_branch = runArgvSafe('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectDir);
   const on_feature_branch =
     current_branch !== null &&
     current_branch !== 'main' &&
@@ -47,23 +71,31 @@ export const checkShipReady: QueryHandler = async (args, projectDir) => {
   // Determine base branch
   let base_branch: string | null = null;
   if (current_branch) {
-    const mergeRef = runSyncSafe(`git config --get branch.${current_branch}.merge`, projectDir);
+    // #3587: branch name passed as a single argv element — git treats it
+    // as data, the shell is never invoked, no interpolation possible.
+    const mergeRef = runArgvSafe(
+      'git',
+      ['config', '--get', `branch.${current_branch}.merge`],
+      projectDir,
+    );
     if (mergeRef) {
       base_branch = mergeRef.replace('refs/heads/', '');
     } else {
       // Fallback: check if 'main' branch exists, else 'master'
-      const mainExists = boolSyncSafe('git rev-parse --verify main', projectDir);
+      const mainExists = boolArgvSafe('git', ['rev-parse', '--verify', 'main'], projectDir);
       base_branch = mainExists ? 'main' : 'master';
     }
   }
 
-  const remoteOut = runSyncSafe('git remote', projectDir);
+  const remoteOut = runArgvSafe('git', ['remote'], projectDir);
   const remote_configured = remoteOut !== null && remoteOut.trim().length > 0;
 
-  // gh availability
+  // gh availability — argv as well so a future change that interpolates
+  // a user-controlled value into the probe cannot silently introduce a
+  // new injection seam.
   const gh_available =
-    boolSyncSafe('gh --version', projectDir) ||
-    boolSyncSafe('which gh', projectDir);
+    boolArgvSafe('gh', ['--version'], projectDir) ||
+    boolArgvSafe('which', ['gh'], projectDir);
 
   // gh_authenticated: advisory — skip actual auth check to avoid slow network call
   const gh_authenticated = false;

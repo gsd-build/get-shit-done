@@ -1491,6 +1491,30 @@ describe('phase remove command', () => {
     assert.ok(forceResult.success, `Force remove failed: ${forceResult.error}`);
   });
 
+  test('bug-3409: supports --force before phase id', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n### Phase 1: A\n**Goal:** A\n### Phase 2: B\n**Goal:** B\n`
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State\n\n**Current Phase:** 1\n**Total Phases:** 2\n`
+    );
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-a'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-b'), { recursive: true });
+
+    const result = runGsdTools('phase remove --force 2', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.removed, '2');
+    assert.strictEqual(output.directory_deleted, '02-b');
+    assert.ok(!fs.existsSync(path.join(tmpDir, '.planning', 'phases', '02-b')));
+
+    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(state.includes('**Total Phases:** 1'), 'total phases should be decremented after real removal');
+  });
+
   test('removes decimal phase and renumbers siblings', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'ROADMAP.md'),

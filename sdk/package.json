@@ -36,6 +36,24 @@
   "scripts": {
     "build": "tsc",
     "check:alias-drift": "npm run build && node scripts/check-command-aliases-fresh.mjs",
+    "gen:state-document": "npm run build && npx tsx scripts/gen-state-document.ts",
+    "check:state-document-fresh": "npm run build && node scripts/check-state-document-fresh.mjs",
+    "gen:configuration": "npm run build && node scripts/gen-configuration.mjs",
+    "check:configuration-fresh": "npm run build && node scripts/check-configuration-fresh.mjs",
+    "gen:workstream-inventory-builder": "npm run build && node scripts/gen-workstream-inventory-builder.mjs",
+    "check:workstream-inventory-builder-fresh": "npm run build && node scripts/check-workstream-inventory-builder-fresh.mjs",
+    "gen:project-root": "npm run build && node scripts/gen-project-root.mjs",
+    "check:project-root-fresh": "npm run build && node scripts/check-project-root-fresh.mjs",
+    "gen:plan-scan": "npm run build && node scripts/gen-plan-scan.mjs",
+    "check:plan-scan-fresh": "npm run build && node scripts/check-plan-scan-fresh.mjs",
+    "gen:secrets": "npm run build && node scripts/gen-secrets.mjs",
+    "check:secrets-fresh": "npm run build && node scripts/check-secrets-fresh.mjs",
+    "gen:schema-detect": "npm run build && node scripts/gen-schema-detect.mjs",
+    "check:schema-detect-fresh": "npm run build && node scripts/check-schema-detect-fresh.mjs",
+    "gen:decisions": "npm run build && node scripts/gen-decisions.mjs",
+    "check:decisions-fresh": "npm run build && node scripts/check-decisions-fresh.mjs",
+    "gen:workstream-name-policy": "npm run build && node scripts/gen-workstream-name-policy.mjs",
+    "check:workstream-name-policy-fresh": "npm run build && node scripts/check-workstream-name-policy-fresh.mjs",
     "prepublishOnly": "rm -rf dist && tsc && chmod +x dist/cli.js",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
@@ -43,11 +61,13 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "synckit": "^0.11.12",
     "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
+    "tsx": "^4.22.0",
     "typescript": "^5.7.0",
     "vitest": "^3.1.1"
   }

@@ -11,6 +11,7 @@ allowed-tools:
   - Grep
   - Agent
   - AskUserQuestion
+requires: [phase]
 ---
 <objective>
 Verify threat mitigations for a completed phase. Three states:

@@ -272,8 +272,8 @@ describe('#2529 /gsd-settings mentions new command', () => {
   test('settings workflow mentions canonical /gsd-config --integrations', () => {
     const src = fs.readFileSync(SETTINGS_WORKFLOW_PATH, 'utf-8');
     assert.ok(
-      src.includes('gsd-config --integrations'),
-      'settings.md must mention /gsd-config --integrations'
+      src.includes('/gsd:config --integrations'),
+      'settings.md must mention /gsd:config --integrations'
     );
     assert.ok(
       !src.includes('/gsd-settings-integrations'),

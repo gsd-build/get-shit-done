@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
+requires: [audit-milestone, discuss-phase, execute-phase, new-milestone, phase, plan-phase, stats, update]
 ---
 
 <objective>
@@ -42,10 +43,10 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 0. **Check for audit:**
 
    - Look for `.planning/v{{version}}-MILESTONE-AUDIT.md`
-   - If missing or stale: recommend `/gsd-audit-milestone` first
+   - If missing or stale: recommend `/gsd:audit-milestone` first
    - If audit status is `gaps_found`: recommend closing the gaps inline
      (the audit output already enumerates them — insert closure phases
-     via `/gsd-phase --insert <N>` plus the standard
+     via `/gsd:phase --insert <N>` plus the standard
      discuss/plan/execute chain) before proceeding.
    - If audit status is `passed`: proceed to step 1
 
@@ -53,14 +54,14 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
    ## Pre-flight Check
 
    {If no v{{version}}-MILESTONE-AUDIT.md:}
-   ⚠ No milestone audit found. Run `/gsd-audit-milestone` first to verify
+   ⚠ No milestone audit found. Run `/gsd:audit-milestone` first to verify
    requirements coverage, cross-phase integration, and E2E flows.
 
    {If audit has gaps:}
    ⚠ Milestone audit found gaps. The audit output already enumerates the
    unsatisfied requirements, cross-phase issues, and broken flows — insert
-   a closure phase per gap with `/gsd-phase --insert <N>` and run the
-   standard `/gsd-discuss-phase` → `/gsd-plan-phase` → `/gsd-execute-phase`
+   a closure phase per gap with `/gsd:phase --insert <N>` and run the
+   standard `/gsd:discuss-phase` → `/gsd:plan-phase` → `/gsd:execute-phase`
    chain. Or proceed anyway to accept the gaps as tech debt.
 
    {If audit passed:}
@@ -114,7 +115,7 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
    - Ask about pushing tag
 
 8. **Offer next steps:**
-   - `/gsd-new-milestone` — start next milestone (questioning → research → requirements → roadmap)
+   - `/gsd:new-milestone` — start next milestone (questioning → research → requirements → roadmap)
 
 </process>
 
@@ -125,7 +126,7 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 - `.planning/REQUIREMENTS.md` deleted (fresh for next milestone)
 - ROADMAP.md collapsed to one-line entry
 - PROJECT.md updated with current state
-- Git tag v{{version}} created
+- Git tag v{{version}} created (if `git.create_tag` enabled)
 - Commit successful
 - User knows next steps (including need for fresh requirements)
   </success_criteria>
@@ -138,5 +139,5 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 - **Archive before deleting:** Always create archive files before updating/deleting originals
 - **One-line summary:** Collapsed milestone in ROADMAP.md should be single line with link
 - **Context efficiency:** Archive keeps ROADMAP.md and REQUIREMENTS.md constant size per milestone
-- **Fresh requirements:** Next milestone starts with `/gsd-new-milestone` which includes requirements definition
+- **Fresh requirements:** Next milestone starts with `/gsd:new-milestone` which includes requirements definition
   </critical_rules>

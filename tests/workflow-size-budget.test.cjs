@@ -56,7 +56,6 @@ const LARGE_WORKFLOWS = new Set([
   'complete-milestone',    // 847
   'verify-work',           // 740
   'transition',            // 693
-  'help',                  // 667
   'discuss-phase-assumptions', // 670
   'progress',              // 619
   'new-milestone',         // 611

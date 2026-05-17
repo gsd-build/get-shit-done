@@ -30,19 +30,9 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const SENTINEL_NAME = '.review-fix-recovery-pending.json';
+const { parseFrontmatter } = require('./helpers.cjs');
 
-function parseFrontmatter(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return null;
-  const body = match[1];
-  const out = {};
-  for (const line of body.split('\n')) {
-    const m = line.match(/^([a-zA-Z_]+):\s*(.*)$/);
-    if (m) out[m[1]] = m[2].trim();
-  }
-  return out;
-}
+const SENTINEL_NAME = '.review-fix-recovery-pending.json';
 
 function extractStep(content, stepName) {
   const re = new RegExp(`<step\\s+name="${stepName}">([\\s\\S]*?)</step>`);

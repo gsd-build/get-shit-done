@@ -141,16 +141,69 @@ For each SUMMARY.md in the phase directory:
 
 {Decisions from STATE.md accumulated context relevant to this phase}
 ```
+
+**7. Configured project sections:**
+Read append-only project-specific PRD/PR body sections from config:
+
+```bash
+CUSTOM_PR_SECTIONS=$(gsd-sdk query config-get ship.pr_body_sections --default '[]' 2>/dev/null || echo '[]')
+```
+
+`ship.pr_body_sections` is an onboarding-time extension point for teams that need extra PRD-style sections such as `User Stories & Acceptance Criteria`, `Risks & Dependencies`, `Success Metrics`, `Release Criteria`, or `Stakeholder Review & Approval`.
+
+Use these sections for lean/agile PRD material that should travel with the PR without making the core `/gsd:ship` body configurable:
+
+- User stories and acceptance criteria that explain the functional increment from the user's point of view.
+- Definition of Done or release criteria that make the completion standard explicit.
+- Risks, dependencies, stakeholder review, and traceability notes needed by regulated or approval-heavy projects.
+
+Rules:
+
+- Treat configured sections as append-only. They are rendered after `Key Decisions` and cannot replace, remove, or reorder the required core sections: `Summary`, `Changes`, `Requirements Addressed`, `Verification`, and `Key Decisions`.
+- Each entry must have `heading` plus at least one of `source`, `template`, or `fallback`.
+- `enabled` defaults to `true`; when `enabled` is `false`, skip the section without warning. This lets onboarding seed optional sections that a project can enable later.
+- `source` is a fallback chain of planning artifact headings: `PLAN.md ## Risks || VERIFICATION.md ## Manual Checks`. Allowed artifacts are `ROADMAP.md`, `PLAN.md`, `SUMMARY.md`, `VERIFICATION.md`, `STATE.md`, `REQUIREMENTS.md`, and `CONTEXT.md`.
+- `template` is literal Markdown with a closed token namespace only: `{phase_number}`, `{phase_name}`, `{phase_dir}`, `{base_branch}`, `{padded_phase}`.
+- `fallback` is literal Markdown used when `source` finds no content and no `template` is present.
+- Omit sections whose final rendered body is empty after trimming.
+
+Example configured sections:
+
+```json
+[
+  {
+    "heading": "User Stories & Acceptance Criteria",
+    "enabled": true,
+    "source": "REQUIREMENTS.md ## User Stories || REQUIREMENTS.md ## Acceptance Criteria",
+    "fallback": "- Acceptance criteria are covered by the linked requirements and verification evidence."
+  },
+  {
+    "heading": "Risks & Dependencies",
+    "enabled": true,
+    "source": "PLAN.md ## Risks || PLAN.md ## Dependencies",
+    "fallback": "- No known high-risk rollout dependencies."
+  },
+  {
+    "heading": "Stakeholder Review & Approval",
+    "enabled": false,
+    "template": "- Product owner approval pending for {phase_name}."
+  }
+]
+```
 </step>
 
 <step name="create_pr">
-Create the PR using the generated body:
+Create the PR using the generated body. Write the body to a temp file first so large generated PRD sections do not hit shell argument limits:
 
 ```bash
+PR_BODY_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-pr-body.XXXXXX.md")
+trap 'rm -f "${PR_BODY_FILE:-}"' EXIT
+printf '%s\n' "${PR_BODY}" > "${PR_BODY_FILE}"
+
 gh pr create \
   --title "Phase ${PHASE_NUMBER}: ${PHASE_NAME}" \
-  --body "${PR_BODY}" \
-  --base ${BASE_BRANCH}
+  --body-file "${PR_BODY_FILE}" \
+  --base "${BASE_BRANCH}"
 ```
 
 If `--draft` flag was passed: add `--draft`.
@@ -276,8 +329,8 @@ Requirements: {N} REQ-IDs addressed
 Next steps:
 - Review/approve PR
 - Merge when CI passes
-- /gsd-complete-milestone (if last phase in milestone)
-- /gsd-progress (to see what's next)
+- /gsd:complete-milestone (if last phase in milestone)
+- /gsd:progress (to see what's next)
 
 ───────────────────────────────────────────────────────────────
 ```
@@ -288,9 +341,9 @@ Next steps:
 <offer_next>
 After shipping:
 
-- /gsd-complete-milestone — if all phases in milestone are done
-- /gsd-progress — see overall project state
-- /gsd-execute-phase {next} — continue to next phase
+- /gsd:complete-milestone — if all phases in milestone are done
+- /gsd:progress — see overall project state
+- /gsd:execute-phase {next} — continue to next phase
 </offer_next>
 
 <success_criteria>

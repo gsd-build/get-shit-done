@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { safeReadFile, normalizeMd, output, error, atomicWriteFileSync } = require('./core.cjs');
+const { output, error } = require('./core.cjs');
+const { platformReadSync: safeReadFile, platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Parsing engine ───────────────────────────────────────────────────────────
 
@@ -344,7 +345,7 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   try { parsedValue = JSON.parse(value); } catch { parsedValue = value; }
   fm[field] = parsedValue;
   const newContent = spliceFrontmatter(content, fm);
-  atomicWriteFileSync(fullPath, normalizeMd(newContent));
+  platformWriteSync(fullPath, newContent);
   output({ updated: true, field, value: parsedValue }, raw, 'true');
 }
 
@@ -358,7 +359,7 @@ function cmdFrontmatterMerge(cwd, filePath, data, raw) {
   try { mergeData = JSON.parse(data); } catch { error('Invalid JSON for --data'); return; }
   Object.assign(fm, mergeData);
   const newContent = spliceFrontmatter(content, fm);
-  atomicWriteFileSync(fullPath, normalizeMd(newContent));
+  platformWriteSync(fullPath, newContent);
   output({ merged: true, fields: Object.keys(mergeData) }, raw, 'true');
 }
 

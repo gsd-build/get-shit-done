@@ -249,6 +249,10 @@ Once a phase is verified, ship it:
 /gsd-ship 1          # Creates a PR with auto-generated body
 ```
 
+The PR body always includes the required GSD sections: `Summary`, `Changes`, `Requirements Addressed`, `Verification`, and `Key Decisions`. During `/gsd-new-project`, you can also enable optional PRD-style sections such as user stories, acceptance criteria, risks, release criteria, and stakeholder approval. These are appended through `ship.pr_body_sections` and do not change the required core sections.
+
+For setup examples, field definitions, and troubleshooting, see [Custom PR Body Sections](ship-pr-body-sections.md).
+
 For multi-phase projects, repeat the loop:
 
 ```
@@ -721,11 +725,11 @@ The `security.cjs` module scans for known injection patterns (role overrides, in
 
 ---
 
-### Package Legitimacy Gate (v1.51)
+### Package Legitimacy Gate (v1.42.1)
 
 AI coding tools hallucinate package names. Attackers pre-register those names on npm, PyPI, and crates.io with malicious post-install scripts — a technique called *slopsquatting*. A hallucinated name that passes `npm view` looks legitimate, so it would flow undetected through GSD's research → plan → execute pipeline all the way to `npm install <malicious-pkg>` running on your machine.
 
-v1.51 adds a three-layer gate that stops this before it reaches your shell.
+v1.42.1 adds a three-layer gate that stops this before it reaches your shell.
 
 #### What you'll see
 
@@ -798,7 +802,7 @@ pip install slopcheck
 
 `slopcheck` is a MIT-licensed Python tool maintained by ToxSec (the researcher who documented the slopsquatting attack surface). It checks packages across npm, PyPI, crates.io, RubyGems, Go modules, Maven, and Packagist using multi-signal heuristics: registry age, download count, source-repo linkage, naming distance to popular packages, and registry-specific suspicion patterns.
 
-If `slopcheck` is ever unavailable or abandoned, GSD's `[ASSUMED]`-gate fallback ensures you always get a human checkpoint before any install — the system never silently degrades to the pre-v1.51 behavior.
+If `slopcheck` is ever unavailable or abandoned, GSD's `[ASSUMED]`-gate fallback ensures you always get a human checkpoint before any install — the system never silently degrades to the pre-v1.42.1 behavior.
 
 ---
 
@@ -1214,6 +1218,12 @@ Each disabled server removes its schema from every subsequent turn for the rest 
 For the full audit, harness reference, and the composition note with `model_profile`, see [MCP Tool Schema Cost](../get-shit-done/references/context-budget.md#mcp-tool-schema-cost-harness-concern) in the bundled `context-budget.md` reference.
 
 ### Using Non-Claude Runtimes (Codex, OpenCode, Gemini CLI, Kilo)
+
+> **Codex CLI minimum supported version: `0.130.0`** (issue [#3562](https://github.com/gsd-build/get-shit-done/issues/3562)).
+>
+> Codex CLI [0.130.0](https://github.com/openai/codex/releases/tag/rust-v0.130.0) (released 2026-05-08) removed extra-skills-roots discovery via [openai/codex#21485](https://github.com/openai/codex/pull/21485). From that version onward, Codex only discovers commands from `~/.codex/skills/<name>/SKILL.md` (user root), `<project>/.codex/skills/` (cwd root), and registered plugin roots. The GSD installer writes `~/.codex/skills/gsd-<name>/SKILL.md` directly so `$gsd-help`, `$gsd-new-project`, etc. are discoverable after restart.
+>
+> **Earlier Codex CLI versions** (pre-0.130.0) had additional skill-root scanning that discovered the GSD agent/workflow files in alternate locations. GSD still installs the `~/.codex/skills/gsd-*` copies on those versions, which can show a duplicate listing alongside the legacy auto-discovered surface — restart Codex after install and either upgrade to ≥ 0.130.0 or accept the duplicate entries until you do.
 
 If you installed GSD for a non-Claude runtime, the installer already configured model resolution so all agents use the runtime's default model. No manual setup is needed. Specifically, the installer sets `resolve_model_ids: "omit"` in your config, which tells GSD to skip Anthropic model ID resolution and let the runtime choose its own default model.
 

@@ -52,6 +52,7 @@ describe('changeset new: name generator + scaffold writer (#2975)', () => {
       type: 'Fixed',
       pr: 9999,
       body: 'this is a placeholder body that the contributor will replace.',
+      docsExempt: null,
     });
   });
 

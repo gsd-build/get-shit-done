@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 3577
+---
+**Phase 6 `config-*` SDK port parity carve-outs** — restored the legacy contract for four CLI tests broken by the Phase 6 router migration. `config-ensure-section` no longer routes through the new SDK `configEnsureSection` handler (which expected a positional `<section>` arg the CLI never passes) and instead keeps the `cmdConfigEnsureSection → ensureConfigFile → buildNewProjectConfig` CJS path that produces the full default `.planning/config.json`. The SDK `configNewProject` defaults now match `sdk/shared/config-defaults.manifest.json` (`commit_docs: true`, `parallelization: true`) and report the project-rooted relative path `.planning/config.json` to mirror the CJS shape. SDK error vocabulary is aligned with CJS: `Unknown config key: <key>` (no quotes), and config-get's malformed-JSON error is led by `Failed to read config.json:` so legacy regression tests keep matching. Closes the `Usage: config-ensure-section <section>` regression seen in `tests/{config,agent-skills,ai-evals}.test.cjs`.

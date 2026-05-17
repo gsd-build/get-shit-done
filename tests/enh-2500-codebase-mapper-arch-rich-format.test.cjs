@@ -99,7 +99,9 @@ describe('enh-2500: gsd-codebase-mapper arch focus — rich architecture output'
 
   test('template includes data flow traces with numbered steps', () => {
     const hasPrimaryRequestPath = /###\s+Primary Request Path/i.test(archTemplate);
-    const hasThreeNumberedSteps = /^\s*1\..+\n\s*2\..+\n\s*3\./m.test(archTemplate);
+    // [^\n]+ + \r?\n is CRLF-tolerant: .+ doesn't match \r in JS regex by
+    // default, so \r before the literal \n in CRLF content kills the match.
+    const hasThreeNumberedSteps = /^\s*1\.[^\n]+\r?\n\s*2\.[^\n]+\r?\n\s*3\./m.test(archTemplate);
     const hasFileLineRefs = /\(`\[.*:(?:line|\d+)\]`\)/.test(archTemplate);
 
     assert.ok(

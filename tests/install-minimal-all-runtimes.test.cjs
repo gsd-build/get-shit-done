@@ -179,6 +179,16 @@ function expectedSkillSet() {
   return new Set([...MINIMAL_SKILL_ALLOWLIST]);
 }
 
+function expectedManifestSkillSet(runtime) {
+  // Codex CLI 0.130.0 does not auto-discover commands from workflow / agent
+  // files (#3562) — it only registers commands from skills/<name>/SKILL.md.
+  // Codex installs therefore materialize the same minimal-allowlist skill
+  // surface as the other runtimes; the prior "Codex discovers official
+  // skills directly" assumption (which led to an empty Codex skill set
+  // here) does not hold in practice.
+  return expectedSkillSet();
+}
+
 describe('install: --minimal honoured for every runtime in --global mode', () => {
   for (const runtime of SKILL_RUNTIMES) {
     test(`${runtime} --global --minimal emits exactly the core skill set, zero agents`, () => {
@@ -193,7 +203,7 @@ describe('install: --minimal honoured for every runtime in --global mode', () =>
           `${runtime} global manifest.mode should be "minimal"`);
         assert.deepStrictEqual(
           [...manifestSkillSet(manifest)].sort(),
-          [...expectedSkillSet()].sort(),
+          [...expectedManifestSkillSet(runtime)].sort(),
           `${runtime} global should record exactly the MINIMAL allowlist in the manifest`,
         );
         assert.strictEqual(manifestAgentCount(manifest), 0,
@@ -219,7 +229,7 @@ describe('install: --minimal honoured for every runtime in --local mode', () => 
           `${runtime} local manifest.mode should be "minimal"`);
         assert.deepStrictEqual(
           [...manifestSkillSet(manifest)].sort(),
-          [...expectedSkillSet()].sort(),
+          [...expectedManifestSkillSet(runtime)].sort(),
           `${runtime} local should record exactly the MINIMAL allowlist in the manifest (regression guard for #2923)`,
         );
         assert.strictEqual(manifestAgentCount(manifest), 0,

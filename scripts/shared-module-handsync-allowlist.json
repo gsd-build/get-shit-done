@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_comment": "Allowlist for scripts/lint-shared-module-handsync.cjs — Phase 6 of #3524 (#3575). Two categories: cooperatingSiblings (legitimate pairs, lint accepts silently) and migrateMeBacklog (known drift anti-patterns, lint warns but does not fail). All entries require cjs + ts path + classification + justification.",
+  "cooperatingSiblings": [
+    {
+      "cjs": "get-shit-done/bin/lib/active-workstream-store.cjs",
+      "ts": "sdk/src/query/active-workstream-store.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS manages filesystem-backed workstream store; SDK layer wraps via Adapter for query dispatch. Different responsibilities, not drift."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/config-schema.cjs",
+      "ts": "sdk/src/query/config-schema.ts",
+      "classification": "cooperating-sibling",
+      "justification": "SDK config-schema.ts is the generated source-of-truth derived from sdk/shared/config-schema.manifest.json (Phase 2/#3540). CJS config-schema.cjs is the Adapter that reads from that manifest. Not a hand-sync pair; freshness check enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/frontmatter.cjs",
+      "ts": "sdk/src/query/frontmatter.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS implements full frontmatter parsing/mutation; SDK frontmatter.ts is the native SDK query handler delegating to the CJS runtime via the seam bridge. Not duplicating logic."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/init.cjs",
+      "ts": "sdk/src/query/init.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS init.cjs is the authoritative initializer; SDK init.ts provides the native handler layer for the SDK query seam. Phase 5.2+ will migrate remaining subcommands, but current architecture is intentional."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/phase.cjs",
+      "ts": "sdk/src/query/phase.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS phase.cjs is the full phase lifecycle implementation; SDK phase.ts provides the native query handler. The SDK delegates to CJS for most subcommands. Phase 5.2+ candidate for further migration."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/profile-output.cjs",
+      "ts": "sdk/src/query/profile-output.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS profile-output.cjs handles profiling output rendering; SDK profile-output.ts is the corresponding SDK query handler. Separate responsibilities across the seam."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/roadmap.cjs",
+      "ts": "sdk/src/query/roadmap.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS roadmap.cjs is the full roadmap implementation; SDK roadmap.ts provides the native handler for SDK query dispatch. Phase 5.2+ candidate."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/state.cjs",
+      "ts": "sdk/src/query/state.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS state.cjs is the full state implementation; SDK state.ts routes known subcommands via executeForCjs (Phase 5.0/#3558, Phase 5.1/#3574). Intentional seam delegation pattern."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/state-document.cjs",
+      "ts": "sdk/src/query/state-document.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS state-document.cjs is the generated Adapter reading from sdk/src/state-document/ Shared Module (Phase 1/#3531). SDK state-document.ts is the corresponding source-of-truth query handler. Freshness check enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/template.cjs",
+      "ts": "sdk/src/query/template.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS template.cjs handles template operations; SDK template.ts is the corresponding SDK native handler. Separate responsibilities across the seam."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/uat.cjs",
+      "ts": "sdk/src/query/uat.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS uat.cjs implements UAT workflows; SDK uat.ts provides the SDK query handler layer. Separate responsibilities."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/verify.cjs",
+      "ts": "sdk/src/query/verify.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS verify.cjs is the full verify implementation; SDK verify.ts provides the native handler. Phase 5.2+ candidate for further delegation."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/workstream.cjs",
+      "ts": "sdk/src/query/workstream.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS workstream.cjs handles workstream management; SDK workstream.ts provides the SDK query handler. Workstream support inside sync bridge is an open follow-up item."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/workstream-inventory.cjs",
+      "ts": "sdk/src/query/workstream-inventory.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS workstream-inventory.cjs is the generated Adapter for the workstream-inventory Shared Module (Phase 3/#3548). SDK workstream-inventory.ts is the source-of-truth query handler. Freshness check enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/config.cjs",
+      "ts": "sdk/src/config.ts",
+      "classification": "CJS-CLI-ONLY",
+      "justification": "Phase 2 (#3536) already migrated CONFIG_DEFAULTS and loadConfig/mergeDefaults to the Configuration Module and sdk/src/config.ts. What remains in config.cjs is exclusively CLI command handlers (cmdConfigGet, cmdConfigSet, cmdConfigNewProject, cmdConfigEnsureSection, cmdConfigSetModelProfile, cmdConfigPath, cmdMigrateConfig, buildNewProjectConfig, setConfigValue, ensureConfigFile) that depend on CJS-only APIs (withPlanningLock, platformWriteSync/ReadSync/EnsureDir, sync fs ops, process.exit). sdk/src/config.ts provides only the async loadConfig/mergeDefaults SDK layer. The two files serve disjoint surfaces with no logical overlap — not a hand-sync drift anti-pattern."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/intel.cjs",
+      "ts": "sdk/src/query/intel.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS intel.cjs is the synchronous runtime implementation used by gsd-tools.cjs; sdk/src/query/intel.ts is the async QueryHandler port for the SDK query seam (explicitly documented as a port in its file header). The two files intentionally diverge on INTEL_FILES naming (CJS: file-roles.json/api-map.json/dependency-graph.json/arch-decisions.json; SDK: files.json/apis.json/deps.json/arch.md) — existing CJS tests are locked to the old naming. Not a hand-sync drift pattern; separate runtime responsibilities across the seam."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/model-catalog.cjs",
+      "ts": "sdk/src/model-catalog.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "Both files read from sdk/shared/model-catalog.json (ADR-0003 precedent) as independent consumers of the shared manifest. CJS exposes VALID_AGENT_TIERS, MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT, nextTier, formatAgentToModelMapAsTable for core.cjs and model-profiles.cjs consumers. SDK exposes resolveRuntimeTierDefault, runtimesWithReasoningEffort for session-runner.ts and query handlers. The shared JSON is the single source-of-truth; both adapters derive their exports from it without duplicating any logic between themselves."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/plan-scan.cjs",
+      "ts": "sdk/src/query/plan-scan.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "CJS plan-scan.cjs is the generated Adapter reading from sdk/src/query/plan-scan.ts Shared Module (Phase 6/#3575). SDK plan-scan.ts is the source-of-truth. Freshness check (check-plan-scan-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/secrets.cjs",
+      "ts": "sdk/src/query/secrets.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "CJS secrets.cjs is the generated Adapter reading from sdk/src/query/secrets.ts Shared Module (Phase 6/#3575). SDK secrets.ts is the source-of-truth. Freshness check (check-secrets-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/schema-detect.cjs",
+      "ts": "sdk/src/query/schema-detect.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "CJS schema-detect.cjs is the generated Adapter reading from sdk/src/query/schema-detect.ts Shared Module (Phase 6/#3575). SDK schema-detect.ts is the source-of-truth. Generated CJS adds detectSchemaOrm compat export (not in SDK) and exports SCHEMA_PATTERNS/ORM_INFO for backward compatibility. Freshness check (check-schema-detect-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/decisions.cjs",
+      "ts": "sdk/src/query/decisions.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "Phase 6 (#3575): CJS decisions.cjs is the generated Adapter reading from sdk/src/query/decisions.ts Shared Module. SDK source-of-truth; regex aligned to accept alphanumeric IDs (D-INFRA-01). CJS callers (gap-checker.cjs) use {id, text} subset; extra fields {category, tags, trackable} are present but ignored. Freshness check (check-decisions-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/workstream-name-policy.cjs",
+      "ts": "sdk/src/workstream-name-policy.ts",
+      "classification": "ADAPTER-OVER-MODULE",
+      "justification": "Phase 6 (#3575): CJS workstream-name-policy.cjs is the generated Adapter reading from sdk/src/workstream-name-policy.ts Shared Module. SDK source-of-truth now exports all three functions used by CJS callers (toWorkstreamSlug, hasInvalidPathSegment, isValidActiveWorkstreamName) plus validateWorkstreamName alias. Freshness check (check-workstream-name-policy-fresh.mjs) enforces alignment."
+    }
+  ],
+  "migrateMeBacklog": []
+}

@@ -105,7 +105,7 @@ describe('bug-2801: ingest-docs.md workflow calls gsd-tools not gsd-sdk', () => 
     const content = fs.readFileSync(WORKFLOW_FILE, 'utf-8');
     // Extract bash fenced code blocks structurally.
     const bashBlocks = [];
-    const codeBlockRe = /```bash\n([\s\S]*?)```/g;
+    const codeBlockRe = /```bash\r?\n([\s\S]*?)```/g;
     let m;
     while ((m = codeBlockRe.exec(content)) !== null) {
       bashBlocks.push(m[1]);
@@ -129,7 +129,7 @@ describe('bug-2801: ingest-docs.md workflow calls gsd-tools not gsd-sdk', () => 
   test('ingest-docs.md init step uses canonical node-path gsd-tools.cjs invocation', () => {
     const content = fs.readFileSync(WORKFLOW_FILE, 'utf-8');
     // Parse fenced bash blocks structurally — do not match raw markdown text.
-    const codeBlockRe = /```bash\n([\s\S]*?)```/g;
+    const codeBlockRe = /```bash\r?\n([\s\S]*?)```/g;
     const bashLines = [...content.matchAll(codeBlockRe)]
       .flatMap((m) => m[1].split('\n'))
       .filter((l) => !/^\s*#/.test(l));

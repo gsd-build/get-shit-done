@@ -160,7 +160,7 @@ Classify per phase:
 
 Add to audit YAML: `nyquist: { compliant_phases, partial_phases, missing_phases, overall }`
 
-Discovery only — never auto-calls `/gsd-validate-phase`.
+Discovery only — never auto-calls `/gsd:validate-phase`.
 
 ## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
 
@@ -233,7 +233,7 @@ All requirements covered. Cross-phase integration verified. E2E flows complete.
 
 /clear then:
 
-/gsd-complete-milestone {version}
+/gsd:complete-milestone {version}
 
 ───────────────────────────────────────────────────────────────
 
@@ -266,9 +266,9 @@ All requirements covered. Cross-phase integration verified. E2E flows complete.
 
 | Phase | VALIDATION.md | Compliant | Action |
 |-------|---------------|-----------|--------|
-| {phase} | exists/missing | true/false/partial | `/gsd-validate-phase {N}` |
+| {phase} | exists/missing | true/false/partial | `/gsd:validate-phase {N}` |
 
-Phases needing validation: run `/gsd-validate-phase {N}` for each flagged phase.
+Phases needing validation: run `/gsd:validate-phase {N}` for each flagged phase.
 
 ───────────────────────────────────────────────────────────────
 
@@ -281,13 +281,13 @@ per group of related gaps) using the standard phase chain:
 
 /clear then:
 
-/gsd-phase --insert <N> "Close gap: <REQ-ID> — <description>"
-/gsd-discuss-phase <N>
-/gsd-plan-phase <N>
-/gsd-execute-phase <N>
+/gsd:phase --insert <N> "Close gap: <REQ-ID> — <description>"
+/gsd:discuss-phase <N>
+/gsd:plan-phase <N>
+/gsd:execute-phase <N>
 
 For Nyquist-coverage gaps flagged in the table above, prefer running
-`/gsd-validate-phase <N>` for each flagged phase (and `/gsd-secure-phase
+`/gsd:validate-phase <N>` for each flagged phase (and `/gsd:secure-phase
 <N>` if SECURITY.md was flagged) before inserting a new closure phase —
 they may close the gap retroactively without a new phase.
 
@@ -295,7 +295,7 @@ they may close the gap retroactively without a new phase.
 
 **Also available:**
 - cat .planning/v{version}-MILESTONE-AUDIT.md — see full report
-- /gsd-complete-milestone {version} — proceed anyway (accept tech debt)
+- /gsd:complete-milestone {version} — proceed anyway (accept tech debt)
 
 ───────────────────────────────────────────────────────────────
 
@@ -325,17 +325,17 @@ All requirements met. No critical blockers. Accumulated tech debt needs review.
 
 **A. Complete milestone** — accept debt, track in backlog
 
-/gsd-complete-milestone {version}
+/gsd:complete-milestone {version}
 
 **B. Plan a cleanup phase** — address the debt above before completing.
 Insert a closure phase using the standard chain:
 
 /clear then:
 
-/gsd-phase --insert <N> "Address tech debt: <area>"
-/gsd-discuss-phase <N>
-/gsd-plan-phase <N>
-/gsd-execute-phase <N>
+/gsd:phase --insert <N> "Address tech debt: <area>"
+/gsd:discuss-phase <N>
+/gsd:plan-phase <N>
+/gsd:execute-phase <N>
 
 ───────────────────────────────────────────────────────────────
 </offer_next>

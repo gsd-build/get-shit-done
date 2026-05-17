@@ -110,7 +110,8 @@ describe('Cursor CLI reviewer in /gsd-review (#1960)', () => {
   // --- help.md ---
 
   describe('help.md', () => {
-    const helpPath = path.join(ROOT, 'get-shit-done', 'workflows', 'help.md');
+    // After #3039, help content moved into help/modes/full.md.
+    const helpPath = path.join(ROOT, 'get-shit-done', 'workflows', 'help', 'modes', 'full.md');
 
     test('lists --cursor in /gsd-review signature', () => {
       const c = fs.readFileSync(helpPath, 'utf-8');

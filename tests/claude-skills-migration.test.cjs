@@ -89,8 +89,10 @@ describe('convertClaudeCommandToClaudeSkill', () => {
     assert.ok(result.includes('name: gsd-next'), 'frontmatter name uses hyphen form (#2808)');
   });
 
-  test('preserves body content unchanged', () => {
-    const body = '\n<objective>\nDo the thing.\n</objective>\n\n<process>\nStep 1.\nStep 2.\n</process>\n';
+  test('preserves body content while normalizing gsd: command references (#3583)', () => {
+    // The body transformer now rewrites gsd: references (colon → hyphen) but must
+    // leave all other custom prose, tags, and structure intact.
+    const body = '\n<objective>\nSee /gsd:plan-phase and gsd:review for details.\n</objective>\n\n<process>\nStep 1.\nStep 2.\n</process>\n';
     const input = [
       '---',
       'name: gsd:test',
@@ -100,10 +102,17 @@ describe('convertClaudeCommandToClaudeSkill', () => {
     ].join('');
 
     const result = convertClaudeCommandToClaudeSkill(input, 'gsd-test');
+    // Custom structure preserved
     assert.ok(result.includes('<objective>'), 'objective tag preserved');
-    assert.ok(result.includes('Do the thing.'), 'body text preserved');
+    assert.ok(result.includes('See /gsd-plan-phase'), 'rewritten command reference visible');
     assert.ok(result.includes('<process>'), 'process tag preserved');
     assert.ok(result.includes('Step 1.'), 'step text preserved');
+
+    // #3583: gsd: references in body are normalized to hyphen form
+    assert.ok(result.includes('/gsd-plan-phase'), 'colon command ref rewritten to hyphen');
+    assert.ok(result.includes('gsd-review'), 'bare colon ref rewritten to hyphen');
+    assert.ok(!result.includes('gsd:plan-phase'), 'no colon form should survive in body');
+    assert.ok(!result.includes('gsd:review'), 'no colon form should survive in body');
   });
 
   test('preserves agent field', () => {

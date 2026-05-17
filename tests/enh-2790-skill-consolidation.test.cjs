@@ -18,7 +18,9 @@ const COMMANDS_DIR = path.join(__dirname, '..', 'commands', 'gsd');
  */
 function parseFrontmatter(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');
-  const lines = raw.split('\n');
+  // CRLF-tolerant: Windows checkouts leave \r on every line. lines.indexOf('---', 1)
+  // would never match because elements would be '---\r' instead of '---'.
+  const lines = raw.split(/\r?\n/);
   if (lines[0].trim() !== '---') return {};
   const endIdx = lines.indexOf('---', 1);
   if (endIdx === -1) return {};

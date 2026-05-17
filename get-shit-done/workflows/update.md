@@ -14,13 +14,14 @@ Detect whether GSD is installed locally or globally by checking both locations a
 First, derive `PREFERRED_CONFIG_DIR` and `PREFERRED_RUNTIME` from the invoking prompt's `execution_context` path:
 - If the path contains `/get-shit-done/workflows/update.md`, strip that suffix and store the remainder as `PREFERRED_CONFIG_DIR`
 - Path contains `/.codex/` -> `codex`
+- Path contains `/.gemini/antigravity/` -> `antigravity`
 - Path contains `/.gemini/` -> `gemini`
 - Path contains `/.config/kilo/` or `/.kilo/`, or `PREFERRED_CONFIG_DIR` contains `kilo.json` / `kilo.jsonc` -> `kilo`
 - Path contains `/.config/opencode/` or `/.opencode/`, or `PREFERRED_CONFIG_DIR` contains `opencode.json` / `opencode.jsonc` -> `opencode`
 - Otherwise -> `claude`
 
 Use `PREFERRED_CONFIG_DIR` when available so custom `--config-dir` installs are checked before default locations.
-Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd-update` targets the runtime that invoked it.
+Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd:update` targets the runtime that invoked it.
 
 Kilo config precedence must match the installer: `KILO_CONFIG_DIR` -> `dirname(KILO_CONFIG)` -> `XDG_CONFIG_HOME/kilo` -> `~/.config/kilo`.
 
@@ -36,7 +37,7 @@ expand_home() {
 # Using an array instead of a space-separated string ensures correct
 # iteration in both bash and zsh (zsh does not word-split unquoted
 # variables by default). Fixes #1173.
-RUNTIME_DIRS=( "claude:.claude" "opencode:.config/opencode" "opencode:.opencode" "gemini:.gemini" "kilo:.config/kilo" "kilo:.kilo" "codex:.codex" )
+RUNTIME_DIRS=( "claude:.claude" "opencode:.config/opencode" "opencode:.opencode" "antigravity:.gemini/antigravity" "gemini:.gemini" "kilo:.config/kilo" "kilo:.kilo" "codex:.codex" )
 ENV_RUNTIME_DIRS=()
 
 # PREFERRED_CONFIG_DIR / PREFERRED_RUNTIME should be set from execution_context
@@ -58,6 +59,8 @@ fi
 if [ -z "$PREFERRED_RUNTIME" ]; then
   if [ -n "$CODEX_HOME" ]; then
     PREFERRED_RUNTIME="codex"
+  elif [ -n "$ANTIGRAVITY_CONFIG_DIR" ]; then
+    PREFERRED_RUNTIME="antigravity"
   elif [ -n "$GEMINI_CONFIG_DIR" ]; then
     PREFERRED_RUNTIME="gemini"
   elif [ -n "$KILO_CONFIG_DIR" ]; then
@@ -95,7 +98,7 @@ if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done
     printf '%s' "$p"
   }
   normalized_preferred="$(normalize_path "$PREFERRED_CONFIG_DIR")"
-  for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
+  for dir in .claude .config/opencode .opencode .gemini/antigravity .gemini .config/kilo .kilo .codex; do
     resolved_local="$(cd "./$dir" 2>/dev/null && pwd)"
     normalized_local="$(normalize_path "$resolved_local")"
     if [ -n "$normalized_local" ] && [ "$normalized_local" = "$normalized_preferred" ]; then
@@ -125,6 +128,9 @@ fi
 # Absolute global candidates from env overrides (covers custom config dirs).
 if [ -n "$CLAUDE_CONFIG_DIR" ]; then
   ENV_RUNTIME_DIRS+=( "claude:$(expand_home "$CLAUDE_CONFIG_DIR")" )
+fi
+if [ -n "$ANTIGRAVITY_CONFIG_DIR" ]; then
+  ENV_RUNTIME_DIRS+=( "antigravity:$(expand_home "$ANTIGRAVITY_CONFIG_DIR")" )
 fi
 if [ -n "$GEMINI_CONFIG_DIR" ]; then
   ENV_RUNTIME_DIRS+=( "gemini:$(expand_home "$GEMINI_CONFIG_DIR")" )
@@ -356,7 +362,7 @@ by re-running the local installer from your dev branch:
 
     node bin/install.js --global --claude
 
-Running /gsd-update would install the npm release (A.B.C) and downgrade
+Running /gsd:update would install the npm release (A.B.C) and downgrade
 your dev version — do NOT use it to resolve this warning.
 ```
 
@@ -406,7 +412,7 @@ Your custom files in other locations are preserved:
 - Custom hooks ✓
 - Your CLAUDE.md files ✓
 
-If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd-update --reapply` after the update.
+If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd:update --reapply` after the update.
 ```
 
 
@@ -581,14 +587,14 @@ for dir in "${CACHE_DIRS[@]}"; do
   fi
 done
 
-for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
+for dir in .claude .config/opencode .opencode .gemini/antigravity .gemini .config/kilo .kilo .codex; do
   rm -f "./$dir/cache/gsd-update-check.json"
   rm -f "$HOME/$dir/cache/gsd-update-check.json"
 done
 
 # Clear the shared tool-agnostic cache written by gsd-check-update.js hook (#2784).
 # The hook uses ~/.cache/gsd/gsd-update-check.json regardless of runtime; clear it
-# so the statusline stops showing the stale "⬆ /gsd-update" indicator after update.
+# so the statusline stops showing the stale "⬆ /gsd:update" indicator after update.
 rm -f "$HOME/.cache/gsd/gsd-update-check.json"
 ```
 
@@ -619,7 +625,7 @@ Check for gsd-local-patches/backup-meta.json in the config directory.
 
 ```
 Local patches were backed up before the update.
-Run `/gsd-update --reapply` to merge your modifications into the new version.
+Run `/gsd:update --reapply` to merge your modifications into the new version.
 ```
 
 **If no patches:** Continue normally.

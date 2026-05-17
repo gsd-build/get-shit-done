@@ -30,5 +30,29 @@ jobs:
             with updated reproduction steps on the latest GSD version.
           stale-issue-label: 'stale'
           stale-pr-label: 'stale'
-          exempt-issue-labels: 'fix-pending,priority: critical,pinned,confirmed-bug,confirmed'
+          exempt-issue-labels: 'fix-pending,priority: critical,pinned,confirmed-bug,confirmed,awaiting-retest,needs-reproduction'
           exempt-pr-labels: 'fix-pending,priority: critical,pinned,DO NOT MERGE'
+
+  stale-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v10.2.0
+        with:
+          only-issue-labels: 'awaiting-retest,needs-reproduction'
+          days-before-issue-stale: 5
+          days-before-issue-close: 0
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          remove-stale-when-updated: true
+          stale-issue-message: >
+            Closing — we asked for a retest / reproduction more than 5 days ago and
+            haven't heard back. If this is still happening on the latest GSD version
+            you are welcome to open a new issue with the requested information.
+            We expect follow-up to maintainer requests within a reasonable window or
+            we close to keep the tracker actionable.
+          close-issue-message: >
+            Closed (not planned) — reporter did not respond within 5 days of our
+            retest / reproduction request. Re-open with the requested information,
+            or file a new issue if it still affects you on the latest GSD version.
+          exempt-issue-labels: 'pinned,priority: critical,fix-pending'

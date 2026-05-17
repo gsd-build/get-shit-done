@@ -142,7 +142,9 @@ claude --dangerously-skip-permissions
 
 GSD is built for frictionless automation. Skip-permissions is how it's intended to run.
 
-See **[docs/USER-GUIDE.md](docs/USER-GUIDE.md)** for the full walkthrough, non-interactive install flags for all 15 runtimes, minimal install (`--minimal`), Docker setup, and permissions configuration.
+Install only the skills you need with `--profile=core` (six core-loop skills), `--profile=standard` (core + phase management), or the default full install. Profiles compose: `--profile=core,audit`. `--minimal` is an alias for `--profile=core`. See **[docs/USER-GUIDE.md](docs/USER-GUIDE.md)** for the full walkthrough, non-interactive install flags for all 15 runtimes, and permissions configuration. See [ADR-0011](docs/adr/0011-skill-surface-budget-module.md) for the profile model and runtime surface control.
+
+Current release highlights are in [docs/RELEASE-v1.42.1.md](docs/RELEASE-v1.42.1.md): package legitimacy checks, safer installer migrations, runtime surface control, custom ship PR sections, reviewer defaults, fallow structural review, and quota-aware execution recovery.
 
 ---
 
@@ -161,6 +163,7 @@ The main loop:
 | `/gsd-progress --next` | Auto-detect and run the next step |
 | `/gsd-complete-milestone` | Archive milestone and tag release |
 | `/gsd-new-milestone` | Start next version |
+| `/gsd:surface` | Enable/disable skill clusters at runtime without reinstall |
 
 For ad-hoc tasks, autonomous mode, codebase analysis, forensics, and the full command surface — see **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 
@@ -193,6 +196,10 @@ Key dials:
 | `workflow.research` / `plan_check` / `verifier` | Toggle the quality agents that add tokens and time |
 | `parallelization.enabled` | Run independent plans simultaneously |
 
+Optional structural review: set `code_quality.fallow.enabled` to `true` to add a fallow pre-pass to `/gsd-code-review`. GSD writes `.planning/phases/<phase>/FALLOW.json` and surfaces a `Structural Findings (fallow)` section in `REVIEW.md`. Install with `npm install -D fallow@^2.70.0` (or system-wide via `cargo install fallow`; note that the Rust binary's JSON schema must match the documented v2.70+ contract — older versions may produce silent zero-finding output).
+
+Package legitimacy checks are built into the research, planning, and execution path: recommended dependencies get audited, unverified packages require a human checkpoint, and failed installs stop instead of trying similarly named alternatives.
+
 For the full configuration reference — all settings, git branching strategies, per-runtime model overrides, workstream config inheritance, agent skills injection — see **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)**.
 
 ---
@@ -214,6 +221,8 @@ For the full configuration reference — all settings, git branching strategies,
 ## Troubleshooting
 
 **Commands not showing up?** Restart your runtime after install. GSD installs to `~/.claude/skills/gsd-*/` (Claude Code), `~/.codex/skills/gsd-*/` (Codex), or the equivalent for your runtime.
+
+**Codex users — minimum supported CLI version is `0.130.0`.** Codex CLI 0.130.0 ([release notes](https://github.com/openai/codex/releases/tag/rust-v0.130.0)) removed extra-skill-roots discovery via [openai/codex#21485](https://github.com/openai/codex/pull/21485); from that version onward Codex discovers skills from standard roots (including `~/.codex/skills/<name>/SKILL.md`). GSD installs there directly. Earlier Codex CLI versions may still discover additional roots, which can surface duplicate `gsd-*` entries (one from extra-roots discovery, one from `~/.codex/skills/`); restart Codex after install and either upgrade or accept the duplicate listing.
 
 **Something broken?** Re-run the installer — it's idempotent:
 ```bash

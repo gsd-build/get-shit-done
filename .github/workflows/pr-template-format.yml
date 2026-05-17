@@ -1,0 +1,105 @@
+name: PR Template Format
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  check-template-format:
+    name: Pull request template format
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check out policy from base branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Evaluate PR template format
+        id: policy
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+        run: node scripts/pr-template-policy.cjs
+
+      - name: Warn trusted contributor about missing template
+        if: steps.policy.outputs.action == 'warn'
+        uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        with:
+          script: |
+            const marker = '<!-- gsd-pr-template-policy -->';
+            const pr = context.payload.pull_request;
+            const policy = JSON.parse(${{ toJSON(steps.policy.outputs.result) }});
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            if (!comments.some((comment) => comment.body && comment.body.includes(marker))) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: [
+                  marker,
+                  '## Please use the PR template format',
+                  '',
+                  'This PR is allowed to stay open because the author is a contributor or higher, but the body does not follow one of the required PR templates.',
+                  '',
+                  'Please update the PR description to use the fix, enhancement, or feature template format from `CONTRIBUTING.md` so the automated documentation modules can do their job.',
+                  '',
+                  `Detected problem: ${policy.reason}`,
+                ].join('\n'),
+              });
+            }
+            core.warning(policy.reason);
+
+      - name: Comment, close, and fail untrusted malformed PR
+        if: steps.policy.outputs.action == 'close'
+        uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        with:
+          script: |
+            const marker = '<!-- gsd-pr-template-policy -->';
+            const pr = context.payload.pull_request;
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+            const policy = JSON.parse(${{ toJSON(steps.policy.outputs.result) }});
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            if (!comments.some((comment) => comment.body && comment.body.includes(marker))) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: [
+                  marker,
+                  '## PR template required - PR auto-closed',
+                  '',
+                  'This PR does not follow one of the required pull request templates from the contribution guidelines.',
+                  '',
+                  'Please reopen with the correct typed template:',
+                  '',
+                  `- [Fix PR template](${repoUrl}/blob/main/.github/PULL_REQUEST_TEMPLATE/fix.md)`,
+                  `- [Enhancement PR template](${repoUrl}/blob/main/.github/PULL_REQUEST_TEMPLATE/enhancement.md)`,
+                  `- [Feature PR template](${repoUrl}/blob/main/.github/PULL_REQUEST_TEMPLATE/feature.md)`,
+                  '',
+                  'This check only validates template format. It does not close PRs for an unfilled issue number such as `Fixes #`; the issue-link workflow handles issue references separately after the PR exists.',
+                  '',
+                  `Detected problem: ${policy.reason}`,
+                ].join('\n'),
+              });
+            }
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              state: 'closed',
+            });
+            core.setFailed(policy.reason);

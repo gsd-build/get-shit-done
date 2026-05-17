@@ -1,5 +1,5 @@
 import { GSDError, exitCodeFor } from '../errors.js';
-import { GSDToolsError } from '../gsd-tools.js';
+import { GSDToolsError } from '../gsd-tools-error.js';
 import type { QueryDispatchResult } from './query-dispatch-contract.js';
 
 export interface QueryCliAdapterOutput {

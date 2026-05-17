@@ -43,6 +43,7 @@ const { execFileSync } = require('child_process');
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
 const { install, GSD_CODEX_MARKER } = require(INSTALL_SRC);
+const { cleanup } = require('./helpers.cjs');
 
 // Ensure hooks/dist/ is populated before install tests
 before(() => {
@@ -60,13 +61,14 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    // Use the shared 5s Windows-EBUSY retry budget instead of inline 1s.
+    cleanup(tmpDir);
   });
 
   // Helper: pre-populate .codex/config.toml with a GSD marker + stale hooks block
   // using the given line ending for the stale hooks block header, and a potentially
   // different EOL for the hooks body. This exercises the cross-platform mixed scenario.
-  function writeCodexConfigWithStaleHooks(dir, headerEol, bodyEol) {
+function writeCodexConfigWithStaleHooks(dir, headerEol, bodyEol) {
     // Build the stale block with header EOL for the "# GSD Hooks" line, but body EOL
     // for the content lines (simulates a file edited by two different platforms).
     const staleBlock = [
@@ -92,6 +94,24 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
     return configPath;
   }
 
+  function readHooksSessionStartCommands(codexHome) {
+    const hooksPath = path.join(codexHome, 'hooks.json');
+    if (!fs.existsSync(hooksPath)) return [];
+    const raw = fs.readFileSync(hooksPath, 'utf8').trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const table = (parsed.hooks && typeof parsed.hooks === 'object' && !Array.isArray(parsed.hooks))
+      ? parsed.hooks
+      : parsed;
+    const sessionStart = Array.isArray(table.SessionStart) ? table.SessionStart : [];
+    return sessionStart.flatMap((entry) => [
+      ...(typeof entry?.command === 'string' ? [entry.command] : []),
+      ...(Array.isArray(entry?.hooks)
+        ? entry.hooks.map((hook) => hook && hook.command).filter((cmd) => typeof cmd === 'string')
+        : []),
+    ]);
+  }
+
   test('LF config.toml: stale gsd-update-check block removed on reinstall', (t) => {
     const origCwd = process.cwd();
     t.after(() => { process.chdir(origCwd); });
@@ -107,9 +127,11 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
       !content.includes('gsd-update-check'),
       'Stale gsd-update-check entry must be removed from LF config.toml (#2698)'
     );
-    assert.ok(
-      content.includes('gsd-check-update'),
-      'New gsd-check-update hook must appear after reinstall'
+    const hooksJsonCommands = readHooksSessionStartCommands(path.join(tmpDir, '.codex'));
+    assert.equal(
+      hooksJsonCommands.some((cmd) => cmd.includes('gsd-check-update')),
+      true,
+      'New gsd-check-update hook must appear in hooks.json after reinstall'
     );
   });
 
@@ -128,9 +150,11 @@ describe('#2698: CRLF stale gsd-update-check block is removed on Codex reinstall
       !content.includes('gsd-update-check'),
       'Stale gsd-update-check entry must be removed from CRLF config.toml (#2698)'
     );
-    assert.ok(
-      content.includes('gsd-check-update'),
-      'New gsd-check-update hook must appear after reinstall'
+    const hooksJsonCommands = readHooksSessionStartCommands(path.join(tmpDir, '.codex'));
+    assert.equal(
+      hooksJsonCommands.some((cmd) => cmd.includes('gsd-check-update')),
+      true,
+      'New gsd-check-update hook must appear in hooks.json after reinstall'
     );
   });
 

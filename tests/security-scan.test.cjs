@@ -69,7 +69,7 @@ function runScript(scriptPath, content, extraArgs) {
       stderr: err.stderr || '',
     };
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 }
 

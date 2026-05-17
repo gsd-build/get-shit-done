@@ -58,6 +58,18 @@ describe('gsd-project-researcher agent registration (#2419)', () => {
     );
   });
 
+  test('new-project.md reports required-agent and skill-payload diagnostics separately', () => {
+    const content = fs.readFileSync(NEW_PROJECT_PATH, 'utf-8');
+    assert.ok(content.includes('required_agents_installed'),
+      'new-project.md must parse required_agents_installed from init JSON');
+    assert.ok(content.includes('missing_required_agents'),
+      'new-project.md must report missing required new-project agents separately');
+    assert.ok(content.includes('agent_skill_payloads_available'),
+      'new-project.md must distinguish skill payload availability from agent definitions');
+    assert.ok(content.includes('agents_dir'),
+      'new-project.md must show which agents directory was checked');
+  });
+
   test('new-milestone.md parses agents_installed from init JSON', () => {
     const content = fs.readFileSync(NEW_MILESTONE_PATH, 'utf-8');
     assert.ok(

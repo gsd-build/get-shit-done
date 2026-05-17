@@ -58,7 +58,7 @@ Tool schemas count against the same context budget as model context, prompts, an
 
 ### Pre-Phase MCP Audit
 
-Before starting a long phase (especially `/gsd-execute-phase`, `/gsd-plan-phase`, or anything that fans out across many subagents), run this audit:
+Before starting a long phase (especially `/gsd:execute-phase`, `/gsd:plan-phase`, or anything that fans out across many subagents), run this audit:
 
 - [ ] **Browser / playwright tools enabled?** If this phase has no UI work, disable them. They're among the heaviest per-turn schemas.
 - [ ] **Platform-specific tools enabled?** Mac-tools / Windows-tools / OS-specific helpers should be disabled when not actively needed for the phase at hand.

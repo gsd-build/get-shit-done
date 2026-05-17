@@ -29,36 +29,13 @@ const fs = require('fs');
 const path = require('path');
 
 const { installSdkIfNeeded } = require('../bin/install.js');
-const { createTempDir, cleanup } = require('./helpers.cjs');
+const { createTempDir, cleanup, captureConsole } = require('./helpers.cjs');
 
-function captureConsole(fn) {
-  const stdout = [];
-  const stderr = [];
-  const origLog = console.log;
-  const origWarn = console.warn;
-  const origError = console.error;
-  console.log = (...a) => stdout.push(a.join(' '));
-  console.warn = (...a) => stderr.push(a.join(' '));
-  console.error = (...a) => stderr.push(a.join(' '));
-  let threw = null;
-  try {
-    fn();
-  } catch (e) {
-    threw = e;
-  } finally {
-    console.log = origLog;
-    console.warn = origWarn;
-    console.error = origError;
-  }
-  if (threw) throw threw;
-  const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
-  return {
-    stdout: stdout.map(strip).join('\n'),
-    stderr: stderr.map(strip).join('\n'),
-  };
-}
+const isWindows = process.platform === 'win32';
 
-describe('bug #2829: local-mode install must materialize gsd-sdk on PATH', () => {
+describe('bug #2829: local-mode install must materialize gsd-sdk on PATH',
+  { skip: isWindows ? 'POSIX-only: asserts ~/.local/bin shebang shim; Windows uses gsd-sdk.cmd + USERPROFILE + PATHEXT' : false },
+  () => {
   let tmpRoot;
   let sdkDir;
   let pathDir;

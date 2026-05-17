@@ -48,9 +48,9 @@ function readKeyFile(filePath) {
     const buf = fs.readFileSync(filePath);
     // UTF-16 LE BOM tolerance (parity with Brave key-file handling).
     if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
-      return buf.toString('utf16le').replace(/^﻿/, '').trim();
+      return buf.toString('utf16le').replace(/^\uFEFF/, '').trim();
     }
-    return buf.toString('utf-8').replace(/^﻿/, '').trim();
+    return buf.toString('utf-8').replace(/^\uFEFF/, '').trim();
   } catch {
     return null;
   }

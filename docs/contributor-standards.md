@@ -89,7 +89,22 @@ An ADR is optional (a comment in the relevant issue or PR is sufficient) when:
 
 ### Naming conventions
 
-`NNNN-<short-slug>.md` — four-digit zero-padded sequence number, followed by a kebab-case slug that names the Module or decision. Example: `0003-model-catalog-module.md`.
+**New ADRs and PRDs use issue#-prefix slug naming. This is a contributor requirement, not a suggestion.**
+
+```text
+docs/adr/<issue#>-<kebab-slug>.md    (new ADRs)
+docs/prd/<issue#>-<kebab-slug>.md    (new PRDs)
+```
+
+Example: `docs/adr/3485-adr-prd-naming-convention.md`.
+
+**Why:** GitHub issue numbers are server-assigned and atomic — the reservation mechanism already exists because the issue-first rule requires it. Promoting the issue# to the artifact ID eliminates the entire collision class that the `NNNN-*` local-compute scheme created (see the `0010-*` × 2 and `0011-*` × 3 duplicates on disk).
+
+**Migration policy:** Legacy ADRs `0001-*` through `0011-*` keep their numbers as immutable historical record. The new convention applies to all ADRs and PRDs created on or after the merge of the implementing PR (#3485). Do not renumber legacy files.
+
+For the end-to-end workflow — opening the issue, waiting for approval, creating the file, and submitting the PR — see **[CONTRIBUTING.md — "Proposing an ADR or PRD"](../CONTRIBUTING.md#proposing-an-adr-or-prd)**.
+
+The legacy four-digit scheme (`0003-model-catalog-module.md`) applies only to pre-existing files.
 
 ### Required sections
 
@@ -121,7 +136,7 @@ Reference sibling ADRs by filename, not by title prose: `see \`0001-dispatch-pol
 
 ### ADR README index
 
-`docs/adr/` does not currently maintain a separate `README.md` index. The canonical index is the table in this document (above). If an ADR is added, update this table in the same PR.
+`docs/adr/README.md` maintains the canonical index table and the naming convention documentation. The table in this document (above) covers accepted ADRs for contributor reference. If an ADR is added, update both tables in the same PR.
 
 ### Governance
 

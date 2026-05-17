@@ -65,8 +65,8 @@ describe('buildBannerOutput', () => {
       'banner should name latest version'
     );
     assert.ok(
-      out.systemMessage.includes('/gsd-update'),
-      'banner should reference /gsd-update command'
+      out.systemMessage.includes('/gsd:update'),
+      'banner should reference /gsd:update command'
     );
   });
 
@@ -211,7 +211,7 @@ describe('gsd-update-banner.js end-to-end', () => {
       const parsed = JSON.parse(r.stdout);
       assert.equal(typeof parsed.systemMessage, 'string');
       assert.ok(parsed.systemMessage.includes('1.40.0'));
-      assert.ok(parsed.systemMessage.includes('/gsd-update'));
+      assert.ok(parsed.systemMessage.includes('/gsd:update'));
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }

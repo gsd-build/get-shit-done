@@ -234,7 +234,7 @@ describe('milestone complete command', () => {
     );
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n\n## Current Position\n\nPhase: 03 — EXECUTING\nPlan: 03-02\nStatus: Executing\nLast activity: 2025-01-01 — Running phase\n\n## Operator Next Steps\n\n- Re-run /gsd-complete-milestone v1.0\n`
+      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n\n## Current Position\n\nPhase: 03 — EXECUTING\nPlan: 03-02\nStatus: Executing\nLast activity: 2025-01-01 — Running phase\n\n## Operator Next Steps\n\n- Re-run /gsd:complete-milestone v1.0\n`
     );
 
     const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
@@ -243,7 +243,9 @@ describe('milestone complete command', () => {
     const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
     assert.ok(state.includes('Phase: Milestone v1.0 complete'));
     assert.ok(state.includes('Status: Awaiting next milestone'));
-    assert.ok(!state.includes('Re-run /gsd-complete-milestone'));
+    assert.ok(!state.includes('Re-run /gsd:complete-milestone'));
+    // #3584: persisted ROADMAP/STATE strings now use the runtime-routable
+    // hyphen-form slash command (formatter resolves codex → $gsd-, others → /gsd-).
     assert.ok(state.includes('/gsd-new-milestone'));
   });
 
@@ -261,6 +263,7 @@ describe('milestone complete command', () => {
     assert.ok(state.includes('## Current Position'));
     assert.ok(state.includes('Phase: Milestone v1.0 complete'));
     assert.ok(state.includes('## Operator Next Steps'));
+    // #3584: hyphen form is the runtime-routable shape for skills-based installs.
     assert.ok(state.includes('/gsd-new-milestone'));
   });
 
@@ -864,4 +867,3 @@ describe('new-milestone workflow verification gate', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // validate consistency command
 // ─────────────────────────────────────────────────────────────────────────────
-

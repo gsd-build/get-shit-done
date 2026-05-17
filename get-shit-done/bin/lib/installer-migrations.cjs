@@ -7,6 +7,7 @@ const {
   validateInstallerMigrationActions,
   validateInstallerMigrationRecord,
 } = require('./installer-migration-authoring.cjs');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 
 const MANIFEST_NAME = 'gsd-file-manifest.json';
 const INSTALL_STATE_NAME = 'gsd-install-state.json';
@@ -71,9 +72,24 @@ function readInstallState(configDir) {
   };
 }
 
-function writeInstallState(configDir, state) {
+// Strict atomic write for the install state: must never be left half-written.
+// Bypasses the seam because platformWriteSync falls back to a direct write on
+// rename failure, which would silently violate this invariant.
+function atomicWriteInstallState(configDir, content) {
   fs.mkdirSync(configDir, { recursive: true });
-  writeFileAtomicSync(path.join(configDir, INSTALL_STATE_NAME), JSON.stringify(state, null, 2) + '\n');
+  const filePath = path.join(configDir, INSTALL_STATE_NAME);
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    fs.writeFileSync(tmpPath, content, 'utf8');
+    fs.renameSync(tmpPath, filePath);
+  } catch (error) {
+    try { fs.rmSync(tmpPath, { force: true }); } catch { /* best-effort */ }
+    throw error;
+  }
+}
+
+function writeInstallState(configDir, state) {
+  atomicWriteInstallState(configDir, JSON.stringify(state, null, 2) + '\n');
   return state;
 }
 
@@ -263,20 +279,6 @@ function isStructurallyEmpty(value) {
   return typeof value === 'object' && Object.keys(value).length === 0;
 }
 
-function writeFileAtomicSync(filePath, content) {
-  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-  try {
-    fs.writeFileSync(tmpPath, content, 'utf8');
-    fs.renameSync(tmpPath, filePath);
-  } catch (error) {
-    try {
-      fs.rmSync(tmpPath, { force: true });
-    } catch {
-      // best-effort cleanup only; preserve the original write failure
-    }
-    throw error;
-  }
-}
 
 function journalAction(action, status, extras = {}) {
   const { value, ...safeAction } = action;
@@ -424,8 +426,7 @@ function rollbackAppliedMigrationResult({ configDir, journal, journalPath, rollb
     if (previousInstallStateBytes === null) {
       fs.rmSync(path.join(configDir, INSTALL_STATE_NAME), { force: true });
     } else {
-      fs.mkdirSync(configDir, { recursive: true });
-      writeFileAtomicSync(path.join(configDir, INSTALL_STATE_NAME), previousInstallStateBytes);
+      atomicWriteInstallState(configDir, previousInstallStateBytes);
     }
   } catch (error) {
     failures.push({ relPath: INSTALL_STATE_NAME, error: error.message });
@@ -476,12 +477,12 @@ function applyInstallerMigrationPlan({ configDir, plan, now = () => new Date().t
   const rollback = [];
   const installStatePath = path.join(configDir, INSTALL_STATE_NAME);
   const previousInstallStateBytes = fs.existsSync(installStatePath)
-    ? fs.readFileSync(installStatePath)
+    ? fs.readFileSync(installStatePath, 'utf8')
     : null;
 
   try {
     fs.mkdirSync(path.dirname(journalPath), { recursive: true });
-    fs.writeFileSync(journalPath, JSON.stringify(journal, null, 2) + '\n', 'utf8');
+    platformWriteSync(journalPath, JSON.stringify(journal, null, 2) + '\n');
 
     for (const action of plan.actions) {
       if (
@@ -517,7 +518,7 @@ function applyInstallerMigrationPlan({ configDir, plan, now = () => new Date().t
             rollbackRelPath: path.posix.join(rollbackRootRelPath, normalized),
           }));
         } else {
-          writeFileAtomicSync(fullPath, JSON.stringify(action.value, null, 2) + '\n');
+          platformWriteSync(fullPath, JSON.stringify(action.value, null, 2) + '\n');
           journal.actions.push(journalAction(action, 'rewritten', {
             rollbackRelPath: path.posix.join(rollbackRootRelPath, normalized),
           }));
@@ -542,7 +543,7 @@ function applyInstallerMigrationPlan({ configDir, plan, now = () => new Date().t
       fs.rmSync(fullPath, { force: true });
     }
 
-    fs.writeFileSync(journalPath, JSON.stringify(journal, null, 2) + '\n', 'utf8');
+    platformWriteSync(journalPath, JSON.stringify(journal, null, 2) + '\n');
 
     const state = readInstallState(configDir);
     const applied = appliedMigrationIds(state);

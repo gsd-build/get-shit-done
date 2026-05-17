@@ -106,14 +106,14 @@ describe('bug #3126: runtime-homes env-var overrides', () => {
   test('opencode uses XDG_CONFIG_HOME when OPENCODE_CONFIG_DIR absent', () => {
     withEnv('OPENCODE_CONFIG_DIR', undefined, () => {
       withEnv('XDG_CONFIG_HOME', '/xdg', () => {
-        assert.strictEqual(getGlobalConfigDir('opencode'), '/xdg/opencode');
+        assert.strictEqual(getGlobalConfigDir('opencode'), path.join('/xdg', 'opencode'));
       });
     });
   });
   test('kilo uses XDG_CONFIG_HOME when KILO_CONFIG_DIR absent', () => {
     withEnv('KILO_CONFIG_DIR', undefined, () => {
       withEnv('XDG_CONFIG_HOME', '/xdg', () => {
-        assert.strictEqual(getGlobalConfigDir('kilo'), '/xdg/kilo');
+        assert.strictEqual(getGlobalConfigDir('kilo'), path.join('/xdg', 'kilo'));
       });
     });
   });

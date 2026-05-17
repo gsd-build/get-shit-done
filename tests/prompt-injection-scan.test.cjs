@@ -52,6 +52,7 @@ const SCAN_EXTS = new Set(['.md', '.cjs', '.js', '.json']);
 const ALLOWLIST = new Set([
   'get-shit-done/bin/lib/security.cjs',        // The security module itself
   'get-shit-done/workflows/discuss-phase.md',  // Large workflow (~50K) with power mode + i18n
+  'get-shit-done/workflows/new-project.md',     // Large workflow (~50K) — agent install, runtime detect, brownfield map, #3491 worktree gating
   'get-shit-done/workflows/execute-phase.md',  // Large orchestration workflow (~51K) with wave execution + code-review gate
   'get-shit-done/workflows/plan-phase.md',      // Large orchestration workflow (~51K) with TDD mode integration
   'hooks/gsd-prompt-guard.js',                  // The prompt guard hook
@@ -100,7 +101,10 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of agentFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -130,7 +134,10 @@ describe('codebase prompt injection scan', () => {
     const oversized = [];
 
     for (const file of agentFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -151,7 +158,10 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of workflowFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -174,7 +184,10 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of commandFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -197,7 +210,10 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of hookFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -220,7 +236,10 @@ describe('codebase prompt injection scan', () => {
     const findings = [];
 
     for (const file of libFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -243,7 +262,10 @@ describe('codebase prompt injection scan', () => {
     const invisiblePattern = /[\u200B-\u200F\u2028-\u202F\uFEFF\u00AD]/;
 
     for (const file of allFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
 
       const content = fs.readFileSync(file, 'utf-8');
@@ -272,7 +294,10 @@ describe('codebase prompt injection scan', () => {
     const boundaryPattern = /<\/?(?:system|assistant|human)>/i;
 
     for (const file of allFiles) {
-      const relPath = path.relative(PROJECT_ROOT, file);
+      // Normalize to POSIX separators so ALLOWLIST.has() works on Windows
+      // (path.relative returns 'get-shit-done\bin\...' on win32; allowlist
+      // keys are POSIX 'get-shit-done/bin/...').
+      const relPath = path.relative(PROJECT_ROOT, file).replace(/\\/g, '/');
       if (ALLOWLIST.has(relPath)) continue;
       // Allow .md files to use common tags in examples/docs
       // But flag .js/.cjs files that embed these

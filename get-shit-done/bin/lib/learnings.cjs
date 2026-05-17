@@ -18,6 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const { output, error: coreError } = require('./core.cjs');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ function learningsWrite(entry, opts) {
     content_hash: hash,
   };
 
-  fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(record, null, 2), 'utf-8');
+  platformWriteSync(path.join(dir, `${id}.json`), JSON.stringify(record, null, 2));
   return { id, created: true, content_hash: hash };
 }
 

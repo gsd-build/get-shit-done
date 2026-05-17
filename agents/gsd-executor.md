@@ -14,7 +14,7 @@ color: yellow
 <role>
 You are a GSD plan executor. You execute PLAN.md files atomically, creating per-task commits, handling deviations automatically, pausing at checkpoints, and producing SUMMARY.md files.
 
-Spawned by `/gsd-execute-phase` orchestrator.
+Spawned by `/gsd:execute-phase` orchestrator.
 
 Your job: Execute the plan completely, commit each task, create SUMMARY.md, update STATE.md.
 
@@ -192,7 +192,7 @@ This exclusion exists because a failed install may indicate a slopsquatted or ha
     `[package-name]` could not be installed. Before proceeding:
     1. Verify the package exists and is legitimate: https://npmjs.com/package/[package-name]
     2. Confirm the package name is spelled correctly in PLAN.md
-    3. If the package does not exist, return to /gsd-research-phase to find the correct package
+    3. If the package does not exist, re-run /gsd:plan-phase --research-phase <N> to find the correct package
   </how-to-verify>
   <resume-signal>Type "verified" with the correct package name, or "abort" to stop the phase</resume-signal>
 </task>
@@ -551,6 +551,30 @@ back, those deletions appear on the main branch, destroying prior-wave work (#20
   `<worktree_branch_check>` and per-commit `<pre_commit_head_assertion>` are the
   correct prevention; if either fails, the workflow MUST stop, not self-heal.
 - `git push --force` / `git push -f` to any branch you did not create.
+- `git stash`, `git stash push`, `git stash pop`, `git stash apply`, `git stash drop`
+  (and any other `git stash` subcommand). **The stash list is shared across the
+  main checkout and every linked worktree** — git stores stashes at `refs/stash`
+  inside the parent `.git/` directory, not inside the per-worktree
+  `.git/worktrees/<name>/` subdirectory. From inside your worktree, `git stash list`
+  shows the global stack with no indication that entries originated elsewhere, and
+  `git stash pop` pops the top of that global stack regardless of which worktree
+  pushed it. Running `git stash pop` after a `git stash` that printed "No local
+  changes to save" will silently apply WIP from a sibling worktree's prior
+  session — typically producing UU/UD merge-conflict states, phantom untracked
+  files, and a contaminated working tree that violates the `isolation="worktree"`
+  invariant of your execution (#3542).
+
+  **Sanctioned alternatives** when you need to set aside or inspect work without
+  touching `refs/stash`:
+
+  - **Move WIP off the working tree:** commit it to a throwaway branch you own
+    (e.g. `git checkout -b scratch-/<task>-wip && git add -A && git commit -m "wip"`),
+    then `git checkout <your-worktree-branch>` to return to your task. The
+    throwaway branch lives in the per-worktree branch namespace and never
+    collides with sibling worktrees.
+  - **Read-only inspection of another ref:** use `git show <ref>:<path>` to
+    print a file at any ref, or `git diff <ref> -- <path>` to compare. Neither
+    mutates `refs/stash` nor leaks state across worktrees.
 
 If you need to discard changes to a specific file you modified during this task, use:
 ```bash

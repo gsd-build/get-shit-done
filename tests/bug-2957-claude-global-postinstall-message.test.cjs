@@ -15,8 +15,10 @@ process.env.GSD_TEST_MODE = '1';
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const os = require('node:os');
 
 const ROOT = path.join(__dirname, '..');
+const SETTINGS_PATH = path.join(os.tmpdir(), `gsd-test-settings-${process.pid}.json`);
 const installModule = require(path.join(ROOT, 'bin', 'install.js'));
 
 function captureFinishInstallOutput(runtime, isGlobal) {
@@ -25,7 +27,7 @@ function captureFinishInstallOutput(runtime, isGlobal) {
   console.log = (...args) => { lines.push(args.join(' ')); };
   try {
     installModule.finishInstall(
-      '/tmp/gsd-test-settings.json',
+      SETTINGS_PATH,
       {},
       null,
       false,

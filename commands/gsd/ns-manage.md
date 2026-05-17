@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [config, workspace, workstreams, thread, pause-work, resume-work, update, ship, inbox, pr-branch, undo]
 ---
 
 Route to the appropriate management skill based on the user's intent.

@@ -12,6 +12,7 @@ allowed-tools:
   - Agent
   - TodoWrite
   - AskUserQuestion
+requires: [phase, verify-work]
 ---
 <objective>
 Execute all plans in a phase using wave-based parallel execution.

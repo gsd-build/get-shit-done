@@ -11,8 +11,10 @@
 const fs = require('fs');
 const path = require('path');
 const { output, error, toPosixPath, getMilestoneInfo, generateSlugInternal } = require('./core.cjs');
+const { platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { planningRoot, setActiveWorkstream, getActiveWorkstream } = require('./planning-workspace.cjs');
 const { toWorkstreamSlug, hasInvalidPathSegment, isValidActiveWorkstreamName } = require('./workstream-name-policy.cjs');
+const { formatGsdSlash, resolveRuntime } = require('./runtime-slash.cjs');
 const {
   getOtherActiveWorkstreamInventories,
   inspectWorkstream,
@@ -46,7 +48,7 @@ function migrateToWorkstreams(cwd, workstreamName) {
     { name: 'phases', type: 'dir' },
   ];
 
-  fs.mkdirSync(wsDir, { recursive: true });
+  platformEnsureDir(wsDir);
 
   const filesMoved = [];
   try {
@@ -84,7 +86,7 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
 
   const baseDir = planningRoot(cwd);
   if (!fs.existsSync(baseDir)) {
-    error('.planning/ directory not found — run /gsd-new-project first');
+    error(`.planning/ directory not found — run ${formatGsdSlash('new-project', resolveRuntime(cwd))} first`);
   }
 
   const wsRoot = path.join(baseDir, 'workstreams');
@@ -131,12 +133,12 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
         return;
       }
     } else {
-      fs.mkdirSync(wsRoot, { recursive: true });
+      platformEnsureDir(wsRoot);
     }
   }
 
-  fs.mkdirSync(wsDir, { recursive: true });
-  fs.mkdirSync(path.join(wsDir, 'phases'), { recursive: true });
+  platformEnsureDir(wsDir);
+  platformEnsureDir(path.join(wsDir, 'phases'));
 
   const today = new Date().toISOString().split('T')[0];
   const stateContent = [
@@ -165,7 +167,7 @@ function cmdWorkstreamCreate(cwd, name, options, raw) {
 
   const statePath = path.join(wsDir, 'STATE.md');
   if (!fs.existsSync(statePath)) {
-    fs.writeFileSync(statePath, stateContent, 'utf-8');
+    platformWriteSync(statePath, stateContent);
   }
 
   setActiveWorkstream(cwd, slug);
@@ -253,7 +255,7 @@ function cmdWorkstreamComplete(cwd, name, options, raw) {
     archivePath = path.join(archiveDir, `ws-${name}-${today}-${suffix++}`);
   }
 
-  fs.mkdirSync(archivePath, { recursive: true });
+  platformEnsureDir(archivePath);
 
   const filesMoved = [];
   try {

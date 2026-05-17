@@ -28,7 +28,7 @@ Todos are captured during work sessions with /gsd-add-todo.
 
 Would you like to:
 
-1. Continue with current phase (/gsd-progress)
+1. Continue with current phase (/gsd:progress)
 2. Add a todo now (/gsd-add-todo)
 ```
 
@@ -37,8 +37,8 @@ Exit.
 
 <step name="parse_filter">
 Check for area filter in arguments:
-- `/gsd-capture --list` → show all
-- `/gsd-capture --list api` → filter to area:api only
+- `/gsd:capture --list` → show all
+- `/gsd:capture --list api` → filter to area:api only
 </step>
 
 <step name="list_todos">
@@ -56,7 +56,7 @@ Pending Todos:
 ---
 
 Reply with a number to view details, or:
-- `/gsd-capture --list [area]` to filter by area
+- `/gsd:capture --list [area]` to filter by area
 - `q` to exit
 ```
 

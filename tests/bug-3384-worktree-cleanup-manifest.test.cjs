@@ -87,8 +87,8 @@ describe('bug #3384: worktree cleanup is manifest-scoped and fail-closed', () =>
     };
 
     const result = executeWorktreeWaveCleanupPlan(plan, {
-      execGit: (cwd, args) => {
-        calls.push({ cwd, args });
+      execGit: (args, opts) => {
+        calls.push({ cwd: opts.cwd, args });
         const key = args.join(' ');
         if (key === '-C /repo/.claude/worktrees/agent-a1 rev-parse --abbrev-ref HEAD') {
           return { exitCode: 0, stdout: 'worktree-agent-a1', stderr: '' };
@@ -141,7 +141,7 @@ describe('bug #3384: worktree cleanup is manifest-scoped and fail-closed', () =>
     };
 
     const result = executeWorktreeWaveCleanupPlan(plan, {
-      execGit: (_cwd, args) => {
+      execGit: (args) => {
         const key = args.join(' ');
         if (key === '-C /repo/.claude/worktrees/agent-a1 rev-parse --abbrev-ref HEAD') {
           return { exitCode: 0, stdout: 'worktree-agent-a1', stderr: '' };
@@ -184,7 +184,7 @@ describe('bug #3384: worktree cleanup is manifest-scoped and fail-closed', () =>
     };
 
     const result = executeWorktreeWaveCleanupPlan(plan, {
-      execGit: (_cwd, args) => {
+      execGit: (args) => {
         calls.push(args.join(' '));
         const key = args.join(' ');
         if (key === '-C /repo/.claude/worktrees/agent-a1 rev-parse --abbrev-ref HEAD') {

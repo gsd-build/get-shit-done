@@ -50,6 +50,7 @@ const MANAGED_HOOKS = [
   'gsd-check-update-worker.js',
   'gsd-check-update.js',
   'gsd-context-monitor.js',
+  'gsd-graphify-update.sh',
   'gsd-phase-boundary.sh',
   'gsd-prompt-guard.js',
   'gsd-read-guard.js',

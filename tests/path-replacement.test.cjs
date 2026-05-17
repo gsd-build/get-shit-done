@@ -30,6 +30,17 @@ function computePathPrefix(homedir, targetDir) {
   return resolvedTarget + '/';
 }
 
+// Detect whether `content` leaks a resolved absolute homedir path (e.g.
+// /home/alice or /root). A bare substring match false-positives when homedir
+// is short and happens to appear inside ordinary words or tags — for example
+// `</root_cause_analysis>` when os.homedir() === '/root' (Docker). Real path
+// leaks are followed by a path separator, so we require a trailing '/'.
+// See #3503.
+function containsResolvedHomedir(content, normalizedHomedir) {
+  if (!normalizedHomedir || normalizedHomedir === '$HOME') return false;
+  return content.includes(normalizedHomedir + '/');
+}
+
 describe('pathPrefix computation', () => {
   test('default Claude global install uses $HOME/', () => {
     const homedir = os.homedir();
@@ -160,10 +171,34 @@ describe('installed .md files contain no resolved absolute paths', () => {
       let content = fs.readFileSync(file, 'utf8');
       content = content.replace(claudeDirRegex, pathPrefix);
       content = content.replace(claudeHomeRegex, pathPrefix);
-      if (content.includes(normalizedHomedir) && normalizedHomedir !== '$HOME') {
+      if (containsResolvedHomedir(content, normalizedHomedir)) {
         failures.push(path.relative(repoRoot, file));
       }
     }
     assert.deepStrictEqual(failures, [], `Files with resolved absolute paths: ${failures.join(', ')}`);
+  });
+});
+
+describe('containsResolvedHomedir predicate (#3503)', () => {
+  test('flags a real homedir path leak with trailing slash', () => {
+    const content = 'see /home/alice/.claude/config for details';
+    assert.strictEqual(containsResolvedHomedir(content, '/home/alice'), true);
+  });
+
+  test('does NOT flag short homedir appearing as substring of an identifier (#3503)', () => {
+    // Regression: in Docker, os.homedir() === '/root'. Agent markdown contains
+    // `<root_cause_analysis>` / `</root_cause_analysis>` tags. The old naive
+    // substring check false-fired on these. The trailing-slash rule fixes it.
+    const content = '<root_cause_analysis>\nfoo\n</root_cause_analysis>';
+    assert.strictEqual(containsResolvedHomedir(content, '/root'), false);
+  });
+
+  test('still flags /root when followed by a real path separator', () => {
+    const content = 'cat /root/.claude/agents.md';
+    assert.strictEqual(containsResolvedHomedir(content, '/root'), true);
+  });
+
+  test('returns false for $HOME placeholder', () => {
+    assert.strictEqual(containsResolvedHomedir('$HOME/.claude/', '$HOME'), false);
   });
 });

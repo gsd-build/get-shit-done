@@ -265,12 +265,15 @@ describe('bug-2980: scripts/diff-touches-shipped-paths.cjs classifier semantics'
   });
 
   test('mixed diff is shipped if ANY path is shipped', () => {
-    // A commit that touches both a shipped file and a non-shipped file
-    // must be classified as shipped — the non-shipped paths are along
-    // for the ride, but the commit can still affect what ships.
+    // A commit that touches both a shipped file and an unrelated non-
+    // shipped, non-push-blocking file must be classified as shipped — the
+    // non-shipped paths are along for the ride, but the commit can still
+    // affect what ships. Note: this fixture deliberately avoids
+    // `.github/workflows/*`, which is push-blocking (#3621) and forces a
+    // skip regardless of other shipped paths in the same bundle.
     const tmp = makeFixtureRepo(['bin']);
     try {
-      const stdin = '.github/workflows/release-sdk.yml\nbin/foo.js\ntests/bar.test.cjs\n';
+      const stdin = 'CHANGELOG.md\nbin/foo.js\nplanning/notes.md\n';
       assert.equal(runClassifier(stdin, tmp).status, 0, 'mixed diff with at least one shipped path must classify as shipped');
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });

@@ -1,5 +1,20 @@
 'use strict';
 
+// Resolution environment variable surface for #3541 — when the installer
+// runs without a TTY (typical /gsd:update path via Claude Code or any
+// scripted update), prompt-user migration actions cannot be answered
+// interactively. We resolve them by classification:
+//   - Stale SDK build artifacts (get-shit-done/sdk/{dist,src}/gsd-*):
+//     default `remove`. Fresh install supplies replacements.
+//   - User-facing skill anchors (skills/gsd-*/SKILL.md): default `keep`.
+//     User-owned content is preserved.
+// Anything else: fall through to the hard assertion with an improved,
+// grouped, actionable error message.
+//
+// docs/installer-migrations.md#prompt-user-resolution for the spec.
+const RESOLUTION_ENV_VAR = 'GSD_INSTALLER_MIGRATION_RESOLVE';
+const VALID_CHOICES = ['keep', 'remove'];
+
 function installerMigrationActionLabel(action) {
   if (!action || !action.type) return 'skipped';
   if (action.type === 'backup-and-remove') return 'backed up and removed';
@@ -83,14 +98,257 @@ function summarizeInstallerMigrationResult(result) {
   };
 }
 
+// #3628: explicit whitelist of bundled hook files shipped in the npm
+// distribution under `hooks/`. The classifier-based auto-removal of these
+// files at first-time-baseline scan (added in #3610) is restricted to this
+// set — a shape regex like `^hooks/gsd-[^/]+\.(?:js|sh|cjs|mjs)$` also
+// matches user-authored custom hooks and retired bundled hooks from prior
+// versions, and auto-removing those is silent data loss.
+//
+// The bug-3628 regression guard asserts this Set stays aligned with the
+// on-disk `hooks/` directory in both directions: whitelist-but-missing
+// AND shipped-but-not-whitelisted both fail CI.
+const BUNDLED_GSD_HOOK_FILES = Object.freeze(new Set([
+  'hooks/gsd-check-update-worker.js',
+  'hooks/gsd-check-update.js',
+  'hooks/gsd-context-monitor.js',
+  'hooks/gsd-graphify-update.sh',
+  'hooks/gsd-phase-boundary.sh',
+  'hooks/gsd-prompt-guard.js',
+  'hooks/gsd-read-guard.js',
+  'hooks/gsd-read-injection-scanner.js',
+  'hooks/gsd-session-state.sh',
+  'hooks/gsd-statusline.js',
+  'hooks/gsd-update-banner.js',
+  'hooks/gsd-validate-commit.sh',
+  'hooks/gsd-workflow-guard.js',
+]));
+
+// Classify a blocked prompt-user action into one of the safe-default
+// categories. Returns null when no safe default applies — caller must
+// fall back to the hard assertion / interactive prompt for those.
+//
+// Stale SDK build artifacts live under get-shit-done/sdk/{dist,src}/
+// and are regenerated on every install, so removing them is lossless.
+// User-facing skill anchors are the .md files that surface as commands
+// to the user — these are user-owned and must be kept.
+function classifyPromptUserAction(action) {
+  const relPath = action && action.relPath;
+  if (typeof relPath !== 'string' || !relPath) return null;
+  if (/^get-shit-done\/sdk\/(dist|src)\//.test(relPath)) {
+    return { category: 'stale-sdk-build-artifact', choice: 'remove' };
+  }
+  if (/^skills\/gsd-[^/]+\/SKILL\.md$/.test(relPath)) {
+    return { category: 'user-facing-skill', choice: 'keep' };
+  }
+  // #3610 / #3628: bundled GSD hooks shipped under `hooks/`. The whitelist
+  // is the explicit set of filenames in the npm distribution — files that
+  // match the shape but are NOT in the whitelist (user-authored hooks,
+  // retired hooks from prior versions) fall through to the block-or-prompt
+  // flow so the user retains control. On a first-time-baseline scan the
+  // installer can safely remove whitelisted hooks because it is about to
+  // write the fresh bundled versions in their place.
+  if (BUNDLED_GSD_HOOK_FILES.has(relPath)) {
+    return { category: 'bundled-gsd-hook', choice: 'remove' };
+  }
+  return null;
+}
+
+// Convert a blocked prompt-user action into a concrete plan action.
+// `keep` → baseline-preserve-user (idempotent — already on disk).
+// `remove` → backup-and-remove (safe: keeps a rollback copy in the
+// migration journal under gsd-migration-journal/<runId>-backups/).
+function materializeResolution(action, choice) {
+  const base = {
+    migrationId: action.migrationId,
+    migrationChecksum: action.migrationChecksum,
+    relPath: action.relPath,
+    reason: action.reason,
+    classification: action.classification,
+    originalHash: action.originalHash || null,
+    currentHash: action.currentHash || null,
+    requestedType: 'prompt-user',
+  };
+  if (choice === 'keep') {
+    return { ...base, type: 'baseline-preserve-user' };
+  }
+  // 'remove'
+  return { ...base, type: 'backup-and-remove', backupRelPath: null };
+}
+
+function normalizeResolutionChoice(rawValue) {
+  if (typeof rawValue !== 'string') return null;
+  const normalized = rawValue.trim().toLowerCase();
+  return VALID_CHOICES.includes(normalized) ? normalized : null;
+}
+
+function actionSupportsChoice(action, choice) {
+  if (!action || !choice) return false;
+  if (!Array.isArray(action.choices) || action.choices.length === 0) {
+    return VALID_CHOICES.includes(choice);
+  }
+  return action.choices.includes(choice);
+}
+
+// Resolve prompt-user actions when stdin is not a TTY. Mutates the
+// passed result so:
+//   - resolved actions are appended to plan.actions in their concrete
+//     form (baseline-preserve-user / backup-and-remove);
+//   - result.blocked and plan.blocked are filtered to actions that
+//     could NOT be safely defaulted (caller must still handle those).
+// Returns { result, resolutions } where `resolutions` is the structured
+// log of every defaulted resolution.
+function resolveInstallerMigrationPromptsForNonTty(result, options = {}) {
+  if (!result || typeof result !== 'object') {
+    return { result, resolutions: [] };
+  }
+  const blocked = blockedInstallerMigrationActions(result);
+  if (blocked.length === 0) {
+    return { result, resolutions: [] };
+  }
+  const isTty = options.isTty === true;
+  if (isTty) {
+    // Honour interactive prompting paths (not implemented yet — the
+    // hard throw is still the right behaviour for TTY runs); resolver
+    // only fires when the installer cannot interactively ask.
+    return { result, resolutions: [] };
+  }
+
+  const env =
+    options && options.env && typeof options.env === 'object'
+      ? options.env
+      : process.env;
+  const envChoice = normalizeResolutionChoice(env && env[RESOLUTION_ENV_VAR]);
+  const resolutions = [];
+  const unresolved = [];
+
+  for (const action of blocked) {
+    if (action && action.type === 'prompt-user') {
+      let category = null;
+      let choice = null;
+      let source = null;
+      if (envChoice && actionSupportsChoice(action, envChoice)) {
+        category = 'operator-override';
+        choice = envChoice;
+        source = RESOLUTION_ENV_VAR;
+      } else {
+        const classification = classifyPromptUserAction(action);
+        if (classification) {
+          category = classification.category;
+          choice = classification.choice;
+          source = 'non-tty-default';
+        }
+      }
+
+      if (choice) {
+        const resolved = materializeResolution(action, choice);
+        // Replace the original prompt-user action in-place when present so
+        // applyInstallerMigrationPlan never sees an unsupported action type.
+        // Fallback to append only when the blocked action did not originate
+        // from plan.actions (defensive).
+        if (result.plan && Array.isArray(result.plan.actions)) {
+          const idx = result.plan.actions.indexOf(action);
+          if (idx >= 0) {
+            result.plan.actions[idx] = resolved;
+          } else {
+            result.plan.actions.push(resolved);
+          }
+        }
+        resolutions.push({
+          relPath: action.relPath,
+          category,
+          choice,
+          reason: action.reason,
+          resolvedActionType: resolved.type,
+          source,
+        });
+        continue;
+      }
+    }
+    unresolved.push(action);
+  }
+
+  // Mutate both the top-level and plan.blocked surfaces so downstream
+  // callers (assertInstallerMigrationsUnblocked, summarizers) see the
+  // post-resolution state.
+  if (Array.isArray(result.blocked)) {
+    result.blocked = unresolved;
+  }
+  if (result.plan && Array.isArray(result.plan.blocked)) {
+    result.plan.blocked = unresolved;
+  }
+
+  return { result, resolutions };
+}
+
+// Group blocked prompt-user actions by their `reason` so the operator
+// sees one summary line per cause instead of N path lines for the
+// same underlying issue.
+function groupBlockedByReason(blocked) {
+  const byReason = new Map();
+  for (const action of blocked) {
+    const reason = (action && action.reason) || 'no reason given';
+    if (!byReason.has(reason)) byReason.set(reason, []);
+    byReason.get(reason).push(action);
+  }
+  return byReason;
+}
+
+function describeChoicesForActions(blocked) {
+  const choiceSet = new Set();
+  for (const action of blocked) {
+    if (action && Array.isArray(action.choices)) {
+      for (const choice of action.choices) choiceSet.add(choice);
+    }
+  }
+  if (choiceSet.size === 0) {
+    for (const fallback of VALID_CHOICES) choiceSet.add(fallback);
+  }
+  return [...choiceSet];
+}
+
+function buildBlockedErrorMessage(blocked) {
+  const byReason = groupBlockedByReason(blocked);
+  const totalFiles = blocked.length;
+  const choices = describeChoicesForActions(blocked);
+
+  const lines = [
+    `installer migration blocked pending user choice: ${totalFiles} file${totalFiles === 1 ? '' : 's'} need a decision`,
+    `  choices: [${choices.join(', ')}]`,
+  ];
+  for (const [reason, actions] of byReason) {
+    lines.push(`  - ${actions.length} file${actions.length === 1 ? '' : 's'}: ${reason}`);
+    // Show up to 3 sample paths so operators can spot which files are
+    // affected without dumping a thousand-line wall when SDK build
+    // artifacts leak.
+    const sample = actions.slice(0, 3).map((a) => a.relPath);
+    if (sample.length > 0) {
+      lines.push(`      e.g. ${sample.join(', ')}${actions.length > sample.length ? `, ... (+${actions.length - sample.length} more)` : ''}`);
+    }
+  }
+  lines.push(
+    `  resolve non-interactively by setting ${RESOLUTION_ENV_VAR}=<choice> ` +
+    `(or run the installer in a TTY to be prompted per file).`
+  );
+  return lines.join('\n');
+}
+
 function assertInstallerMigrationsUnblocked(result) {
   const blocked = blockedInstallerMigrationActions(result);
   if (blocked.length === 0) return;
-  const paths = blocked.map((action) => action.relPath).join(', ');
-  throw new Error(`installer migration blocked pending user choice: ${paths}`);
+  const message = buildBlockedErrorMessage(blocked);
+  const error = new Error(message);
+  error.blocked = blocked;
+  error.blockedByReason = Object.fromEntries(groupBlockedByReason(blocked));
+  error.resolutionEnvVar = RESOLUTION_ENV_VAR;
+  throw error;
 }
 
 module.exports = {
+  RESOLUTION_ENV_VAR,
+  BUNDLED_GSD_HOOK_FILES,
   assertInstallerMigrationsUnblocked,
+  classifyPromptUserAction,
+  resolveInstallerMigrationPromptsForNonTty,
   summarizeInstallerMigrationResult,
 };

@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const { output, loadConfig, resolveModelInternal, pathExistsInternal, toPosixPath, checkAgentsInstalled } = require('./core.cjs');
+const { platformReadSync } = require('./shell-command-projection.cjs');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -122,30 +123,27 @@ function detectProjectType(cwd) {
     try { return pathExistsInternal(cwd, rel); } catch { return false; }
   };
 
+  // Read package.json once — used by has_cli_bin, is_monorepo, has_tests checks.
+  const pkgRaw = platformReadSync(path.join(cwd, 'package.json'));
+  let pkg = null;
+  if (pkgRaw) {
+    try { pkg = JSON.parse(pkgRaw); } catch { /* invalid JSON */ }
+  }
+
   // has_cli_bin: package.json has a `bin` field
-  let has_cli_bin = false;
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf-8'));
-    has_cli_bin = !!(pkg.bin && (typeof pkg.bin === 'string' || Object.keys(pkg.bin).length > 0));
-  } catch { /* no package.json or invalid JSON */ }
+  const has_cli_bin = !!(pkg && pkg.bin && (typeof pkg.bin === 'string' || Object.keys(pkg.bin).length > 0));
 
   // is_monorepo: pnpm-workspace.yaml, lerna.json, or package.json workspaces
   let is_monorepo = exists('pnpm-workspace.yaml') || exists('lerna.json');
-  if (!is_monorepo) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf-8'));
-      is_monorepo = Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0;
-    } catch { /* ignore */ }
+  if (!is_monorepo && pkg) {
+    is_monorepo = Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0;
   }
 
   // has_tests: common test directories or test frameworks in devDependencies
   let has_tests = exists('test') || exists('tests') || exists('__tests__') || exists('spec');
-  if (!has_tests) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf-8'));
-      const devDeps = Object.keys(pkg.devDependencies || {});
-      has_tests = devDeps.some(d => ['vitest', 'jest', 'mocha', 'jasmine', 'ava'].includes(d));
-    } catch { /* ignore */ }
+  if (!has_tests && pkg) {
+    const devDeps = Object.keys(pkg.devDependencies || {});
+    has_tests = devDeps.some(d => ['vitest', 'jest', 'mocha', 'jasmine', 'ava'].includes(d));
   }
 
   // has_deploy_config: various deployment config files
@@ -202,32 +200,37 @@ function detectDocTooling(cwd) {
  */
 function detectMonorepoWorkspaces(cwd) {
   // pnpm-workspace.yaml
-  try {
-    const content = fs.readFileSync(path.join(cwd, 'pnpm-workspace.yaml'), 'utf-8');
-    const lines = content.split('\n');
+  const pnpmRaw = platformReadSync(path.join(cwd, 'pnpm-workspace.yaml'));
+  if (pnpmRaw) {
     const workspaces = [];
-    for (const line of lines) {
+    for (const line of pnpmRaw.split('\n')) {
       const m = line.match(/^\s*-\s+['"]?(.+?)['"]?\s*$/);
       if (m) workspaces.push(m[1].trim());
     }
     if (workspaces.length > 0) return workspaces;
-  } catch { /* not present */ }
+  }
 
   // package.json workspaces
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf-8'));
-    if (Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0) {
-      return pkg.workspaces;
-    }
-  } catch { /* not present or invalid */ }
+  const pkgRaw = platformReadSync(path.join(cwd, 'package.json'));
+  if (pkgRaw) {
+    try {
+      const pkg = JSON.parse(pkgRaw);
+      if (Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0) {
+        return pkg.workspaces;
+      }
+    } catch { /* invalid JSON */ }
+  }
 
   // lerna.json
-  try {
-    const lerna = JSON.parse(fs.readFileSync(path.join(cwd, 'lerna.json'), 'utf-8'));
-    if (Array.isArray(lerna.packages) && lerna.packages.length > 0) {
-      return lerna.packages;
-    }
-  } catch { /* not present or invalid */ }
+  const lernaRaw = platformReadSync(path.join(cwd, 'lerna.json'));
+  if (lernaRaw) {
+    try {
+      const lerna = JSON.parse(lernaRaw);
+      if (Array.isArray(lerna.packages) && lerna.packages.length > 0) {
+        return lerna.packages;
+      }
+    } catch { /* invalid JSON */ }
+  }
 
   return [];
 }

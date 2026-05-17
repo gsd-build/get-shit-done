@@ -9,6 +9,7 @@ allowed-tools:
   - Glob
   - SlashCommand
   - AskUserQuestion
+requires: [phase]
 ---
 <objective>
 Check project progress, summarize recent work and what's ahead, then intelligently route to the next action.
@@ -35,7 +36,8 @@ Three modes:
 </execution_context>
 
 <process>
-Parse the first token of $ARGUMENTS:
+Arguments provided: "$ARGUMENTS"
+Parse the first token from the provided arguments:
 - If it is `--next`: strip the flag, execute the next workflow (passing remaining args e.g. --force).
 - If it is `--do`: strip the flag, pass remainder as freeform intent to the do workflow.
 - Otherwise: execute the progress workflow end-to-end (pass --forensic through if present).

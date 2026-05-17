@@ -39,13 +39,10 @@ const { install } = require('../bin/install.js');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function makeTmpDir(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-}
+const { createTempDir, cleanup } = require('./helpers.cjs');
+const makeTmpDir = createTempDir;
 
-function rmTmpDir(dir) {
-  fs.rmSync(dir, { recursive: true, force: true });
-}
+const rmTmpDir = cleanup;
 
 /**
  * Silence console output during install to avoid noise in test output.
@@ -82,11 +79,17 @@ function silenceConsole(fn) {
 describe('bug #3288: model-catalog.cjs install-layout resolution', () => {
   let tmpRoot;
   let savedHome;
+  let savedUserProfile;
   let savedExplicitConfigDir;
 
   beforeEach(() => {
     tmpRoot = makeTmpDir('gsd-3288-');
     savedHome = process.env.HOME;
+    // On Windows, os.homedir() reads USERPROFILE (and HOMEDRIVE+HOMEPATH), NOT
+    // HOME. install() resolves the install destination via os.homedir(), so the
+    // tests must also redirect USERPROFILE → tmpRoot on win32 to keep the
+    // installer writing inside the fixture.
+    savedUserProfile = process.env.USERPROFILE;
     // Stash and clear explicitConfigDir via env so install() picks up our tmp dir.
     // Must delete (not just save) so any CI-set value doesn't leak into install()
     // and target a different directory than tmpRoot (CR finding, PR #3293).
@@ -96,6 +99,8 @@ describe('bug #3288: model-catalog.cjs install-layout resolution', () => {
 
   afterEach(() => {
     process.env.HOME = savedHome;
+    if (savedUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = savedUserProfile;
     if (savedExplicitConfigDir === undefined) {
       delete process.env.GSD_EXPLICIT_CONFIG_DIR;
     } else {
@@ -179,6 +184,7 @@ module.exports = { catalog };
     const claudeDir = path.join(tmpRoot, '.claude');
     fs.mkdirSync(claudeDir, { recursive: true });
     process.env.HOME = tmpRoot;
+    process.env.USERPROFILE = tmpRoot;
 
     // Capture process.exit to prevent the test from being killed.
     const origExit = process.exit;

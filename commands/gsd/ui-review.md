@@ -10,6 +10,7 @@ allowed-tools:
   - Grep
   - Agent
   - AskUserQuestion
+requires: [phase]
 ---
 <objective>
 Conduct a retroactive 6-pillar visual audit. Produces UI-REVIEW.md with

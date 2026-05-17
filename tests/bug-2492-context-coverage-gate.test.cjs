@@ -154,10 +154,13 @@ describe('SDK wiring for #2492 gates', () => {
 
   test('config-schema.ts VALID_CONFIG_KEYS allows workflow.context_coverage_gate', () => {
     // #2653 — allowlist moved out of config-mutation.ts into shared config-schema.ts.
-    const c = fs.readFileSync(CONFIG_SCHEMA_TS, 'utf-8');
+    // After Cycle 5 (#3536), config-schema.ts is a thin adapter; verify via the
+    // manifest (the single source of truth for both CJS and SDK).
+    const manifestPath = path.join(__dirname, '..', 'sdk', 'shared', 'config-schema.manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
     assert.ok(
-      c.includes("'workflow.context_coverage_gate'"),
-      'workflow.context_coverage_gate must be in VALID_CONFIG_KEYS',
+      manifest.validKeys.includes('workflow.context_coverage_gate'),
+      'workflow.context_coverage_gate must be in manifest validKeys (SDK config-schema.ts sources from manifest)',
     );
   });
 

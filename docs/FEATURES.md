@@ -156,27 +156,18 @@
   - [Issue-Driven Orchestration Guide](#129-issue-driven-orchestration-guide)
   - [Graphify Commit-Based Staleness](#130-graphify-commit-based-staleness)
   - [MVP Mode SDK Resolution Layer](#131-mvp-mode-sdk-resolution-layer)
-- [v1.32 Features](#v132-features)
-  - [STATE.md Consistency Gates](#69-statemd-consistency-gates)
-  - [Autonomous `--to N` Flag](#70-autonomous---to-n-flag)
-  - [Research Gate](#71-research-gate)
-  - [Verifier Milestone Scope Filtering](#72-verifier-milestone-scope-filtering)
-  - [Read-Before-Edit Guard Hook](#73-read-before-edit-guard-hook)
-  - [Context Reduction](#74-context-reduction)
-  - [Discuss-Phase `--power` Flag](#75-discuss-phase---power-flag)
-  - [Debug `--diagnose` Flag](#76-debug---diagnose-flag)
-  - [Phase Dependency Analysis](#77-phase-dependency-analysis)
-  - [Anti-Pattern Severity Levels](#78-anti-pattern-severity-levels)
-  - [Methodology Artifact Type](#79-methodology-artifact-type)
-  - [Planner Reachability Check](#80-planner-reachability-check)
-  - [Playwright-MCP UI Verification](#81-playwright-mcp-ui-verification)
-  - [Pause-Work Expansion](#82-pause-work-expansion)
-  - [Response Language Config](#83-response-language-config)
-  - [Manual Update Procedure](#84-manual-update-procedure)
-  - [New Runtime Support (Trae, Cline, Augment Code)](#85-new-runtime-support-trae-cline-augment-code)
-  - [Autonomous `--interactive` Flag](#86-autonomous---interactive-flag)
-  - [Commit-Docs Guard Hook](#87-commit-docs-guard-hook)
-  - [Community Hooks Opt-In](#88-community-hooks-opt-in)
+- [v1.42.1 Features](#v1421-features)
+  - [Package Legitimacy Gate](#132-package-legitimacy-gate)
+  - [Skill Surface Budgeting](#133-skill-surface-budgeting)
+  - [Installer Migrations](#134-installer-migrations)
+  - [Custom Ship PR Body Sections](#135-custom-ship-pr-body-sections)
+  - [Review Default Reviewers](#136-review-default-reviewers)
+  - [Fallow Structural Review Pre-Pass](#137-fallow-structural-review-pre-pass)
+  - [End-of-Phase Human Verification Mode](#138-end-of-phase-human-verification-mode)
+  - [Quota and Rate-Limit Failure Classification](#139-quota-and-rate-limit-failure-classification)
+  - [Statusline Context Position](#140-statusline-context-position)
+  - [Milestone Tag Creation Toggle](#141-milestone-tag-creation-toggle)
+  - [Structured JSON Error Mode](#142-structured-json-error-mode)
 
 ---
 
@@ -412,10 +403,13 @@
 - REQ-SHIP-03: System MUST auto-generate PR body from SUMMARY.md, VERIFICATION.md, and REQUIREMENTS.md
 - REQ-SHIP-04: System MUST update STATE.md with shipping status and PR number
 - REQ-SHIP-05: System MUST support `--draft` flag for draft PRs
+- REQ-SHIP-06: System MUST support append-only project PR body sections configured with `ship.pr_body_sections`
 
 **Prerequisites:** Phase verified, `gh` CLI installed and authenticated, work on feature branch
 
-**Produces:** GitHub PR with rich body, STATE.md updated
+**Produces:** GitHub PR with rich body, optional configured PRD-style sections, STATE.md updated
+
+**User documentation:** [Custom PR Body Sections](ship-pr-body-sections.md)
 
 ---
 
@@ -1174,7 +1168,7 @@ When verification returns `human_needed`, items are persisted as a trackable HUM
 
 ### 42. Cross-AI Peer Review
 
-**Command:** `/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--all]`
+**Command:** `/gsd-review --phase N [--gemini] [--claude] [--codex] [--coderabbit] [--opencode] [--qwen] [--cursor] [--ollama] [--lm-studio] [--llama-cpp] [--all]`
 
 **Purpose:** Invoke external AI CLIs (Gemini, Claude, Codex, CodeRabbit, OpenCode, Qwen Code, Cursor) to independently review phase plans. Produces structured REVIEWS.md with per-reviewer feedback.
 
@@ -1184,8 +1178,14 @@ When verification returns `human_needed`, items are persisted as a trackable HUM
 - REQ-REVIEW-03: System MUST invoke each selected CLI independently
 - REQ-REVIEW-04: System MUST collect responses and produce `REVIEWS.md`
 - REQ-REVIEW-05: Reviews MUST be consumable by `/gsd-plan-phase --reviews`
+- REQ-REVIEW-06: System MUST support project-level no-flag defaults via `review.default_reviewers`
+- REQ-REVIEW-07: Reviewer precedence MUST be explicit flags > `--all` > `review.default_reviewers` > all detected reviewers
 
 **Produces:** `{phase}-REVIEWS.md` — Per-reviewer structured feedback
+
+**User configuration note:**
+- Set `review.default_reviewers` in `.planning/config.json` (or via `gsd config-set`) to control no-flag `/gsd-review` fan-out.
+- Use `--all` for a full pre-merge sweep without changing project defaults.
 
 ---
 
@@ -2853,3 +2853,217 @@ CLI flag → ROADMAP `**Mode:** mvp` → `workflow.mvp_mode` config → `false`
 **Bug fix:** `roadmap.get-phase --pick mode` in the SDK's `roadmap.ts` previously returned `null` for phases with `**Mode:** mvp`, causing MVP_MODE to silently fall through to false on the native dispatch path. Restores parity with the CJS implementation.
 
 **Reference issue:** [#3178](https://github.com/gsd-build/get-shit-done/pull/3178)
+
+---
+
+## v1.42.1 Features
+
+### 132. Package Legitimacy Gate
+
+**Purpose:** Stop hallucinated, suspicious, or slopsquatting package names before they reach a shell install command.
+
+**Behavior:**
+- Phase research writes a `## Package Legitimacy Audit` table for recommended packages.
+- Packages verified only through search are treated as `[ASSUMED]`, not trusted.
+- `[SLOP]` packages are removed from recommendations.
+- Plans that need `[ASSUMED]` or suspicious packages add a human verification checkpoint.
+- Executor install failures stop for human verification instead of auto-trying similarly named packages.
+
+**Requirements:**
+- REQ-PKG-GATE-01: Research MUST record package registry, age, download/source signals, slopcheck verdict, and disposition.
+- REQ-PKG-GATE-02: Planner MUST gate unverified or suspicious package installs before execution.
+- REQ-PKG-GATE-03: Executor MUST NOT auto-substitute package names after failed package-manager installs.
+
+**Reference:** [v1.42.1 Release Notes](RELEASE-v1.42.1.md)
+
+---
+
+### 133. Skill Surface Budgeting
+
+**Purpose:** Let users reduce installed skill and agent surface area when context budget matters.
+
+**Install profiles:**
+| Profile | Purpose |
+|---------|---------|
+| `core` | Minimal main-loop surface |
+| `standard` | Core plus common phase-management commands |
+| `full` | Complete surface; default |
+
+**Runtime control:** `/gsd:surface` lists profile state and enables, disables, or resets skill clusters without reinstalling.
+
+**Requirements:**
+- REQ-SURFACE-01: Installer MUST resolve `--profile=<name>` and persist the active profile in `.gsd-profile`.
+- REQ-SURFACE-02: `--minimal` and `--core-only` MUST remain aliases for `--profile=core`.
+- REQ-SURFACE-03: Runtime surface state MUST persist outside the install profile marker.
+
+**Reference:** [ADR-0011](adr/0011-skill-surface-budget-module.md)
+
+---
+
+### 134. Installer Migrations
+
+**Purpose:** Make runtime config cleanup explicit, auditable, and rollback-aware during installs and updates.
+
+**Capabilities:**
+- First-time baseline migration records managed files.
+- Legacy stale-file cleanup uses ownership evidence before deleting or rewriting.
+- User-owned artifacts are preserved.
+- Ambiguous GSD-looking files block with a clear report instead of being silently overwritten.
+- Migration plans support dry-run reporting and rollback protection.
+
+**Requirements:**
+- REQ-INSTALL-MIGRATION-01: Migration records MUST include metadata, install scope, and ownership evidence.
+- REQ-INSTALL-MIGRATION-02: Destructive actions MUST fail closed when ownership is ambiguous.
+- REQ-INSTALL-MIGRATION-03: Install failures MUST restore the pre-install state when rollback data exists.
+
+**Reference:** [Installer Migrations](installer-migrations.md)
+
+---
+
+### 135. Custom Ship PR Body Sections
+
+**Command:** `/gsd-ship`
+
+**Config key:** `ship.pr_body_sections`
+
+**Purpose:** Add project-specific PRD-style sections to generated PR bodies without editing GSD workflow files.
+
+**Behavior:** Configured sections append after the required `Summary`, `Changes`, `Requirements Addressed`, `Verification`, and `Key Decisions` sections. They can copy from artifact headings, render templates, or fall back to static text.
+
+**Requirements:**
+- REQ-SHIP-SECTIONS-01: Custom sections MUST NOT replace, remove, or reorder required PR sections.
+- REQ-SHIP-SECTIONS-02: Unknown template tokens MUST be rejected by config validation.
+- REQ-SHIP-SECTIONS-03: Disabled sections MUST stay in config without appearing in PR output.
+
+**Reference:** [Custom PR Body Sections](ship-pr-body-sections.md)
+
+---
+
+### 136. Review Default Reviewers
+
+**Command:** `/gsd-review`
+
+**Config key:** `review.default_reviewers`
+
+**Purpose:** Let teams choose the default reviewer subset for no-flag `/gsd-review` runs.
+
+**Precedence:**
+```text
+explicit reviewer flags -> --all -> review.default_reviewers -> all detected reviewers
+```
+
+**Requirements:**
+- REQ-REVIEW-DEFAULTS-01: Missing `review.default_reviewers` MUST preserve the previous all-detected behavior.
+- REQ-REVIEW-DEFAULTS-02: Empty arrays MUST be rejected; remove the key to restore all-detected behavior.
+- REQ-REVIEW-DEFAULTS-03: Known but unavailable reviewers MUST be skipped with diagnostics rather than hard-failing the run.
+
+**Reference:** [Configuration Reference](CONFIGURATION.md#reviewer-defaults-for-gsd-review)
+
+---
+
+### 137. Fallow Structural Review Pre-Pass
+
+**Command:** `/gsd-code-review`
+
+**Config keys:** `code_quality.fallow.*`
+
+**Purpose:** Add an optional structural analysis pass before the agent review.
+
+**Behavior:** When enabled, GSD resolves a `fallow` binary, runs a bounded audit, writes `FALLOW.json`, and embeds structural findings in `REVIEW.md`.
+
+**Requirements:**
+- REQ-FALLOW-01: Fallow MUST be opt-in and disabled by default.
+- REQ-FALLOW-02: Missing or failing fallow runs MUST produce clear diagnostics.
+- REQ-FALLOW-03: Findings larger than the embed budget MUST be skipped with a warning, preserving the raw JSON artifact.
+
+**Reference:** [Configuration Reference](CONFIGURATION.md#code-quality-settings)
+
+---
+
+### 138. End-of-Phase Human Verification Mode
+
+**Config key:** `workflow.human_verify_mode`
+
+**Purpose:** Reduce mid-flight human checkpoint interruptions while preserving human verification requirements.
+
+**Behavior:** The default `"end-of-phase"` mode embeds human checks into `<verify><human-check>` blocks for phase review. `"mid-flight"` restores blocking `checkpoint:human-verify` tasks.
+
+**Requirements:**
+- REQ-HUMAN-VERIFY-01: `checkpoint:decision` and `checkpoint:human-action` MUST remain blocking regardless of mode.
+- REQ-HUMAN-VERIFY-02: Human-needed verification MUST remain pending until the end-of-phase review resolves it.
+- REQ-HUMAN-VERIFY-03: Configs without the key MUST use `"end-of-phase"`.
+
+**Reference:** [Checkpoints Reference](../get-shit-done/references/checkpoints.md)
+
+---
+
+### 139. Quota and Rate-Limit Failure Classification
+
+**Command:** `/gsd-execute-phase`
+
+**Purpose:** Treat provider quota and rate-limit failures as wait-and-resume conditions, not normal executor failures.
+
+**Behavior:** Agent output is classified for signals such as `429`, `rate limit`, `usage limit`, `RESOURCE_EXHAUSTED`, and `usage_limit_reached`. Matching failures present a wait-for-reset recovery path.
+
+**Requirements:**
+- REQ-QUOTA-01: Quota failures MUST NOT offer immediate retry as the primary recovery.
+- REQ-QUOTA-02: Classification MUST cover Claude, Copilot, Codex, Gemini, and generic provider sentinels.
+- REQ-QUOTA-03: Non-quota failures MUST continue through the normal execution failure path.
+
+**Reference:** [Provider Rate Limit Signals](research/provider-rate-limit-signals.md)
+
+---
+
+### 140. Statusline Context Position
+
+**Config key:** `statusline.context_position`
+
+**Purpose:** Keep the context meter visible in narrow terminals.
+
+**Options:**
+| Value | Behavior |
+|-------|----------|
+| `"end"` | Default; render context meter near the line tail |
+| `"front"` | Render context meter immediately after the model name |
+
+**Requirements:**
+- REQ-STATUSLINE-POS-01: Invalid values MUST be rejected by config validation.
+- REQ-STATUSLINE-POS-02: Missing config MUST preserve existing end-position rendering.
+
+**Reference:** [Configuration Reference](CONFIGURATION.md#statusline-settings)
+
+---
+
+### 141. Milestone Tag Creation Toggle
+
+**Command:** `/gsd-complete-milestone`
+
+**Config key:** `git.create_tag`
+
+**Purpose:** Let projects with external release automation complete milestones without creating local git tags.
+
+**Behavior:** `git.create_tag: false` skips milestone tag creation. The workflow still updates milestone artifacts and state.
+
+**Requirements:**
+- REQ-MILESTONE-TAG-01: Missing config MUST preserve automatic tag creation.
+- REQ-MILESTONE-TAG-02: Existing tag collisions MUST fail clearly instead of overwriting tags.
+- REQ-MILESTONE-TAG-03: Disabling tag creation MUST NOT skip milestone archival.
+
+**Reference:** [Configuration Reference](CONFIGURATION.md#git-branching)
+
+---
+
+### 142. Structured JSON Error Mode
+
+**CLI:** `gsd-tools --json-errors`
+
+**Purpose:** Give SDK and automation callers stable machine-readable error envelopes.
+
+**Behavior:** Commands that fail under `--json-errors` return structured `ok: false` payloads with error kind, message, command context, and exit mapping instead of prose-only stderr.
+
+**Requirements:**
+- REQ-JSON-ERRORS-01: Unknown commands, validation errors, timeouts, native failures, fallback failures, and internal errors MUST map to canonical error kinds.
+- REQ-JSON-ERRORS-02: CLI exit code mapping MUST remain stable for automation callers.
+- REQ-JSON-ERRORS-03: Human-readable output MUST remain the default when `--json-errors` is absent.
+
+**Reference:** [JSON Error Mode](json-errors.md)

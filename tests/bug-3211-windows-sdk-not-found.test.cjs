@@ -50,6 +50,9 @@ const cp = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const installModule = require(path.join(ROOT, 'bin', 'install.js'));
+const { captureConsole } = require('./helpers.cjs');
+
+const isWindows = process.platform === 'win32';
 
 const {
   filterNpxFromPath,
@@ -202,7 +205,9 @@ describe('bug #3211-C: getUserShellWindowsPersistentPath export', () => {
     }
   });
 
-  test('when the PowerShell probe is mocked to return a path, strips _npx dirs', () => {
+  test('when the PowerShell probe is mocked to return a path, strips _npx dirs',
+    { skip: isWindows ? 'cp.execSync reassignment is not picked up by install.js on Windows; real registry Path is returned. POSIX coverage in mock; live Windows path is covered by 3211-D.' : false },
+    () => {
     // Mock cp.execSync to return a Windows Path with both persistent and _npx dirs.
     const savedExecSync = cp.execSync;
     const winPersistentDir = 'C:\\Users\\user\\AppData\\Roaming\\npm';
@@ -249,27 +254,6 @@ describe('bug #3211-D: installSdkIfNeeded — Windows _npx false-positive', () =
   let sdkDir;
   let savedEnv;
   let origExecSync;
-
-  function captureConsole(fn) {
-    const stdout = [];
-    const stderr = [];
-    const origLog = console.log;
-    const origWarn = console.warn;
-    const origError = console.error;
-    console.log = (...a) => stdout.push(a.join(' '));
-    console.warn = (...a) => stderr.push(a.join(' '));
-    console.error = (...a) => stderr.push(a.join(' '));
-    let threw = null;
-    try { fn(); } catch (e) { threw = e; }
-    finally {
-      console.log = origLog;
-      console.warn = origWarn;
-      console.error = origError;
-    }
-    if (threw) throw threw;
-    const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
-    return { stdout: stdout.map(strip).join('\n'), stderr: stderr.map(strip).join('\n') };
-  }
 
   function makeSdkDir(root) {
     const dir = path.join(root, 'sdk');

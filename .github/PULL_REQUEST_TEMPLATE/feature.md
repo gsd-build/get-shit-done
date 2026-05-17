@@ -86,6 +86,26 @@ Closes #
 
 ---
 
+## Documentation
+
+> CI enforces this — `lint:docs` fails any PR with an `Added` / `Changed` / `Deprecated` / `Removed`
+> changeset fragment that does not also touch at least one file under `docs/`. Features almost
+> always trigger `Added`. See
+> [CONTRIBUTING.md → Documentation Updates](../../CONTRIBUTING.md#documentation-updates-update-the-relevant-docs).
+
+- [ ] Updated the relevant file(s) under `docs/` to reflect this feature
+  - New command or flag → `docs/COMMANDS.md` and `docs/FEATURES.md`
+  - New workflow or behavior → `docs/USER-GUIDE.md`
+  - Configuration / schema change → `docs/CONFIGURATION.md`
+  - Architectural change → `docs/ARCHITECTURE.md` and/or `docs/adr/`
+  - Agent or skill change → `docs/AGENTS.md`
+- [ ] All `docs/` content added in this PR is written in English
+  (translated READMEs `README.pt-BR.md` / `README.zh-CN.md` / `README.ja-JP.md` / `README.ko-KR.md`
+  are community-maintained and do not need to be updated in this PR)
+- [ ] If genuinely no user-facing docs impact (rare for features — explain in PR), apply the
+      `no-docs` label **or** add `<!-- docs-exempt: <reason> -->` inside each triggering
+      changeset fragment.
+
 ## Checklist
 
 - [ ] Issue linked above with `Closes #NNN` — **PR will be auto-closed if missing**
@@ -95,7 +115,6 @@ Closes #
 - [ ] All existing tests pass (`npm test`)
 - [ ] New tests cover the happy path, error cases, and edge cases
 - [ ] `.changeset/` fragment added with a user-facing description of the feature (`npm run changeset -- --type Added --pr <NNN> --body "..."`)
-- [ ] Documentation updated — commands, workflows, references, README if applicable
 - [ ] No unnecessary external dependencies added
 - [ ] Works on Windows (backslash paths handled)
 

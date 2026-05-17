@@ -24,6 +24,7 @@ import { checkCompletion } from './check-completion.js';
 import { checkGates } from './check-gates.js';
 import { checkVerificationStatus } from './check-verification-status.js';
 import { checkShipReady } from './check-ship-ready.js';
+import { agentClassifyFailure } from './agent-failure-classifier.js';
 
 export const FOUNDATION_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['generate-slug', generateSlug],
@@ -54,7 +55,15 @@ export const MUTATION_SURFACES_STATIC_CATALOG: ReadonlyArray<readonly [string, Q
   ['config-set', configSet],
   ['config-set-model-profile', configSetModelProfile],
   ['config-new-project', configNewProject],
-  ['config-ensure-section', configEnsureSection],
+  // Legacy contract: `config-ensure-section` (no positional arg) initialises
+  // the full default .planning/config.json — semantically identical to
+  // `config-new-project` with empty userChoices. Phase 6 originally bound
+  // this to the `configEnsureSection` single-section-ensure handler, which
+  // requires args[0]=sectionName the CLI never passes. Re-binding to
+  // configNewProject restores the legacy contract on the SDK path.
+  // `configEnsureSection` itself remains exported for any future SDK caller
+  // that wants the single-section semantics.
+  ['config-ensure-section', configNewProject],
   ['commit', commit],
   ['check-commit', checkCommit],
   ['template.fill', templateFill],
@@ -97,4 +106,6 @@ export const DECISION_ROUTING_STATIC_CATALOG: ReadonlyArray<readonly [string, Qu
   ['check.ship-ready', checkShipReady],
   ['check ship-ready', checkShipReady],
   ['commands', commandsList],
+  ['agent.classify-failure', agentClassifyFailure],
+  ['agent classify-failure', agentClassifyFailure],
 ] as const;

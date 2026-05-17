@@ -389,6 +389,43 @@ describe('configSet', () => {
     const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
     expect(raw.commit_docs).toBe(true);
   });
+
+  it('validates ship.pr_body_sections arrays (#3167)', async () => {
+    const { configSet } = await import('./config-mutation.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({}),
+    );
+
+    const sections = JSON.stringify([
+      {
+        heading: 'Risks & Rollback',
+        enabled: true,
+        source: 'PLAN.md ## Risks || PLAN.md ## Rollback',
+        fallback: '- Rollback: revert this PR.',
+      },
+      {
+        heading: 'Stakeholder Sign-off',
+        enabled: false,
+        template: '- Product owner: {phase_name}',
+      },
+    ]);
+    const result = await configSet(['ship.pr_body_sections', sections], tmpDir);
+    expect((result.data as { updated: boolean }).updated).toBe(true);
+
+    const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    expect(raw.ship.pr_body_sections).toHaveLength(2);
+    expect(raw.ship.pr_body_sections[1].enabled).toBe(false);
+
+    await expect(configSet(
+      ['ship.pr_body_sections', JSON.stringify([{ heading: 'Bad', enabled: 'yes', fallback: '- item' }])],
+      tmpDir,
+    )).rejects.toThrow(/enabled/);
+    await expect(configSet(
+      ['ship.pr_body_sections', JSON.stringify([{ heading: 'Bad', template: '- {unknown}' }])],
+      tmpDir,
+    )).rejects.toThrow(/Unsupported template token/);
+  });
 });
 
 // ─── configSetModelProfile ─────────────────────────────────────────────────
@@ -450,6 +487,22 @@ describe('configNewProject', () => {
     const raw = JSON.parse(await readFile(join(tmpDir, '.planning', 'config.json'), 'utf-8'));
     expect(raw.model_profile).toBe('quality');
     expect(raw.commit_docs).toBe(true);
+  });
+
+  it('validates ship.pr_body_sections choices before writing config', async () => {
+    const { configNewProject } = await import('./config-mutation.js');
+    const choices = JSON.stringify({
+      ship: {
+        pr_body_sections: [
+          {
+            heading: 'Invalid source',
+            source: 'package.json ## Scripts',
+          },
+        ],
+      },
+    });
+
+    await expect(configNewProject([choices], tmpDir)).rejects.toThrow(GSDError);
   });
 
   it('does not overwrite existing config', async () => {

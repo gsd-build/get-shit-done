@@ -24,9 +24,7 @@ const {
   generateSlugInternal,
   normalizePhaseName,
   reapStaleTempFiles,
-  normalizeMd,
   comparePhaseNum,
-  safeReadFile,
   pathExistsInternal,
   getMilestoneInfo,
   getMilestonePhaseFilter,
@@ -587,30 +585,6 @@ describe('generateSlugInternal', () => {
 // phase.test.cjs (which covers all edge cases: hybrid, letter-suffix,
 // multi-level decimal, case-insensitive, directory-slug, and full sort order).
 // Removed duplicates here to keep a single authoritative test location.
-
-// ─── safeReadFile ──────────────────────────────────────────────────────────────
-
-describe('safeReadFile', () => {
-  let tmpDir;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-core-test-'));
-  });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
-
-  test('reads existing file', () => {
-    const filePath = path.join(tmpDir, 'test.txt');
-    fs.writeFileSync(filePath, 'hello world');
-    assert.strictEqual(safeReadFile(filePath), 'hello world');
-  });
-
-  test('returns null for missing file', () => {
-    assert.strictEqual(safeReadFile('/nonexistent/path/file.txt'), null);
-  });
-});
 
 // ─── pathExistsInternal ────────────────────────────────────────────────────────
 
@@ -1210,115 +1184,6 @@ describe('getMilestonePhaseFilter', () => {
 
     const filter = getMilestonePhaseFilter(tmpDir);
     assert.strictEqual(filter.phaseCount, 0);
-  });
-});
-
-// ─── normalizeMd ─────────────────────────────────────────────────────────────
-
-describe('normalizeMd', () => {
-  test('returns null/undefined/empty unchanged', () => {
-    assert.strictEqual(normalizeMd(null), null);
-    assert.strictEqual(normalizeMd(undefined), undefined);
-    assert.strictEqual(normalizeMd(''), '');
-  });
-
-  test('MD022: adds blank lines around headings', () => {
-    const input = 'Some text\n## Heading\nMore text\n';
-    const result = normalizeMd(input);
-    assert.ok(result.includes('\n\n## Heading\n\n'), 'heading should have blank lines around it');
-  });
-
-  test('MD032: adds blank line before list after non-list content', () => {
-    const input = 'Some text\n- item 1\n- item 2\n';
-    const result = normalizeMd(input);
-    assert.ok(result.includes('Some text\n\n- item 1'), 'list should have blank line before it');
-  });
-
-  test('MD032: adds blank line after list before non-list content', () => {
-    const input = '- item 1\n- item 2\nSome text\n';
-    const result = normalizeMd(input);
-    assert.ok(result.includes('- item 2\n\nSome text'), 'list should have blank line after it');
-  });
-
-  test('MD032: does not add extra blank lines between list items', () => {
-    const input = '- item 1\n- item 2\n- item 3\n';
-    const result = normalizeMd(input);
-    assert.ok(result.includes('- item 1\n- item 2\n- item 3'), 'consecutive list items should not get blank lines');
-  });
-
-  test('MD031: adds blank lines around fenced code blocks', () => {
-    const input = 'Some text\n```js\ncode\n```\nMore text\n';
-    const result = normalizeMd(input);
-    assert.ok(result.includes('Some text\n\n```js'), 'code block should have blank line before');
-    assert.ok(result.includes('```\n\nMore text'), 'code block should have blank line after');
-  });
-
-  test('MD012: collapses 3+ consecutive blank lines to 2', () => {
-    const input = 'Line 1\n\n\n\n\nLine 2\n';
-    const result = normalizeMd(input);
-    assert.ok(!result.includes('\n\n\n'), 'should not have 3+ consecutive blank lines');
-    assert.ok(result.includes('Line 1\n\nLine 2'), 'should collapse to double newline');
-  });
-
-  test('MD047: ensures file ends with single newline', () => {
-    const input = 'Content';
-    const result = normalizeMd(input);
-    assert.ok(result.endsWith('\n'), 'should end with newline');
-    assert.ok(!result.endsWith('\n\n'), 'should not end with double newline');
-  });
-
-  test('MD047: trims trailing multiple newlines', () => {
-    const input = 'Content\n\n\n';
-    const result = normalizeMd(input);
-    assert.ok(result.endsWith('Content\n'), 'should end with single newline after content');
-  });
-
-  test('preserves frontmatter delimiters', () => {
-    const input = '---\nkey: value\n---\n\n# Heading\n\nContent\n';
-    const result = normalizeMd(input);
-    assert.ok(result.startsWith('---\n'), 'should preserve opening frontmatter');
-    assert.ok(result.includes('---\n\n# Heading'), 'should preserve frontmatter closing');
-  });
-
-  test('handles CRLF line endings', () => {
-    const input = 'Some text\r\n## Heading\r\nMore text\r\n';
-    const result = normalizeMd(input);
-    assert.ok(!result.includes('\r'), 'should normalize to LF');
-    assert.ok(result.includes('\n\n## Heading\n\n'), 'should add blank lines around heading');
-  });
-
-  test('handles ordered lists', () => {
-    const input = 'Some text\n1. First\n2. Second\nMore text\n';
-    const result = normalizeMd(input);
-    assert.ok(result.includes('Some text\n\n1. First'), 'ordered list should have blank line before');
-  });
-
-  test('does not add blank line between table and list', () => {
-    const input = '| Col |\n|-----|\n| val |\n- item\n';
-    const result = normalizeMd(input);
-    // Table rows start with |, should not add extra blank before list after table
-    assert.ok(result.includes('| val |\n\n- item'), 'list after table should have blank line');
-  });
-
-  test('complex real-world STATE.md-like content', () => {
-    const input = [
-      '# Project State',
-      '## Current Position',
-      'Phase: 5 of 10',
-      'Status: Executing',
-      '## Decisions',
-      '- Decision 1',
-      '- Decision 2',
-      '## Blockers',
-      'None',
-    ].join('\n');
-    const result = normalizeMd(input);
-    // Every heading should have blank lines around it
-    assert.ok(result.includes('\n\n## Current Position\n\n'), 'section heading needs blank lines');
-    assert.ok(result.includes('\n\n## Decisions\n\n'), 'decisions heading needs blank lines');
-    assert.ok(result.includes('\n\n## Blockers\n\n'), 'blockers heading needs blank lines');
-    // List should have blank line before it
-    assert.ok(result.includes('\n\n- Decision 1'), 'list needs blank line before');
   });
 });
 

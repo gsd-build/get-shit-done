@@ -17,7 +17,8 @@ const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 const COMMAND_PATH = path.join(__dirname, '..', 'commands', 'gsd', 'execute-phase.md');
 const WORKFLOW_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'execute-phase.md');
 const COMMANDS_DOC_PATH = path.join(__dirname, '..', 'docs', 'COMMANDS.md');
-const HELP_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'help.md');
+// After #3039, the comprehensive command reference moved to help/modes/full.md.
+const HELP_PATH = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'help', 'modes', 'full.md');
 
 // allow-test-rule: source-text-is-the-product
 // The workflow and command .md files are the installed AI instructions — their text content

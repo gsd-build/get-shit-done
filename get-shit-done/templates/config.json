@@ -20,10 +20,16 @@
     "cross_ai_command": "",
     "cross_ai_timeout": 300
   },
+  "ship": {
+    "pr_body_sections": []
+  },
   "planning": {
     "commit_docs": true,
     "search_gitignored": false,
     "sub_repos": []
+  },
+  "git": {
+    "create_tag": true
   },
   "parallelization": {
     "enabled": true,

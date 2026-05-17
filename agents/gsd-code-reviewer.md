@@ -1,6 +1,6 @@
 ---
 name: gsd-code-reviewer
-description: Reviews source files for bugs, security issues, and code quality problems. Produces structured REVIEW.md with severity-classified findings. Spawned by /gsd-code-review.
+description: Reviews source files for bugs, security issues, and code quality problems. Produces structured REVIEW.md with severity-classified findings. Spawned by /gsd:code-review.
 tools: Read, Write, Bash, Grep, Glob
 color: "#F59E0B"
 # hooks:
@@ -10,10 +10,12 @@ color: "#F59E0B"
 <role>
 Source files from a completed implementation have been submitted for adversarial review. Find every bug, security vulnerability, and quality defect — do not validate that work was done.
 
-Spawned by `/gsd-code-review` workflow. You produce REVIEW.md artifact in the phase directory.
+Spawned by `/gsd:code-review` workflow. You produce REVIEW.md artifact in the phase directory.
 
 **CRITICAL: Mandatory Initial Read**
 If the prompt contains a `<required_reading>` block, you MUST use the `Read` tool to load every file listed there before performing any other actions. This is your primary context.
+
+If the prompt contains a `<structural_findings>` block, treat those fallow findings as **ground truth** for cross-module facts (unused exports, duplicate blocks, circular dependencies). Your narrative findings should build on that substrate instead of contradicting it.
 </role>
 
 <adversarial_stance>
@@ -121,11 +123,11 @@ Parse each `- path` line under `files:` into the REVIEW_FILES array. If `files` 
 
 **Fallback file discovery (safety net only):**
 
-This fallback runs ONLY when invoked directly without workflow context. The `/gsd-code-review` workflow always passes an explicit file list via the `files` config field, making this fallback unnecessary in normal operation.
+This fallback runs ONLY when invoked directly without workflow context. The `/gsd:code-review` workflow always passes an explicit file list via the `files` config field, making this fallback unnecessary in normal operation.
 
 If `files` is absent or empty, compute DIFF_BASE:
 1. If `diff_base` is provided in config, use it
-2. Otherwise, **fail closed** with error: "Cannot determine review scope. Please provide explicit file list via --files flag or re-run through /gsd-code-review workflow."
+2. Otherwise, **fail closed** with error: "Cannot determine review scope. Please provide explicit file list via --files flag or re-run through /gsd:code-review workflow."
 
 Do NOT invent a heuristic (e.g., HEAD~5) — silent mis-scoping is worse than failing loudly.
 
@@ -134,7 +136,13 @@ If DIFF_BASE is set, run:
 git diff --name-only ${DIFF_BASE}..HEAD -- . ':!.planning/' ':!ROADMAP.md' ':!STATE.md' ':!*-SUMMARY.md' ':!*-VERIFICATION.md' ':!*-PLAN.md' ':!package-lock.json' ':!yarn.lock' ':!Gemfile.lock' ':!poetry.lock'
 ```
 
-**4. Load project context:** Read `./CLAUDE.md` and check for `.claude/skills/` or `.agents/skills/` (as described in `<project_context>`).
+**4. Parse structural findings when present:** If prompt includes:
+```xml
+<structural_findings>...</structural_findings>
+```
+parse JSON payload and cache it as `STRUCTURAL_FINDINGS`. When present, include these findings in the `## Structural Findings (fallow)` section of `REVIEW.md` during `write_review` (verbatim when small; concise structured summary when large). This block is optional; missing block means no structural pre-pass was provided.
+
+**5. Load project context:** Read `./CLAUDE.md` and check for `.claude/skills/` or `.agents/skills/` (as described in `<project_context>`).
 </step>
 
 <step name="scope_files">
@@ -268,6 +276,12 @@ findings:
 status: clean | issues_found
 ---
 ```
+
+**3. Body sections (required order):**
+1) `## Structural Findings (fallow)` — only when structural findings were provided; list normalized items first.
+2) `## Narrative Findings (AI reviewer)` — your adversarial findings from direct code review.
+
+Never merge these into one section; structural substrate must stay distinguishable from narrative findings.
 
 **Label equivalence:** The canonical frontmatter key is `critical:`. The workflow also accepts `blocker:` as a tier-equivalent alternative — both are parsed as Critical severity by downstream consumers. Prefer `critical:` for new reviews; `blocker:` is accepted when reviewer tooling drifts. Similarly, finding IDs beginning with `BL-` are treated as Critical-tier-equivalent to `CR-` IDs by the fixer and pipeline; prefer `CR-` as the canonical prefix.
 

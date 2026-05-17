@@ -8,6 +8,7 @@ allowed-tools:
   - Bash
   - Agent
   - AskUserQuestion
+requires: [new-project, phase, plan-phase]
 ---
 <objective>
 Start a new milestone: questioning → research (optional) → requirements → roadmap.
@@ -21,7 +22,7 @@ Brownfield equivalent of new-project. Project exists, PROJECT.md has history. Ga
 - `.planning/ROADMAP.md` — phase structure (continues numbering)
 - `.planning/STATE.md` — reset for new milestone
 
-**After:** `/gsd-plan-phase [N]` to start execution.
+**After:** `/gsd:plan-phase [N]` to start execution.
 </objective>
 
 <execution_context>

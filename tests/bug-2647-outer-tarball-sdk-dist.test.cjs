@@ -97,21 +97,25 @@ describe('bug #2647: outer tarball ships sdk/dist so gsd-sdk query works', () =>
     // if sdk/dist/cli.js already exists, use it; otherwise build.
     const sdkDir = path.join(REPO_ROOT, 'sdk');
     const cliJs = path.join(sdkDir, 'dist', 'cli.js');
+    // On Windows `npm` is the shell script `npm.cmd`; without {shell:true}
+    // execFileSync only finds literal-name binaries and errors with ENOENT.
+    const isWindows = process.platform === 'win32';
+    const npmCmd = isWindows ? 'npm.cmd' : 'npm';
     if (!fs.existsSync(cliJs)) {
       // Build requires node_modules; install if missing, then build.
       const sdkNodeModules = path.join(sdkDir, 'node_modules');
       if (!fs.existsSync(sdkNodeModules)) {
-        execFileSync('npm', ['ci', '--silent'], { cwd: sdkDir, stdio: 'pipe', env: npmEnv });
+        execFileSync(npmCmd, ['ci', '--silent'], { cwd: sdkDir, stdio: 'pipe', env: npmEnv, shell: isWindows });
       }
-      execFileSync('npm', ['run', 'build'], { cwd: sdkDir, stdio: 'pipe', env: npmEnv });
+      execFileSync(npmCmd, ['run', 'build'], { cwd: sdkDir, stdio: 'pipe', env: npmEnv, shell: isWindows });
     }
     assert.ok(fs.existsSync(cliJs), 'sdk build must produce sdk/dist/cli.js');
 
     try {
       const out = execFileSync(
-        'npm',
+        npmCmd,
         ['pack', '--dry-run', '--json', '--ignore-scripts'],
-        { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: npmEnv },
+        { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: npmEnv, shell: isWindows },
       ).toString('utf-8');
       const manifest = JSON.parse(out);
       const files = manifest[0].files.map((f) => f.path);

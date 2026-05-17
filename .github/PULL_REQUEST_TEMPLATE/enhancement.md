@@ -66,6 +66,22 @@ Closes #
 
 ---
 
+## Documentation
+
+> CI enforces this — `lint:docs` fails any PR with an `Added` / `Changed` / `Deprecated` / `Removed`
+> changeset fragment that does not also touch at least one file under `docs/`.
+> See [CONTRIBUTING.md → Documentation Updates](../../CONTRIBUTING.md#documentation-updates-update-the-relevant-docs).
+
+- [ ] Updated the relevant file(s) under `docs/` to reflect this change
+  - Behavior or output change → `docs/USER-GUIDE.md` and/or `docs/COMMANDS.md`
+  - Configuration / schema change → `docs/CONFIGURATION.md`
+  - Architectural change → `docs/ARCHITECTURE.md` and/or `docs/adr/`
+  - Agent or skill change → `docs/AGENTS.md`
+- [ ] All `docs/` content added in this PR is written in English
+- [ ] If genuinely no user-facing docs impact (infrastructure / internal refactor / test-only),
+      apply the `no-docs` label **or** add `<!-- docs-exempt: <reason> -->` inside each
+      triggering changeset fragment and leave a comment explaining why.
+
 ## Checklist
 
 - [ ] Issue linked above with `Closes #NNN` — **PR will be auto-closed if missing**
@@ -74,7 +90,6 @@ Closes #
 - [ ] All existing tests pass (`npm test`)
 - [ ] New or updated tests cover the enhanced behavior
 - [ ] `.changeset/` fragment added (`npm run changeset -- --type Changed --pr <NNN> --body "..."`) — or `no-changelog` label applied if not user-facing
-- [ ] Documentation updated if behavior or output changed
 - [ ] No unnecessary dependencies added
 
 ## Breaking changes

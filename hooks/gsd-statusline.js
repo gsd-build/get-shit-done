@@ -398,11 +398,11 @@ function runStatusline() {
       try {
         const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
         if (cache.update_available) {
-          gsdUpdate = '\x1b[33m⬆ /gsd-update\x1b[0m │ ';
+          gsdUpdate = '\x1b[33m⬆ /gsd:update\x1b[0m │ ';
         }
         if (cache.stale_hooks && cache.stale_hooks.length > 0) {
           // If installed version is ahead of npm latest, this is a dev install.
-          // Running /gsd-update would downgrade — show a contextual warning instead.
+          // Running /gsd:update would downgrade — show a contextual warning instead.
           const isDevInstall = (() => {
             if (!cache.installed || !cache.latest || cache.latest === 'unknown') return false;
             const parseV = v => v.replace(/^v/, '').split('.').map(Number);
@@ -413,16 +413,17 @@ function runStatusline() {
           if (isDevInstall) {
             gsdUpdate += '\x1b[33m⚠ dev install — re-run installer to sync hooks\x1b[0m │ ';
           } else {
-            gsdUpdate += '\x1b[31m⚠ stale hooks — run /gsd-update\x1b[0m │ ';
+            gsdUpdate += '\x1b[31m⚠ stale hooks — run /gsd:update\x1b[0m │ ';
           }
         }
       } catch (e) {}
     }
 
-    // Last-slash-command suffix (opt-in via statusline.show_last_command, #2538).
+    // Last-slash-command suffix and context_position config (#2538, #2937).
     // Reads the active session transcript for the most recent <command-name> tag.
     // Failure here must never break the statusline — wrap the entire lookup.
     let lastCmdSuffix = '';
+    let position = 'end';
     try {
       const cfg = readGsdConfig(dir);
       if (getConfigValue(cfg, 'statusline.show_last_command') === true) {
@@ -432,6 +433,8 @@ function runStatusline() {
           lastCmdSuffix = ` │ \x1b[2mlast: /${lastCmd}\x1b[0m`;
         }
       }
+      const cfgPos = getConfigValue(cfg, 'statusline.context_position');
+      if (cfgPos != null) position = cfgPos;
     } catch (e) {
       // Never break the statusline on config/transcript errors
     }
@@ -444,21 +447,61 @@ function runStatusline() {
         ? `\x1b[2m${gsdStateStr}\x1b[0m`
         : null;
 
-    if (middle) {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${ctx}${lastCmdSuffix}`);
-    } else {
-      process.stdout.write(`${gsdUpdate}\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${ctx}${lastCmdSuffix}`);
-    }
+    process.stdout.write(composeStatusline({ gsdUpdate, model, ctx, middle, dirname, lastCmdSuffix, position }));
   } catch (e) {
     // Silent fail - don't break statusline on parse errors
   }
 });
 }
 
+// --- Layout composer --------------------------------------------------------
+
+/**
+ * Compose the statusline string from pre-built segments.
+ *
+ * @param {object} opts
+ * @param {string} [opts.gsdUpdate='']      - leading update/stale-hooks warning (already formatted)
+ * @param {string} opts.model               - model display name (plain text; dim styling applied here)
+ * @param {string} [opts.ctx='']            - context-window meter segment (empty string = absent)
+ * @param {string|null} [opts.middle=null]  - middle segment (todo task or GSD state), null = absent
+ * @param {string} opts.dirname             - project directory basename (dim styling applied here)
+ * @param {string} [opts.lastCmdSuffix='']  - last-command suffix, e.g. ' │ last: /foo'
+ * @param {'end'|'front'} [opts.position='end']
+ *   - 'end'   (default): ctx appended after dirname — preserved byte-for-byte
+ *   - 'front': ctx immediately after model name so the meter stays visible in narrow terminals
+ *
+ * Invalid position values are silently coerced to 'end' — config-set schema rejects
+ * invalid values upfront; runtime fallback defends against stale/corrupt configs
+ * without breaking the statusline.
+ */
+function composeStatusline({
+  gsdUpdate = '',
+  model,
+  ctx = '',
+  middle = null,
+  dirname,
+  lastCmdSuffix = '',
+  position = 'end',
+} = {}) {
+  const modelSeg = `\x1b[2m${model}\x1b[0m`;
+  const dirSeg = `\x1b[2m${dirname}\x1b[0m`;
+  // Coerce invalid values to 'end' (belt-and-suspenders; see JSDoc above)
+  const pos = position === 'front' ? 'front' : 'end';
+
+  if (pos === 'front') {
+    if (middle) return `${gsdUpdate}${modelSeg}${ctx} │ ${middle} │ ${dirSeg}${lastCmdSuffix}`;
+    return `${gsdUpdate}${modelSeg}${ctx} │ ${dirSeg}${lastCmdSuffix}`;
+  }
+  // 'end' — preserved byte-for-byte relative to original inline templates
+  if (middle) return `${gsdUpdate}${modelSeg} │ ${middle} │ ${dirSeg}${ctx}${lastCmdSuffix}`;
+  return `${gsdUpdate}${modelSeg} │ ${dirSeg}${ctx}${lastCmdSuffix}`;
+}
+
 // Export helpers for unit tests. Harmless when run as a script.
 module.exports = {
   readGsdState, parseStateMd, formatGsdState,
   readGsdConfig, getConfigValue, readLastSlashCommand,
+  composeStatusline,
 };
 
 /**
@@ -471,6 +514,7 @@ function renderStatusline(data) {
   const dirname = path.basename(dir);
 
   let lastCmdSuffix = '';
+  let position = 'end';
   try {
     const cfg = readGsdConfig(dir);
     if (getConfigValue(cfg, 'statusline.show_last_command') === true) {
@@ -479,14 +523,13 @@ function renderStatusline(data) {
         lastCmdSuffix = ` │ \x1b[2mlast: /${lastCmd}\x1b[0m`;
       }
     }
+    const cfgPos = getConfigValue(cfg, 'statusline.context_position');
+    if (cfgPos != null) position = cfgPos;
   } catch (e) { /* swallow */ }
 
   const gsdStateStr = formatGsdState(readGsdState(dir) || {});
   const middle = gsdStateStr ? `\x1b[2m${gsdStateStr}\x1b[0m` : null;
-  if (middle) {
-    return `\x1b[2m${model}\x1b[0m │ ${middle} │ \x1b[2m${dirname}\x1b[0m${lastCmdSuffix}`;
-  }
-  return `\x1b[2m${model}\x1b[0m │ \x1b[2m${dirname}\x1b[0m${lastCmdSuffix}`;
+  return composeStatusline({ model, ctx: '', middle, dirname, lastCmdSuffix, position });
 }
 
 module.exports.renderStatusline = renderStatusline;

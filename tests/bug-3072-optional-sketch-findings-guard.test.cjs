@@ -13,13 +13,13 @@ function read(rel) {
 
 function extractFindingsProbesFromBashBlocks(markdown) {
   const probes = [];
-  const fenceRe = /```bash\n([\s\S]*?)```/g;
+  const fenceRe = /```bash\r?\n([\s\S]*?)```/g;
   let fenceMatch;
 
   while ((fenceMatch = fenceRe.exec(markdown)) !== null) {
     const block = fenceMatch[1];
-    const baseLine = markdown.slice(0, fenceMatch.index).split('\n').length;
-    const lines = block.split('\n');
+    const baseLine = markdown.slice(0, fenceMatch.index).split(/\r?\n/).length;
+    const lines = block.split(/\r?\n/);
 
     lines.forEach((line, idx) => {
       if (!line.includes('.claude/skills/')) return;
