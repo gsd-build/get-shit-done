@@ -44,7 +44,7 @@ Initialize a new project with deep context gathering.
 **Prerequisites:** No existing `.planning/PROJECT.md`
 **Produces:** `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, `config.json`, `research/`, `CLAUDE.md`
 
-**Project mode prompt (v1.50.0+).** During the interactive flow, GSD asks whether the project follows the **Vertical MVP** discipline (each phase delivers an end-to-end user capability — recommended for new products) or **Horizontal Layers** (build complete technical layers, assemble at the end — better for infrastructure-heavy projects). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase, which downstream commands (`/gsd-plan-phase`, `/gsd-execute-phase`, `/gsd-verify-work`, `/gsd-progress`, `/gsd-stats`, `/gsd-graphify`) detect automatically. See [docs/USER-GUIDE.md → MVP Mode](USER-GUIDE.md#mvp-mode) for the full walkthrough.
+**Project mode prompt (v1.45.0+).** During the interactive flow, GSD asks whether the project follows the **Vertical MVP** discipline (each phase delivers an end-to-end user capability — recommended for new products) or **Horizontal Layers** (build complete technical layers, assemble at the end — better for infrastructure-heavy projects). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase, which downstream commands (`/gsd-plan-phase`, `/gsd-execute-phase`, `/gsd-verify-work`, `/gsd-progress`, `/gsd-stats`, `/gsd-graphify`) detect automatically. See [docs/USER-GUIDE.md → MVP Mode](USER-GUIDE.md#mvp-mode) for the full walkthrough.
 
 ```bash
 /gsd-new-project                    # Interactive mode (includes mode prompt)

@@ -12,7 +12,7 @@ npm install -g get-shit-done-cc@1.45.0
 
 ## Headline: Vertical MVP / TDD / UAT planning track
 
-1.45.0 ships an end-to-end **MVP mode** for the GSD planning pipeline — from project kickoff, through phase planning, through execution, through verification. Issue [#2826](https://github.com/gsd-build/get-shit-done/issues/2826) is the umbrella PRD; the four implementation sub-phases are [#2885](https://github.com/gsd-build/get-shit-done/issues/2885), [#2875](https://github.com/gsd-build/get-shit-done/issues/2875), [#2877](https://github.com/gsd-build/get-shit-done/issues/2877), [#2879](https://github.com/gsd-build/get-shit-done/issues/2879), [#2882](https://github.com/gsd-build/get-shit-done/issues/2882).
+1.45.0 ships an end-to-end **MVP mode** for the GSD planning pipeline — from project kickoff, through phase planning, through execution, through verification. Issue [#2826](https://github.com/gsd-build/get-shit-done/issues/2826) is the umbrella PRD; the five implementation sub-phases are [#2885](https://github.com/gsd-build/get-shit-done/issues/2885), [#2875](https://github.com/gsd-build/get-shit-done/issues/2875), [#2877](https://github.com/gsd-build/get-shit-done/issues/2877), [#2879](https://github.com/gsd-build/get-shit-done/issues/2879), [#2882](https://github.com/gsd-build/get-shit-done/issues/2882).
 
 ### What's new
 
@@ -31,7 +31,7 @@ New required-reading injection: `references/planner-mvp-mode.md`. New parser sur
 A new top-level command that walks the user through framing a phase as a vertical MVP slice before planning. Three structured prompts capture an "As a / I want to / So that" user story. If the story is too large, an interactive **SPIDR** (Spike / Path / Interface / Data / Rule) splitting flow surfaces a list of `/gsd-phase` invocations to break the work apart. The command then:
 
 - Mutates the ROADMAP entry to set `**Mode:** mvp` and replaces `**Goal:**` with the assembled user story
-- Delegates to `/gsd-plan-phase --mvp <N>` to produce the plan
+- Delegates to `/gsd-plan-phase <N>` — no flag needed; the planner auto-detects MVP via the `**Mode:** mvp` line just written to ROADMAP.md
 
 Two new references: [`spidr-splitting.md`](../get-shit-done/references/spidr-splitting.md), [`user-story-template.md`](../get-shit-done/references/user-story-template.md).
 
@@ -51,7 +51,7 @@ The MVP slice closes out with read-side surfaces:
 
 - **`/gsd-new-project`** prompts up front for **Vertical MVP** vs **Horizontal Layers** mode and seeds the milestone accordingly
 - **`/gsd-progress`** emits a "User-flow next up" panel for MVP-mode phases, surfacing user-visible task names ahead of internal scaffolding
-- **`/gsd-stats`** adds an `MVP phases: N` summary line when the roadmap contains any
+- **`/gsd-stats`** adds a `Phases: N total | M MVP | K standard` summary line when the roadmap contains at least one MVP-mode phase
 - **`/gsd-graphify`** visually differentiates MVP-mode phase nodes from horizontal-layer phases in the rendered graph
 
 #### User-facing documentation

@@ -143,7 +143,7 @@ module.exports = {
   id: BASELINE_MIGRATION_ID,
   title: 'Record first-time installer migration baseline',
   description: 'Classify existing install surfaces before destructive installer migrations run.',
-  introducedIn: '1.50.0',
+  introducedIn: '1.45.0',
   scopes: ['global', 'local'],
   destructive: false,
   plan: ({ configDir, runtime, baselineScan, classifyArtifact }) => {

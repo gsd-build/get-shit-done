@@ -180,7 +180,7 @@ node gsd-tools.cjs roadmap analyze
 node gsd-tools.cjs roadmap update-plan-progress <N>
 ```
 
-> **Mode field (v1.50.0+).** `roadmap get-phase` returns a `mode` field extracted from `**Mode:**` (e.g. `"mvp"`). Lowercased + trimmed; unrecognized values preserved verbatim for forward-compat. The companion `gsd-sdk query phase.mvp-mode <N>` ([MVP Commands](#mvp-commands)) wraps this with the full precedence chain.
+> **Mode field (v1.45.0+).** `roadmap get-phase` returns a `mode` field extracted from `**Mode:**` (e.g. `"mvp"`). Lowercased + trimmed; unrecognized values preserved verbatim for forward-compat. The companion `gsd-sdk query phase.mvp-mode <N>` ([MVP Commands](#mvp-commands)) wraps this with the full precedence chain.
 
 ---
 

@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Feature
 
-- **Vertical MVP Slice mode — umbrella feature (#2826).** New end-to-end MVP planning track across the GSD pipeline. The four sub-phases shipped as PRs #2867 (#2885), #2874 (#2875), #2878 (#2877), #2880 (#2879), #2883 (#2882) — squash-merged together via #3206, surfaced for the v1.45.0 release here.
+- **Vertical MVP Slice mode — umbrella feature (#2826).** New end-to-end MVP planning track across the GSD pipeline. The five sub-phases shipped as PRs #2867 (#2885), #2874 (#2875), #2878 (#2877), #2880 (#2879), #2883 (#2882) — squash-merged together via #3206, surfaced for the v1.45.0 release here.
 
 - **`--mvp` flag on `/gsd-plan-phase`** — opt-in vertical-slice planning. Plans are organized as feature slices (UI→API→DB) instead of horizontal layers, so each task moves a real user-visible capability forward. Persistable per-phase via `**Mode:** mvp` in ROADMAP.md. Resolution order: CLI flag → ROADMAP `**Mode:**` field → `workflow.mvp_mode` config → false. New-project Phase 1 + `--mvp` triggers Walking Skeleton output (`SKELETON.md`) capturing architectural decisions for subsequent phases. Single planner agent, mode-switched. (#2885)
 
@@ -20,7 +20,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **MVP-mode UAT framing in `/gsd-verify-work`** — under MVP mode, the generated UAT script asks "can a real user complete the feature?" before any technical checks. User-flow steps (open, fill, click, observe) run first; technical checks (endpoint schemas, error states) only run after. Adds a goal-backward "User Flow Coverage" section to `VERIFICATION.md` mapping user-story steps to evidence in the codebase. A user-story-format guard refuses to verify a `mode: mvp` phase whose `**Goal:**` line is not in user-story format. New reference: `verify-mvp-mode.md`. (#2879)
 
-- **Vertical MVP discovery & progress surfaces.** `/gsd-new-project` prompts the user to choose between **Vertical MVP** (each phase delivers an end-to-end user capability — recommended for new products) and **Horizontal Layers** (build complete technical layers, assemble at the end). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase. `/gsd-progress` adds a user-flow status sub-block sourced from `PLAN.md` task names when a phase has `**Mode:** mvp`. `/gsd-stats` adds a `Phases: N total | M MVP | K standard` summary line when at least one MVP phase exists. `/gsd-graphify` renders MVP-mode phase nodes with a distinct green fill (`#22c55e`) and a ` (MVP)` label suffix — two-channel signaling for color-blind and grayscale renders. (#2882)
+- **Vertical MVP discovery & progress surfaces.** `/gsd-new-project` prompts the user to choose between **Vertical MVP** (each phase delivers an end-to-end user capability — recommended for new products) and **Horizontal Layers** (build complete technical layers, assemble at the end). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase. `/gsd-progress` adds a user-flow status sub-block sourced from `PLAN.md` task names when a phase has `**Mode:** mvp`. `/gsd-stats` adds a `Phases: N total | M MVP | K standard` summary line when at least one MVP phase exists. `/gsd-graphify` renders MVP-mode phase nodes with a distinct green fill (`#22c55e`) and a `(MVP)` label suffix — two-channel signaling for color-blind and grayscale renders. (#2882)
 
 ### Documentation
 
@@ -2768,7 +2768,8 @@ Technical implementation details for Phase 2 appear in the **Changed** section b
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.42.1...HEAD
+[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.45.0...HEAD
+[1.45.0]: https://github.com/gsd-build/get-shit-done/compare/v1.42.3...v1.45.0
 [1.42.1]: https://github.com/gsd-build/get-shit-done/compare/v1.41.0...v1.42.1
 [1.38.4]: https://github.com/gsd-build/get-shit-done/compare/v1.38.2...v1.38.4
 [1.38.2]: https://github.com/gsd-build/get-shit-done/compare/v1.37.1...v1.38.2
