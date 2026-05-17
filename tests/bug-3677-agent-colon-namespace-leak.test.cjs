@@ -171,4 +171,72 @@ describe('bug #3677 — agent body colon-namespace leak (Claude / Qwen / Hermes)
       assert.ok(out.includes('/gsd-sdk'), 'gsd-sdk (binary, not slash command) preserved');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // E — Behavioral coverage ported from PR #3681 (johnzilla / John Turner).
+  //
+  // #3681 proposed the same allow-list fix independently and was closed by its
+  // author in favor of this PR. Its test file contributed two coverage angles
+  // worth keeping: real-source efficacy against every `agents/gsd-*.md` (the
+  // shape of bug that pure-function tests miss) and idempotence-via-fixpoint
+  // (guards against double-rewrite on reinstall). Credit: johnzilla.
+  // ---------------------------------------------------------------------------
+  describe('E — real-source efficacy + idempotence (ported from #3681, credit: johnzilla)', () => {
+    const fs = require('node:fs');
+    const { readCmdNames } = require(path.join(REPO_ROOT, 'scripts', 'fix-slash-commands.cjs'));
+    const cmdNames = readCmdNames();
+
+    // Roster regex matches any registered command in `gsd:<cmd>` form with a
+    // negative lookbehind (so `mygsd:foo` is ignored) and a non-word lookahead
+    // (so `plan-phase-extra` is not a false match for `plan-phase`).
+    const roster = () => new RegExp(
+      `(?<![a-zA-Z0-9_-])gsd:(${[...cmdNames].sort((a, b) => b.length - a.length).join('|')})(?=[^a-zA-Z0-9_-]|$)`,
+    );
+
+    test('E0: command roster is populated and contains the symptom commands', () => {
+      assert.ok(cmdNames.length > 0, 'command roster must be populated');
+      assert.ok(cmdNames.includes('execute-phase'));
+      assert.ok(cmdNames.includes('plan-phase'));
+    });
+
+    test('E1: every agents/gsd-*.md transforms clean — no roster colon refs survive', () => {
+      const agentsDir = path.join(REPO_ROOT, 'agents');
+      const offenders = [];
+      for (const f of fs.readdirSync(agentsDir)) {
+        if (!f.startsWith('gsd-') || !f.endsWith('.md')) continue;
+        const src = fs.readFileSync(path.join(agentsDir, f), 'utf-8');
+        const out = transformContentToHyphen(src, cmdNames);
+        if (roster().test(out)) offenders.push(f);
+      }
+      assert.deepEqual(
+        offenders,
+        [],
+        `agents still carry roster colon refs after transform: ${offenders.join(', ')}`,
+      );
+    });
+
+    test('E2: idempotent — transform of already-hyphenated input is a no-op', () => {
+      const input = 'use /gsd-plan-phase next, then /gsd-execute-phase';
+      assert.strictEqual(
+        transformContentToHyphen(input, cmdNames),
+        input,
+        'reinstalls re-run the transform; double application must not mangle the body',
+      );
+    });
+
+    test('E3: word boundary — /gsd:plan-phase-extra is not a roster match', () => {
+      assert.strictEqual(
+        transformContentToHyphen('/gsd:plan-phase-extra', cmdNames),
+        '/gsd:plan-phase-extra',
+      );
+    });
+
+    test('E4: rewrites bare `gsd:<cmd>` shorthand (no leading slash)', () => {
+      const out = transformContentToHyphen(
+        'Spawned by the gsd:execute-phase orchestrator.',
+        cmdNames,
+      );
+      assert.strictEqual(out, 'Spawned by the gsd-execute-phase orchestrator.');
+    });
+  });
 });
