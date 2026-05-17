@@ -90,9 +90,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        shell: bash
         run: npm ci
 
       - name: Build SDK dist (required by installer)
+        shell: bash
         run: npm run build:sdk
 
       # Seam contract gate: keep manifest -> generated aliases -> registry/CJS adapters aligned.
@@ -214,8 +216,10 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Install dependencies
+        shell: bash
         run: npm ci
       - name: Build SDK dist
+        shell: bash
         run: npm run build:sdk
       - name: Unit coverage
         shell: bash
