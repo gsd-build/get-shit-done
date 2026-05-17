@@ -8371,6 +8371,11 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   } else if (fs.existsSync(agentsSrc)) {
     fs.mkdirSync(agentsDest, { recursive: true });
 
+    // #3677: roster for the agent-body colon→hyphen normalization below.
+    // Computed once (not per-file) — consumed by the isHyphenNameAgentRuntime
+    // gate inside the loop.
+    const _agentCmdNames = readGsdCommandNames();
+
     // Copy new agents
     const agentEntries = fs.readdirSync(agentsSrc, { withFileTypes: true });
     for (const entry of agentEntries) {
@@ -8439,6 +8444,22 @@ function install(isGlobal, runtime = 'claude', options = {}) {
           content = content.replace(/CLAUDE\.md/g, 'HERMES.md');
           content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
           content = content.replace(/\.claude\//g, '.hermes/');
+        }
+        // #3677: runtimes that register agents under the canonical hyphen
+        // `name:` (#2808) must not ship retired /gsd:<cmd> colon references
+        // in agent bodies — they are unroutable on those installs (Claude
+        // rejects `/gsd:execute-phase` with "Did you mean /gsd-execute-phase?").
+        // Mirrors the SKILL.md body rewrite (#3583/#3629). The other runtimes
+        // are deliberately excluded: their convertClaudeAgentTo* adapters
+        // already convert command namespaces (Copilot CONV-07, Codex `$gsd-`,
+        // etc.), and Gemini intentionally keeps the colon form because its
+        // slash commands are colon-namespaced.
+        const isHyphenNameAgentRuntime =
+          !isOpencode && !isKilo && !isGemini && !isCodex && !isCopilot &&
+          !isAntigravity && !isCursor && !isWindsurf && !isAugment &&
+          !isTrae && !isCodebuddy && !isCline;
+        if (isHyphenNameAgentRuntime) {
+          content = transformContentToHyphen(content, _agentCmdNames);
         }
         const destName = isCopilot ? entry.name.replace('.md', '.agent.md') : entry.name;
         fs.writeFileSync(path.join(agentsDest, destName), content);
