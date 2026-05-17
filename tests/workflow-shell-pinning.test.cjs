@@ -46,11 +46,16 @@ function listWorkflowFiles() {
     .map((e) => path.join(WORKFLOWS_DIR, e));
 
   // Filter to files that have at least one windows-latest reference.
-  // A simple string search is sufficient — if "windows-latest" appears
-  // anywhere in the file, the file is in scope.
+  // allow-test-rule: file-scope prefilter, not a test assertion — we need to
+  // detect whether a workflow file targets Windows runners at all. The pwsh
+  // stderr-swallow class is windows-only, so files that never mention
+  // windows-latest are out of scope. Exposing a typed IR from production
+  // code is not appropriate here because the source-of-truth is the YAML
+  // itself; the actual test assertions below ARE structural (parse runs-on,
+  // strategy.matrix.os, defaults.run.shell, etc.).
   return all.filter((f) => {
     const raw = fs.readFileSync(f, 'utf8');
-    return raw.includes('windows-latest');
+    return raw.indexOf('windows-latest') !== -1;
   });
 }
 
