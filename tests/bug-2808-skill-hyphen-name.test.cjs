@@ -34,8 +34,17 @@ const path = require('node:path');
 const { cleanup, createTempDir } = require('./helpers.cjs');
 
 const ROOT = path.join(__dirname, '..');
-const { convertClaudeCommandToClaudeSkill, copyCommandsAsClaudeSkills, skillFrontmatterName } =
+const { convertClaudeCommandToClaudeSkill, installRuntimeArtifacts, uninstallRuntimeArtifacts, skillFrontmatterName } =
   require(path.join(ROOT, 'bin', 'install.js'));
+
+const {
+  loadSkillsManifest,
+  resolveProfile,
+} = require(path.join(ROOT, 'get-shit-done', 'bin', 'lib', 'install-profiles.cjs'));
+
+// Full resolved profile — installs all available skills from the source dir
+const _manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest: _manifest });
 
 const WORKFLOWS_DIR = path.join(ROOT, 'get-shit-done', 'workflows');
 const COMMANDS_DIR = path.join(ROOT, 'commands', 'gsd');
@@ -150,8 +159,15 @@ describe('bug-2808: SKILL.md name: uses hyphen form', () => {
   test('generated autocomplete skill surface uses hyphen names without underscores', (t) => {
     const tmp = createTempDir('gsd-autocomplete-surface-');
     t.after(() => cleanup(tmp));
-    const skillsDir = path.join(tmp, 'skills');
-    copyCommandsAsClaudeSkills(COMMANDS_DIR, skillsDir, 'gsd', '$HOME/.claude/', 'claude', true);
+
+    // Use the real COMMANDS_DIR as the source via .gsd-source marker.
+    // installRuntimeArtifacts('claude', configDir, 'global') writes to
+    // configDir/skills/gsd-*/SKILL.md using the same converter as the shim did.
+    const configDir = path.join(tmp, 'config');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), COMMANDS_DIR + '\n');
+    installRuntimeArtifacts('claude', configDir, 'global', resolvedProfileFull);
+    const skillsDir = path.join(configDir, 'skills');
 
     // Don't filter the directory listing by `startsWith('gsd-')` — that
     // would silently hide exactly the kind of drift this test exists to

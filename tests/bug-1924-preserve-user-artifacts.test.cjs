@@ -170,21 +170,24 @@ describe('#1924: dev-preferences.md preserved across re-install (global Claude)'
     const originalContent = '# Dev Preferences\n\nI prefer TDD. I like short functions.\n';
     fs.writeFileSync(devPrefsPath, originalContent);
 
-    // Re-run installer (simulating gsd-update)
-    // Bug: this triggers legacy cleanup that rmSync's commands/gsd/ entirely,
-    // deleting dev-preferences.md
+    // Re-run installer (simulating gsd-update).
+    // In the layout-driven path (B2), legacy commands/gsd/ is removed and
+    // dev-preferences.md is migrated to skills/gsd-dev-preferences/SKILL.md (#2973).
     runInstaller(tmpDir);
 
+    // Content is migrated to the new canonical skills location (#2973).
+    // The old commands/gsd/ path is cleaned up; the skill file carries the content.
+    const devPrefSkillPath = path.join(tmpDir, 'skills', 'gsd-dev-preferences', 'SKILL.md');
     assert.ok(
-      fs.existsSync(devPrefsPath),
-      'dev-preferences.md must survive re-install — gsd-update legacy cleanup must not delete user-generated files'
+      fs.existsSync(devPrefSkillPath),
+      'dev-preferences.md must be migrated to skills/gsd-dev-preferences/SKILL.md — gsd-update legacy cleanup must not silently drop user-generated content'
     );
 
-    const afterContent = fs.readFileSync(devPrefsPath, 'utf8');
+    const afterContent = fs.readFileSync(devPrefSkillPath, 'utf8');
     assert.strictEqual(
       afterContent,
       originalContent,
-      'dev-preferences.md content must be identical after re-install'
+      'migrated dev-preferences content must be identical to the original'
     );
   });
 
@@ -199,19 +202,22 @@ describe('#1924: dev-preferences.md preserved across re-install (global Claude)'
     fs.writeFileSync(legacyFile, '---\nname: gsd:next\n---\n\nLegacy content.');
 
     // But dev-preferences.md is also there (user-generated)
+    const devPrefsContent = '# Dev Preferences\n\nMy preferences.\n';
     const devPrefsPath = path.join(commandsGsdDir, 'dev-preferences.md');
-    fs.writeFileSync(devPrefsPath, '# Dev Preferences\n\nMy preferences.\n');
+    fs.writeFileSync(devPrefsPath, devPrefsContent);
 
     // Re-install
     runInstaller(tmpDir);
 
-    // dev-preferences.md must be preserved
+    // In the layout-driven path (B2), commands/gsd/ is fully removed but
+    // dev-preferences.md content is migrated to the new canonical skill location.
+    const devPrefSkillPath = path.join(tmpDir, 'skills', 'gsd-dev-preferences', 'SKILL.md');
     assert.ok(
-      fs.existsSync(devPrefsPath),
-      'dev-preferences.md must be preserved while legacy commands/gsd/ is cleaned up'
+      fs.existsSync(devPrefSkillPath),
+      'dev-preferences.md content must be migrated to skills/gsd-dev-preferences/SKILL.md'
     );
 
-    // The legacy GSD command (next.md) is NOT user-generated, should be removed
+    // The legacy GSD command (next.md) is NOT user-generated, must be removed
     // (it would exist only as a skill now in skills/gsd-next/SKILL.md)
     assert.ok(
       !fs.existsSync(legacyFile),

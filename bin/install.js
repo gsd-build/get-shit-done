@@ -123,6 +123,7 @@ const {
   loadSkillsManifest,
   stageSkillsForProfile,
   stageAgentsForProfile,
+  stageSkillsForRuntimeAsSkills,
 } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
 const {
   applyInstallerMigrationPlan,
@@ -134,6 +135,9 @@ const {
   resolveInstallerMigrationPromptsForNonTty,
   summarizeInstallerMigrationResult,
 } = require(path.join(_gsdLibDir, 'installer-migration-report.cjs'));
+const {
+  resolveRuntimeArtifactLayout,
+} = require(path.join(_gsdLibDir, 'runtime-artifact-layout.cjs'));
 
 // Parse args
 const args = process.argv.slice(2);
@@ -2231,58 +2235,6 @@ function convertClaudeAgentToAugmentAgent(content) {
  * Copy Claude commands as Augment skills — one folder per skill with SKILL.md.
  * Mirrors copyCommandsAsCursorSkills but uses Augment converters.
  */
-function copyCommandsAsAugmentSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  // Remove previous GSD Augment skills to avoid stale command skills
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const augmentDirRegex = /~\/\.augment\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(augmentDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToAugmentSkill(content, skillName);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 function convertSlashCommandsToTraeSkillMentions(content) {
   return content.replace(/\/gsd:([a-z0-9-]+)/g, (_, commandName) => {
@@ -5563,462 +5515,52 @@ function listCodexSkillNames(skillsDir, prefix = 'gsd-') {
     .sort();
 }
 
-function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
+/**
+ * Generic skills install helper used by all copyCommandsAs*Skills shims.
+ *
+ * Recursively walks srcDir, applies converter to each .md file (mirroring the
+ * old per-function recurse() bodies), applies runtime content rewrites
+ * (path + branding), and writes each skill as <prefix>-<stem>/SKILL.md under
+ * skillsDir. Replaces the ~50-line recursion bodies in the 9 old functions.
+ *
+ * @param {string} srcDir          source commands directory
+ * @param {string} skillsDir       destination skills directory
+ * @param {string} prefix          skill name prefix without trailing dash (e.g. 'gsd')
+ * @param {string} pathPrefix      trailing-slash path prefix for content rewrites
+ * @param {string} runtime         canonical runtime ID for rewrite table
+ * @param {Function} converter     wrapped converter (content, skillName) → string
+ */
 
-  fs.mkdirSync(skillsDir, { recursive: true });
 
-  // Remove previous GSD Codex skills to avoid stale command skills.
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const codexDirRegex = /~\/\.codex\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(codexDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToCodexSkill(content, skillName);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
-
-function copyCommandsAsCursorSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  // Remove previous GSD Cursor skills to avoid stale command skills
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const cursorDirRegex = /~\/\.cursor\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(cursorDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToCursorSkill(content, skillName);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 /**
  * Copy Claude commands as Windsurf skills — one folder per skill with SKILL.md.
  * Mirrors copyCommandsAsCursorSkills but uses Windsurf converters.
  */
-function copyCommandsAsWindsurfSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
 
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  // Remove previous GSD Windsurf skills to avoid stale command skills
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const windsurfDirRegex = /~\/\.codeium\/windsurf\//g;
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(windsurfDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToWindsurfSkill(content, skillName);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
-
-function copyCommandsAsTraeSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const bareGlobalClaudeRegex = /~\/\.claude\b/g;
-      const bareGlobalClaudeHomeRegex = /\$HOME\/\.claude\b/g;
-      const bareLocalClaudeRegex = /\.\/\.claude\b/g;
-      const traeDirRegex = /~\/\.trae\//g;
-      const normalizedPathPrefix = pathPrefix.replace(/\/$/, '');
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(bareGlobalClaudeRegex, normalizedPathPrefix);
-      content = content.replace(bareGlobalClaudeHomeRegex, normalizedPathPrefix);
-      content = content.replace(bareLocalClaudeRegex, `./${getDirName(runtime)}`);
-      content = content.replace(traeDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToTraeSkill(content, skillName);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 /**
  * Copy Claude commands as CodeBuddy skills — one folder per skill with SKILL.md.
  * CodeBuddy uses the same tool names as Claude Code, but has its own config directory structure.
  */
-function copyCommandsAsCodebuddySkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      const globalClaudeRegex = /~\/\.claude\//g;
-      const globalClaudeHomeRegex = /\$HOME\/\.claude\//g;
-      const localClaudeRegex = /\.\/\.claude\//g;
-      const bareGlobalClaudeRegex = /~\/\.claude\b/g;
-      const bareGlobalClaudeHomeRegex = /\$HOME\/\.claude\b/g;
-      const bareLocalClaudeRegex = /\.\/\.claude\b/g;
-      const codebuddyDirRegex = /~\/\.codebuddy\//g;
-      const normalizedPathPrefix = pathPrefix.replace(/\/$/, '');
-      content = content.replace(globalClaudeRegex, pathPrefix);
-      content = content.replace(globalClaudeHomeRegex, pathPrefix);
-      content = content.replace(localClaudeRegex, `./${getDirName(runtime)}/`);
-      content = content.replace(bareGlobalClaudeRegex, normalizedPathPrefix);
-      content = content.replace(bareGlobalClaudeHomeRegex, normalizedPathPrefix);
-      content = content.replace(bareLocalClaudeRegex, `./${getDirName(runtime)}`);
-      content = content.replace(codebuddyDirRegex, pathPrefix);
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToCodebuddySkill(content, skillName);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 /**
  * Copy Claude commands as Copilot skills — one folder per skill with SKILL.md.
  * Applies CONV-01 (structure), CONV-02 (allowed-tools), CONV-06 (paths), CONV-07 (command names).
  */
-function copyCommandsAsCopilotSkills(srcDir, skillsDir, prefix, isGlobal = false) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  // Remove previous GSD Copilot skills
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      content = convertClaudeCommandToCopilotSkill(content, skillName, isGlobal);
-      content = processAttribution(content, getCommitAttribution('copilot'));
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 /**
  * Copy Claude commands as Claude skills — one folder per skill with SKILL.md.
  * Claude Code 2.1.88+ uses skills/xxx/SKILL.md instead of commands/gsd/xxx.md.
- * Claude is the native format so no path replacement is needed — only
- * frontmatter restructuring via convertClaudeCommandToClaudeSkill.
+ * Supports runtime='claude'|'qwen'|'hermes'; branding rewrites are applied via
+ * applyRuntimeContentRewritesInPlace inside _copyCommandsAsSkillsViaConverter.
  * @param {string} srcDir - Source commands directory
  * @param {string} skillsDir - Target skills directory
  * @param {string} prefix - Skill name prefix (e.g. 'gsd')
  * @param {string} pathPrefix - Path prefix for file references
  * @param {string} runtime - Target runtime
- * @param {boolean} isGlobal - Whether this is a global install
+ * @param {boolean} isGlobal - Whether this is a global install (unused; kept for compat)
  */
-function copyCommandsAsClaudeSkills(srcDir, skillsDir, prefix, pathPrefix, runtime, isGlobal = false) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  // Live command names for the colon→hyphen body transform (#3583), computed
-  // once per install instead of inside convertClaudeCommandToClaudeSkill where
-  // it would re-scan commands/gsd for every skill.
-  const cmdNames = readGsdCommandNames();
-
-  // #2973 (CR follow-up on #3003): preserve user-generated skills across the
-  // wipe-and-replace. `gsd-dev-preferences/SKILL.md` is written by the user
-  // via `/gsd-profile-user --refresh`; it is NOT shipped by the npm package,
-  // so a wipe without snapshot deletes the user's content with nothing to
-  // restore from. Snapshot the SKILL.md (and any sibling files in that
-  // directory) before the wipe and restore them after.
-  const USER_OWNED_SKILLS = new Set(['gsd-dev-preferences']);
-  const preservedUserSkills = new Map(); // skillName -> Map(relPath -> Buffer)
-  for (const skillName of USER_OWNED_SKILLS) {
-    const skillDir = path.join(skillsDir, skillName);
-    if (!fs.existsSync(skillDir)) continue;
-    const files = new Map();
-    const walkSnap = (curRel, curAbs) => {
-      for (const e of fs.readdirSync(curAbs, { withFileTypes: true })) {
-        const childRel = curRel ? path.join(curRel, e.name) : e.name;
-        const childAbs = path.join(curAbs, e.name);
-        if (e.isDirectory()) walkSnap(childRel, childAbs);
-        else if (e.isFile()) files.set(childRel, fs.readFileSync(childAbs));
-      }
-    };
-    walkSnap('', skillDir);
-    if (files.size > 0) preservedUserSkills.set(skillName, files);
-  }
-
-  // Remove previous GSD Claude skills to avoid stale command skills
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  // Restore user-owned skills after the wipe but before recursive copy populates
-  // shipped skills. If the npm package later happens to ship a same-named skill
-  // (currently it does not for gsd-dev-preferences), the restored user content
-  // is the source of truth: the recurse() loop below would overwrite it on
-  // collision, but the USER_OWNED_SKILLS set is by definition disjoint from
-  // shipped-skill names.
-  for (const [skillName, files] of preservedUserSkills) {
-    const skillDir = path.join(skillsDir, skillName);
-    fs.mkdirSync(skillDir, { recursive: true });
-    for (const [relPath, buf] of files) {
-      const absPath = path.join(skillDir, relPath);
-      fs.mkdirSync(path.dirname(absPath), { recursive: true });
-      fs.writeFileSync(absPath, buf);
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      content = content.replace(/~\/\.claude\//g, pathPrefix);
-      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
-      content = content.replace(/\.\/\.claude\//g, `./${getDirName(runtime)}/`);
-      content = content.replace(/~\/\.qwen\//g, pathPrefix);
-      content = content.replace(/\$HOME\/\.qwen\//g, pathPrefix);
-      content = content.replace(/\.\/\.qwen\//g, `./${getDirName(runtime)}/`);
-      content = content.replace(/~\/\.hermes\//g, pathPrefix);
-      content = content.replace(/\$HOME\/\.hermes\//g, pathPrefix);
-      content = content.replace(/\.\/\.hermes\//g, `./${getDirName(runtime)}/`);
-      // Qwen reuses Claude skill format but needs runtime-specific content replacement
-      if (runtime === 'qwen') {
-        content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
-        content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
-        content = content.replace(/\.claude\//g, '.qwen/');
-      }
-      // Hermes Agent reuses Claude skill format; rewrite branding + paths.
-      if (runtime === 'hermes') {
-        content = content.replace(/CLAUDE\.md/g, 'HERMES.md');
-        content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
-        content = content.replace(/\.claude\//g, '.hermes/');
-      }
-      content = processAttribution(content, getCommitAttribution(runtime));
-      content = convertClaudeCommandToClaudeSkill(content, skillName, runtime, cmdNames);
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 /**
  * Write the Hermes "gsd" category DESCRIPTION.md.
@@ -6056,50 +5598,6 @@ function writeHermesCategoryDescription(categoryDir) {
  * @param {string} prefix - Skill name prefix (e.g. 'gsd')
  * @param {boolean} isGlobal - Whether this is a global install
  */
-function copyCommandsAsAntigravitySkills(srcDir, skillsDir, prefix, isGlobal = false) {
-  if (!fs.existsSync(srcDir)) {
-    return;
-  }
-
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  // Remove previous GSD Antigravity skills
-  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
-  for (const entry of existing) {
-    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
-      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-    }
-  }
-
-  function recurse(currentSrcDir, currentPrefix) {
-    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(currentSrcDir, entry.name);
-      if (entry.isDirectory()) {
-        recurse(srcPath, `${currentPrefix}-${entry.name}`);
-        continue;
-      }
-
-      if (!entry.name.endsWith('.md')) {
-        continue;
-      }
-
-      const baseName = entry.name.replace('.md', '');
-      const skillName = `${currentPrefix}-${baseName}`;
-      const skillDir = path.join(skillsDir, skillName);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      let content = fs.readFileSync(srcPath, 'utf8');
-      content = convertClaudeCommandToAntigravitySkill(content, skillName, isGlobal);
-      content = processAttribution(content, getCommitAttribution('antigravity'));
-
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
-    }
-  }
-
-  recurse(srcDir, prefix);
-}
 
 /**
  * Single source of truth for user-owned artifacts inside get-shit-done/.
@@ -6157,7 +5655,12 @@ function restoreUserArtifacts(destDir, saved) {
 
 /**
  * Migrate a legacy dev-preferences.md (saved from commands/gsd/) into the
- * skills/gsd-dev-preferences/SKILL.md location used by the writer after #2973.
+ * runtime-aware SKILL.md location used by the writer after #2973.
+ *
+ * For runtimes with a nested skills layout (e.g. Hermes: skills/gsd/<stem>/),
+ * the target is <configDir>/skills/gsd/dev-preferences/SKILL.md.
+ * For runtimes with a flat skills layout (prefix='gsd-'), the target is
+ * <configDir>/skills/gsd-dev-preferences/SKILL.md.
  *
  * Skips silently if no legacy file was preserved, or if a SKILL.md already
  * exists at the new location (don't clobber user-customized skill content
@@ -6166,11 +5669,23 @@ function restoreUserArtifacts(destDir, saved) {
  *
  * @param {string} targetDir - Resolved runtime config directory (e.g. ~/.claude)
  * @param {Map<string, string>} saved - Map returned by preserveUserArtifacts
+ * @param {string} [runtime] - canonical runtime ID (e.g. 'hermes', 'qwen', 'claude')
+ * @param {'global'|'local'} [scope] - install scope
  * @returns {boolean} - true if a file was migrated, false otherwise
  */
-function migrateLegacyDevPreferencesToSkill(targetDir, saved) {
+function migrateLegacyDevPreferencesToSkill(targetDir, saved, runtime, scope = 'global') {
   if (!saved || !saved.has('dev-preferences.md')) return false;
-  const skillDir = path.join(targetDir, 'skills', 'gsd-dev-preferences');
+  let skillDir;
+  if (runtime) {
+    const layout = resolveRuntimeArtifactLayout(runtime, targetDir, scope);
+    const skillsKindEntry = layout.kinds.find((k) => k.kind === 'skills');
+    if (!skillsKindEntry) return false; // runtime has no skills layout (e.g. cline)
+    const stemName = skillsKindEntry.prefix === '' ? 'dev-preferences' : 'gsd-dev-preferences';
+    skillDir = path.join(targetDir, skillsKindEntry.destSubpath, stemName);
+  } else {
+    // Legacy fallback for callers that have not yet been updated to pass runtime
+    skillDir = path.join(targetDir, 'skills', 'gsd-dev-preferences');
+  }
   const skillFile = path.join(skillDir, 'SKILL.md');
   if (fs.existsSync(skillFile)) return false;
   try {
@@ -6179,6 +5694,517 @@ function migrateLegacyDevPreferencesToSkill(targetDir, saved) {
     return true;
   } catch {
     return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Layout-driven install/uninstall orchestrators
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply per-runtime content rewrites in place across every SKILL.md inside a
+ * staged directory. Reproduces the rewrite scaffolding that the old
+ * copyCommandsAs<Runtime>Skills functions applied between read-content and
+ * converter-call. Applied AFTER stage (which already called the converter);
+ * rewrites target stable path patterns the converter doesn't touch.
+ *
+ * For Qwen/Hermes, branding rewrites (.claude/ → .qwen/ / .hermes/) run
+ * AFTER the slash-form path replacements but they only catch bare `.claude/`
+ * patterns (skill-body relative refs) that the slash forms didn't consume.
+ * This mirrors the exact ordering in the legacy copyCommandsAsClaudeSkills body.
+ *
+ * @param {string} stagedDir
+ * @param {string} runtime
+ * @param {string} pathPrefix  e.g. "~/.codex/" — trailing-slash string
+ */
+function applyRuntimeContentRewritesInPlace(stagedDir, runtime, pathPrefix) {
+  if (!fs.existsSync(stagedDir)) return;
+
+  // Walk all SKILL.md files under stagedDir
+  const walkAndRewrite = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walkAndRewrite(fullPath);
+      } else if (entry.name === 'SKILL.md') {
+        let content = fs.readFileSync(fullPath, 'utf8');
+        content = _applyRuntimeRewrites(content, runtime, pathPrefix);
+        fs.writeFileSync(fullPath, content);
+      }
+    }
+  };
+  walkAndRewrite(stagedDir);
+}
+
+/**
+ * Apply the per-runtime rewrite table to a single content string.
+ * Extracted so it can be unit-tested independently of the filesystem walk.
+ *
+ * @param {string} content
+ * @param {string} runtime
+ * @param {string} pathPrefix  trailing-slash string
+ * @returns {string}
+ */
+function _applyRuntimeRewrites(content, runtime, pathPrefix) {
+  const dirName = getDirName(runtime);
+  const normalizedPathPrefix = pathPrefix.replace(/\/$/, '');
+
+  switch (runtime) {
+    case 'codex':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/~\/\.codex\//g, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'cursor':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/~\/\.cursor\//g, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'windsurf':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/~\/\.codeium\/windsurf\//g, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'augment':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/~\/\.augment\//g, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'trae':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/~\/\.claude\b/g, normalizedPathPrefix);
+      content = content.replace(/\$HOME\/\.claude\b/g, normalizedPathPrefix);
+      content = content.replace(/\.\/\.claude\b/g, `./${dirName}`);
+      content = content.replace(/~\/\.trae\//g, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'codebuddy':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/~\/\.claude\b/g, normalizedPathPrefix);
+      content = content.replace(/\$HOME\/\.claude\b/g, normalizedPathPrefix);
+      content = content.replace(/\.\/\.claude\b/g, `./${dirName}`);
+      content = content.replace(/~\/\.codebuddy\//g, pathPrefix);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'copilot':
+      // Copilot converter handles path rewrites; only attribution here
+      content = processAttribution(content, getCommitAttribution('copilot'));
+      break;
+
+    case 'antigravity':
+      // Antigravity converter handles path rewrites; only attribution here
+      content = processAttribution(content, getCommitAttribution('antigravity'));
+      break;
+
+    case 'claude':
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'qwen':
+      // Branding rewrites run before path rewrites to avoid consuming
+      // patterns that the path step would also match.
+      content = content.replace(/CLAUDE\.md/g, 'QWEN.md');
+      content = content.replace(/\bClaude Code\b/g, 'Qwen Code');
+      // Base path rewrites (use ~/ and $HOME/ slash forms first — most specific)
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/~\/\.qwen\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.qwen\//g, pathPrefix);
+      // Bare relative .claude/ → .qwen/ (residual refs not matched above)
+      content = content.replace(/\.claude\//g, '.qwen/');
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/\.\/\.qwen\//g, `./${dirName}/`);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    case 'hermes':
+      // Branding rewrites run before path rewrites (same rationale as qwen)
+      content = content.replace(/CLAUDE\.md/g, 'HERMES.md');
+      content = content.replace(/\bClaude Code\b/g, 'Hermes Agent');
+      // Base path rewrites
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
+      content = content.replace(/~\/\.hermes\//g, pathPrefix);
+      content = content.replace(/\$HOME\/\.hermes\//g, pathPrefix);
+      // Bare relative .claude/ → .hermes/ (residual refs)
+      content = content.replace(/\.claude\//g, '.hermes/');
+      content = content.replace(/\.\/\.claude\//g, `./${dirName}/`);
+      content = content.replace(/\.\/\.hermes\//g, `./${dirName}/`);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
+    default:
+      // Unknown runtime — no rewrites
+      break;
+  }
+
+  return content;
+}
+
+/**
+ * Copy a staged directory's contents into destDir.
+ * Additive — does not prune (surface.cjs handles pruning).
+ *
+ * For skills kind: each child of stagedDir is a `${prefix}${stem}/` dir; copy
+ *   the whole dir into destDir.
+ * For commands/agents kind: iterate .md files and write them into destDir.
+ *   - commands: write as `${prefix}${stem}.md` unless destSubpath already
+ *     encodes the GSD namespace as its last segment (e.g. `commands/gsd`), in
+ *     which case write as `${stem}.md` (directory IS the namespace).
+ *   - agents: write as-is (files already carry their own `gsd-` prefix).
+ */
+function _copyStaged(stagedDir, destDir, kind) {
+  if (!fs.existsSync(stagedDir)) return;
+  fs.mkdirSync(destDir, { recursive: true });
+
+  if (kind.kind === 'skills') {
+    // Each child of stagedDir is a prefixed skill directory: gsd-help/, etc.
+    for (const entry of fs.readdirSync(stagedDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const src = path.join(stagedDir, entry.name);
+      const dest = path.join(destDir, entry.name);
+      fs.cpSync(src, dest, { recursive: true });
+    }
+    return;
+  }
+
+  // commands or agents
+  const entries = fs.readdirSync(stagedDir, { withFileTypes: true });
+  // For commands: apply prefix unless the destSubpath's last segment already
+  // represents the GSD namespace (e.g. 'commands/gsd' → last segment 'gsd').
+  const destLast = path.basename(kind.destSubpath);
+  const prefixStem = kind.prefix ? kind.prefix.replace(/-$/, '') : '';
+  const namespacedByDir = kind.kind === 'commands' && destLast === prefixStem;
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith('.md')) continue;
+    const stem = entry.name.slice(0, -3); // strip .md
+
+    let destName;
+    if (kind.kind === 'agents') {
+      // Agent files already carry the gsd- prefix in the source dir
+      destName = entry.name;
+    } else if (namespacedByDir) {
+      // Directory is the namespace; don't double-prefix the filename
+      destName = entry.name;
+    } else {
+      // Flat commands directory (e.g. command/ for opencode/kilo)
+      destName = `${kind.prefix}${stem}.md`;
+    }
+
+    fs.copyFileSync(path.join(stagedDir, entry.name), path.join(destDir, destName));
+  }
+}
+
+/**
+ * Remove GSD-prefixed entries from destDir matching kind.prefix.
+ * For Hermes nested case (prefix === ''): the destSubpath IS the namespace
+ * (skills/gsd) — remove the entire destDir.
+ */
+function _removeGsdEntries(destDir, kind) {
+  if (!fs.existsSync(destDir)) return;
+  if (kind.prefix === '') {
+    // Whole-namespace removal (Hermes nested case — destSubpath is skills/gsd)
+    // The directory itself is the GSD namespace, so remove it entirely.
+    fs.rmSync(destDir, { recursive: true, force: true });
+    return;
+  }
+  for (const entry of fs.readdirSync(destDir, { withFileTypes: true })) {
+    if (!entry.name.startsWith(kind.prefix)) continue;
+    fs.rmSync(path.join(destDir, entry.name), { recursive: true, force: true });
+  }
+}
+
+/**
+ * Run legacy install migrations that must execute BEFORE the layout-driven
+ * copy so stale artifacts are cleaned up before new ones are written.
+ *
+ * - Claude/Qwen/Hermes: migrate legacy commands/gsd/dev-preferences.md →
+ *   skills/gsd-dev-preferences/SKILL.md if the old file is present.
+ *   Also removes the legacy commands/gsd/ directory.
+ * - Hermes: remove flat skills/gsd-STAR directories (pre-2841 layout) before
+ *   writing the new nested skills/gsd/ layout.
+ *
+ * @param {string} runtime
+ * @param {string} configDir  resolved runtime config directory
+ * @param {'global'|'local'} [scope]
+ */
+function _runLegacyInstallMigrations(runtime, configDir, scope = 'global') {
+  const legacyCommandsGsd = path.join(configDir, 'commands', 'gsd');
+
+  // Claude / Qwen / Hermes: clean up legacy commands/gsd/ and preserve dev-preferences
+  // for migration. The actual migration call is deferred to after all layout cleanup so
+  // that for Hermes the flat skills/gsd-*/ removal (below) does not delete the freshly
+  // created skills/gsd-dev-preferences/ skill dir.
+  let savedLegacyArtifacts = null;
+  if (runtime === 'claude' || runtime === 'qwen' || runtime === 'hermes') {
+    if (fs.existsSync(legacyCommandsGsd)) {
+      savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsGsd, ['dev-preferences.md']);
+      fs.rmSync(legacyCommandsGsd, { recursive: true });
+    }
+  }
+
+  // Hermes: remove pre-#2841 flat skills/gsd-*/ entries that lived alongside
+  // the new skills/gsd/ nested layout.
+  if (runtime === 'hermes') {
+    const flatSkillsDir = path.join(configDir, 'skills');
+    if (fs.existsSync(flatSkillsDir)) {
+      for (const entry of fs.readdirSync(flatSkillsDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(flatSkillsDir, entry.name), { recursive: true });
+        }
+      }
+    }
+
+    // Hermes: remove intermediate-layout skills/gsd/gsd-*/ entries that existed
+    // between #2841 and #3664. Phase 2 (#3664) uses prefix='' producing bare-stem
+    // names (skills/gsd/<stem>/SKILL.md); the intermediate layout had the gsd-
+    // prefix inside the nested dir (skills/gsd/gsd-<stem>/SKILL.md). Only
+    // children whose name starts with gsd- are removed — the parent skills/gsd/
+    // directory and any non-gsd- siblings (user content) are preserved.
+    const nestedGsdDir = path.join(configDir, 'skills', 'gsd');
+    if (fs.existsSync(nestedGsdDir)) {
+      for (const entry of fs.readdirSync(nestedGsdDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(nestedGsdDir, entry.name), { recursive: true });
+        }
+      }
+    }
+  }
+
+  // Migrate dev-preferences.md content → runtime-aware SKILL.md location (#2973).
+  // Done after all layout cleanup so Hermes flat-dir removal does not delete the
+  // newly created skill dir. No-op if skill file already exists.
+  if (savedLegacyArtifacts) {
+    migrateLegacyDevPreferencesToSkill(configDir, savedLegacyArtifacts, runtime, scope);
+  }
+}
+
+/**
+ * Run legacy uninstall cleanup that must execute BEFORE the layout-driven
+ * removal so old-format entries are also cleaned up.
+ *
+ * - Claude global/Qwen: remove legacy commands/gsd/ directory if present.
+ *   For Claude LOCAL, commands/gsd/ is the current primary location (not
+ *   legacy), so we skip removal here and let _removeGsdEntries handle it
+ *   with gsd- prefix filtering (preserving user files like dev-preferences.md).
+ * - Hermes: remove pre-2841 flat skills/gsd-STAR entries.
+ *
+ * @param {string} runtime
+ * @param {string} configDir  resolved runtime config directory
+ * @param {'global'|'local'} [scope]
+ */
+function _runLegacyUninstallCleanup(runtime, configDir, scope = 'global') {
+  // Claude global / Qwen: commands/gsd/ is a legacy location (global Claude
+  // uses skills/ now; Qwen always uses skills/). Remove whole directory.
+  // Claude local: commands/gsd/ is the primary current location — skip here,
+  // let layout's _removeGsdEntries handle gsd-prefixed file removal.
+  // #2973 / Codex review (bd1f06c9): preserve user-owned dev-preferences.md
+  // before destructive wipe. Migration to skills/gsd-dev-preferences/SKILL.md
+  // is deferred and returned so the caller can apply it AFTER layout-driven
+  // removal — this prevents the layout's gsd-* prefix removal from wiping the
+  // freshly created skill dir (same pattern as _runLegacyInstallMigrations).
+  let savedLegacyArtifacts = null;
+  // commands/gsd/ is a legacy location for Qwen, Hermes, and Claude-global.
+  // Claude-local commands/gsd/ is the primary current location — skip here.
+  const isLegacyCommandsGsd = runtime === 'qwen' || runtime === 'hermes' || (runtime === 'claude' && scope === 'global');
+  if (isLegacyCommandsGsd) {
+    const legacyCommandsGsd = path.join(configDir, 'commands', 'gsd');
+    if (fs.existsSync(legacyCommandsGsd)) {
+      savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsGsd, ['dev-preferences.md']);
+      fs.rmSync(legacyCommandsGsd, { recursive: true });
+    }
+  }
+
+  // Hermes: pre-#2841 flat skills/gsd-*/ entries
+  if (runtime === 'hermes') {
+    const flatSkillsDir = path.join(configDir, 'skills');
+    if (fs.existsSync(flatSkillsDir)) {
+      for (const entry of fs.readdirSync(flatSkillsDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(flatSkillsDir, entry.name), { recursive: true });
+        }
+      }
+    }
+  }
+
+  // Return saved artifacts so the caller can migrate after layout-driven removal.
+  return savedLegacyArtifacts;
+}
+
+/**
+ * Layout-driven install orchestrator.
+ * Runs legacy migrations first, then uses resolveRuntimeArtifactLayout to
+ * determine what artifact kinds to write and where.
+ *
+ * @param {string} runtime             canonical runtime ID
+ * @param {string} configDir           resolved runtime config directory
+ * @param {'global'|'local'} scope
+ * @param {Object} resolvedProfile     from resolveProfile() / resolveEffectiveProfile()
+ */
+/**
+ * Deep-snapshot a directory tree into a Map<relPath, Buffer>.
+ * Returns an empty Map if the directory doesn't exist.
+ * @param {string} dir
+ * @returns {Map<string, Buffer>}
+ */
+function _snapshotDir(dir) {
+  const files = new Map();
+  if (!fs.existsSync(dir)) return files;
+  const walk = (relPath, absPath) => {
+    for (const e of fs.readdirSync(absPath, { withFileTypes: true })) {
+      const childRel = relPath ? path.join(relPath, e.name) : e.name;
+      const childAbs = path.join(absPath, e.name);
+      if (e.isDirectory()) walk(childRel, childAbs);
+      else if (e.isFile()) files.set(childRel, fs.readFileSync(childAbs));
+    }
+  };
+  walk('', dir);
+  return files;
+}
+
+/**
+ * Restore a directory tree from a Map<relPath, Buffer> produced by _snapshotDir.
+ * @param {string} dir
+ * @param {Map<string, Buffer>} snapshot
+ */
+function _restoreDir(dir, snapshot) {
+  for (const [relPath, buf] of snapshot) {
+    const absPath = path.join(dir, relPath);
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, buf);
+  }
+}
+
+function installRuntimeArtifacts(runtime, configDir, scope, resolvedProfile) {
+  // Legacy cleanup before layout-driven writes
+  _runLegacyInstallMigrations(runtime, configDir, scope);
+
+  const layout = resolveRuntimeArtifactLayout(runtime, configDir, scope);
+
+  // Compute pathPrefix once for the rewrite step (same derivation as the
+  // top-level install() function).
+  const _resolvedTarget = path.resolve(configDir).replace(/\\/g, '/');
+  const _homeDir = os.homedir().replace(/\\/g, '/');
+  const pathPrefix = computePathPrefix({
+    isGlobal: scope === 'global',
+    isOpencode: runtime === 'opencode',
+    isWindowsHost: process.platform === 'win32',
+    resolvedTarget: _resolvedTarget,
+    homeDir: _homeDir,
+  });
+
+  for (const kind of layout.kinds) {
+    const staged = kind.stage(resolvedProfile);
+    if (kind.kind === 'skills') {
+      applyRuntimeContentRewritesInPlace(staged, runtime, pathPrefix);
+    }
+    const dest = path.join(layout.configDir, kind.destSubpath);
+    fs.mkdirSync(dest, { recursive: true });
+
+    if (kind.kind === 'skills' && fs.existsSync(dest)) {
+      // Pre-prune: snapshot user-owned content before _removeGsdEntries wipes it,
+      // then restore after. This preserves user dirs across a wipe-and-replace
+      // install (#2973 / #3664).
+      //
+      // For prefix='' (Hermes): _removeGsdEntries wipes the entire dest dir (skills/gsd/).
+      // Preserve every subdir that is NOT in the staged set — those are user-added dirs
+      // (e.g. user-content/) that GSD does not manage.
+      //
+      // For prefix='gsd-' (others): _removeGsdEntries removes only gsd-* entries.
+      // Non-gsd-* user dirs (e.g. my-custom-skill/) are untouched. Only preserve the
+      // explicit user-owned GSD-prefixed skill gsd-dev-preferences, which GSD does not
+      // reinstall from source but must survive the prune (#2973).
+      const toPreserve = new Map(); // dirName -> Map<relPath, Buffer>
+
+      if (kind.prefix === '') {
+        // Hermes: wipes entire dest dir — preserve anything not in staged.
+        const stagedNames = fs.existsSync(staged)
+          ? new Set(fs.readdirSync(staged, { withFileTypes: true })
+              .filter(e => e.isDirectory()).map(e => e.name))
+          : new Set();
+        for (const entry of fs.readdirSync(dest, { withFileTypes: true })) {
+          if (!entry.isDirectory() || stagedNames.has(entry.name)) continue;
+          const snap = _snapshotDir(path.join(dest, entry.name));
+          if (snap.size > 0) toPreserve.set(entry.name, snap);
+        }
+      } else {
+        // Non-Hermes: only preserve explicitly user-owned GSD-prefixed skill dirs.
+        // gsd-dev-preferences is the sole user-customisable skill in this category.
+        const USER_OWNED_SKILL_DIRS = ['gsd-dev-preferences'];
+        for (const dirName of USER_OWNED_SKILL_DIRS) {
+          const skillDir = path.join(dest, dirName);
+          if (!fs.existsSync(skillDir)) continue;
+          const snap = _snapshotDir(skillDir);
+          if (snap.size > 0) toPreserve.set(dirName, snap);
+        }
+      }
+
+      _removeGsdEntries(dest, kind);
+      _copyStaged(staged, dest, kind);
+
+      // Restore user-owned dirs after the prune+copy
+      for (const [dirName, snap] of toPreserve) {
+        _restoreDir(path.join(dest, dirName), snap);
+      }
+    } else {
+      // For non-skills kinds (commands, agents): no user content to preserve;
+      // just prune stale gsd-* entries and copy new ones.
+      _removeGsdEntries(dest, kind);
+      _copyStaged(staged, dest, kind);
+    }
+  }
+}
+
+/**
+ * Layout-driven uninstall orchestrator.
+ * Runs legacy cleanup first, then uses resolveRuntimeArtifactLayout to
+ * determine which GSD-owned entries to remove.
+ *
+ * @param {string} runtime             canonical runtime ID
+ * @param {string} configDir           resolved runtime config directory
+ * @param {'global'|'local'} scope
+ */
+function uninstallRuntimeArtifacts(runtime, configDir, scope) {
+  // Legacy cleanup before layout-driven removal (scope-aware to avoid
+  // removing Claude local commands/gsd/ which is the primary install dir).
+  // Returns saved user artifacts so we can migrate AFTER layout removal
+  // (the layout's gsd-* prefix pass would wipe a skill dir created here).
+  const savedLegacyArtifacts = _runLegacyUninstallCleanup(runtime, configDir, scope);
+
+  const layout = resolveRuntimeArtifactLayout(runtime, configDir, scope);
+  for (const kind of layout.kinds) {
+    const dest = path.join(layout.configDir, kind.destSubpath);
+    _removeGsdEntries(dest, kind);
+  }
+
+  // #2973 / Codex review (bd1f06c9): migrate dev-preferences.md to the
+  // runtime-aware SKILL.md location after all layout-driven removal is
+  // complete. Do NOT restore to commands/gsd/ — the user is uninstalling.
+  if (savedLegacyArtifacts) {
+    migrateLegacyDevPreferencesToSkill(configDir, savedLegacyArtifacts, runtime, scope);
   }
 }
 
@@ -6549,98 +6575,54 @@ function uninstall(isGlobal, runtime = 'claude') {
     removedCount++;
   } catch {}
 
-  // 1. Remove GSD commands/skills
-  if (isOpencode || isKilo) {
-    // OpenCode/Kilo: remove command/gsd-*.md files
-    const commandDir = path.join(targetDir, 'command');
-    if (fs.existsSync(commandDir)) {
-      const files = fs.readdirSync(commandDir);
-      for (const file of files) {
-        if (file.startsWith('gsd-') && file.endsWith('.md')) {
-          fs.unlinkSync(path.join(commandDir, file));
-          removedCount++;
+  // 1. Remove GSD commands/skills (layout-driven)
+  const scope = isGlobal ? 'global' : 'local';
+  uninstallRuntimeArtifacts(runtime, targetDir, scope);
+  removedCount++;
+
+  // 1a. Non-layout Codex side-effects: agent .toml files, config.toml sections, hooks.json
+  if (isCodex) {
+    const codexAgentsDir = path.join(targetDir, 'agents');
+    if (fs.existsSync(codexAgentsDir)) {
+      const tomlFiles = fs.readdirSync(codexAgentsDir);
+      let tomlCount = 0;
+      for (const file of tomlFiles) {
+        if (file.startsWith('gsd-') && file.endsWith('.toml')) {
+          fs.unlinkSync(path.join(codexAgentsDir, file));
+          tomlCount++;
         }
       }
-      console.log(`  ${green}✓${reset} Removed GSD commands from command/`);
-    }
-  } else if (isCodex || isCursor || isWindsurf || isTrae || isCodebuddy) {
-    // Codex/Cursor/Windsurf/Trae/CodeBuddy: remove skills/gsd-*/SKILL.md skill directories
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
+      if (tomlCount > 0) {
         removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} ${runtimeLabel} skills`);
+        console.log(`  ${green}✓${reset} Removed ${tomlCount} agent .toml configs`);
       }
     }
 
-    // Codex-only: remove GSD agent .toml config files and config.toml sections
-    if (isCodex) {
-      const codexAgentsDir = path.join(targetDir, 'agents');
-      if (fs.existsSync(codexAgentsDir)) {
-        const tomlFiles = fs.readdirSync(codexAgentsDir);
-        let tomlCount = 0;
-        for (const file of tomlFiles) {
-          if (file.startsWith('gsd-') && file.endsWith('.toml')) {
-            fs.unlinkSync(path.join(codexAgentsDir, file));
-            tomlCount++;
-          }
-        }
-        if (tomlCount > 0) {
-          removedCount++;
-          console.log(`  ${green}✓${reset} Removed ${tomlCount} agent .toml configs`);
-        }
-      }
-
-      // Codex: clean GSD sections from config.toml
-      const configPath = path.join(targetDir, 'config.toml');
-      if (fs.existsSync(configPath)) {
-        const content = fs.readFileSync(configPath, 'utf8');
-        const cleaned = stripGsdFromCodexConfig(content);
-        if (cleaned === null) {
-          // File is empty after stripping — delete it
-          fs.unlinkSync(configPath);
-          removedCount++;
-          console.log(`  ${green}✓${reset} Removed config.toml (was GSD-only)`);
-        } else if (cleaned !== content) {
-          fs.writeFileSync(configPath, cleaned);
-          removedCount++;
-          console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
-        }
-      }
-
-      const hooksJsonCleanup = removeCodexHooksJsonSessionStart(targetDir);
-      if (hooksJsonCleanup.changed) {
+    // Codex: clean GSD sections from config.toml
+    const codexConfigPath = path.join(targetDir, 'config.toml');
+    if (fs.existsSync(codexConfigPath)) {
+      const content = fs.readFileSync(codexConfigPath, 'utf8');
+      const cleaned = stripGsdFromCodexConfig(content);
+      if (cleaned === null) {
+        fs.unlinkSync(codexConfigPath);
         removedCount++;
-        console.log(`  ${green}✓${reset} Removed managed Codex SessionStart hook from hooks.json`);
-      }
-    }
-  } else if (isCopilot) {
-    // Copilot: remove skills/gsd-*/ directories (same layout as Codex skills)
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
+        console.log(`  ${green}✓${reset} Removed config.toml (was GSD-only)`);
+      } else if (cleaned !== content) {
+        fs.writeFileSync(codexConfigPath, cleaned);
         removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Copilot skills`);
+        console.log(`  ${green}✓${reset} Cleaned GSD sections from config.toml`);
       }
     }
 
-    // Copilot: clean GSD section from copilot-instructions.md
+    const hooksJsonCleanup = removeCodexHooksJsonSessionStart(targetDir);
+    if (hooksJsonCleanup.changed) {
+      removedCount++;
+      console.log(`  ${green}✓${reset} Removed managed Codex SessionStart hook from hooks.json`);
+    }
+  }
+
+  // 1b. Non-layout Copilot side-effect: copilot-instructions.md cleanup
+  if (isCopilot) {
     const instructionsPath = path.join(targetDir, 'copilot-instructions.md');
     if (fs.existsSync(instructionsPath)) {
       const content = fs.readFileSync(instructionsPath, 'utf8');
@@ -6655,115 +6637,21 @@ function uninstall(isGlobal, runtime = 'claude') {
         console.log(`  ${green}✓${reset} Cleaned GSD section from copilot-instructions.md`);
       }
     }
-  } else if (isAntigravity) {
-    // Antigravity: remove skills/gsd-*/ directories (same layout as Copilot skills)
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
-        removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Antigravity skills`);
-      }
-    }
-  } else if (isQwen) {
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
-        removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Qwen Code skills`);
-      }
-    }
+  }
 
-    const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
-    if (fs.existsSync(legacyCommandsDir)) {
-      const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
-      fs.rmSync(legacyCommandsDir, { recursive: true });
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
-      // #2973: also migrate dev-preferences.md content into the new
-      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
-      // This prevents the legacy file from being orphaned after the writer
-      // starts targeting the skills path. No-op if SKILL.md already exists.
-      restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
-      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
-        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
-      }
-    }
-  } else if (isHermes) {
-    // Hermes Agent: skills live under skills/gsd/ as a single category (per
-    // spec in #2841). Remove the whole gsd/ category directory; also clean up
-    // any pre-nested-layout flat skills/gsd-*/ left over from older installs.
-    const skillsDir = path.join(targetDir, 'skills');
-    let skillCount = 0;
-    const nestedCategoryDir = path.join(skillsDir, 'gsd');
-    if (fs.existsSync(nestedCategoryDir)) {
-      const entries = fs.readdirSync(nestedCategoryDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          skillCount++;
-        }
-      }
-      fs.rmSync(nestedCategoryDir, { recursive: true });
-    }
-    if (fs.existsSync(skillsDir)) {
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-    }
-    if (skillCount > 0) {
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed ${skillCount} Hermes Agent skills`);
-    }
-
-    const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
-    if (fs.existsSync(legacyCommandsDir)) {
-      const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
-      fs.rmSync(legacyCommandsDir, { recursive: true });
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
-      // #2973: also migrate dev-preferences.md content into the new
-      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
-      // This prevents the legacy file from being orphaned after the writer
-      // starts targeting the skills path. No-op if SKILL.md already exists.
-      restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
-      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
-        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
-      }
-    }
-  } else if (isGemini) {
-    // Gemini: still uses commands/gsd/
+  // 1c. Claude local: remove commands/gsd/ (primary local install location).
+  //     The layout's _removeGsdEntries uses the 'gsd-' prefix which applies to
+  //     flat command dirs (OpenCode/Kilo). Claude local files use no prefix inside
+  //     the namespaced directory, so layout does not remove them. Handle inline.
+  //     Preserve dev-preferences.md across the wipe (#1423).
+  if (!isGlobal && runtime === 'claude') {
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(gsdCommandsDir)) {
-      // Preserve user-generated files before wipe (#1423)
-      // Note: if more user files are added, consider a naming convention (e.g., USER-*.md)
-      // and preserve all matching files instead of listing each one individually.
       const devPrefsPath = path.join(gsdCommandsDir, 'dev-preferences.md');
       const preservedDevPrefs = fs.existsSync(devPrefsPath) ? fs.readFileSync(devPrefsPath, 'utf-8') : null;
-
       fs.rmSync(gsdCommandsDir, { recursive: true });
       removedCount++;
       console.log(`  ${green}✓${reset} Removed commands/gsd/`);
-
-      // Restore user-generated files
       if (preservedDevPrefs) {
         try {
           fs.mkdirSync(gsdCommandsDir, { recursive: true });
@@ -6774,57 +6662,19 @@ function uninstall(isGlobal, runtime = 'claude') {
         }
       }
     }
-  } else if (isGlobal) {
-    // Claude Code global: remove skills/gsd-*/ directories (primary global install location)
-    const skillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(skillsDir)) {
-      let skillCount = 0;
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
-          fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
-          skillCount++;
-        }
-      }
-      if (skillCount > 0) {
-        removedCount++;
-        console.log(`  ${green}✓${reset} Removed ${skillCount} Claude Code skills`);
-      }
-    }
+  }
 
-    // Also clean up legacy commands/gsd/ from older global installs
-    const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
-    if (fs.existsSync(legacyCommandsDir)) {
-      // Preserve user-generated files before legacy wipe (#1423)
-      const devPrefsPath = path.join(legacyCommandsDir, 'dev-preferences.md');
-      const preservedDevPrefs = fs.existsSync(devPrefsPath) ? fs.readFileSync(devPrefsPath, 'utf-8') : null;
-
-      fs.rmSync(legacyCommandsDir, { recursive: true });
-      removedCount++;
-      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
-
-      if (preservedDevPrefs) {
-        try {
-          fs.mkdirSync(legacyCommandsDir, { recursive: true });
-          fs.writeFileSync(devPrefsPath, preservedDevPrefs);
-          console.log(`  ${green}✓${reset} Preserved commands/gsd/dev-preferences.md`);
-        } catch (err) {
-          console.error(`  ${red}✗${reset} Failed to restore dev-preferences.md: ${err.message}`);
-        }
-      }
-    }
-  } else {
-    // Claude Code local: remove commands/gsd/ (primary local install location since #1736)
+  // 1d. Gemini: remove commands/gsd/ with dev-preferences.md preservation.
+  //     The layout removes gsd-*.toml files but not the directory itself.
+  //     Preserve user files before removing the directory.
+  if (isGemini) {
     const gsdCommandsDir = path.join(targetDir, 'commands', 'gsd');
     if (fs.existsSync(gsdCommandsDir)) {
-      // Preserve user-generated files before wipe (#1423)
       const devPrefsPath = path.join(gsdCommandsDir, 'dev-preferences.md');
       const preservedDevPrefs = fs.existsSync(devPrefsPath) ? fs.readFileSync(devPrefsPath, 'utf-8') : null;
-
       fs.rmSync(gsdCommandsDir, { recursive: true });
       removedCount++;
       console.log(`  ${green}✓${reset} Removed commands/gsd/`);
-
       if (preservedDevPrefs) {
         try {
           fs.mkdirSync(gsdCommandsDir, { recursive: true });
@@ -6833,6 +6683,37 @@ function uninstall(isGlobal, runtime = 'claude') {
         } catch (err) {
           console.error(`  ${red}✗${reset} Failed to restore dev-preferences.md: ${err.message}`);
         }
+      }
+    }
+  }
+
+  // 1d. Qwen/Hermes: migrate dev-preferences.md from legacy commands/gsd/ location
+  //     during uninstall. _runLegacyUninstallCleanup (called by uninstallRuntimeArtifacts)
+  //     removes the directory; we must preserve/restore user artifacts before that path.
+  //     This block runs AFTER uninstallRuntimeArtifacts, so we check if the directory
+  //     was already removed and skip if so (idempotent).
+  if (isQwen || isHermes) {
+    // dev-preferences may have survived in skills/ as SKILL.md — nothing to do for
+    // that case. If a stale commands/gsd/ still exists (e.g. legacy was not removed),
+    // attempt migration. In practice _runLegacyUninstallCleanup removes it first,
+    // so this is a best-effort guard.
+    const legacyDir = path.join(targetDir, 'commands', 'gsd');
+    if (fs.existsSync(legacyDir)) {
+      const savedLegacyArtifacts = preserveUserArtifacts(legacyDir, ['dev-preferences.md']);
+      fs.rmSync(legacyDir, { recursive: true });
+      removedCount++;
+      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/`);
+      const _uninstallScope = isGlobal ? 'global' : 'local';
+      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts, runtime, _uninstallScope)) {
+        // Compute the actual path written so the log line is accurate per-runtime
+        const _layout = resolveRuntimeArtifactLayout(runtime, targetDir, _uninstallScope);
+        const _sk = _layout.kinds.find((k) => k.kind === 'skills');
+        const _stem = _sk && _sk.prefix === '' ? 'dev-preferences' : 'gsd-dev-preferences';
+        const _skillRelPath = _sk ? `${_sk.destSubpath}/${_stem}/SKILL.md` : 'skills/gsd-dev-preferences/SKILL.md';
+        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → ${_skillRelPath} (#2973)`);
+      } else {
+        // Migration failed or already exists — restore to legacy location so user content is not lost
+        restoreUserArtifacts(legacyDir, savedLegacyArtifacts);
       }
     }
   }
@@ -7499,7 +7380,9 @@ function writeManifest(configDir, runtime = 'claude', options = {}) {
     }
   }
   if ((isCodex || isCopilot || isAntigravity || isCursor || isWindsurf || isTrae || (!isOpencode && !isGemini)) && fs.existsSync(codexSkillsDir)) {
-    for (const skillName of listCodexSkillNames(codexSkillsDir)) {
+    // Hermes uses prefix '' (bare stem names); all others use 'gsd-'
+    const skillListPrefix = isHermes ? '' : 'gsd-';
+    for (const skillName of listCodexSkillNames(codexSkillsDir, skillListPrefix)) {
       const skillRoot = path.join(codexSkillsDir, skillName);
       const skillHashes = generateManifest(skillRoot);
       for (const [rel, hash] of Object.entries(skillHashes)) {
@@ -7925,15 +7808,16 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const _isCoreProfileAlias = _activeProfileName === 'core';
   const _effectiveInstallMode = _isCoreProfileAlias ? 'minimal' : 'full';
   // Load the manifest and compute resolved profile for named profiles.
-  // --minimal keeps its own staging path via _stageSkillsFn (see below).
+  // For --minimal/core: use an empty manifest (core profile has no transitive
+  // deps) to produce a resolvedProfile with the core skill set. This allows
+  // installRuntimeArtifacts to use stageSkillsForProfile uniformly across all
+  // profile modes without a null sentinel.
   const _commandsDir = path.join(src, 'commands', 'gsd');
   const _skillsManifest = _isCoreProfileAlias ? new Map() : loadSkillsManifest(_commandsDir);
-  const _resolvedProfile = _isCoreProfileAlias
-    ? null  // --minimal uses stageSkillsForMode at dispatch sites
-    : resolveProfile({
-        modes: [_activeProfileName],
-        manifest: _skillsManifest,
-      });
+  const _resolvedProfile = resolveProfile({
+    modes: [_activeProfileName],
+    manifest: _skillsManifest,
+  });
   // Unified staging function: for --minimal uses stageSkillsForMode (back-compat);
   // for named profiles uses stageSkillsForProfile (new API with transitive closure).
   function _stageSkills(commandsGsdDir) {
@@ -8238,8 +8122,69 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   reportInstallerMigrationResult(installerMigrationResult);
   assertInstallerMigrationsUnblocked(installerMigrationResult);
 
-  // OpenCode/Kilo use command/ (flat), Codex uses skills/, Claude/Gemini use commands/gsd/
-  if (isOpencode || isKilo) {
+  // Artifact install dispatcher — routes to layout-driven path for all
+  // skills-based runtimes (both full and minimal/core profiles); keeps
+  // back-compat paths for commands-based runtimes (OpenCode/Kilo/Gemini/
+  // Claude-local).
+  //
+  // installRuntimeArtifacts handles legacy migration + skill/agent staging
+  // via layout kinds for all profile modes. _resolvedProfile already reflects
+  // the user's --profile=core / --minimal choice.
+  //
+  // Non-layout side-effects preserved inline:
+  //   Hermes: writeHermesCategoryDescription (not a layout kind)
+  //   Cline:  no-op (cline layout has empty kinds[])
+  //   Gemini: conflict-detection logic (not expressible in layout)
+  //   OpenCode/Kilo: copyFlattenedCommands (frontmatter conversion not in commandsKind)
+  //   Claude local: copyWithPathReplacement + stale-skills cleanup
+
+  // Layout-driven path for all skills-based runtimes (full and minimal modes).
+  // applyRuntimeContentRewritesInPlace (called inside installRuntimeArtifacts)
+  // handles per-runtime path + branding rewrites, including Qwen/Hermes.
+  const _isSkillsRuntime = isCodex || isCopilot || isAntigravity || isCursor || isWindsurf ||
+    isAugment || isTrae || isCodebuddy || isQwen || isHermes ||
+    (runtime === 'claude' && isGlobal);
+
+  if (_isSkillsRuntime) {
+    // Layout-driven install for skills-based runtimes (full and minimal modes)
+    const scope = isGlobal ? 'global' : 'local';
+    installRuntimeArtifacts(runtime, targetDir, scope, _resolvedProfile);
+
+    // Hermes only: write DESCRIPTION.md for the gsd/ category after layout install
+    if (isHermes) {
+      writeHermesCategoryDescription(path.join(targetDir, 'skills', 'gsd'));
+    }
+
+    // Verify installed artifacts and report
+    if (isHermes) {
+      const hermesSkillsDir = path.join(targetDir, 'skills', 'gsd');
+      if (fs.existsSync(hermesSkillsDir)) {
+        // Hermes layout uses prefix: '' — skill dirs have bare stem names (no gsd- prefix)
+        const count = fs.readdirSync(hermesSkillsDir, { withFileTypes: true })
+          .filter(e => e.isDirectory()).length;
+        if (count > 0) {
+          console.log(`  ${green}✓${reset} Installed ${count} skills to skills/gsd/`);
+        } else {
+          failures.push('skills/gsd/*');
+        }
+      } else {
+        failures.push('skills/gsd/*');
+      }
+    } else {
+      const skillsDir = path.join(targetDir, 'skills');
+      if (fs.existsSync(skillsDir)) {
+        const count = fs.readdirSync(skillsDir, { withFileTypes: true })
+          .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
+        if (count > 0) {
+          console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
+        } else {
+          failures.push('skills/gsd-*');
+        }
+      } else {
+        failures.push('skills/gsd-*');
+      }
+    }
+  } else if (isOpencode || isKilo) {
     // OpenCode/Kilo: flat structure in command/ directory
     const commandDir = path.join(targetDir, 'command');
     fs.mkdirSync(commandDir, { recursive: true });
@@ -8252,188 +8197,6 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       console.log(`  ${green}✓${reset} Installed ${count} commands to command/`);
     } else {
       failures.push('command/gsd-*');
-    }
-  } else if (isCodex) {
-    // Codex CLI (0.130.0 at time of #3562) does NOT auto-discover commands
-    // from get-shit-done/workflows/*.md or agents/*.md. It only registers
-    // commands from skills/<name>/SKILL.md. The earlier "Codex discovers
-    // official skills directly" branch left users with workflows on disk and
-    // no $gsd-* entrypoints. Regenerate the skill surface the same way the
-    // other runtimes do — copyCommandsAsCodexSkills() rewrites each
-    // commands/gsd/*.md as ~/.codex/skills/gsd-<name>/SKILL.md and converts
-    // Claude-flavored command frontmatter into Codex skill frontmatter.
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsCodexSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
-    if (fs.existsSync(skillsDir)) {
-      const count = fs.readdirSync(skillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
-      if (count > 0) {
-        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
-      } else {
-        failures.push('skills/gsd-*');
-      }
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isCopilot) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsCopilotSkills(gsdSrc, skillsDir, 'gsd', isGlobal);
-    if (fs.existsSync(skillsDir)) {
-      const count = fs.readdirSync(skillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
-      if (count > 0) {
-        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
-      } else {
-        failures.push('skills/gsd-*');
-      }
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isAntigravity) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsAntigravitySkills(gsdSrc, skillsDir, 'gsd', isGlobal);
-    if (fs.existsSync(skillsDir)) {
-      const count = fs.readdirSync(skillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
-      if (count > 0) {
-        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
-      } else {
-        failures.push('skills/gsd-*');
-      }
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isCursor) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsCursorSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
-    const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
-    if (installedSkillNames.length > 0) {
-      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isWindsurf) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsWindsurfSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
-    const installedSkillNames = listCodexSkillNames(skillsDir); // reuse — same dir structure
-    if (installedSkillNames.length > 0) {
-      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isAugment) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsAugmentSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
-    const installedSkillNames = listCodexSkillNames(skillsDir);
-    if (installedSkillNames.length > 0) {
-      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isTrae) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsTraeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
-    const installedSkillNames = listCodexSkillNames(skillsDir);
-    if (installedSkillNames.length > 0) {
-      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
-    } else {
-      failures.push('skills/gsd-*');
-    }
-  } else if (isQwen) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
-    if (fs.existsSync(skillsDir)) {
-      const count = fs.readdirSync(skillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
-      if (count > 0) {
-        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
-      } else {
-        failures.push('skills/gsd-*');
-      }
-    } else {
-      failures.push('skills/gsd-*');
-    }
-
-    const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
-    if (fs.existsSync(legacyCommandsDir)) {
-      const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
-      fs.rmSync(legacyCommandsDir, { recursive: true });
-      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
-      // #2973: also migrate dev-preferences.md content into the new
-      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
-      // This prevents the legacy file from being orphaned after the writer
-      // starts targeting the skills path. No-op if SKILL.md already exists.
-      restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
-      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
-        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
-      }
-    }
-  } else if (isHermes) {
-    // Hermes Agent: nests all GSD skills under skills/gsd/ as a single
-    // category (per spec in #2841) so the 86 gsd-* skills collapse into a
-    // single entry in Hermes' system prompt instead of 86 top-level entries.
-    // The Claude skill pipeline writes each gsd-<cmd>/SKILL.md inside the
-    // gsd/ category dir, alongside a DESCRIPTION.md that Hermes uses as the
-    // category summary.
-    const hermesSkillsDir = path.join(targetDir, 'skills', 'gsd');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsClaudeSkills(gsdSrc, hermesSkillsDir, 'gsd', pathPrefix, runtime, isGlobal);
-    writeHermesCategoryDescription(hermesSkillsDir);
-    if (fs.existsSync(hermesSkillsDir)) {
-      const count = fs.readdirSync(hermesSkillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
-      if (count > 0) {
-        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/gsd/`);
-      } else {
-        failures.push('skills/gsd/gsd-*');
-      }
-    } else {
-      failures.push('skills/gsd/gsd-*');
-    }
-
-    // Migrate any prior flat-layout install (skills/gsd-*/) into the nested
-    // skills/gsd/ category — keeps existing users from carrying duplicates
-    // after upgrading to the nested layout.
-    const flatSkillsDir = path.join(targetDir, 'skills');
-    if (fs.existsSync(flatSkillsDir)) {
-      const stale = fs.readdirSync(flatSkillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
-      for (const entry of stale) {
-        fs.rmSync(path.join(flatSkillsDir, entry.name), { recursive: true });
-      }
-    }
-
-    const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
-    if (fs.existsSync(legacyCommandsDir)) {
-      const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
-      fs.rmSync(legacyCommandsDir, { recursive: true });
-      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
-      // #2973: also migrate dev-preferences.md content into the new
-      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
-      // This prevents the legacy file from being orphaned after the writer
-      // starts targeting the skills path. No-op if SKILL.md already exists.
-      restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
-      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
-        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
-      }
-    }
-  } else if (isCodebuddy) {
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsCodebuddySkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime);
-    const installedSkillNames = listCodexSkillNames(skillsDir);
-    if (installedSkillNames.length > 0) {
-      console.log(`  ${green}✓${reset} Installed ${installedSkillNames.length} skills to skills/`);
-    } else {
-      failures.push('skills/gsd-*');
     }
   } else if (isCline) {
     // Cline is rules-based — commands are embedded in .clinerules (generated below).
@@ -8488,39 +8251,6 @@ function install(isGlobal, runtime = 'claude', options = {}) {
         console.log(`  ${green}✓${reset} Installed commands/gsd`);
       } else {
         failures.push('commands/gsd');
-      }
-    }
-  } else if (isGlobal) {
-    // Claude Code global: skills/ format (2.1.88+ compatibility)
-    const skillsDir = path.join(targetDir, 'skills');
-    const gsdSrc = _stageSkills(_commandsDir);
-    copyCommandsAsClaudeSkills(gsdSrc, skillsDir, 'gsd', pathPrefix, runtime, isGlobal);
-    if (fs.existsSync(skillsDir)) {
-      const count = fs.readdirSync(skillsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
-      if (count > 0) {
-        console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
-      } else {
-        failures.push('skills/gsd-*');
-      }
-    } else {
-      failures.push('skills/gsd-*');
-    }
-
-    // Clean up legacy commands/gsd/ from previous global installs
-    // Preserve user-generated files (dev-preferences.md) before wiping the directory
-    const legacyCommandsDir = path.join(targetDir, 'commands', 'gsd');
-    if (fs.existsSync(legacyCommandsDir)) {
-      const savedLegacyArtifacts = preserveUserArtifacts(legacyCommandsDir, ['dev-preferences.md']);
-      fs.rmSync(legacyCommandsDir, { recursive: true });
-      console.log(`  ${green}✓${reset} Removed legacy commands/gsd/ directory`);
-      // #2973: also migrate dev-preferences.md content into the new
-      // skills/gsd-dev-preferences/SKILL.md location (skills-aware runtimes).
-      // This prevents the legacy file from being orphaned after the writer
-      // starts targeting the skills path. No-op if SKILL.md already exists.
-      restoreUserArtifacts(legacyCommandsDir, savedLegacyArtifacts);
-      if (migrateLegacyDevPreferencesToSkill(targetDir, savedLegacyArtifacts)) {
-        console.log(`  ${green}✓${reset} Migrated dev-preferences.md → skills/gsd-dev-preferences/SKILL.md (#2973)`);
       }
     }
   } else {
@@ -11320,9 +11050,10 @@ function installAllRuntimes(runtimes, isGlobal, isInteractive) {
   }
 }
 
-// Test-only exports — skip main logic when loaded as a module for testing
-if (process.env.GSD_TEST_MODE) {
-  module.exports = {
+// Always export so runtime-artifact-layout.cjs's lazy loader can access
+// converter functions when called from within the CLI path (circular require).
+// The main() block below is gated on !GSD_TEST_MODE, as before.
+module.exports = {
     yamlIdentifier,
     computePathPrefix,
     getCodexSkillAdapterHeader,
@@ -11372,7 +11103,6 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeToCopilotContent,
     convertClaudeCommandToCopilotSkill,
     convertClaudeAgentToCopilotAgent,
-    copyCommandsAsCopilotSkills,
     GSD_COPILOT_INSTRUCTIONS_MARKER,
     GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER,
     mergeCopilotInstructions,
@@ -11380,26 +11110,20 @@ if (process.env.GSD_TEST_MODE) {
     convertClaudeToAntigravityContent,
     convertClaudeCommandToAntigravitySkill,
     convertClaudeAgentToAntigravityAgent,
-    copyCommandsAsAntigravitySkills,
     convertClaudeCommandToClaudeSkill,
     skillFrontmatterName,
-    copyCommandsAsClaudeSkills,
     convertClaudeToWindsurfMarkdown,
     convertClaudeCommandToWindsurfSkill,
     convertClaudeAgentToWindsurfAgent,
-    copyCommandsAsWindsurfSkills,
     convertClaudeToAugmentMarkdown,
     convertClaudeCommandToAugmentSkill,
     convertClaudeAgentToAugmentAgent,
-    copyCommandsAsAugmentSkills,
     convertClaudeToTraeMarkdown,
     convertClaudeCommandToTraeSkill,
     convertClaudeAgentToTraeAgent,
-    copyCommandsAsTraeSkills,
     convertClaudeToCodebuddyMarkdown,
     convertClaudeCommandToCodebuddySkill,
     convertClaudeAgentToCodebuddyAgent,
-    copyCommandsAsCodebuddySkills,
     convertClaudeToCliineMarkdown,
     convertClaudeAgentToClineAgent,
     writeManifest,
@@ -11437,10 +11161,12 @@ if (process.env.GSD_TEST_MODE) {
     buildCodexHookBlock,
     rewriteLegacyCodexHookBlock,
     readGsdCommandNames,
+    installRuntimeArtifacts,
+    uninstallRuntimeArtifacts,
   };
-} else {
 
-  // Main logic
+// Main logic — only run when not loaded as a module for testing
+if (!process.env.GSD_TEST_MODE) {
   if (hasSkillsRoot) {
     // Print the skills root directory for a given runtime (used by /gsd-sync-skills).
     // Usage: node install.js --skills-root <runtime>
@@ -11492,4 +11218,4 @@ if (process.env.GSD_TEST_MODE) {
     }
   }
 
-} // end of else block for GSD_TEST_MODE
+} // end of !GSD_TEST_MODE main logic block

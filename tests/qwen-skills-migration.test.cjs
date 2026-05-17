@@ -21,8 +21,16 @@ const fs = require('fs');
 
 const {
   convertClaudeCommandToClaudeSkill,
-  copyCommandsAsClaudeSkills,
+  installRuntimeArtifacts,
 } = require('../bin/install.js');
+
+const {
+  loadSkillsManifest,
+  resolveProfile,
+} = require('../get-shit-done/bin/lib/install-profiles.cjs');
+
+const manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest });
 
 // ─── convertClaudeCommandToClaudeSkill (used by Qwen via copyCommandsAsClaudeSkills) ──
 
@@ -118,9 +126,9 @@ describe('Qwen Code: convertClaudeCommandToClaudeSkill', () => {
   });
 });
 
-// ─── copyCommandsAsClaudeSkills (used for Qwen skills install) ─────────────
+// ─── installRuntimeArtifacts (used for Qwen skills install) ─────────────────
 
-describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
+describe('Qwen Code: installRuntimeArtifacts', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -149,11 +157,15 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
       '<objective>Quick task body</objective>',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '/test/prefix/', 'qwen', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    // Redirect findInstallSourceRoot to the test's custom srcDir
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    // Verify SKILL.md was created
-    const skillPath = path.join(skillsDir, 'gsd-quick', 'SKILL.md');
+    installRuntimeArtifacts('qwen', configDir, 'global', resolvedProfileFull);
+
+    // Qwen layout: skills/gsd-<stem>/SKILL.md (destSubpath='skills', prefix='gsd-')
+    const skillPath = path.join(configDir, 'skills', 'gsd-quick', 'SKILL.md');
     assert.ok(fs.existsSync(skillPath), 'gsd-quick/SKILL.md exists');
 
     // Verify content
@@ -164,7 +176,7 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
     assert.ok(content.includes('<objective>'), 'body content preserved');
   });
 
-  test('replaces ~/.claude/ paths with pathPrefix', () => {
+  test('replaces ~/.claude/ paths via applyRuntimeContentRewritesInPlace', () => {
     const srcDir = path.join(tmpDir, 'src', 'commands', 'gsd');
     fs.mkdirSync(srcDir, { recursive: true });
     fs.writeFileSync(path.join(srcDir, 'next.md'), [
@@ -176,15 +188,18 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
       'Reference: @~/.claude/get-shit-done/workflows/next.md',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '$HOME/.qwen/', 'qwen', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-next', 'SKILL.md'), 'utf8');
-    assert.ok(content.includes('$HOME/.qwen/'), 'path replaced to .qwen/');
-    assert.ok(!content.includes('~/.claude/'), 'old claude path removed');
+    installRuntimeArtifacts('qwen', configDir, 'global', resolvedProfileFull);
+
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd-next', 'SKILL.md'), 'utf8');
+    assert.ok(!content.includes('~/.claude/'), 'old claude tilde-path removed');
+    assert.ok(!content.includes('$HOME/.claude/'), 'old claude $HOME-path not present');
   });
 
-  test('replaces $HOME/.claude/ paths with pathPrefix', () => {
+  test('replaces $HOME/.claude/ paths via applyRuntimeContentRewritesInPlace', () => {
     const srcDir = path.join(tmpDir, 'src', 'commands', 'gsd');
     fs.mkdirSync(srcDir, { recursive: true });
     fs.writeFileSync(path.join(srcDir, 'plan.md'), [
@@ -196,12 +211,15 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
       'Reference: $HOME/.claude/get-shit-done/workflows/plan.md',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '$HOME/.qwen/', 'qwen', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-plan', 'SKILL.md'), 'utf8');
-    assert.ok(content.includes('$HOME/.qwen/'), 'path replaced to .qwen/');
-    assert.ok(!content.includes('$HOME/.claude/'), 'old claude path removed');
+    installRuntimeArtifacts('qwen', configDir, 'global', resolvedProfileFull);
+
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd-plan', 'SKILL.md'), 'utf8');
+    assert.ok(!content.includes('$HOME/.claude/'), 'old claude $HOME-path removed');
+    assert.ok(!content.includes('~/.claude/'), 'old claude tilde-path not present');
   });
 
   test('removes stale gsd- skills before installing new ones', () => {
@@ -216,15 +234,19 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
       'Body',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    // Pre-create a stale skill
-    fs.mkdirSync(path.join(skillsDir, 'gsd-old-skill'), { recursive: true });
-    fs.writeFileSync(path.join(skillsDir, 'gsd-old-skill', 'SKILL.md'), 'old');
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '/test/', 'qwen', false);
+    // Pre-create a stale skill at the new layout location
+    const staleSkillDir = path.join(configDir, 'skills', 'gsd-old-skill');
+    fs.mkdirSync(staleSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(staleSkillDir, 'SKILL.md'), 'old');
 
-    assert.ok(!fs.existsSync(path.join(skillsDir, 'gsd-old-skill')), 'stale skill removed');
-    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-quick', 'SKILL.md')), 'new skill installed');
+    installRuntimeArtifacts('qwen', configDir, 'global', resolvedProfileFull);
+
+    assert.ok(!fs.existsSync(staleSkillDir), 'stale skill removed');
+    assert.ok(fs.existsSync(path.join(configDir, 'skills', 'gsd-quick', 'SKILL.md')), 'new skill installed');
   });
 
   test('preserves agent field in frontmatter', () => {
@@ -244,10 +266,13 @@ describe('Qwen Code: copyCommandsAsClaudeSkills', () => {
       'Execute body',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '/test/', 'qwen', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-execute', 'SKILL.md'), 'utf8');
+    installRuntimeArtifacts('qwen', configDir, 'global', resolvedProfileFull);
+
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd-execute', 'SKILL.md'), 'utf8');
     assert.ok(content.includes('agent: gsd-executor'), 'agent field preserved');
   });
 });

@@ -24,7 +24,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-const { parseFrontmatter } = require('./helpers.cjs');
+const { parseFrontmatter, createTempDir, cleanup } = require('./helpers.cjs');
 
 const {
   getDirName,
@@ -35,14 +35,20 @@ const {
   convertClaudeToCopilotContent,
   convertClaudeCommandToCopilotSkill,
   convertClaudeAgentToCopilotAgent,
-  copyCommandsAsCopilotSkills,
   GSD_COPILOT_INSTRUCTIONS_MARKER,
   GSD_COPILOT_INSTRUCTIONS_CLOSE_MARKER,
   mergeCopilotInstructions,
   stripGsdFromCopilotInstructions,
   writeManifest,
   reportLocalPatches,
+  installRuntimeArtifacts,
 } = require('../bin/install.js');
+
+// ─── Profile resolution for installRuntimeArtifacts tests ────────────────────
+const _gsdLibDir = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib');
+const { loadSkillsManifest, resolveProfile } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
+const _manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest: _manifest });
 
 // ─── getDirName ─────────────────────────────────────────────────────────────────
 
@@ -610,41 +616,46 @@ Check ~/.claude/settings and run gsd:health.`;
   });
 });
 
-// ─── copyCommandsAsCopilotSkills (integration) ─────────────────────────────────
+// ─── installRuntimeArtifacts (copilot integration) ─────────────────────────────
 
-describe('copyCommandsAsCopilotSkills', () => {
+describe('installRuntimeArtifacts (copilot integration)', () => {
+  // Pivoted from copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd') shim to
+  // installRuntimeArtifacts('copilot', configDir, 'global', resolvedProfileFull).
+  // Output layout: <configDir>/skills/gsd-<stem>/SKILL.md (destSubpath='skills', prefix='gsd-').
   const srcDir = path.join(__dirname, '..', 'commands', 'gsd');
-  let tempDir;
+  let configDir;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-copilot-skills-'));
+    configDir = createTempDir('gsd-copilot-skills-');
   });
 
   afterEach(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    cleanup(configDir);
   });
 
   test('creates skill folders from source commands', () => {
-    copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+    installRuntimeArtifacts('copilot', configDir, 'global', resolvedProfileFull);
 
+    const skillsDir = path.join(configDir, 'skills');
     // Check specific folders exist
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-health')), 'gsd-health folder exists');
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-health', 'SKILL.md')), 'gsd-health/SKILL.md exists');
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-help')), 'gsd-help folder exists');
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-progress')), 'gsd-progress folder exists');
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-health')), 'gsd-health folder exists');
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-health', 'SKILL.md')), 'gsd-health/SKILL.md exists');
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-help')), 'gsd-help folder exists');
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-progress')), 'gsd-progress folder exists');
 
     // Count gsd-* directories — should match number of source command files
-    const dirs = fs.readdirSync(tempDir, { withFileTypes: true })
+    const dirs = fs.readdirSync(skillsDir, { withFileTypes: true })
       .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
-    const expectedSkillCount = fs.readdirSync(path.join(__dirname, '..', 'commands', 'gsd'))
+    const expectedSkillCount = fs.readdirSync(srcDir)
       .filter(f => f.endsWith('.md')).length;
     assert.strictEqual(dirs.length, expectedSkillCount, `expected ${expectedSkillCount} skill folders, got ${dirs.length}`);
   });
 
   test('skill content has Copilot frontmatter format', () => {
-    copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+    installRuntimeArtifacts('copilot', configDir, 'global', resolvedProfileFull);
 
-    const skillContent = fs.readFileSync(path.join(tempDir, 'gsd-health', 'SKILL.md'), 'utf8');
+    const skillsDir = path.join(configDir, 'skills');
+    const skillContent = fs.readFileSync(path.join(skillsDir, 'gsd-health', 'SKILL.md'), 'utf8');
     // Frontmatter format checks
     assert.ok(skillContent.startsWith('---\nname: gsd-health\n'), 'starts with name: gsd-health');
     assert.ok(skillContent.includes('allowed-tools: Read, Bash, Write, AskUserQuestion'),
@@ -660,13 +671,14 @@ describe('copyCommandsAsCopilotSkills', () => {
     const srcFile = path.join(srcDir, 'autonomous.md');
     assert.ok(fs.existsSync(srcFile), 'commands/gsd/autonomous.md must exist as source');
 
-    copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+    installRuntimeArtifacts('copilot', configDir, 'global', resolvedProfileFull);
 
+    const skillsDir = path.join(configDir, 'skills');
     // Skill folder and file created
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-autonomous')), 'gsd-autonomous folder exists');
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-autonomous', 'SKILL.md')), 'gsd-autonomous/SKILL.md exists');
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-autonomous')), 'gsd-autonomous folder exists');
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-autonomous', 'SKILL.md')), 'gsd-autonomous/SKILL.md exists');
 
-    const skillContent = fs.readFileSync(path.join(tempDir, 'gsd-autonomous', 'SKILL.md'), 'utf8');
+    const skillContent = fs.readFileSync(path.join(skillsDir, 'gsd-autonomous', 'SKILL.md'), 'utf8');
     const fm = parseFrontmatter(skillContent);
 
     // Frontmatter: name converted from gsd:autonomous to gsd-autonomous
@@ -704,16 +716,26 @@ describe('copyCommandsAsCopilotSkills', () => {
   });
 
   test('cleans up old skill directories on re-run', () => {
-    // Create a fake old directory
-    fs.mkdirSync(path.join(tempDir, 'gsd-fake-old'), { recursive: true });
-    fs.writeFileSync(path.join(tempDir, 'gsd-fake-old', 'SKILL.md'), 'old');
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-fake-old')), 'fake old dir exists before');
+    const skillsDir = path.join(configDir, 'skills');
+    fs.mkdirSync(skillsDir, { recursive: true });
 
-    // Run copy — should clean up old dirs
-    copyCommandsAsCopilotSkills(srcDir, tempDir, 'gsd');
+    // Stale GSD-managed dir must be pruned
+    const staleDir = path.join(skillsDir, 'gsd-old-stale-skill');
+    fs.mkdirSync(staleDir, { recursive: true });
+    fs.writeFileSync(path.join(staleDir, 'SKILL.md'), 'stale content');
 
-    assert.ok(!fs.existsSync(path.join(tempDir, 'gsd-fake-old')), 'fake old dir removed');
-    assert.ok(fs.existsSync(path.join(tempDir, 'gsd-health')), 'real dirs still exist');
+    // Non-GSD dir should survive (installRuntimeArtifacts never prunes non-gsd-*)
+    fs.mkdirSync(path.join(skillsDir, 'user-custom'), { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'user-custom', 'SKILL.md'), 'user content');
+
+    installRuntimeArtifacts('copilot', configDir, 'global', resolvedProfileFull);
+
+    // Real skills are present after install
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-health')), 'real dirs still exist');
+    // Stale GSD-prefixed dir is removed by pre-prune
+    assert.ok(!fs.existsSync(staleDir), 'stale gsd-* dir removed by pre-prune');
+    // Non-GSD dir is preserved
+    assert.ok(fs.existsSync(path.join(skillsDir, 'user-custom')), 'non-GSD dir preserved');
   });
 });
 

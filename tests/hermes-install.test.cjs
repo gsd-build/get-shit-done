@@ -109,18 +109,20 @@ describe('Hermes Agent local install/uninstall', () => {
 
     // Nested layout per spec #2841: all GSD skills collapse into a single
     // skills/gsd/ category so Hermes' system prompt sees one entry, not 86.
-    assert.ok(fs.existsSync(path.join(targetDir, 'skills', 'gsd', 'gsd-help', 'SKILL.md')));
+    // Skills use bare stem names (no gsd- prefix) inside the category dir,
+    // per the layout module's prefix: '' design for Hermes (#3664).
+    assert.ok(fs.existsSync(path.join(targetDir, 'skills', 'gsd', 'help', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(targetDir, 'skills', 'gsd', 'DESCRIPTION.md')),
       'DESCRIPTION.md exists at category root');
     assert.ok(fs.existsSync(path.join(targetDir, 'get-shit-done', 'VERSION')));
     assert.ok(fs.existsSync(path.join(targetDir, 'agents')));
 
     const manifest = writeManifest(targetDir, 'hermes');
-    assert.ok(Object.keys(manifest.files).some(file => file.startsWith('skills/gsd/gsd-help/')), manifest);
+    assert.ok(Object.keys(manifest.files).some(file => file.startsWith('skills/gsd/help/')), JSON.stringify(manifest.files));
 
     uninstall(false, 'hermes');
 
-    assert.ok(!fs.existsSync(path.join(targetDir, 'skills', 'gsd', 'gsd-help')), 'Hermes skill directory removed');
+    assert.ok(!fs.existsSync(path.join(targetDir, 'skills', 'gsd', 'help')), 'Hermes skill directory removed');
     assert.ok(!fs.existsSync(path.join(targetDir, 'skills', 'gsd')), 'Hermes gsd category dir removed');
     assert.ok(!fs.existsSync(path.join(targetDir, 'get-shit-done')), 'get-shit-done removed');
   });
@@ -128,13 +130,15 @@ describe('Hermes Agent local install/uninstall', () => {
   test('installed SKILL.md frontmatter conforms to Hermes spec', () => {
     install(false, 'hermes');
     const targetDir = path.join(tmpDir, '.hermes');
-    // Nested layout: skills live under skills/gsd/gsd-*/SKILL.md.
+    // Nested layout: skills live under skills/gsd/<stem>/SKILL.md.
+    // The layout module uses prefix: '' for Hermes so skill dirs have bare
+    // stem names (help, plan, …) inside the category dir (#3664).
     const categoryDir = path.join(targetDir, 'skills', 'gsd');
     const skillDirs = fs.readdirSync(categoryDir, { withFileTypes: true })
-      .filter(e => e.isDirectory() && e.name.startsWith('gsd-'))
+      .filter(e => e.isDirectory() && e.name !== 'DESCRIPTION.md')
       .map(e => e.name);
 
-    assert.ok(skillDirs.length > 0, 'at least one gsd-* skill installed');
+    assert.ok(skillDirs.length > 0, 'at least one skill installed');
 
     // Parse every SKILL.md and assert structural shape required by Hermes.
     for (const dir of skillDirs) {
@@ -203,7 +207,7 @@ describe('E2E: Hermes Agent uninstall skills cleanup', () => {
     cleanup(tmpDir);
   });
 
-  test('removes all gsd-* skill directories on --hermes --uninstall', () => {
+  test('removes all skill directories on --hermes --uninstall', () => {
     const targetDir = path.join(tmpDir, '.hermes');
     install(false, 'hermes');
 
@@ -211,9 +215,10 @@ describe('E2E: Hermes Agent uninstall skills cleanup', () => {
     const categoryDir = path.join(skillsDir, 'gsd');
     assert.ok(fs.existsSync(categoryDir), 'skills/gsd/ category dir exists after install');
 
+    // Layout uses prefix: '' for Hermes — skill dirs have bare stem names (no gsd- prefix)
     const installedSkills = fs.readdirSync(categoryDir, { withFileTypes: true })
-      .filter(e => e.isDirectory() && e.name.startsWith('gsd-'));
-    assert.ok(installedSkills.length > 0, `found ${installedSkills.length} gsd-* skill dirs before uninstall`);
+      .filter(e => e.isDirectory());
+    assert.ok(installedSkills.length > 0, `found ${installedSkills.length} skill dirs before uninstall`);
 
     uninstall(false, 'hermes');
 

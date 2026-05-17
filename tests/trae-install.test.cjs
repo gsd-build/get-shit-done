@@ -19,11 +19,19 @@ const {
   convertClaudeToTraeMarkdown,
   convertClaudeCommandToTraeSkill,
   convertClaudeAgentToTraeAgent,
-  copyCommandsAsTraeSkills,
+  installRuntimeArtifacts,
   install,
   uninstall,
   writeManifest,
 } = require('../bin/install.js');
+
+const {
+  loadSkillsManifest,
+  resolveProfile,
+} = require('../get-shit-done/bin/lib/install-profiles.cjs');
+
+const manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest });
 
 describe('Trae runtime directory mapping', () => {
   test('maps Trae to .trae for local installs', () => {
@@ -133,7 +141,7 @@ Read CLAUDE.md before acting.
   });
 });
 
-describe('copyCommandsAsTraeSkills', () => {
+describe('installRuntimeArtifacts (trae)', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -145,12 +153,12 @@ describe('copyCommandsAsTraeSkills', () => {
   });
 
   test('creates one skill directory per GSD command', () => {
-    const srcDir = path.join(__dirname, '..', 'commands', 'gsd');
-    const skillsDir = path.join(tmpDir, '.trae', 'skills');
+    const configDir = path.join(tmpDir, '.trae');
+    fs.mkdirSync(configDir, { recursive: true });
 
-    copyCommandsAsTraeSkills(srcDir, skillsDir, 'gsd', '$HOME/.trae/', 'trae');
+    installRuntimeArtifacts('trae', configDir, 'local', resolvedProfileFull);
 
-    const generated = path.join(skillsDir, 'gsd-help', 'SKILL.md');
+    const generated = path.join(configDir, 'skills', 'gsd-help', 'SKILL.md');
     assert.ok(fs.existsSync(generated), generated);
 
     const content = fs.readFileSync(generated, 'utf8');
