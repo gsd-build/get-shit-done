@@ -21,7 +21,7 @@ The root problem is the absence of a typed seam for "where does runtime R put ar
   - **Gemini**: `kinds: [ { kind: 'commands', destSubpath: 'commands/gsd', prefix: 'gsd-' } ]` — no agents, no skills.
 - `applySurface` migrates from `(runtimeConfigDir, commandsDir, agentsDir, manifest, clusterMap)` to `(runtimeConfigDir, layout, manifest, clusterMap)`. Body collapses to `for (const kind of layout.kinds) _syncGsdDir(kind.stage(resolved), path.join(layout.configDir, kind.destSubpath), kind.kind)`.
 - `_findInstallSource` and `_findAgentsSource` in `surface.cjs` are removed. The layout owns source resolution.
-- Install and uninstall paths in `bin/install.js` migrate to iterate `layout.kinds`. Per-runtime if/else branches for skill-directory creation/removal collapse to one layout-driven loop per pipeline.
+- Phase 2 (separate PR): install and uninstall paths in `bin/install.js` migrate to iterate `layout.kinds`. Per-runtime if/else branches for skill-directory creation/removal collapse to one layout-driven loop per pipeline.
 - Legacy-layout migrations (`bin/install.js:6710`/`:8402` for the pre-nested `skills/gsd-*/` flat layout; `migrateLegacyDevPreferencesToSkill` for #2973) remain inside the Installer Migration Module (ADR-0008) and run **before** layout-driven copy. The layout module describes only the current canonical target — no historical kinds.
 
 ## Initial Scope
@@ -121,7 +121,7 @@ function applySurface(runtimeConfigDir, layout, manifest, clusterMap) {
 ## Open questions
 
 - Whether the `skills` kind's `stage` closure should accept the per-runtime converter as a parameter (preserving converter-as-pure-function purity) or import it directly. Implementation detail — settle in the PR.
-- Whether the layout module should expose a `listKinds(runtime)` introspection helper for `/gsd:status` and diagnostics, or keep `Layout` as the only public type. Lean toward a single public type; add helpers only when a second consumer needs them.
+- Whether the layout module should expose a `listKinds(runtime)` introspection helper for status/diagnostics surfaces, or keep `Layout` as the only public type. Lean toward a single public type; add helpers only when a second consumer needs them.
 - Whether Phase 2 (install/uninstall migration in `bin/install.js`) should land as a single follow-up PR or be split per pipeline. Lean toward single PR — the install and uninstall sides share the runtime branch structure and migrating only one introduces a temporary asymmetry inverse to today's.
 - The adjacent `readSurface` partial-field silent-null fallback in `surface.cjs:55-75` (also flagged in #3659) is **out of scope here** — track separately. It's an independent shallow interface in the same module, not a runtime-layout concern.
 
