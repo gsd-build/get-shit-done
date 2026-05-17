@@ -373,6 +373,10 @@ describe('#3347 hook — HEAD-advancing command matchers', () => {
     'git pull --ff-only',
     'git rebase --continue',
     'git cherry-pick abc123',
+    // #3653 — `gsd-sdk query commit` invokes git via spawnSync('git', [...]),
+    // so the substring "git commit" never appears in tool_input.command.
+    // The hook must match the user-facing SDK invocation directly.
+    'gsd-sdk query commit "docs: probe" --files .planning/STATE.md',
   ]) {
     test(`dispatches on: ${cmd}`, (t) => {
       const tmpDir = createTempGitRepo({
@@ -388,6 +392,29 @@ describe('#3347 hook — HEAD-advancing command matchers', () => {
       assert.ok(
         fs.existsSync(path.join(tmpDir, '.planning/graphs/.last-build-status.json')),
         `must dispatch for HEAD-advancing op: ${cmd}`,
+      );
+    });
+  }
+
+  // #3653 — only the SDK `commit` verb invokes git internally. Other
+  // `gsd-sdk query` verbs (phase.complete, roadmap.update-plan-progress,
+  // state.begin-phase) mutate .md files but do NOT advance HEAD; matching
+  // them would cause a spurious rebuild per state mutation.
+  for (const cmd of [
+    'gsd-sdk query phase.complete 109',
+    'gsd-sdk query roadmap.update-plan-progress 109 W001',
+    'gsd-sdk query state.begin-phase 110',
+  ]) {
+    test(`does NOT dispatch on non-HEAD-advancing SDK verb: ${cmd}`, (t) => {
+      const tmpDir = createTempGitRepo({
+        config: { graphify: { enabled: true, auto_update: true } },
+      });
+      t.after(() => cleanup(tmpDir));
+      const r = runHook(tmpDir, { tool_name: 'Bash', tool_input: { command: cmd } });
+      assert.strictEqual(r.status, 0);
+      assert.ok(
+        !fs.existsSync(path.join(tmpDir, '.planning/graphs/.last-build-status.json')),
+        `must NOT dispatch for non-HEAD-advancing SDK verb: ${cmd}`,
       );
     });
   }
