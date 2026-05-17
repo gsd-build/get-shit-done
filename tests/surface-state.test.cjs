@@ -65,7 +65,7 @@ describe('readSurface / writeSurface', () => {
     const dir = tmpDir();
     try {
       const state = {
-        baseProfile: 'core,audit',
+        baseProfile: 'core,standard',
         disabledClusters: [],
         explicitAdds: [],
         explicitRemoves: ['health'],
@@ -134,6 +134,79 @@ describe('readSurface / writeSurface', () => {
       const { result, warnings } = captureWarn(() => readSurface(dir));
       assert.strictEqual(result, null);
       assert.match(warnings[0], /baseProfile/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('typo in baseProfile warns about unknown mode but still returns state (#3662 Codex)', () => {
+    const dir = tmpDir();
+    try {
+      fs.writeFileSync(
+        path.join(dir, '.gsd-surface.json'),
+        JSON.stringify({ baseProfile: 'standrad', disabledClusters: [], explicitAdds: [], explicitRemoves: [] }),
+        'utf8'
+      );
+      const { result, warnings } = captureWarn(() => readSurface(dir));
+      assert.deepStrictEqual(result, {
+        baseProfile: 'standrad',
+        disabledClusters: [],
+        explicitAdds: [],
+        explicitRemoves: [],
+      });
+      assert.strictEqual(warnings.length, 1);
+      assert.match(warnings[0], /unknown profile mode/);
+      assert.match(warnings[0], /standrad/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('composed baseProfile warns only about unknown member (#3662 Codex)', () => {
+    const dir = tmpDir();
+    try {
+      fs.writeFileSync(
+        path.join(dir, '.gsd-surface.json'),
+        JSON.stringify({ baseProfile: 'core,bogus', disabledClusters: [], explicitAdds: [], explicitRemoves: [] }),
+        'utf8'
+      );
+      const { result, warnings } = captureWarn(() => readSurface(dir));
+      assert.strictEqual(result.baseProfile, 'core,bogus');
+      assert.strictEqual(warnings.length, 1);
+      // Warning must call out 'bogus' as unknown, but not list 'core' as unknown
+      // (it does appear once in the "(valid: core, standard, full)" hint — that's fine).
+      const unknownPart = warnings[0].split('(valid:')[0];
+      assert.match(unknownPart, /bogus/);
+      assert.doesNotMatch(unknownPart, /\bcore\b/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('known composed baseProfile does not warn (#3662 Codex)', () => {
+    const dir = tmpDir();
+    try {
+      fs.writeFileSync(
+        path.join(dir, '.gsd-surface.json'),
+        JSON.stringify({ baseProfile: 'core,standard', disabledClusters: [], explicitAdds: [], explicitRemoves: [] }),
+        'utf8'
+      );
+      const { warnings } = captureWarn(() => readSurface(dir));
+      assert.deepStrictEqual(warnings, [], 'all-known modes should not warn');
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test('writeSurface warns on unknown profile mode but still writes (#3662 Codex)', () => {
+    const dir = tmpDir();
+    try {
+      const { warnings } = captureWarn(() => writeSurface(dir, { baseProfile: 'standrad' }));
+      const onDisk = JSON.parse(fs.readFileSync(path.join(dir, '.gsd-surface.json'), 'utf8'));
+      assert.strictEqual(onDisk.baseProfile, 'standrad');
+      assert.strictEqual(warnings.length, 1);
+      assert.match(warnings[0], /unknown profile mode/);
+      assert.match(warnings[0], /standrad/);
     } finally {
       cleanup(dir);
     }

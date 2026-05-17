@@ -33,6 +33,24 @@ const {
 const { CLUSTERS, allClusteredSkills } = require('./clusters.cjs');
 
 const SURFACE_FILE_NAME = '.gsd-surface.json';
+const KNOWN_PROFILE_NAMES = new Set(Object.keys(PROFILES));
+
+/**
+ * Inspect a `baseProfile` string (single name or comma-composed) and warn for
+ * any modes that aren't registered in PROFILES. Returns the list of unknown
+ * modes so callers can include it in their own diagnostic. Callers keep the
+ * raw string — resolveProfile() decides the resolution fallback.
+ *
+ * @param {string} baseProfile
+ * @returns {string[]} unknown modes
+ */
+function unknownProfileModes(baseProfile) {
+  return baseProfile
+    .split(',')
+    .map((m) => m.trim())
+    .filter((m) => m.length > 0)
+    .filter((m) => !KNOWN_PROFILE_NAMES.has(m));
+}
 
 // ---------------------------------------------------------------------------
 // State IO
@@ -104,6 +122,10 @@ function readSurface(runtimeConfigDir) {
     console.warn(`[gsd] readSurface(${filePath}): missing, non-string, or blank 'baseProfile'; falling back to no surface state.`);
     return null;
   }
+  const unknownModes = unknownProfileModes(parsed.baseProfile);
+  if (unknownModes.length > 0) {
+    console.warn(`[gsd] readSurface(${filePath}): unknown profile mode(s) in 'baseProfile': ${unknownModes.join(', ')} (valid: ${[...KNOWN_PROFILE_NAMES].join(', ')}); resolveProfile() will skip unknowns and may fall back to 'full'.`);
+  }
   return normalizeSurfaceState(parsed);
 }
 
@@ -121,6 +143,10 @@ function readSurface(runtimeConfigDir) {
 function writeSurface(runtimeConfigDir, surfaceState) {
   if (!surfaceState || typeof surfaceState.baseProfile !== 'string' || surfaceState.baseProfile.trim() === '') {
     throw new TypeError("writeSurface: 'baseProfile' must be a non-blank string");
+  }
+  const unknownModes = unknownProfileModes(surfaceState.baseProfile);
+  if (unknownModes.length > 0) {
+    console.warn(`[gsd] writeSurface: unknown profile mode(s) in 'baseProfile': ${unknownModes.join(', ')} (valid: ${[...KNOWN_PROFILE_NAMES].join(', ')}); persisting anyway — resolveProfile() will skip unknowns.`);
   }
   const normalized = normalizeSurfaceState(surfaceState);
   platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(normalized, null, 2) + '\n');
