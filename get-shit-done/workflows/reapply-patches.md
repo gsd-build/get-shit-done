@@ -1,6 +1,6 @@
 # Reapply Local Patches Workflow
 
-Invoked by `/gsd-update --reapply` (`commands/gsd/update.md`).
+Invoked by `/gsd:update --reapply` (`commands/gsd/update.md`).
 
 After a GSD update wipes and reinstalls files, this workflow merges user's previously saved local modifications back into the new version. Uses three-way comparison (pristine baseline, user-modified backup, newly installed version) to reliably distinguish user customizations from version drift.
 
@@ -111,7 +111,7 @@ Read `backup-meta.json` from the patches directory.
 ```
 No local patches found. Nothing to reapply.
 
-Local patches are automatically saved when you run /gsd-update
+Local patches are automatically saved when you run /gsd:update
 after modifying any GSD workflow, command, or agent files.
 ```
 Exit.
@@ -228,7 +228,7 @@ d. **If ALL differences appear to be mechanical drift → still flag as CONFLICT
 When the config directory is a git repo but the pristine install commit can't be found, use commit history to identify user changes:
 ```bash
 # Find non-update commits that touched this file
-git -C "$CONFIG_DIR" log --oneline --no-merges -- "{file_path}" | grep -v "gsd:update\|GSD update\|gsd-install"
+git -C "$CONFIG_DIR" log --oneline --no-merges -- "{file_path}" | grep -v "gsd:update\|gsd-update\|GSD update\|gsd-install"
 ```
 Each matching commit represents an intentional user modification. Use the commit messages and diffs to understand what was changed and why.
 
@@ -317,7 +317,7 @@ Resolve before proceeding:
   (a) Re-merge the missing content into the installed file by hand, or
   (b) Restore from backup: cp {patches_dir}/{file} {installed_path}
 
-Then re-run /gsd-update --reapply to re-verify.
+Then re-run /gsd:update --reapply to re-verify.
 ```
 
 Do not proceed to cleanup until the verifier exits 0.
@@ -334,7 +334,7 @@ The Hunk Verification Table produced in Step 4 must also be reviewed before proc
 ERROR: Hunk Verification Table is missing — Step 4 did not produce it.
 The deterministic verifier (5a) may still have passed, but a missing table
 means post-merge verification was not fully completed. Rerun
-/gsd-update --reapply to retry with full verification.
+/gsd:update --reapply to retry with full verification.
 ```
 
 A missing table absent from the workflow output cannot bypass this gate.

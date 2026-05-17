@@ -809,6 +809,71 @@ Detail
     expect(result).toContain('Phase 100');
     expect(result).toContain('Phase Details');
   });
+
+  // ─── Bug #3493: generic `## Phase Details` after planned-milestone sibling ──
+  it('bug-3493: preserves generic `## Phase Details` heading after `### 📋 vX.Y+ (Planned)` sibling', async () => {
+    // Minimal repro from issue #3493 verbatim: a generic (non-version-prefixed)
+    // `## Phase Details` heading sits AFTER a `### 📋 v2.1+ (Planned)` sibling
+    // in document order. The 📋-bearing sibling otherwise terminates the slice
+    // and the generic Phase Details body — including `### Phase 4: Next` — is
+    // dropped, even though it belongs to the active v2.0 milestone.
+    const roadmap = `# Roadmap: Example
+
+## Phases
+
+<details>
+<summary>✅ v1.0 First Milestone — SHIPPED</summary>
+- [x] **Phase 1: First** (1/1 plans)
+</details>
+
+### v2.0 Active Milestone (Phases 2–5)
+
+- [x] **Phase 2: Foundation** (5/5 plans) — completed
+- [x] **Phase 3: Pipeline** (8/8 plans) — completed
+- [ ] **Phase 4: Next** — pending
+- [ ] **Phase 5: Final** — pending
+
+### 📋 v2.1+ (Planned — Not Yet Scoped)
+
+Candidates pending milestone selection.
+
+## Phase Details
+
+### Phase 2: Foundation
+**Goal**: Foundation goal.
+
+### Phase 3: Pipeline
+**Goal**: Pipeline goal.
+
+### Phase 4: Next
+**Goal**: Next goal.
+
+### Phase 5: Final
+**Goal**: Final goal.
+`;
+    const state = `---\nmilestone: v2.0\n---\n# State\n`;
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const slice = await extractCurrentMilestone(roadmap, tmpDir);
+
+    // The generic Phase Details heading and all four detail sections must
+    // survive — they belong to the active v2.0 milestone even though they
+    // sit after the planned-milestone sibling in document order.
+    expect(slice).toContain('## Phase Details');
+    expect(slice).toContain('### Phase 2: Foundation');
+    expect(slice).toContain('### Phase 3: Pipeline');
+    expect(slice).toContain('### Phase 4: Next');
+    expect(slice).toContain('### Phase 5: Final');
+
+    // And roadmapGetPhase (which calls extractCurrentMilestone internally)
+    // must locate Phase 4's detail section.
+    const result = await roadmapGetPhase(['4'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.found).toBe(true);
+    expect(data.phase_number).toBe('4');
+    expect(data.phase_name).toBe('Next');
+  });
 });
 
 // ─── roadmapGetPhase ──────────────────────────────────────────────────────

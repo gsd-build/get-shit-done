@@ -48,7 +48,7 @@ describe('dispatcher error paths', () => {
       path.join(tmpDir, '.planning', 'STATE.md'),
       '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\n'
     );
-    const result = runGsdTools(`--cwd=${tmpDir} state load`, process.cwd());
+    const result = runGsdTools(['--cwd=' + tmpDir, 'state', 'load'], process.cwd());
     assert.strictEqual(result.success, true, `Should succeed with --cwd=, got: ${result.error}`);
   });
 

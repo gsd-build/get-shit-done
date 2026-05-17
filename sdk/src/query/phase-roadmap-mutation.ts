@@ -5,7 +5,21 @@ import { acquireStateLock, releaseStateLock } from './state-mutation.js';
 /**
  * Replace a pattern only in the current milestone section of ROADMAP.md.
  *
- * Port of replaceInCurrentMilestone from core.cjs line 1197-1206.
+ * Port of replaceInCurrentMilestone from core.cjs lines 1013-1022.
+ *
+ * Semantics (byte-for-byte CJS parity):
+ *   • No `</details>` in the content  → plain `content.replace(pattern, replacement)`.
+ *   • Otherwise → split at the last `</details>` and replace only in the
+ *     content AFTER it.
+ *
+ * INTENTIONALLY DOES NOT fall back to "search the last <details> block when
+ * the after-slice didn't match." That fallback existed in an earlier SDK
+ * port and would silently corrupt shipped-milestone content when the current
+ * milestone is itself wrapped in `<details open>...</details>` and there's
+ * nothing after the close tag. CJS callers handle the "milestone inside
+ * <details>" case by passing the unscoped `content.replace(...)` directly
+ * (see phase.cjs:1080 for plan-count update). Keep this function in
+ * lockstep with core.cjs — deviations are how bug-2005 slipped in.
  */
 export function replaceInCurrentMilestone(
   content: string,
@@ -19,30 +33,7 @@ export function replaceInCurrentMilestone(
   const offset = lastDetailsClose + '</details>'.length;
   const before = content.slice(0, offset);
   const after = content.slice(offset);
-
-  const replacedAfter = after.replace(pattern, replacement);
-  if (replacedAfter !== after) {
-    return before + replacedAfter;
-  }
-
-  const detailsBlockRe = /<details>[\s\S]*?<\/details>/gi;
-  const spans: { start: number; end: number; text: string }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = detailsBlockRe.exec(content)) !== null) {
-    spans.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
-  }
-
-  if (spans.length === 0) {
-    return content.replace(pattern, replacement);
-  }
-
-  const lastSpan = spans[spans.length - 1];
-  const updatedLastBlock = lastSpan.text.replace(pattern, replacement);
-  return (
-    content.slice(0, lastSpan.start) +
-    updatedLastBlock +
-    content.slice(lastSpan.end)
-  );
+  return before + after.replace(pattern, replacement);
 }
 
 /**

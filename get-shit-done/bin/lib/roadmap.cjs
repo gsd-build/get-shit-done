@@ -4,7 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches, atomicWriteFileSync } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, phaseMarkdownRegexSource, phaseMarkdownRegexSourceExact, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches } = require('./core.cjs');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 const { planningPaths, withPlanningLock } = require('./planning-workspace.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
 
@@ -51,16 +52,8 @@ function countPhasePlansAndSummaries(phaseDir) {
   };
 }
 
-function phaseMarkdownRegexSource(phaseNum) {
-  const stripped = String(phaseNum).replace(/^[A-Z]{1,6}-(?=\d)/i, '');
-  const match = stripped.match(/^0*(\d+)([A-Z])?((?:\.\d+)*)$/i);
-  if (!match) return escapeRegex(phaseNum);
-
-  const integer = match[1].replace(/^0+/, '') || '0';
-  const letter = match[2] ? escapeRegex(match[2]) : '';
-  const decimal = match[3] ? escapeRegex(match[3]) : '';
-  return `0*${escapeRegex(integer)}${letter}${decimal}`;
-}
+// `phaseMarkdownRegexSource` moved to core.cjs (#3537) so phase.cjs and
+// core.cjs itself can consume it without circular deps. Imported above.
 
 /**
  * Search for a phase header (and its section) within the given content string.
@@ -101,7 +94,7 @@ function searchPhaseInContent(content, escapedPhase, phaseNum) {
 
   // Find the end of this section (next ## or ### phase header, or end of file)
   const restOfContent = content.slice(headerIndex);
-  const nextHeaderMatch = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
+  const nextHeaderMatch = restOfContent.match(/\n#{2,4}\s+Phase\s+[\w][\w.-]*/i);
   const sectionEnd = nextHeaderMatch
     ? headerIndex + nextHeaderMatch.index
     : content.length;
@@ -146,13 +139,36 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
     const rawContent = fs.readFileSync(roadmapPath, 'utf-8');
     const milestoneContent = extractCurrentMilestone(rawContent, cwd);
 
-    // Escape special regex chars in phase number, handle decimal
-    const escapedPhase = escapeRegex(phaseNum);
+    // #3599 two-pass: when the caller passes a project-code-prefixed ID like
+    // `PROJ-42`, try the exact-prefixed heading first (`### Phase PROJ-42:`).
+    // If no match, fall back to the #3537 padding-tolerant numeric form so
+    // a `CK-01` query still resolves to `### Phase 1:`. Doing this at the
+    // call site (instead of inside phaseMarkdownRegexSource) avoids the
+    // alternation-order ambiguity where a bare `### Phase 42:` heading in
+    // the same document would intercept the match for a `PROJ-42` query.
+    const fullContent = stripShippedMilestones(rawContent);
+
+    const exactSource = phaseMarkdownRegexSourceExact(phaseNum);
+    if (exactSource) {
+      const exactMilestone = searchPhaseInContent(milestoneContent, exactSource, phaseNum);
+      if (exactMilestone && !exactMilestone.error) {
+        output(exactMilestone, raw, exactMilestone.section);
+        return;
+      }
+      const exactFull = searchPhaseInContent(fullContent, exactSource, phaseNum);
+      if (exactFull && !exactFull.error) {
+        output(exactFull, raw, exactFull.section);
+        return;
+      }
+    }
+
+    // #3537: padding-tolerant fragment so callers passing `02.7` still match
+    // un-padded ROADMAP prose (`### Phase 2.7:`).
+    const escapedPhase = phaseMarkdownRegexSource(phaseNum);
 
     // Search the current milestone slice first, then fall back to full roadmap.
     // A malformed_roadmap result (checklist-only) from the milestone should not
     // block finding a full header match in the wider roadmap content.
-    const fullContent = stripShippedMilestones(rawContent);
     const milestoneResult = searchPhaseInContent(milestoneContent, escapedPhase, phaseNum);
     const result = (milestoneResult && !milestoneResult.error)
       ? milestoneResult
@@ -247,8 +263,11 @@ function cmdRoadmapAnalyze(cwd, raw) {
       }
     } catch { /* intentionally empty */ }
 
-    // Check ROADMAP checkbox status
-    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
+    // Check ROADMAP checkbox status.
+    // #3537: padding-tolerant fragment — the heading discovered above may use
+    // a different padding than the summary-bullet checkbox below it (mixed
+    // padding inside one ROADMAP is legal and seen in real projects).
+    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${phaseMarkdownRegexSource(phaseNum)}[:\\s]`, 'i');
     const checkboxMatch = content.match(checkboxPattern);
     const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
 
@@ -407,7 +426,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       roadmapContent = roadmapContent.replace(planCheckboxPattern, '$1x$2');
     }
 
-    atomicWriteFileSync(roadmapPath, roadmapContent, 'utf-8');
+    platformWriteSync(roadmapPath, roadmapContent);
   });
   output({
     updated: true,
@@ -510,8 +529,10 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
   withPlanningLock(cwd, () => {
     let content = fs.readFileSync(roadmapPath, 'utf-8');
 
-    // Find the phase section
-    const phaseEscaped = escapeRegex(phaseNum);
+    // Find the phase section.
+    // #3537: padding-tolerant fragment so the caller's resolved padded id
+    // matches un-padded ROADMAP headings.
+    const phaseEscaped = phaseMarkdownRegexSource(phaseNum);
     const phaseHeaderPattern = new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEscaped}:[^\\n]*)`, 'i');
     const phaseMatch = content.match(phaseHeaderPattern);
     if (!phaseMatch) return;
@@ -580,7 +601,7 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
 
     const nextContent = content.slice(0, phaseStart) + newPhaseSection + content.slice(phaseEnd);
     if (nextContent === content) return;
-    atomicWriteFileSync(roadmapPath, nextContent);
+    platformWriteSync(roadmapPath, nextContent);
     updated = true;
   });
 

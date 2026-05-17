@@ -15,8 +15,11 @@ import { roadmapUpdatePlanProgress } from './roadmap-update-plan-progress.js';
 import {
   verifyPlanStructure, verifyPhaseCompleteness, verifyReferences,
   verifyCommits, verifyArtifacts, verifySchemaDrift,
-  verifyCodebaseDrift,
 } from './verify.js';
+// verifyCodebaseDrift intentionally NOT imported — drift is out-of-seam
+// (CJS-only) per ADR/PRD docs/adr/3524-cjs-sdk-hard-seam.md §3 and
+// docs/prd/3524-cjs-sdk-hard-seam.md L160. The CJS router dispatches
+// verify codebase-drift directly to bin/lib/drift.cjs / verify.cjs.
 import { verifyKeyLinks, validateConsistency, validateHealth, validateAgents, validateContext } from './validate.js';
 import {
   phaseListPlans, phaseListArtifacts,
@@ -71,7 +74,8 @@ export const FAMILY_HANDLERS: Record<string, Readonly<Record<string, QueryHandle
     'verify.artifacts': verifyArtifacts,
     'verify.key-links': verifyKeyLinks,
     'verify.schema-drift': verifySchemaDrift,
-    'verify.codebase-drift': verifyCodebaseDrift,
+    // 'verify.codebase-drift' intentionally omitted — out-of-seam CJS-only
+    // per ADR/PRD 3524 §3 / L160. Router dispatches direct to CJS handler.
   },
   validate: {
     'validate.consistency': validateConsistency,

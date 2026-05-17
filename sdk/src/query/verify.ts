@@ -26,7 +26,6 @@ import {
   planningPaths,
 } from './helpers.js';
 import type { QueryHandler } from './utils.js';
-import { resolveGsdToolsPath } from '../sdk-package-compatibility.js';
 
 // ─── verifyPlanStructure ───────────────────────────────────────────────────
 
@@ -645,48 +644,13 @@ export const verifySchemaDrift: QueryHandler = async (args, projectDir, workstre
   };
 };
 
-/**
- * verify.codebase-drift — structural drift detector (#2003).
- *
- * Non-blocking by contract: every failure mode returns a successful response
- * with `{ skipped: true, reason }`. The post-execute drift gate in
- * `/gsd-execute-phase` relies on this guarantee.
- *
- * Delegates to the Node-side implementation in `bin/lib/drift.cjs` and
- * `bin/lib/verify.cjs` via a child process so the drift logic stays in one
- * canonical place (see `cmdVerifyCodebaseDrift`).
- */
-export const verifyCodebaseDrift: QueryHandler = async (_args, projectDir) => {
-  try {
-    const { execFileSync } = await import('node:child_process');
-    const toolsPath = resolveGsdToolsPath(projectDir);
-    const out = execFileSync(process.execPath, [toolsPath, 'verify', 'codebase-drift'], {
-      cwd: projectDir,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    try {
-      return { data: JSON.parse(out) };
-    } catch {
-      return {
-        data: {
-          skipped: true,
-          reason: 'sdk-parse-failed',
-          action_required: false,
-          directive: 'none',
-          elements: [],
-        },
-      };
-    }
-  } catch (err) {
-    return {
-      data: {
-        skipped: true,
-        reason: 'sdk-exception: ' + (err instanceof Error ? err.message : String(err)),
-        action_required: false,
-        directive: 'none',
-        elements: [],
-      },
-    };
-  }
-};
+// verify.codebase-drift handler intentionally NOT exported from the SDK.
+// drift (bin/lib/drift.cjs) is out-of-seam, CJS-only per ADR/PRD
+// docs/adr/3524-cjs-sdk-hard-seam.md §3 and docs/prd/3524-cjs-sdk-hard-seam.md
+// L160: "CJS-only Module handlers (...drift...) keep their in-process CJS
+// implementations because no SDK counterpart exists." Previous Phase 6 stub
+// (which execFileSync'd back to gsd-tools) created an infinite SDK→CLI→SDK
+// recursion when the CJS verify-command-router dispatched through the SDK
+// bridge — observed forking hundreds of node processes on a 64 GiB host.
+// The router now dispatches `verify codebase-drift` direct to
+// `verify.cmdVerifyCodebaseDrift`, which is the canonical implementation.

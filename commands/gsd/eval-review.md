@@ -10,6 +10,7 @@ allowed-tools:
   - Grep
   - Agent
   - AskUserQuestion
+requires: [phase]
 ---
 <objective>
 Conduct a retroactive evaluation coverage audit of a completed AI phase.

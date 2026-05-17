@@ -69,7 +69,7 @@ Apply this recommendation to the revision? [Yes] / [No, let me decide]
 ### 3. Explore — Approach Comparison (requires #1729)
 
 **When:** During Socratic conversation, when multiple viable approaches emerge.
-**Note:** This integration point will be added when /gsd-explore (#1729) lands.
+**Note:** This integration point will be added when /gsd:explore (#1729) lands.
 
 ---
 

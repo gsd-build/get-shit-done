@@ -326,11 +326,18 @@ describe('workspace command files', () => {
    * substring matching on the file as a whole.
    */
   function parseCommandFile(filePath) {
-    const raw = fs.readFileSync(filePath, 'utf8');
+    // Strip UTF-8 BOM if present (some editors inject on save under Windows);
+    // a BOM byte at offset 0 defeats the ^--- anchor, making fmMatch null.
+    const raw = fs.readFileSync(filePath, 'utf8').replace(/^﻿/, '');
     const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
     assert.ok(fmMatch, `${path.basename(filePath)} must start with a YAML frontmatter block`);
     const fm = {};
-    for (const line of fmMatch[1].split('\n')) {
+    for (const rawLine of fmMatch[1].split('\n')) {
+      // Explicit \r strip: split('\n') on CRLF content leaves a trailing
+      // \r on every line, which the value regex pulls into `kv[2]` and trim
+      // is enough for most values — but be defensive so future keys with
+      // exact-string compare don't surprise us.
+      const line = rawLine.replace(/\r$/, '');
       const kv = line.match(/^([a-zA-Z_-]+):\s*(.*)$/);
       if (!kv) continue;
       const key = kv[1];

@@ -19,6 +19,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { platformWriteSync } = require('./shell-command-projection.cjs');
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
@@ -401,7 +402,7 @@ function buildPlanningArtifacts(gsd2Data) {
 /**
  * Format a dry-run preview string for display before writing.
  */
-function buildPreview(gsd2Data, artifacts) {
+function buildPreview(gsd2Data, artifacts, projectDir) {
   const lines = ['Preview — files that will be created in .planning/:'];
 
   for (const rel of artifacts.keys()) {
@@ -420,7 +421,8 @@ function buildPreview(gsd2Data, artifacts) {
   lines.push('');
   lines.push('Cannot migrate automatically:');
   lines.push('  - GSD-2 cost/token ledger (no v1 equivalent)');
-  lines.push('  - GSD-2 database state (rebuilt from files on first /gsd-health)');
+  const { formatGsdSlash, resolveRuntime } = require('./runtime-slash.cjs');
+  lines.push(`  - GSD-2 database state (rebuilt from files on first ${formatGsdSlash('health', resolveRuntime(projectDir))})`);
   lines.push('  - VS Code extension state');
 
   return lines.join('\n');
@@ -434,8 +436,7 @@ function buildPreview(gsd2Data, artifacts) {
 function writePlanningDir(artifacts, planningRoot) {
   for (const [rel, content] of artifacts) {
     const absPath = path.join(planningRoot, rel);
-    fs.mkdirSync(path.dirname(absPath), { recursive: true });
-    fs.writeFileSync(absPath, content, 'utf8');
+    platformWriteSync(absPath, content);
   }
 }
 
@@ -471,7 +472,9 @@ function cmdFromGsd2(args, cwd, raw) {
 
   const gsd2Data = parseGsd2(gsdDir);
   const artifacts = buildPlanningArtifacts(gsd2Data);
-  const preview = buildPreview(gsd2Data, artifacts);
+  // Use projectDir (resolved from --path) — not the process cwd — so the
+  // preview command targets the project actually being imported (#3584).
+  const preview = buildPreview(gsd2Data, artifacts, projectDir);
 
   if (dryRun) {
     return output({ success: true, dryRun: true, preview }, raw);

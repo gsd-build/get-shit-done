@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Static lint: no source-grep tests in the test suite.
+  # Static lint: test-suite and PR-check contracts.
   # Runs once (not per matrix node version) since it is a file-content check.
   lint-tests:
     runs-on: ubuntu-latest
@@ -33,23 +33,27 @@ jobs:
       - name: Lint — command contract (ADR-0002)
         shell: bash
         run: node scripts/lint-command-contract.cjs
+      - name: Lint — PR checks use projectDir
+        shell: bash
+        run: node scripts/lint-pr-check-project-dir.cjs
 
   test:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
+    # Node 26 lanes report forward-compat status without gating the workflow
+    # (setup-node may not yet have stable Node 26 images). 22/24 still gate.
+    continue-on-error: ${{ matrix.node-version == 26 }}
 
     strategy:
-      fail-fast: true
+      # fail-fast disabled so a single lane failure doesn't cancel the rest;
+      # makes OS-specific vs version-specific regressions easier to distinguish.
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        node-version: [22, 24]
-        include:
-          # Single macOS runner — verifies platform compatibility on the standard version
-          - os: macos-latest
-            node-version: 24
-          # Windows path/separator coverage is handled by hardcoded-paths.test.cjs
-          # and windows-robustness.test.cjs (static analysis, runs on all platforms).
-          # A dedicated windows-compat workflow runs on a weekly schedule.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [22, 24, 26]
+        # Windows path/separator coverage is also reinforced by hardcoded-paths.test.cjs
+        # and windows-robustness.test.cjs (static analysis).
+        # A dedicated windows-compat workflow runs on a weekly schedule.
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -103,6 +107,125 @@ jobs:
         shell: bash
         run: node sdk/scripts/check-command-aliases-fresh.mjs
 
-      - name: Run tests with coverage
+      - name: SDK generated state-document artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
         shell: bash
-        run: npm run test:coverage
+        run: node sdk/scripts/check-state-document-fresh.mjs
+
+      - name: SDK generated configuration artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-configuration-fresh.mjs
+
+      - name: SDK generated workstream-inventory-builder artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-workstream-inventory-builder-fresh.mjs
+
+      - name: SDK generated project-root artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-project-root-fresh.mjs
+
+      - name: SDK generated plan-scan artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-plan-scan-fresh.mjs
+
+      - name: SDK generated secrets artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-secrets-fresh.mjs
+
+      - name: SDK generated schema-detect artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-schema-detect-fresh.mjs
+
+      - name: SDK generated decisions artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-decisions-fresh.mjs
+
+      - name: SDK generated workstream-name-policy artifact drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node sdk/scripts/check-workstream-name-policy-fresh.mjs
+
+      - name: Shared Module hand-sync drift check
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 24
+        shell: bash
+        run: node scripts/lint-shared-module-handsync.cjs
+
+      # Split lanes (issue #3597). Unit is the fast default lane; integration
+      # and security run alongside it on every PR. `install` and `slow` are
+      # skipped on PR CI by design — they run on the weekly windows-compat
+      # workflow and on `main` push only. See docs/TESTING-SUITES.md.
+      - name: Run unit tests
+        shell: bash
+        run: npm run test:unit
+
+      - name: Run integration tests
+        shell: bash
+        run: npm run test:integration
+
+      - name: Run security tests
+        shell: bash
+        run: npm run test:security
+
+      # Install + slow lanes only on main-branch push (not PR CI) so PRs stay fast.
+      - name: Run install tests
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: npm run test:install
+
+      - name: Run slow tests
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: npm run test:slow
+
+  # Dedicated coverage job. Runs only on ubuntu/Node 24 (the canonical lane)
+  # because c8 coverage of one suite on one OS is enough signal — running it
+  # across the full matrix would 9x the cost for no extra coverage data.
+  # Replaces main's per-matrix `Run tests with coverage` step.
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Rebase check — merge origin/main into PR head
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.email "ci@gsd-build"
+          git config user.name "CI Rebase Check"
+          git fetch origin main
+          if ! git merge --no-edit --no-ff origin/main; then
+            echo "::error::This PR cannot cleanly merge origin/main. Rebase your branch onto current main and push again."
+            git merge --abort
+            exit 1
+          fi
+      - name: Set up Node.js 24
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
+        with:
+          node-version: 24
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build SDK dist
+        run: npm run build:sdk
+      - name: Unit coverage
+        shell: bash
+        run: npm run test:coverage:unit
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: coverage-unit
+          path: |
+            coverage/
+            .nyc_output/
+          if-no-files-found: ignore

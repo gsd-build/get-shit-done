@@ -91,7 +91,19 @@ export function sanitizeCommitMessage(text: string): string {
  * Checks commit_docs config (unless --force), sanitizes message,
  * stages specified files (or all .planning/), and commits.
  *
- * @param args - args[0]=message, remaining=file paths or flags (--force, --amend, --no-verify)
+ * By default, `--files <paths>` runs `git add -- <path>` for each named file
+ * before committing. This means any per-hunk staging set up via `git add -p`
+ * is **overwritten** by a full re-stage of the file's working-tree content.
+ *
+ * Pass `--respect-staged` to skip the `git add` step entirely. The handler
+ * will commit only what is already staged within the requested pathspec. If
+ * nothing is staged within that scope, the handler returns
+ * `{ committed: false, reason: 'nothing staged' }` without error. The #3061
+ * leak-prevention invariant still holds: the trailing `-- <paths>` pathspec
+ * on the commit ensures files staged outside `--files <paths>` are excluded.
+ *
+ * @param args - args[0]=message, remaining=file paths or flags
+ *               (--force, --amend, --no-verify, --respect-staged)
  * @param projectDir - Project root directory
  * @returns QueryResult with commit result
  */
@@ -102,10 +114,11 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
   const hasForce = allArgs.includes('--force');
   const hasAmend = allArgs.includes('--amend');
   const hasNoVerify = allArgs.includes('--no-verify');
+  const hasRespectStaged = allArgs.includes('--respect-staged');
   const filesIndex = allArgs.indexOf('--files');
   const endIndex = filesIndex !== -1 ? filesIndex : allArgs.length;
   // CodeRabbit #6: don't strip arbitrary `--foo` tokens from commit messages
-  const knownFlags = new Set(['--force', '--amend', '--no-verify']);
+  const knownFlags = new Set(['--force', '--amend', '--no-verify', '--respect-staged']);
   const messageArgs = allArgs.slice(0, endIndex).filter(a => !knownFlags.has(a));
   const message = messageArgs.join(' ') || undefined;
   const filePaths =
@@ -142,30 +155,82 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
   // Compute pathspec once: the handler commits exactly the paths it staged,
   // never anything that was pre-staged externally (#3061).
   const pathsToCommit = filePaths.length > 0 ? filePaths : ['.planning/'];
-  for (const file of pathsToCommit) {
-    // The `--` separator keeps any path that starts with `-` from being
-    // interpreted as a git option (e.g. a file literally named `-A`).
-    const addResult = execGit(projectDir, ['add', '--', file]);
-    if (addResult.exitCode !== 0) {
-      return { data: { committed: false, reason: addResult.stderr || `failed to stage ${file}`, exitCode: addResult.exitCode } };
+
+  // When --respect-staged is set, skip re-staging so that per-hunk staging
+  // from `git add -p` is preserved. Without the flag, run git add for each
+  // path (default behavior, back-compat).
+  if (!hasRespectStaged) {
+    for (const file of pathsToCommit) {
+      // The `--` separator keeps any path that starts with `-` from being
+      // interpreted as a git option (e.g. a file literally named `-A`).
+      const addResult = execGit(projectDir, ['add', '--', file]);
+      if (addResult.exitCode !== 0) {
+        return { data: { committed: false, reason: addResult.stderr || `failed to stage ${file}`, exitCode: addResult.exitCode } };
+      }
     }
   }
 
   // Check if anything is staged within the pathspec we're about to commit.
-  const diffResult = execGit(projectDir, ['diff', '--cached', '--name-only', '--', ...pathsToCommit]);
-  const stagedFiles = diffResult.stdout ? diffResult.stdout.split('\n').filter(Boolean) : [];
+  // When --respect-staged is set the caller may list paths that git doesn't
+  // know yet (e.g. untracked files the operator intentionally skipped via
+  // `git add -p`). Passing those unknown paths directly as a git pathspec
+  // causes `git diff --cached` to exit non-zero with "pathspec did not match".
+  // To avoid that, get all staged files and filter by the requested paths in
+  // TypeScript instead.
+  const stagedFilesResult: { files: string[] } | { error: { reason: string; exitCode: number } } = (() => {
+    if (hasRespectStaged) {
+      const allStaged = execGit(projectDir, ['diff', '--cached', '--name-only']);
+      if (allStaged.exitCode !== 0) {
+        return {
+          error: {
+            reason: allStaged.stderr || allStaged.stdout || 'failed to inspect staged files',
+            exitCode: allStaged.exitCode,
+          },
+        };
+      }
+      const allStagedFiles = allStaged.stdout ? allStaged.stdout.split('\n').filter(Boolean) : [];
+      const normalizePathspec = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '');
+      const normalizedSpecs = pathsToCommit.map(normalizePathspec);
+      return {
+        files: allStagedFiles.filter(file => {
+          const normalizedFile = normalizePathspec(file);
+          return normalizedSpecs.some(spec => normalizedFile === spec || normalizedFile.startsWith(`${spec}/`));
+        }),
+      };
+    }
+    const diffResult = execGit(projectDir, ['diff', '--cached', '--name-only', '--', ...pathsToCommit]);
+    if (diffResult.exitCode !== 0) {
+      return {
+        error: {
+          reason: diffResult.stderr || diffResult.stdout || 'failed to inspect staged files',
+          exitCode: diffResult.exitCode,
+        },
+      };
+    }
+    return { files: diffResult.stdout ? diffResult.stdout.split('\n').filter(Boolean) : [] };
+  })();
+  if ('error' in stagedFilesResult) {
+    return { data: { committed: false, ...stagedFilesResult.error } };
+  }
+  const stagedFiles = stagedFilesResult.files;
   if (stagedFiles.length === 0) {
     return { data: { committed: false, reason: 'nothing staged' } };
   }
 
-  // Build commit command. The trailing `-- pathsToCommit` ensures the commit
-  // captures only files within the requested scope, even when the caller's
-  // index already had unrelated entries staged before this handler ran.
+  // Build commit command. The trailing pathspec ensures the commit captures
+  // only files within the requested scope (#3061 invariant).
+  //
+  // For the default path: use `pathsToCommit` (the caller's requested scope).
+  // For --respect-staged: use `stagedFiles` (the exact set already in the
+  // index within scope). This avoids git rejecting the commit when the caller
+  // listed paths that are not yet known to git (e.g. skipped hunks from
+  // `git add -p` that were intentionally left unstaged).
+  const commitPathspec = hasRespectStaged ? stagedFiles : pathsToCommit;
   const commitArgs: string[] = hasAmend
     ? ['commit', '--amend', '--no-edit']
     : ['commit', '-m', sanitized ?? ''];
   if (hasNoVerify) commitArgs.push('--no-verify');
-  commitArgs.push('--', ...pathsToCommit);
+  commitArgs.push('--', ...commitPathspec);
 
   const commitResult = execGit(projectDir, commitArgs);
   if (commitResult.exitCode !== 0) {

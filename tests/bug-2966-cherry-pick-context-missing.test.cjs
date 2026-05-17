@@ -58,7 +58,9 @@ const WORKFLOW_PATH = path.join(__dirname, '..', '.github', 'workflows', 'releas
  * one for a single test isn't justified.
  */
 function extractStepRun(workflowText, stepName) {
-  const lines = workflowText.split('\n');
+  // CRLF-tolerant split: Windows checkout (autocrlf=true) leaves trailing
+  // \r on every line which downstream regex anchors don't tolerate.
+  const lines = workflowText.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(\s*)- name:\s*(.+?)\s*$/);
     if (!m || m[2] !== stepName) continue;
@@ -197,7 +199,9 @@ describe('bug-2966: release-sdk hotfix cherry-pick classifies context-missing vs
       const blocks = [];
       let inHead = false;
       let head = '';
-      for (const line of conflicted.split('\n')) {
+      for (const rawLine of conflicted.split(/\r?\n/)) {
+        // Strip residual \r so /^=======$/ matches even on CRLF content.
+        const line = rawLine.replace(/\r$/, '');
         if (/^<<<<<<< /.test(line)) { inHead = true; head = ''; continue; }
         if (/^=======$/.test(line) && inHead) { inHead = false; continue; }
         if (/^>>>>>>> /.test(line)) { blocks.push(head); head = ''; continue; }
@@ -217,7 +221,7 @@ describe('bug-2966: release-sdk hotfix cherry-pick classifies context-missing vs
     // exercises the exact predicate that runs in CI — not a copy.
     const yaml = fs.readFileSync(WORKFLOW_PATH, 'utf8');
     const script = extractStepRun(yaml, 'Prepare hotfix branch');
-    const awkMatch = script.match(/awk '\n([\s\S]+?)' "\$CONFLICTED"/);
+    const awkMatch = script.match(/awk '\r?\n([\s\S]+?)' "\$CONFLICTED"/);
     assert.ok(awkMatch, 'expected to find the conflict-classifying awk script in the workflow');
     const awkProgram = awkMatch[1];
 

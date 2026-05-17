@@ -29,7 +29,7 @@ created: {date}
 
 - **After every task commit:** Run `{quick run command}`
 - **After every plan wave:** Run `{full suite command}`
-- **Before `/gsd-verify-work`:** Full suite must be green
+- **Before `/gsd:verify-work`:** Full suite must be green
 - **Max feedback latency:** {N} seconds
 
 ---

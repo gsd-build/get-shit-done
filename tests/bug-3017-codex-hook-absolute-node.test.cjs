@@ -37,7 +37,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const INSTALL = require(path.join(__dirname, '..', 'bin', 'install.js'));
+const projection = require(path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'shell-command-projection.cjs'));
 const { buildCodexHookBlock, rewriteLegacyCodexHookBlock, resolveNodeRunner } = INSTALL;
+const { projectCodexHookTomlCommand } = projection;
 
 /**
  * Parse the toml hook block into a typed record so tests can assert on
@@ -86,6 +88,20 @@ function unescapeRunner(token) {
   return t;
 }
 
+describe('Bug #3017 / #3440: Codex hook projection seam', () => {
+  test('projectCodexHookTomlCommand renders escaped command value from shared projection module', () => {
+    const commandValue = projectCodexHookTomlCommand({
+      absoluteRunner: '"/usr/local/bin/node"',
+      scriptPath: '/tmp/codex-test/.codex/hooks/gsd-check-update.js',
+      platform: 'linux',
+    });
+    assert.equal(
+      commandValue,
+      '\\"/usr/local/bin/node\\" \\"/tmp/codex-test/.codex/hooks/gsd-check-update.js\\"',
+    );
+  });
+});
+
 describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
   test('exported as a function', () => {
     assert.equal(typeof buildCodexHookBlock, 'function');
@@ -108,8 +124,14 @@ describe('Bug #3017: buildCodexHookBlock emits absolute node runner', () => {
     // pass — e.g. '/Users/x/notnode/foo'.
     assert.equal(unescapeRunner(parsed.runner), expectedRunnerPath,
       `parsed runner must equal supplied absolute path: got ${parsed.runner}, want ${expectedRunnerPath}`);
-    assert.equal(parsed.hookPath, '/tmp/codex-test/.codex/hooks/gsd-check-update.js',
-      `hook path equality, got: ${parsed.hookPath}`);
+    // On Windows, path.resolve prepends the current drive letter ("D:") to
+    // the POSIX-shaped fixture path. Accept either form.
+    const expectedHookSuffix = '/tmp/codex-test/.codex/hooks/gsd-check-update.js';
+    assert.ok(
+      parsed.hookPath === expectedHookSuffix ||
+        parsed.hookPath.replace(/^[A-Za-z]:/, '') === expectedHookSuffix,
+      `hook path equality, got: ${parsed.hookPath}, want suffix: ${expectedHookSuffix}`,
+    );
   });
 
   test('returns null when absoluteRunner is null (caller skips registration)', () => {
@@ -167,6 +189,34 @@ describe('Bug #3017: rewriteLegacyCodexHookBlock migrates bare-node on reinstall
     // Non-GSD content (the [model] block) must be preserved verbatim.
     assert.ok(result.content.includes('[model]'));
     assert.ok(result.content.includes('name = "o3"'));
+  });
+
+  test('decodes TOML-escaped quoted script paths before projection', () => {
+    const before = [
+      '# GSD Hooks',
+      '[[hooks.SessionStart]]',
+      '',
+      '[[hooks.SessionStart.hooks]]',
+      'type = "command"',
+      'command = "node \\"C:\\\\Users\\\\x\\\\.codex\\\\hooks\\\\gsd-check-update.js\\""',
+      '',
+    ].join('\n');
+    const runner = '"/usr/local/bin/node"';
+    const result = rewriteLegacyCodexHookBlock(before, runner, { platform: 'win32' });
+    assert.equal(result.changed, true);
+    const parsed = parseCodexHookBlock(result.content);
+    assert.equal(parsed.ok, true, 'hook block must parse correctly');
+    const expected = projectCodexHookTomlCommand({
+      absoluteRunner: runner,
+      scriptPath: 'C:\\Users\\x\\.codex\\hooks\\gsd-check-update.js',
+      platform: 'win32',
+    });
+    assert.equal(parsed.command, expected,
+      'rewritten command must project from decoded Windows path (not TOML-escaped token text)');
+    assert.equal(unescapeRunner(parsed.runner), '/usr/local/bin/node',
+      'runner must equal supplied absolute path');
+    assert.equal(parsed.hookPath, 'C:/Users/x/.codex/hooks/gsd-check-update.js',
+      'hook path must equal decoded Windows path after projection normalization');
   });
 
   test('does NOT touch a managed-hook entry that already uses an absolute runner', () => {

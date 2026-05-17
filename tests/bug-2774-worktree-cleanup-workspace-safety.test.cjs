@@ -33,6 +33,8 @@ const os = require('os');
 
 const { cleanup } = require('./helpers.cjs');
 
+const isWindows = process.platform === 'win32';
+
 // The exact discovery pipeline from get-shit-done/workflows/quick.md and
 // get-shit-done/workflows/execute-phase.md (line: `WORKTREES=$(git worktree
 // list --porcelain | grep "^worktree " | grep "\.claude/worktrees/agent-" |
@@ -176,7 +178,9 @@ describe('bug #2774 — worktree cleanup pipeline must not target the parent wor
       );
     });
 
-    test('while/read loop iterates each whitespace-bearing path exactly once', () => {
+    test('while/read loop iterates each whitespace-bearing path exactly once',
+      { skip: isWindows ? 'POSIX bash process-substitution `< <(...)` under test; not portable to cmd.exe / git-bash variance' : false },
+      () => {
       // Verify the actual consumer pattern from quick.md / execute-phase.md:
       //   while IFS= read -r WT; do ...; done < <(<pipeline>)
       // Counts the lines yielded to the loop body. With the previous
@@ -222,7 +226,9 @@ done < <(${DISCOVERY_PIPELINE})
     });
   });
 
-  describe('end-to-end against real git worktrees', () => {
+  describe('end-to-end against real git worktrees',
+    { skip: isWindows ? 'POSIX shell discovery pipeline under test + Windows 8.3 short-name (RUNNER~1) vs long-name path mismatch in temp dirs' : false },
+    () => {
     let upstream;
     let workspace;
     let agentWorktree;

@@ -32,7 +32,7 @@ describe('few-shot calibration examples', () => {
   describe('frontmatter metadata', () => {
     test('plan-checker.md has version and component in frontmatter', () => {
       const content = readFile(path.join(REFS_DIR, 'plan-checker.md'));
-      assert.match(content, /^---\n/);
+      assert.match(content, /^---\r?\n/);
       assert.match(content, /component:\s*plan-checker/);
       assert.match(content, /version:\s*\d+/);
       assert.match(content, /last_calibrated:\s*\d{4}-\d{2}-\d{2}/);
@@ -40,7 +40,7 @@ describe('few-shot calibration examples', () => {
 
     test('verifier.md has version and component in frontmatter', () => {
       const content = readFile(path.join(REFS_DIR, 'verifier.md'));
-      assert.match(content, /^---\n/);
+      assert.match(content, /^---\r?\n/);
       assert.match(content, /component:\s*verifier/);
       assert.match(content, /version:\s*\d+/);
       assert.match(content, /last_calibrated:\s*\d{4}-\d{2}-\d{2}/);

@@ -25,12 +25,16 @@ function runGsd(args, cwd) {
 
 describe('bug #3212 execute-phase stall detection and safe resume', () => {
   test('config schemas register executor stall detector keys', () => {
-    const cjs = require('../get-shit-done/bin/lib/config-schema.cjs');
-    const sdk = read('sdk/src/query/config-schema.ts');
+    // After Cycle 5 (#3536), both CJS and SDK source from the manifest.
+    // Use the CJS runtime Set for CJS; use the manifest directly for SDK-side
+    // verification (since config-schema.ts no longer has inline literals).
+    const { VALID_CONFIG_KEYS: cjsKeys } = require('../get-shit-done/bin/lib/config-schema.cjs');
+    const manifest = JSON.parse(read('sdk/shared/config-schema.manifest.json'));
+    const manifestKeys = new Set(manifest.validKeys);
 
     for (const key of ['executor.stall_detect_interval_minutes', 'executor.stall_threshold_minutes']) {
-      assert.ok(cjs.VALID_CONFIG_KEYS.has(key), `CJS VALID_CONFIG_KEYS must include ${key}`);
-      assert.ok(sdk.includes(`'${key}'`), `SDK VALID_CONFIG_KEYS must include ${key}`);
+      assert.ok(cjsKeys.has(key), `CJS VALID_CONFIG_KEYS must include ${key}`);
+      assert.ok(manifestKeys.has(key), `Manifest validKeys must include ${key} (SDK sources from manifest)`);
     }
   });
 

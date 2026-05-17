@@ -40,9 +40,14 @@ describe('generate-claude-md', () => {
     const claudePath = path.join(tmpDir, 'CLAUDE.md');
     const content = fs.readFileSync(claudePath, 'utf-8');
     assert.ok(content.includes('## GSD Workflow Enforcement'));
+    // #3584: generated CLAUDE.md must emit the runtime-routable hyphen-form
+    // (Claude/Cursor/OpenCode/Kilo etc.); the legacy colon form is no longer
+    // dispatched by current skill installs.
     assert.ok(content.includes('/gsd-quick'));
     assert.ok(content.includes('/gsd-debug'));
     assert.ok(content.includes('/gsd-execute-phase'));
+    assert.ok(!content.includes('/gsd:quick'));
+    assert.ok(!content.includes('/gsd:execute-phase'));
     assert.ok(content.includes('Do not make direct repo edits outside a GSD workflow'));
   });
 

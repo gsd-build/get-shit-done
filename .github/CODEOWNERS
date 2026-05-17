@@ -1,2 +1,21 @@
 # All changes require review from project owner
 * @glittercowboy
+
+# Phase 6 of #3524 — source-of-truth files require architecture-team review.
+# See docs/agents/cjs-sdk-seam.md for context.
+# The blanket rule above already covers everything; these specific rules make
+# the architectural intent explicit and would still apply if the blanket rule
+# is later relaxed.
+/sdk/src/state-document/                          @glittercowboy
+/sdk/src/configuration/                           @glittercowboy
+/sdk/src/workstream-inventory/                    @glittercowboy
+/sdk/src/project-root/                            @glittercowboy
+/sdk/src/runtime-bridge-sync/                     @glittercowboy
+/sdk/shared/config-defaults.manifest.json         @glittercowboy
+/sdk/shared/config-schema.manifest.json           @glittercowboy
+/sdk/shared/model-catalog.json                    @glittercowboy
+/sdk/src/query/query-runtime-bridge.ts            @glittercowboy
+/scripts/lint-shared-module-handsync.cjs          @glittercowboy
+/scripts/shared-module-handsync-allowlist.json    @glittercowboy
+/sdk/src/query/decisions.ts                       @glittercowboy
+/sdk/src/workstream-name-policy.ts                @glittercowboy

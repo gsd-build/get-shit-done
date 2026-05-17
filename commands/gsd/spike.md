@@ -14,6 +14,7 @@ allowed-tools:
   - WebFetch
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
+requires: []
 ---
 <objective>
 Spike an idea through experiential exploration — build focused experiments to feel the pieces
@@ -25,7 +26,7 @@ Two modes:
 - **Idea mode** (default) — describe an idea to spike
 - **Frontier mode** (no argument or "frontier") — analyzes existing spike landscape and proposes integration and frontier spikes
 
-Does not require `/gsd-new-project` — auto-creates `.planning/spikes/` if needed.
+Does not require prior new-project setup — auto-creates `.planning/spikes/` if needed.
 </objective>
 
 <execution_context>

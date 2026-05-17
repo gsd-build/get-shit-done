@@ -12,8 +12,10 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { output, error, safeReadFile, loadConfig } = require('./core.cjs');
+const { output, error, loadConfig } = require('./core.cjs');
+const { platformReadSync: safeReadFile, platformWriteSync, platformEnsureDir } = require('./shell-command-projection.cjs');
 const { getGlobalSkillDir } = require('./runtime-homes.cjs');
+const { formatGsdSlash, resolveRuntime } = require('./runtime-slash.cjs');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -173,36 +175,46 @@ const CLAUDE_INSTRUCTIONS = {
   },
 };
 
-const CLAUDE_MD_FALLBACKS = {
-  project: 'Project not yet initialized. Run /gsd-new-project to set up.',
-  stack: 'Technology stack not yet documented. Will populate after codebase mapping or first phase.',
-  conventions: 'Conventions not yet established. Will populate as patterns emerge during development.',
-  architecture: 'Architecture not yet mapped. Follow existing patterns found in the codebase.',
-  skills: 'No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.',
-};
+// CLAUDE.md fallback / placeholder text — runtime-aware so emitted slash
+// commands route correctly under the active install (#3584). The values must
+// be computed per-call rather than at module load because the slash form
+// depends on the runtime resolved from the project's config/env.
+function buildClaudeMdFallbacks(runtime) {
+  return {
+    project: `Project not yet initialized. Run ${formatGsdSlash('new-project', runtime)} to set up.`,
+    stack: 'Technology stack not yet documented. Will populate after codebase mapping or first phase.',
+    conventions: 'Conventions not yet established. Will populate as patterns emerge during development.',
+    architecture: 'Architecture not yet mapped. Follow existing patterns found in the codebase.',
+    skills: 'No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.',
+  };
+}
 
 // Directories where project skills may live (checked in order)
 const SKILL_SEARCH_DIRS = ['.claude/skills', '.agents/skills', '.cursor/skills', '.github/skills', '.codex/skills'];
 
-const CLAUDE_MD_WORKFLOW_ENFORCEMENT = [
-  'Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.',
-  '',
-  'Use these entry points:',
-  '- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks',
-  '- `/gsd-debug` for investigation and bug fixing',
-  '- `/gsd-execute-phase` for planned phase work',
-  '',
-  'Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.',
-].join('\n');
+function buildClaudeMdWorkflowEnforcement(runtime) {
+  return [
+    'Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.',
+    '',
+    'Use these entry points:',
+    `- \`${formatGsdSlash('quick', runtime)}\` for small fixes, doc updates, and ad-hoc tasks`,
+    `- \`${formatGsdSlash('debug', runtime)}\` for investigation and bug fixing`,
+    `- \`${formatGsdSlash('execute-phase', runtime)}\` for planned phase work`,
+    '',
+    'Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.',
+  ].join('\n');
+}
 
-const CLAUDE_MD_PROFILE_PLACEHOLDER = [
-  '<!-- GSD:profile-start -->',
-  '## Developer Profile',
-  '',
-  '> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.',
-  '> This section is managed by `generate-claude-profile` -- do not edit manually.',
-  '<!-- GSD:profile-end -->',
-].join('\n');
+function buildClaudeMdProfilePlaceholder(runtime) {
+  return [
+    '<!-- GSD:profile-start -->',
+    '## Developer Profile',
+    '',
+    `> Profile not yet configured. Run \`${formatGsdSlash('profile-user', runtime)}\` to generate your developer profile.`,
+    '> This section is managed by `generate-claude-profile` -- do not edit manually.',
+    '<!-- GSD:profile-end -->',
+  ].join('\n');
+}
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
@@ -283,10 +295,11 @@ function extractMarkdownSection(content, sectionName) {
 // ─── CLAUDE.md Section Generators ─────────────────────────────────────────────
 
 function generateProjectSection(cwd) {
+  const fallbacks = buildClaudeMdFallbacks(resolveRuntime(cwd));
   const projectPath = path.join(cwd, '.planning', 'PROJECT.md');
   const content = safeReadFile(projectPath);
   if (!content) {
-    return { content: CLAUDE_MD_FALLBACKS.project, source: 'PROJECT.md', linkPath: null, hasFallback: true };
+    return { content: fallbacks.project, source: 'PROJECT.md', linkPath: null, hasFallback: true };
   }
   const parts = [];
   const h1Match = content.match(/^# (.+)$/m);
@@ -307,12 +320,13 @@ function generateProjectSection(cwd) {
     if (body) parts.push(`### Constraints\n\n${body}`);
   }
   if (parts.length === 0) {
-    return { content: CLAUDE_MD_FALLBACKS.project, source: 'PROJECT.md', linkPath: null, hasFallback: true };
+    return { content: fallbacks.project, source: 'PROJECT.md', linkPath: null, hasFallback: true };
   }
   return { content: parts.join('\n\n'), source: 'PROJECT.md', linkPath: '.planning/PROJECT.md', hasFallback: false };
 }
 
 function generateStackSection(cwd) {
+  const fallbacks = buildClaudeMdFallbacks(resolveRuntime(cwd));
   const codebasePath = path.join(cwd, '.planning', 'codebase', 'STACK.md');
   const researchPath = path.join(cwd, '.planning', 'research', 'STACK.md');
   let content = safeReadFile(codebasePath);
@@ -324,7 +338,7 @@ function generateStackSection(cwd) {
     linkPath = '.planning/research/STACK.md';
   }
   if (!content) {
-    return { content: CLAUDE_MD_FALLBACKS.stack, source: 'STACK.md', linkPath: null, hasFallback: true };
+    return { content: fallbacks.stack, source: 'STACK.md', linkPath: null, hasFallback: true };
   }
   const lines = content.split('\n');
   const summaryLines = [];
@@ -343,10 +357,11 @@ function generateStackSection(cwd) {
 }
 
 function generateConventionsSection(cwd) {
+  const fallbacks = buildClaudeMdFallbacks(resolveRuntime(cwd));
   const conventionsPath = path.join(cwd, '.planning', 'codebase', 'CONVENTIONS.md');
   const content = safeReadFile(conventionsPath);
   if (!content) {
-    return { content: CLAUDE_MD_FALLBACKS.conventions, source: 'CONVENTIONS.md', linkPath: null, hasFallback: true };
+    return { content: fallbacks.conventions, source: 'CONVENTIONS.md', linkPath: null, hasFallback: true };
   }
   const lines = content.split('\n');
   const summaryLines = [];
@@ -359,10 +374,11 @@ function generateConventionsSection(cwd) {
 }
 
 function generateArchitectureSection(cwd) {
+  const fallbacks = buildClaudeMdFallbacks(resolveRuntime(cwd));
   const architecturePath = path.join(cwd, '.planning', 'codebase', 'ARCHITECTURE.md');
   const content = safeReadFile(architecturePath);
   if (!content) {
-    return { content: CLAUDE_MD_FALLBACKS.architecture, source: 'ARCHITECTURE.md', linkPath: null, hasFallback: true };
+    return { content: fallbacks.architecture, source: 'ARCHITECTURE.md', linkPath: null, hasFallback: true };
   }
   const lines = content.split('\n');
   const summaryLines = [];
@@ -374,9 +390,9 @@ function generateArchitectureSection(cwd) {
   return { content: summary, source: 'ARCHITECTURE.md', linkPath: '.planning/codebase/ARCHITECTURE.md', hasFallback: false };
 }
 
-function generateWorkflowSection() {
+function generateWorkflowSection(cwd) {
   return {
-    content: CLAUDE_MD_WORKFLOW_ENFORCEMENT,
+    content: buildClaudeMdWorkflowEnforcement(resolveRuntime(cwd)),
     source: 'GSD defaults',
     linkPath: null,
     hasFallback: false,
@@ -389,6 +405,7 @@ function generateWorkflowSection() {
  * agents know which skills are available at session startup (Layer 1 discovery).
  */
 function generateSkillsSection(cwd) {
+  const fallbacks = buildClaudeMdFallbacks(resolveRuntime(cwd));
   const discovered = [];
 
   for (const dir of SKILL_SEARCH_DIRS) {
@@ -425,7 +442,7 @@ function generateSkillsSection(cwd) {
   }
 
   if (discovered.length === 0) {
-    return { content: CLAUDE_MD_FALLBACKS.skills, source: 'skills/', hasFallback: true };
+    return { content: fallbacks.skills, source: 'skills/', hasFallback: true };
   }
 
   const lines = ['| Skill | Description | Path |', '|-------|-------------|------|'];
@@ -485,8 +502,10 @@ function cmdWriteProfile(cwd, options, raw) {
   if (!fs.existsSync(analysisPath)) error(`Analysis file not found: ${analysisPath}`);
 
   let analysis;
+  const analysisRaw = safeReadFile(analysisPath);
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf-8'));
+    if (analysisRaw === null) throw new Error(`analysis file not found: ${analysisPath}`);
+    analysis = JSON.parse(analysisRaw);
   } catch (err) {
     error(`Failed to parse analysis JSON: ${err.message}`);
   }
@@ -631,8 +650,8 @@ function cmdWriteProfile(cwd, options, raw) {
     outputPath = path.join(cwd, outputPath);
   }
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, template, 'utf-8');
+  platformEnsureDir(path.dirname(outputPath));
+  platformWriteSync(outputPath, template);
 
   const result = {
     profile_path: outputPath,
@@ -716,8 +735,10 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
   if (!fs.existsSync(analysisPath)) error(`Analysis file not found: ${analysisPath}`);
 
   let analysis;
+  const analysisRaw = safeReadFile(analysisPath);
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf-8'));
+    if (analysisRaw === null) throw new Error(`analysis file not found: ${analysisPath}`);
+    analysis = JSON.parse(analysisRaw);
   } catch (err) {
     error(`Failed to parse analysis JSON: ${err.message}`);
   }
@@ -769,7 +790,7 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
 
   let stackBlock;
   if (analysis.data_source === 'questionnaire') {
-    stackBlock = 'Stack preferences not available (questionnaire-only profile). Run `/gsd-profile-user --refresh` with session data to populate.';
+    stackBlock = `Stack preferences not available (questionnaire-only profile). Run \`${formatGsdSlash('profile-user', resolveRuntime(cwd))} --refresh\` with session data to populate.`;
   } else if (options.stack) {
     stackBlock = options.stack;
   } else {
@@ -782,7 +803,7 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
   // the runtime config dir. This writer was missed in the migration
   // (PR #1540 targeted GSD-shipped command files; dev-preferences is a
   // runtime-generated user artifact). Default now points at the skills/
-  // location so /gsd-profile-user --refresh stops re-creating the legacy
+  // location so /gsd:profile-user --refresh stops re-creating the legacy
   // directory. The path is constructed via path.join (not a literal
   // string) so the cline-install leaked-path lint does not flag it.
   let outputPath = options.output;
@@ -803,12 +824,12 @@ function cmdGenerateDevPreferences(cwd, options, raw) {
     outputPath = path.join(cwd, outputPath);
   }
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, template, 'utf-8');
+  platformEnsureDir(path.dirname(outputPath));
+  platformWriteSync(outputPath, template);
 
   const result = {
     command_path: outputPath,
-    command_name: '/gsd-dev-preferences',
+    command_name: formatGsdSlash('dev-preferences', resolveRuntime(cwd)),
     dimensions_included: dimensionsIncluded,
     source: analysis.data_source || 'session_analysis',
   };
@@ -824,8 +845,10 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
   if (!fs.existsSync(analysisPath)) error(`Analysis file not found: ${analysisPath}`);
 
   let analysis;
+  const analysisRaw = safeReadFile(analysisPath);
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf-8'));
+    if (analysisRaw === null) throw new Error(`analysis file not found: ${analysisPath}`);
+    analysis = JSON.parse(analysisRaw);
   } catch (err) {
     error(`Failed to parse analysis JSON: ${err.message}`);
   }
@@ -874,7 +897,7 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
     '<!-- GSD:profile-start -->',
     '## Developer Profile',
     '',
-    `> Generated by GSD from ${dataSource}. Run \`/gsd-profile-user --refresh\` to update.`,
+    `> Generated by GSD from ${dataSource}. Run \`${formatGsdSlash('profile-user', resolveRuntime(cwd))} --refresh\` to update.`,
     '',
     '| Dimension | Rating | Confidence |',
     '|-----------|--------|------------|',
@@ -904,8 +927,8 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
 
   let action;
 
-  if (fs.existsSync(targetPath)) {
-    let existingContent = fs.readFileSync(targetPath, 'utf-8');
+  let existingContent = safeReadFile(targetPath);
+  if (existingContent !== null) {
     const startMarker = '<!-- GSD:profile-start -->';
     const endMarker = '<!-- GSD:profile-end -->';
     const startIdx = existingContent.indexOf(startMarker);
@@ -920,10 +943,10 @@ function cmdGenerateClaudeProfile(cwd, options, raw) {
       existingContent = existingContent.trimEnd() + '\n\n' + sectionContent + '\n';
       action = 'appended';
     }
-    fs.writeFileSync(targetPath, existingContent, 'utf-8');
+    platformWriteSync(targetPath, existingContent);
   } else {
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, sectionContent + '\n', 'utf-8');
+    platformEnsureDir(path.dirname(targetPath));
+    platformWriteSync(targetPath, sectionContent + '\n');
     action = 'created';
   }
 
@@ -1018,11 +1041,11 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
       sections.push(buildSectionContent(name, gen, heading));
     }
     sections.push('');
-    sections.push(CLAUDE_MD_PROFILE_PLACEHOLDER);
+    sections.push(buildClaudeMdProfilePlaceholder(resolveRuntime(cwd)));
     existingContent = sections.join('\n\n') + '\n';
     action = 'created';
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, existingContent, 'utf-8');
+    platformEnsureDir(path.dirname(outputPath));
+    platformWriteSync(outputPath, existingContent);
   } else {
     action = 'updated';
     let fileContent = existingContent;
@@ -1057,10 +1080,10 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
     }
 
     if (!options.auto && fileContent.indexOf('<!-- GSD:profile-start') === -1) {
-      fileContent = fileContent.trimEnd() + '\n\n' + CLAUDE_MD_PROFILE_PLACEHOLDER + '\n';
+      fileContent = fileContent.trimEnd() + '\n\n' + buildClaudeMdProfilePlaceholder(resolveRuntime(cwd)) + '\n';
     }
 
-    fs.writeFileSync(outputPath, fileContent, 'utf-8');
+    platformWriteSync(outputPath, fileContent);
   }
 
   const finalContent = safeReadFile(outputPath);
@@ -1080,7 +1103,7 @@ function cmdGenerateClaudeMd(cwd, options, raw) {
   let message = `Generated ${genCount}/${totalManaged} sections.`;
   if (sectionsFallback.length > 0) message += ` Fallback: ${sectionsFallback.join(', ')}.`;
   if (sectionsSkipped.length > 0) message += ` Skipped (manually edited): ${sectionsSkipped.join(', ')}.`;
-  if (profileStatus === 'placeholder_added') message += ' Run /gsd-profile-user to unlock Developer Profile.';
+  if (profileStatus === 'placeholder_added') message += ` Run ${formatGsdSlash('profile-user', resolveRuntime(cwd))} to unlock Developer Profile.`;
 
   const result = {
     claude_md_path: outputPath,

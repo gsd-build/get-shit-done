@@ -149,6 +149,8 @@ Research, plan, and verify a phase.
 | `--gaps` | Gap closure mode (reads VERIFICATION.md, skips research) |
 | `--skip-verify` | Skip plan checker verification loop |
 | `--prd <file>` | Use a PRD file instead of discuss-phase for context |
+| `--ingest <path-or-glob>` | Use ADR file(s) instead of discuss-phase for context synthesis |
+| `--ingest-format <auto\|nygard\|madr\|narrative>` | Optional ADR parser format override for `--ingest` |
 | `--reviews` | Replan with cross-AI review feedback from REVIEWS.md |
 | `--validate` | Run state validation before planning begins |
 | `--bounce` | Run external plan bounce validation after planning (uses `workflow.plan_bounce_script`) |
@@ -162,7 +164,7 @@ Research, plan, and verify a phase.
 - With `--research`: force-refresh — re-spawn researcher unconditionally, no prompt.
 - With `--view`: print existing RESEARCH.md to stdout, no spawn. Errors if RESEARCH.md missing.
 
-**Package Legitimacy Gate (v1.51):**
+**Package Legitimacy Gate (v1.42.1):**
 When the researcher recommends external packages, it runs `slopcheck install <pkg> --json` on each one and writes a `## Package Legitimacy Audit` table to RESEARCH.md recording Registry, Age, Downloads, Source Repo, and slopcheck verdict. Verdicts:
 
 - `[SLOP]` — package removed from RESEARCH.md entirely; never reaches the planner
@@ -171,7 +173,7 @@ When the researcher recommends external packages, it runs `slopcheck install <pk
 
 Packages sourced from WebSearch are tagged `[ASSUMED]` (not `[VERIFIED]`) and treated the same as `[SUS]` — they get a human checkpoint before install. If `slopcheck` cannot be installed, every recommended package is tagged `[ASSUMED]` and gated.
 
-See [Package Legitimacy Gate in the User Guide](USER-GUIDE.md#package-legitimacy-gate-v151) for the full checkpoint format, verdict table, and troubleshooting.
+See [Package Legitimacy Gate in the User Guide](USER-GUIDE.md#package-legitimacy-gate-v1421) for the full checkpoint format, verdict table, and troubleshooting.
 
 ```bash
 /gsd-plan-phase 1                              # Research + plan + verify phase 1
@@ -179,6 +181,8 @@ See [Package Legitimacy Gate in the User Guide](USER-GUIDE.md#package-legitimacy
 /gsd-plan-phase --auto                         # Non-interactive planning
 /gsd-plan-phase 2 --validate                   # Validate state before planning
 /gsd-plan-phase 1 --bounce                     # Plan + external bounce validation
+/gsd-plan-phase 2 --ingest docs/adr/0010.md   # ADR express path for context synthesis
+/gsd-plan-phase 2 --ingest 'docs/adr/00*.md' --ingest-format auto
 /gsd-plan-phase --research-phase 4             # Research only on phase 4 (prompts if RESEARCH.md exists)
 /gsd-plan-phase --research-phase 4 --view      # Print existing RESEARCH.md, no spawn
 /gsd-plan-phase --research-phase 4 --research  # Force-refresh research, no prompt
@@ -238,7 +242,7 @@ Execute all plans in a phase with wave-based parallelization, or run a specific 
 **Prerequisites:** Phase has PLAN.md files
 **Produces:** per-plan `{phase}-{N}-SUMMARY.md`, git commits, and `{phase}-VERIFICATION.md` when the phase is fully complete
 
-**Package install failures (v1.51):** If a plan's install step fails, the executor surfaces a `checkpoint:human-verify` and stops. It does not auto-install a similarly-named alternative. This is intentional — silently substituting package names is how slopsquatting spreads. Respond to the checkpoint after verifying the package on its registry page.
+**Package install failures (v1.42.1):** If a plan's install step fails, the executor surfaces a `checkpoint:human-verify` and stops. It does not auto-install a similarly-named alternative. This is intentional — silently substituting package names is how slopsquatting spreads. Respond to the checkpoint after verifying the package on its registry page.
 
 ```bash
 /gsd-execute-phase 1                # Execute phase 1
@@ -291,6 +295,9 @@ Create PR from completed phase work with auto-generated body.
 - Requirements addressed (REQ-IDs)
 - Verification status
 - Key decisions
+- Optional configured PRD-style sections from `ship.pr_body_sections`
+
+See [Custom PR Body Sections](ship-pr-body-sections.md) for onboarding, examples, and validation rules.
 
 ---
 
@@ -541,11 +548,17 @@ Configure per-step flags in `.planning/config.json` under `manager.flags`. These
 
 ### `/gsd-help`
 
-Show all commands and usage guide.
+Show GSD commands at the tier you ask for. Default fits one screen; `--full` is the complete reference; `<topic>` jumps directly to one section.
 
 ```bash
-/gsd-help                           # Quick reference
+/gsd-help                           # One-page tour (default)
+/gsd-help --brief                   # ~10-line one-liner refresher of top commands
+/gsd-help --full                    # Complete reference (every command, every flag)
+/gsd-help <topic>                   # One section only (e.g. /gsd-help debug)
+/gsd-help --brief <topic>           # Compact scoped lookup — signature + one-line summary
 ```
+
+See `get-shit-done/workflows/help/modes/topic.md` for the full alias table. Unknown topics print the recognized list.
 
 ---
 
@@ -959,6 +972,26 @@ All answers merge via `gsd-sdk query config-set`, preserving unrelated keys. API
 
 See [CONFIGURATION.md](CONFIGURATION.md) for the full schema and defaults.
 
+### `/gsd-surface`
+
+Toggle which skills are surfaced — apply a profile, list, or disable a cluster without reinstall.
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | Show enabled and disabled clusters and skills |
+| `status` | Alias for `list` plus token cost summary |
+| `profile <name>` | Write `baseProfile` and re-stage skills |
+| `disable <cluster>` | Add cluster to disabled list and re-stage |
+| `enable <cluster>` | Remove cluster from disabled list and re-stage |
+| `reset` | Delete surface delta; return to install-time profile |
+
+```bash
+/gsd-surface list                   # Show current surface
+/gsd-surface profile standard       # Switch to standard profile
+/gsd-surface disable utility        # Disable the utility cluster
+/gsd-surface reset                  # Restore install-time profile
+```
+
 ---
 
 ## Brownfield Commands
@@ -1080,6 +1113,8 @@ Review source files changed during a phase for bugs, security vulnerabilities, a
 **Produces:** `{phase}-REVIEW.md` with severity-classified findings; `{phase}-REVIEW-FIX.md` when `--fix` is used
 **Spawns:** `gsd-code-reviewer` agent; `gsd-code-fixer` agent (with `--fix`)
 
+**Optional structural pre-pass:** Set `code_quality.fallow.enabled` to `true` to run fallow before the agent review. GSD writes `{phase}/FALLOW.json` and embeds a `Structural Findings (fallow)` section in `REVIEW.md`. Configure scope and profile with `code_quality.fallow.scope` and `code_quality.fallow.profile`.
+
 ```bash
 /gsd-code-review 3                          # Standard review for phase 3
 /gsd-code-review 2 --depth=deep             # Deep cross-file review
@@ -1150,13 +1185,27 @@ Cross-AI peer review of phase plans from external AI CLIs.
 | `--opencode` | Include OpenCode review (via GitHub Copilot) |
 | `--qwen` | Include Qwen Code review (Alibaba Qwen models) |
 | `--cursor` | Include Cursor agent review |
-| `--all` | Include all available CLIs |
+| `--ollama` | Include Ollama server review |
+| `--lm-studio` | Include LM Studio server review |
+| `--llama-cpp` | Include llama.cpp server review |
+| `--all` | Include all available reviewers (CLI + local model servers) |
+
+**Default reviewer behavior (no flags):**
+- If `review.default_reviewers` is **unset**, `/gsd-review` runs all detected reviewers (current default behavior).
+- If `review.default_reviewers` is **set**, `/gsd-review` runs only that subset (for example `["gemini","codex"]`).
+- `--all` always overrides config and runs the full detected set.
+- Explicit flags (for example `--cursor`) override both `--all` and config defaults for that run.
 
 **Produces:** `{phase}-REVIEWS.md` — consumable by `/gsd-plan-phase --reviews`
 
 ```bash
+# set project default reviewers for no-flag /gsd-review runs
+gsd config-set review.default_reviewers '["gemini","codex"]'
+
+/gsd-review --phase 2             # runs gemini+codex from config
 /gsd-review --phase 3 --all
 /gsd-review --phase 2 --gemini
+/gsd-review --phase 2 --cursor    # one-off override
 ```
 
 ---

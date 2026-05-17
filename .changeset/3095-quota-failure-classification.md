@@ -1,0 +1,5 @@
+---
+type: Added
+pr: 3095
+---
+**Distinct quota / rate-limit failure class for dispatched executor subagents** — `execute-phase` step 7 now routes provider quota and rate-limit terminations through a separate recovery branch instead of the generic "real failure" prompt. A new SDK query `agent.classify-failure` (`gsd-sdk query agent.classify-failure -- "<body>"`) classifies the agent return body as `quota-exceeded`, `classify-handoff-bug`, or `unknown-failure`, extracting `retryAfterSeconds` when the provider echoes one. Sentinels cover every runtime GSD dispatches into: Claude Code (`usage limit`, `429`), Copilot CLI (`rate_limit`, `user_weekly_rate_limited`), Codex (`usage_limit_reached`, `too many requests`), and Gemini (`RESOURCE_EXHAUSTED`, `exceeded your`). The recovery prompt for `quota-exceeded` offers wait-for-reset and resume as the first option rather than retry-now, which the runtime would reject again until the quota window resets. The resume path itself relies on the safe-resume gate landing in #3212. (#3095)

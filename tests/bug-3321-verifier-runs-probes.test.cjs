@@ -15,7 +15,7 @@ function verifierProbeContract(content) {
   assert.notEqual(sectionEnd, -1, 'verifier must close Step 7c before Step 8');
 
   const section = content.slice(sectionStart, sectionEnd);
-  const codeBlocks = [...section.matchAll(/```bash\n([\s\S]*?)\n```/g)].map((match) => match[1]);
+  const codeBlocks = [...section.matchAll(/```bash\r?\n([\s\S]*?)\r?\n```/g)].map((match) => match[1].split(/\r?\n/).join('\n'));
   const executionSteps = [...section.matchAll(/^\d+\.\s+(.+)$/gm)].map((match) => match[1]);
   return {
     title: 'Step 7c: Probe Execution',

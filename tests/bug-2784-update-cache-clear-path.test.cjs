@@ -61,10 +61,10 @@ describe('bug-2784: update.md cache-clear covers shared cache path', () => {
     const stepContent = stepMatch[0];
 
     const bashLines = [];
-    const fenceRe = /```(?:bash|sh)\n([\s\S]*?)```/g;
+    const fenceRe = /```(?:bash|sh)\r?\n([\s\S]*?)```/g;
     let m;
     while ((m = fenceRe.exec(stepContent)) !== null) {
-      for (const line of m[1].split('\n')) {
+      for (const line of m[1].split(/\r?\n/)) {
         const trimmed = line.trim();
         if (trimmed) bashLines.push(trimmed);
       }

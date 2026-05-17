@@ -3,7 +3,7 @@ Interactive configuration of GSD power-user knobs — plan bounce, node repair, 
 inline plan threshold, cross-AI execution, base branch, branch templates, response language,
 context window, gitignored search, graphify build timeout, and runtime model tier overrides.
 
-This is a companion to `/gsd-settings` — the common-case prompt there covers model profile,
+This is a companion to `/gsd:settings` — the common-case prompt there covers model profile,
 research/plan_check/verifier toggles, branching strategy, UI/AI phase gates, and worktree
 isolation. This advanced command covers everything else that is user-settable, grouped into
 seven sections so each prompt batch stays cognitively scoped. Every answer pre-selects the
@@ -554,11 +554,11 @@ Display:
 | model_profile_overrides.<runtime>.sonnet   | {model/built-in/null} |
 | model_profile_overrides.<runtime>.haiku    | {model/built-in/null} |
 
-These settings apply to future /gsd-plan-phase, /gsd-execute-phase, /gsd-discuss-phase,
-and /gsd-ship runs.
+These settings apply to future /gsd:plan-phase, /gsd:execute-phase, /gsd:discuss-phase,
+and /gsd:ship runs.
 
 For common-case toggles (model profile, research/plan_check/verifier, branching strategy,
-UI/AI phase gates), use /gsd-settings.
+UI/AI phase gates), use /gsd:settings.
 ```
 </step>
 

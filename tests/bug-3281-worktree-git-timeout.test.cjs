@@ -35,7 +35,7 @@ const WORKTREE_SAFETY_PATH = path.join(
  *   - not throw
  */
 function makeTimeoutStub() {
-  return function stubTimedOutExecGit(_cwd, _args) {
+  return function stubTimedOutExecGit(_args, _opts) {
     return {
       exitCode: null,
       stdout: '',

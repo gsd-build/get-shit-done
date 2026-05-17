@@ -10,6 +10,7 @@ allowed-tools:
   - Grep
   - Agent
   - AskUserQuestion
+requires: [phase, review]
 ---
 
 <objective>

@@ -126,13 +126,13 @@ If `$VALIDATE_MODE` only:
 
 ```bash
 if ! command -v gsd-sdk &>/dev/null; then
-  echo "⚠ gsd-sdk not found in PATH — /gsd-quick requires it."
+  echo "⚠ gsd-sdk not found in PATH — /gsd:quick requires it."
   echo ""
   echo "Install the query-capable GSD SDK CLI:"
   echo "  npm install -g get-shit-done-cc"
   echo ""
   echo "Or update GSD to get the latest packages:"
-  echo "  /gsd-update"
+  echo "  /gsd:update"
   exit 1
 fi
 ```
@@ -170,7 +170,7 @@ fi
 
 Quick mode does not have a pre-declared `files_modified` list (the task is freeform), so use a fail-loud guard at commit time: when the executor stages files for the quick-task commit, if any staged path falls inside a `SUBMODULE_PATHS` entry, abort with a clear error explaining that worktree-isolated commits cannot safely span submodule boundaries — the user can re-run with `workflow.use_worktrees=false` to fall back to sequential execution on the main tree. If `SUBMODULE_PATHS` is empty (no `.gitmodules` in the repo), worktree isolation proceeds normally.
 
-**If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd-new-project` first.
+**If `roadmap_exists` is false:** Error — Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first.
 
 Quick tasks can run mid-phase - validation only checks ROADMAP.md exists, not phase status.
 
@@ -799,6 +799,19 @@ After executor returns:
    node -e 'const fs=require("fs");const p=process.env.QUICK_WORKTREE_MANIFEST||process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("QUICK_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read QUICK_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
    while IFS= read -r WT; do
      [ -z "$WT" ] && continue
+     # Pin CWD to project root before any bare git command (#3521).
+     # An LLM orchestrator may leak CWD into a worktree across tool calls; without
+     # this pin the merge command resolves against the worktree branch itself and
+     # silently no-ops the main-branch merge.
+     PROJECT_ROOT=$(git -C "$WT" rev-parse --git-common-dir 2>/dev/null)
+     # git rev-parse --git-common-dir returns the .git dir, not the working tree root.
+     # Strip the trailing /.git (or bare .git) to get the working tree root.
+     PROJECT_ROOT=$(echo "$PROJECT_ROOT" | sed 's|/\.git$||; s|/\.git/.*||')
+     if [ -z "$PROJECT_ROOT" ] || [ ! -d "$PROJECT_ROOT" ]; then
+       echo "WARN: cannot resolve project root from worktree $WT — skipping cleanup for this entry (#3521)" >&2
+       continue
+     fi
+     cd "$PROJECT_ROOT" || { echo "WARN: cannot cd to project root $PROJECT_ROOT — skipping cleanup for worktree $WT (#3521)" >&2; continue; }
      WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
      if [ -n "$WT_BRANCH" ] && [ "$WT_BRANCH" != "HEAD" ]; then
        # --- Orchestrator file protection (#1756) ---
@@ -1115,7 +1128,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd-quick ${GSD_WS}
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 **If NOT `$VALIDATE_MODE`:**
@@ -1132,7 +1145,7 @@ Commit: ${commit_hash}
 
 ---
 
-Ready for next task: /gsd-quick ${GSD_WS}
+Ready for next task: /gsd:quick ${GSD_WS}
 ```
 
 </process>

@@ -1,6 +1,6 @@
 # Debug Workflow
 
-Invoked by `/gsd-debug` (`commands/gsd/debug.md`).
+Invoked by `/gsd:debug` (`commands/gsd/debug.md`).
 
 Systematic debugging using the scientific method with subagent isolation.
 Orchestrates symptom gathering, session creation, and delegation to `gsd-debug-session-manager`.
@@ -52,11 +52,11 @@ Active Debug Sessions
      hypothesis: Missing null check on req.body.user
      next: Verify fix passes regression test
 ─────────────────────────────────────────────
-Run `/gsd-debug continue <slug>` to resume a session.
-No sessions? `/gsd-debug <description>` to start.
+Run `/gsd:debug continue <slug>` to resume a session.
+No sessions? `/gsd:debug <description>` to start.
 ```
 
-If no files exist or the glob returns nothing: print "No active debug sessions. Run `/gsd-debug <issue description>` to start one."
+If no files exist or the glob returns nothing: print "No active debug sessions. Run `/gsd:debug <issue description>` to start one."
 
 STOP after displaying list. Do NOT proceed to further steps.
 
@@ -83,9 +83,9 @@ No agent spawn. Just information display. STOP after printing.
 
 When SUBCMD=continue and SLUG is set:
 
-**Sanitize SLUG first:** strip whitespace, reject unless it matches `^[a-z0-9][a-z0-9-]*$`, enforce max 30 chars, reject any `..`, `/`, or `\`. If invalid, print "No active debug session found with slug: {SLUG}. Check `/gsd-debug list` for active sessions." and stop.
+**Sanitize SLUG first:** strip whitespace, reject unless it matches `^[a-z0-9][a-z0-9-]*$`, enforce max 30 chars, reject any `..`, `/`, or `\`. If invalid, print "No active debug session found with slug: {SLUG}. Check `/gsd:debug list` for active sessions." and stop.
 
-Check `.planning/debug/{SLUG}.md` exists. If not, print "No active debug session found with slug: {SLUG}. Check `/gsd-debug list` for active sessions." and stop.
+Check `.planning/debug/{SLUG}.md` exists. If not, print "No active debug session found with slug: {SLUG}. Check `/gsd:debug list` for active sessions." and stop.
 
 Read file and print Current Focus block to console:
 
@@ -215,7 +215,7 @@ specialist_dispatch_enabled: true
 Display the compact summary returned by the session manager.
 
 If summary shows `DEBUG SESSION COMPLETE`: done.
-If summary shows `ABANDONED`: note session saved at `.planning/debug/{slug}.md` for later `/gsd-debug continue {slug}`.
+If summary shows `ABANDONED`: note session saved at `.planning/debug/{slug}.md` for later `/gsd:debug continue {slug}`.
 
 </process>
 

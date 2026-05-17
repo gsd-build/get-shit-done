@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 3648
+---
+**`gsd-sdk query resolve-model` now honors `resolve_model_ids: true` under `runtime: "claude"`** — previously the resolver bailed out of `resolveRuntimeTier` for Claude (because Claude is the implicit/default runtime in `config-query.ts:149`) and fell through to the alias-return path on line 243 without consulting the catalog. Consumers asking for resolved model IDs received the tier alias (`opus` / `sonnet` / `haiku`) instead of the full Claude model ID (`claude-opus-4-7` / `claude-sonnet-4-6` / `claude-haiku-4-5`). The CJS branch at `get-shit-done/bin/lib/core.cjs:1348-1350` (`if (config.resolve_model_ids) return MODEL_ALIAS_MAP[alias] || alias;`) was missing from the TS port. Added a `runtime === 'claude' && resolveModelIds === true` branch that calls `resolveRuntimeTierDefault('claude', tier)` from the shared model-catalog so both runtimes derive Claude IDs from the same source of truth. `model_overrides`, the phase-type tier override (`config.models[phaseType]`), and `resolve_model_ids: "omit"` all retain their existing precedence. (#3643)

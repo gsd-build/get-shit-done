@@ -128,7 +128,8 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
     assert.equal(status, 1);
     assert.equal(report.failures, 1);
     const r0 = report.results[0];
-    assert.equal(r0.file, 'skills/discuss-phase/SKILL.md');
+    // Normalize separators: on Windows the SUT emits 'skills\discuss-phase\SKILL.md'.
+    assert.equal(r0.file.replace(/\\/g, '/'), 'skills/discuss-phase/SKILL.md');
     assert.equal(r0.status, 'fail');
     assert.equal(r0.reason, REASON.FAIL_USER_LINES_MISSING);
     assert.ok(

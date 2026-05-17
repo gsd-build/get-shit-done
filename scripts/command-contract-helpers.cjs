@@ -22,7 +22,10 @@ const CANONICAL_TOOLS = new Set([
 ]);
 
 function parseFrontmatter(content) {
-  const lines = content.split('\n');
+  // CRLF-tolerant split: Windows checkouts (autocrlf=true) leave a trailing
+  // \r on every line, making lines.indexOf('---', 1) return -1 (the value
+  // would be '---\r', not '---') → returns {} → every field appears missing.
+  const lines = content.split(/\r?\n/);
   if (lines[0].trim() !== '---') return {};
   const end = lines.indexOf('---', 1);
   if (end === -1) return {};

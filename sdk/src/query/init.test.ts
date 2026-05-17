@@ -325,6 +325,20 @@ describe('initExecutePhase', () => {
     expect(data.milestone_version).toBeDefined();
   });
 
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initExecutePhase(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initExecutePhase(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('returns error when phase arg missing', async () => {
     const result = await initExecutePhase([], tmpDir);
     const data = result.data as Record<string, unknown>;
@@ -344,6 +358,55 @@ describe('initExecutePhase', () => {
     expect(data.branching_strategy).toBe('phase');
     expect(typeof data.branch_name).toBe('string');
   });
+
+  it('keeps same-milestone archived phase directory instead of nulling it (#3469)', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'gsd-init-3469-'));
+    try {
+      await mkdir(join(tmp, '.planning', 'milestones', 'v2.0-phases', '02-auth'), { recursive: true });
+      await writeFile(join(tmp, '.planning', 'PROJECT.md'), '# Project\n\n## What This Is\n\nA project.\n\n## Core Value\n\nValue here.\n\n## Requirements\n\n- Req 1\n');
+      await writeFile(join(tmp, '.planning', 'ROADMAP.md'), [
+        '# Roadmap',
+        '',
+        '## v2.0: Current',
+        '',
+        '### Phase 2: Auth',
+        '',
+        '**Goal:** Implement auth',
+        '',
+      ].join('\n'));
+      await writeFile(join(tmp, '.planning', 'STATE.md'), [
+        '---',
+        'milestone: v2.0',
+        'status: executing',
+        '---',
+        '',
+        '# Session State',
+      ].join('\n'));
+      await writeFile(join(tmp, '.planning', 'config.json'), JSON.stringify({
+        model_profile: 'balanced',
+        commit_docs: false,
+        git: {
+          branching_strategy: 'none',
+          phase_branch_template: 'gsd/phase-{phase}-{slug}',
+          milestone_branch_template: 'gsd/{milestone}-{slug}',
+          quick_branch_template: null,
+        },
+        workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: true },
+      }));
+      await writeFile(
+        join(tmp, '.planning', 'milestones', 'v2.0-phases', '02-auth', '02-01-PLAN.md'),
+        '# Plan\n',
+      );
+
+      const result = await initExecutePhase(['2'], tmp);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_found).toBe(true);
+      expect(data.phase_dir).toBe('.planning/milestones/v2.0-phases/02-auth');
+      expect(data.plan_count).toBe(1);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('initPlanPhase', () => {
@@ -360,10 +423,72 @@ describe('initPlanPhase', () => {
     expect(data.project_root).toBe(tmpDir);
   });
 
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initPlanPhase(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initPlanPhase(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('returns error when phase arg missing', async () => {
     const result = await initPlanPhase([], tmpDir);
     const data = result.data as Record<string, unknown>;
     expect(data.error).toBeDefined();
+  });
+
+  // #3569: init.plan-phase must surface a phase_status field so the
+  // /gsd-plan-phase workflow can short-circuit on closed phases instead of
+  // happily replanning over shipped code. Reuses the project-wide phase
+  // lifecycle vocabulary from determinePhaseStatus (Pending | Planned |
+  // In Progress | Executed | Complete | Needs Review).
+  describe('phase_status (#3569)', () => {
+    it('reports "Complete" when summaries match plans and VERIFICATION.md status: passed', async () => {
+      // Phase 9 fixture already has 1 plan + 1 summary; add a passing VERIFICATION.
+      await writeFile(
+        join(tmpDir, '.planning', 'phases', '09-foundation', '09-VERIFICATION.md'),
+        ['---', 'phase: 09', 'status: passed', 'score: 100', 'verified: true', '---', '# Verification'].join('\n'),
+      );
+
+      const result = await initPlanPhase(['9'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Complete');
+    });
+
+    it('reports "Planned" when plans exist but no summaries written', async () => {
+      // Phase 10 has no plan files in the beforeEach fixture. Add a plan to flip
+      // it from "Pending" (no plans) to "Planned" (plans, no summaries).
+      await writeFile(
+        join(tmpDir, '.planning', 'phases', '10-read-only-queries', '10-01-PLAN.md'),
+        ['---', 'phase: 10-read-only-queries', 'plan: 01', '---', '<objective>x</objective>'].join('\n'),
+      );
+
+      const result = await initPlanPhase(['10'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Planned');
+    });
+
+    it('reports "Pending" when phase has no plans yet', async () => {
+      const result = await initPlanPhase(['10'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Pending');
+    });
+
+    it('reports "Executed" when summaries match plans but VERIFICATION.md is absent', async () => {
+      // Phase 9 fixture: 1 plan, 1 summary, no VERIFICATION yet — executed but
+      // not closed. This is the regression hot zone: pre-fix, init.plan-phase
+      // gave no signal here, so the workflow couldn't distinguish this from
+      // an already-closed phase either.
+      const result = await initPlanPhase(['9'], tmpDir);
+      const data = result.data as Record<string, unknown>;
+      expect(data.phase_status).toBe('Executed');
+    });
   });
 
   // #2769: extractReqIds must accept all bold/colon variants of the
@@ -448,6 +573,20 @@ describe('initVerifyWork', () => {
     expect(data.project_root).toBe(tmpDir);
   });
 
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initVerifyWork(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initVerifyWork(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
   it('resolves workstream-scoped phases when workstream is provided', async () => {
     const wsDir = join(tmpDir, '.planning', 'workstreams', 'delivery');
     await mkdir(join(wsDir, 'phases', '32-shipment-creation-tracking-numbers-print-forms'), { recursive: true });
@@ -489,6 +628,20 @@ describe('initPhaseOp', () => {
     expect(data.has_context).toBe(true);
     expect(data.plan_count).toBeGreaterThanOrEqual(1);
     expect(data.project_root).toBe(tmpDir);
+  });
+
+  it('accepts --phase flag form for existing phase (#3387)', async () => {
+    const result = await initPhaseOp(['--phase', '9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
+  });
+
+  it('accepts --phase=value flag form for existing phase (#3387)', async () => {
+    const result = await initPhaseOp(['--phase=9'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    expect(data.phase_found).toBe(true);
+    expect(data.phase_number).toBe('09');
   });
 });
 

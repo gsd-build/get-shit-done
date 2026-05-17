@@ -155,7 +155,7 @@ From `read-only-parity.integration.test.ts` (full `toEqual` on this repo):
 
 | SDK dispatch (canonical) | Notes |
 | ------------------------ | ----- |
-| `resolve-model` | Args e.g. `gsd-planner`. |
+| `resolve-model` | Args e.g. `gsd-planner`; returns `reasoning_effort` when the selected runtime tier defines one. |
 | `phase-plan-index` | Phase number arg. |
 | `roadmap.get-phase` | Phase number arg. |
 | `list.todos` | No args. |
@@ -298,7 +298,7 @@ Disposition: **Registered** = handled in `createRegistry()` under the listed SDK
 | `state` (subcommands)                                                                                                                   | `state.load`, `state.json`, `state.get`, `state.update`, `state.patch`, … | Registered              | Dotted and `state …` space aliases in `index.ts`.                         |
 | `resolve-model`                                                                                                                         | `resolve-model`                                                           | Registered              |                                                                           |
 | `find-phase`                                                                                                                            | `find-phase`                                                              | Registered              | Golden: subset parity (see above).                                        |
-| `commit`, `check-commit`, `commit-to-subrepo`                                                                                           | `commit`, `check-commit`, `commit-to-subrepo`                             | Registered              |                                                                           |
+| `commit`, `check-commit`, `commit-to-subrepo`                                                                                           | `commit`, `check-commit`, `commit-to-subrepo`                             | Registered              | `commit`: `--files` re-stages full files by default; use `--respect-staged` to skip `git add` and commit only what is already staged within the pathspec (#3522). |
 | `verify-summary`                                                                                                                        | `verify-summary`, `verify.summary`, `verify summary`                      | Registered              |                                                                           |
 | `template`                                                                                                                              | `template.fill`, `template.select`, …                                     | Registered              |                                                                           |
 | `frontmatter`                                                                                                                           | `frontmatter.get`, `frontmatter.set`, …                                   | Registered              |                                                                           |

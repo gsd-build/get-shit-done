@@ -10,6 +10,7 @@ allowed-tools:
   - Grep
   - Agent
   - AskUserQuestion
+requires: [new-project, phase, plan-phase]
 ---
 <objective>
 Guide the user through MVP-mode planning for a phase. The command:

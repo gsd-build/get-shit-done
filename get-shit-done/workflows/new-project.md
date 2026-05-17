@@ -33,7 +33,7 @@ Check if `--auto` flag is present in $ARGUMENTS.
 **Document requirement:**
 Auto mode requires an idea document — either:
 
-- File reference: `/gsd-new-project --auto @prd.md`
+- File reference: `/gsd:new-project --auto @prd.md`
 - Pasted/written text in the prompt
 
 If no document content provided, error:
@@ -42,8 +42,8 @@ If no document content provided, error:
 Error: --auto requires an idea document.
 
 Usage:
-  /gsd-new-project --auto @your-idea.md
-  /gsd-new-project --auto [paste or write your idea here]
+  /gsd:new-project --auto @your-idea.md
+  /gsd:new-project --auto [paste or write your idea here]
 
 The document should describe what you want to build.
 ```
@@ -64,15 +64,27 @@ AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-research-synthesizer)
 AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper)
 ```
 
-Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `agents_installed`, `missing_agents`.
+Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `git_worktree_root`, `in_nested_subdir`, `project_path`, `agents_installed`, `missing_agents`, `agent_runtime`, `agents_dir`, `required_agents`, `required_agents_installed`, `missing_required_agents`, `agent_skill_payloads_available`, `agent_skill_payload_agents`.
 
 **If `agents_installed` is false:** Display a warning before proceeding:
-```
+```text
 ⚠ GSD agents not installed. The following agents are missing from your agents directory:
   {missing_agents joined with newline}
 
+Runtime checked: {agent_runtime}
+Agents directory checked: {agents_dir}
+Required new-project agents missing:
+  {missing_required_agents joined with newline, or "none"}
+
+Agent skill payloads available: {agent_skill_payloads_available}
+Agent skill payload agents:
+  {agent_skill_payload_agents joined with newline, or "none"}
+
+Skill payloads only provide prompt context. Named subagent spawns still require agent
+definitions to be installed for this runtime.
+
 Subagent spawns (gsd-project-researcher, gsd-research-synthesizer, gsd-roadmapper) will fail
-with "agent type not found". Run the installer with --global to make agents available:
+with "agent type not found" if `required_agents_installed` is false. Run the installer with --global to make agents available:
 
   npx get-shit-done-cc@latest --global
 
@@ -103,13 +115,13 @@ if [ "$RUNTIME" = "codex" ]; then INSTRUCTION_FILE="AGENTS.md"; else INSTRUCTION
 
 All subsequent references to the project instruction file use `$INSTRUCTION_FILE`.
 
-**If `project_exists` is true:** Error — project already initialized. Use `/gsd-progress`.
+**If `project_exists` is true:** Error — project already initialized. Use `/gsd:progress`.
 
-**If `has_git` is false:** Initialize git:
+**Git init (#3491 — never nest `.git` inside an existing worktree):**
 
-```bash
-git init
-```
+- If `has_git` true and `in_nested_subdir` true: skip `git init`; warn `⚠ Initializing inside existing worktree (${git_worktree_root}); planning files will track to outer repo.`
+- If `has_git` true and `in_nested_subdir` false: skip `git init` (already at worktree root).
+- If `has_git` false: `git init`.
 
 ## 2. Brownfield Offer
 
@@ -124,13 +136,13 @@ Use AskUserQuestion:
 - header: "Codebase"
 - question: "I detected existing code in this directory. Would you like to map the codebase first?"
 - options:
-  - "Map codebase first" — Run /gsd-map-codebase to understand existing architecture (Recommended)
+  - "Map codebase first" — Run /gsd:map-codebase to understand existing architecture (Recommended)
   - "Skip mapping" — Proceed with project initialization
 
 **If "Map codebase first":**
 
 ```
-Run `/gsd-map-codebase` first, then return to `/gsd-new-project`
+Run `/gsd:map-codebase` first, then return to `/gsd:new-project`
 ```
 
 Exit command.
@@ -223,11 +235,35 @@ AskUserQuestion([
 ])
 ```
 
+**Round 3 — PR body onboarding:**
+
+Ask which optional PRD-style sections `/gsd:ship` should append to generated PR bodies. These map to `ship.pr_body_sections`; selected sections are written with `"enabled": true`, unselected seeded sections are written with `"enabled": false` so the project can enable them later without editing `ship.md`.
+
+Prefer lean/agile PRD sections that make the delivered increment clear: user stories, acceptance criteria, Definition of Done or release criteria, risks, dependencies, and stakeholder review.
+
+```
+AskUserQuestion([
+  {
+    header: "PR Body",
+    question: "Which optional PRD-style sections should /gsd:ship include in PR bodies?",
+    multiSelect: true,
+    options: [
+      { label: "User Stories & Acceptance Criteria", description: "Append user-facing stories and acceptance checks from REQUIREMENTS.md" },
+      { label: "Risks & Dependencies", description: "Append rollout risks, dependencies, and rollback notes from PLAN.md" },
+      { label: "Success Metrics & Release Criteria", description: "Append measurable Definition of Done and release checks for stakeholder review" },
+      { label: "Stakeholder Review & Approval", description: "Append approval checklist for projects that need sign-off traceability" }
+    ]
+  }
+])
+```
+
+Build `ship.pr_body_sections` from those choices. For selected options, set `enabled: true`; for seeded but unselected options, set `enabled: false`. If the user selects none, use `"ship":{"pr_body_sections":[]}`.
+
 Create `.planning/config.json` with all settings (CLI fills in remaining defaults automatically):
 
 ```bash
 mkdir -p .planning
-gsd-sdk query config-new-project '{"mode":"yolo","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":true|false,"auto_advance":true}}'
+gsd-sdk query config-new-project '{"mode":"yolo","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":true|false,"auto_advance":true},"ship":{"pr_body_sections":[{"heading":"User Stories & Acceptance Criteria","enabled":true|false,"source":"REQUIREMENTS.md ## User Stories || REQUIREMENTS.md ## Acceptance Criteria","fallback":"- Acceptance criteria are covered by the linked requirements and verification evidence."},{"heading":"Risks & Dependencies","enabled":true|false,"source":"PLAN.md ## Risks || PLAN.md ## Dependencies","fallback":"- No known high-risk rollout dependencies."},{"heading":"Success Metrics & Release Criteria","enabled":true|false,"source":"REQUIREMENTS.md ## Definition of Done || VERIFICATION.md ## Release Criteria","fallback":"- Release when automated verification and required manual checks pass."},{"heading":"Stakeholder Review & Approval","enabled":true|false,"template":"- Product owner approval pending for {phase_name}."}]}}'
 ```
 
 **If commit_docs = No:** Add `.planning/` to `.gitignore`.
@@ -269,8 +305,8 @@ If any of these exist, surface them before questioning:
 ⚡ Prior exploration detected:
 {if SPIKE_SKILL}  ✓ Spike findings skill: {path} — validated patterns from experiments
 {if SKETCH_SKILL}  ✓ Sketch findings skill: {path} — validated design decisions
-{if HAS_SPIKES && !SPIKE_SKILL}  ◆ Raw spikes in .planning/spikes/ — consider `/gsd-spike --wrap-up` to package findings
-{if HAS_SKETCHES && !SKETCH_SKILL}  ◆ Raw sketches in .planning/sketches/ — consider `/gsd-sketch --wrap-up` to package findings
+{if HAS_SPIKES && !SPIKE_SKILL}  ◆ Raw spikes in .planning/spikes/ — consider `/gsd:spike --wrap-up` to package findings
+{if HAS_SKETCHES && !SKETCH_SKILL}  ◆ Raw sketches in .planning/sketches/ — consider `/gsd:sketch --wrap-up` to package findings
 
 These findings will be incorporated into project context and available to planning agents.
 ```
@@ -434,7 +470,7 @@ This document evolves at phase transitions and milestone boundaries.
 4. Decisions to log? → Add to Key Decisions
 5. "What This Is" still accurate? → Update if drifted
 
-**After each milestone** (via `/gsd-complete-milestone`):
+**After each milestone** (via `/gsd:complete-milestone`):
 1. Full review of all sections
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
@@ -645,14 +681,23 @@ questions: [
 ]
 ```
 
+**PR body onboarding:** Ask which optional PRD-style sections `/gsd:ship` should append to generated PR bodies. Use the same `ship.pr_body_sections` mapping as Step 2a: selected sections get `enabled: true`, seeded-but-unselected sections get `enabled: false`, and selecting none writes an empty list. Prefer lean/agile PRD sections that make user value, acceptance criteria, Definition of Done, and stakeholder traceability explicit.
+
+Recommended options:
+
+- `User Stories & Acceptance Criteria`
+- `Risks & Dependencies`
+- `Success Metrics & Release Criteria`
+- `Stakeholder Review & Approval`
+
 Create `.planning/config.json` with all settings (CLI fills in remaining defaults automatically):
 
 ```bash
 mkdir -p .planning
-gsd-sdk query config-new-project '{"mode":"[yolo|interactive]","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":[false if granularity=coarse, true otherwise]}}'
+gsd-sdk query config-new-project '{"mode":"[yolo|interactive]","granularity":"[selected]","parallelization":true|false,"commit_docs":true|false,"model_profile":"quality|balanced|budget|inherit","workflow":{"research":true|false,"plan_check":true|false,"verifier":true|false,"nyquist_validation":[false if granularity=coarse, true otherwise]},"ship":{"pr_body_sections":[{"heading":"User Stories & Acceptance Criteria","enabled":true|false,"source":"REQUIREMENTS.md ## User Stories || REQUIREMENTS.md ## Acceptance Criteria","fallback":"- Acceptance criteria are covered by the linked requirements and verification evidence."},{"heading":"Risks & Dependencies","enabled":true|false,"source":"PLAN.md ## Risks || PLAN.md ## Dependencies","fallback":"- No known high-risk rollout dependencies."},{"heading":"Success Metrics & Release Criteria","enabled":true|false,"source":"REQUIREMENTS.md ## Definition of Done || VERIFICATION.md ## Release Criteria","fallback":"- Release when automated verification and required manual checks pass."},{"heading":"Stakeholder Review & Approval","enabled":true|false,"template":"- Product owner approval pending for {phase_name}."}]}}'
 ```
 
-**Note:** Run `/gsd-settings` anytime to update model profile, workflow agents, branching strategy, and other preferences.
+**Note:** Run `/gsd:settings` anytime to update model profile, workflow agents, branching strategy, and other preferences.
 
 **If commit_docs = No:**
 
@@ -1332,7 +1377,7 @@ Present completion summary:
 ╚══════════════════════════════════════════╝
 ```
 
-Exit skill and invoke SlashCommand("/gsd-discuss-phase 1 --auto")
+Exit skill and invoke SlashCommand("/gsd:discuss-phase 1 --auto")
 
 **If interactive mode:**
 
@@ -1354,13 +1399,13 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 
 /clear then:
 
-/gsd-discuss-phase 1 — gather context and clarify approach
+/gsd:discuss-phase 1 — gather context and clarify approach
 
 ---
 
 **Also available:**
-- /gsd-ui-phase 1 — generate UI design contract (recommended for frontend phases)
-- /gsd-plan-phase 1 — skip discussion, plan directly
+- /gsd:ui-phase 1 — generate UI design contract (recommended for frontend phases)
+- /gsd:plan-phase 1 — skip discussion, plan directly
 
 ───────────────────────────────────────────────────────────────
 ```
@@ -1376,12 +1421,12 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 
 /clear then:
 
-/gsd-discuss-phase 1 — gather context and clarify approach
+/gsd:discuss-phase 1 — gather context and clarify approach
 
 ---
 
 **Also available:**
-- /gsd-plan-phase 1 — skip discussion, plan directly
+- /gsd:plan-phase 1 — skip discussion, plan directly
 
 ───────────────────────────────────────────────────────────────
 ```
@@ -1424,7 +1469,7 @@ PHASE1_HAS_UI=$(echo "$PHASE1_SECTION" | grep -qi "UI hint.*yes" && echo "true" 
 - [ ] STATE.md initialized
 - [ ] REQUIREMENTS.md traceability updated
 - [ ] `$INSTRUCTION_FILE` generated with GSD workflow guidance (AGENTS.md for Codex, CLAUDE.md otherwise)
-- [ ] User knows next step is `/gsd-discuss-phase 1`
+- [ ] User knows next step is `/gsd:discuss-phase 1`
 
 **Atomic commits:** Each phase commits its artifacts immediately. If context is lost, artifacts persist.
 

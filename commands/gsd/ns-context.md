@@ -5,6 +5,7 @@ argument-hint: ""
 allowed-tools:
   - Read
   - Skill
+requires: [map-codebase, graphify, docs-update, extract-learnings]
 ---
 
 Route to the appropriate codebase-intelligence skill based on the user's intent.

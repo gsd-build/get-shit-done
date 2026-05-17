@@ -1,0 +1,76 @@
+{
+  "_comment": "Canonical CONFIG_DEFAULTS for the Configuration Module. Nested shape is canonical. CJS flat projection (branching_strategy, sub_repos, etc.) is handled by consumers at the boundary. Security keys (security_enforcement, security_asvs_level, security_block_on) and post_planning_gaps live in workflow.* as their canonical location. resolve_model_ids, context_window, phase_naming are CJS-originated top-level keys included here. brave_search, firecrawl, exa_search, and perplexity default to false in the manifest; at runtime buildNewProjectConfig detects API keys. The plan_checker (CJS flat) → workflow.plan_check (canonical nested) divergence is resolved: canonical name is workflow.plan_check. _auto_chain_active is a runtime-state field included for completeness.",
+  "model_profile": "balanced",
+  "commit_docs": true,
+  "parallelization": true,
+  "search_gitignored": false,
+  "brave_search": false,
+  "firecrawl": false,
+  "exa_search": false,
+  "perplexity": false,
+  "resolve_model_ids": false,
+  "context_window": 200000,
+  "phase_naming": "sequential",
+  "project_code": null,
+  "mode": "interactive",
+  "claude_md_path": "./CLAUDE.md",
+  "git": {
+    "branching_strategy": "none",
+    "create_tag": true,
+    "base_branch": null,
+    "phase_branch_template": "gsd/phase-{phase}-{slug}",
+    "milestone_branch_template": "gsd/{milestone}-{slug}",
+    "quick_branch_template": null
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "nyquist_validation": true,
+    "ai_integration_phase": true,
+    "tdd_mode": false,
+    "human_verify_mode": "end-of-phase",
+    "auto_advance": false,
+    "_auto_chain_active": false,
+    "node_repair": true,
+    "node_repair_budget": 2,
+    "ui_phase": true,
+    "ui_safety_gate": true,
+    "text_mode": false,
+    "research_before_questions": false,
+    "discuss_mode": "discuss",
+    "skip_discuss": false,
+    "max_discuss_passes": 3,
+    "subagent_timeout": 300000,
+    "context_coverage_gate": true,
+    "code_review": true,
+    "code_review_depth": "standard",
+    "code_review_command": null,
+    "pattern_mapper": true,
+    "plan_bounce": false,
+    "plan_bounce_script": null,
+    "plan_bounce_passes": 2,
+    "auto_prune_state": false,
+    "post_planning_gaps": true,
+    "security_enforcement": true,
+    "security_asvs_level": 1,
+    "security_block_on": "high"
+  },
+  "planning": {
+    "commit_docs": true,
+    "search_gitignored": false,
+    "sub_repos": [],
+    "granularity": "standard"
+  },
+  "hooks": {
+    "context_warnings": true,
+    "workflow_guard": false
+  },
+  "ship": {
+    "pr_body_sections": []
+  },
+  "graphify": {
+    "auto_update": false
+  },
+  "agent_skills": {}
+}

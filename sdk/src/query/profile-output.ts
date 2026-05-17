@@ -19,7 +19,7 @@ import { GSDError, ErrorClassification } from '../errors.js';
 import { detectRuntime, resolveGlobalSkillMarkdownPath } from './helpers.js';
 import { CLAUDE_INSTRUCTIONS } from './profile-questionnaire-data.js';
 import type { QueryHandler } from './utils.js';
-import { resolveBundledTemplatesDir } from '../sdk-package-compatibility.js';
+import { resolveBundledTemplatesDir, resolveLegacyUserProfilePath } from '../sdk-package-compatibility.js';
 
 const TEMPLATE_DIR = resolveBundledTemplatesDir();
 
@@ -482,7 +482,7 @@ function cmdWriteProfileLogic(
 
   let outputPath = options.output;
   if (!outputPath) {
-    outputPath = join(homedir(), '.claude', 'get-shit-done', 'USER-PROFILE.md');
+    outputPath = resolveLegacyUserProfilePath();
   } else if (!isAbsolute(outputPath)) {
     outputPath = join(cwd, outputPath);
   }

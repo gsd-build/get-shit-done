@@ -36,42 +36,14 @@ const fs = require('fs');
 const path = require('path');
 
 const installModule = require('../bin/install.js');
+
+const isWindows = process.platform === 'win32';
 const { installSdkIfNeeded } = installModule;
-const { createTempDir, cleanup } = require('./helpers.cjs');
+const { createTempDir, cleanup, captureConsole } = require('./helpers.cjs');
 
-function captureConsole(fn) {
-  const stdout = [];
-  const stderr = [];
-  const origLog = console.log;
-  const origWarn = console.warn;
-  const origError = console.error;
-  console.log = (...a) => stdout.push(a.join(' '));
-  console.warn = (...a) => stderr.push(a.join(' '));
-  console.error = (...a) => stderr.push(a.join(' '));
-  let threw = null;
-  try {
-    fn();
-  } catch (e) {
-    threw = e;
-  } finally {
-    console.log = origLog;
-    console.warn = origWarn;
-    console.error = origError;
-  }
-  // Re-throw any captured exception AFTER restoring console so callers don't
-  // have to destructure-and-assert on `threw` (and a future regression that
-  // crashes before printing won't falsely pass `!hasReady`). (#2775
-  // CodeRabbit follow-up)
-  if (threw) throw threw;
-  // strip ANSI for matching
-  const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
-  return {
-    stdout: stdout.map(strip).join('\n'),
-    stderr: stderr.map(strip).join('\n'),
-  };
-}
-
-describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before reporting ready', () => {
+describe('bug #2775: installSdkIfNeeded must verify gsd-sdk on PATH before reporting ready',
+  { skip: isWindows ? 'POSIX-only: asserts ~/.local/bin shebang shim with mode 0o755; Windows uses gsd-sdk.cmd + PATHEXT + registry Path' : false },
+  () => {
   let tmpRoot;
   let sdkDir;
   let pathDir;

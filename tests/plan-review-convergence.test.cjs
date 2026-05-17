@@ -478,11 +478,13 @@ describe('plan-review-convergence workflow: success criteria (#2306-v2)', () => 
 // ─── Config schema registration ───────────────────────────────────────────
 
 describe('plan-review-convergence config schema registration (#2306-v2)', () => {
-  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  // After Cycle 5 (#3536), config-schema.cjs is a thin adapter sourcing from
+  // the manifest. Use the runtime Set instead of text-parsing the source file.
+  const { VALID_CONFIG_KEYS } = require('../get-shit-done/bin/lib/config-schema.cjs');
 
   test('workflow.plan_review_convergence is registered in config-schema.cjs', () => {
     assert.ok(
-      schema.includes("'workflow.plan_review_convergence'"),
+      VALID_CONFIG_KEYS.has('workflow.plan_review_convergence'),
       "workflow.plan_review_convergence must be registered in VALID_CONFIG_KEYS in config-schema.cjs so gsd config-set accepts it (#2306-v2)"
     );
   });
@@ -538,25 +540,27 @@ describe('plan-review-convergence local model reviewer flags (#2306-local)', () 
 });
 
 describe('plan-review-convergence local model config schema registration (#2306-local)', () => {
-  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  // After Cycle 5 (#3536), config-schema.cjs is a thin adapter sourcing from
+  // the manifest. Use the runtime Set instead of text-parsing the source file.
+  const { VALID_CONFIG_KEYS } = require('../get-shit-done/bin/lib/config-schema.cjs');
 
   test('review.ollama_host is registered in config-schema.cjs', () => {
     assert.ok(
-      schema.includes("'review.ollama_host'"),
+      VALID_CONFIG_KEYS.has('review.ollama_host'),
       "review.ollama_host must be in VALID_CONFIG_KEYS so gsd config-set accepts it"
     );
   });
 
   test('review.lm_studio_host is registered in config-schema.cjs', () => {
     assert.ok(
-      schema.includes("'review.lm_studio_host'"),
+      VALID_CONFIG_KEYS.has('review.lm_studio_host'),
       "review.lm_studio_host must be in VALID_CONFIG_KEYS so gsd config-set accepts it"
     );
   });
 
   test('review.llama_cpp_host is registered in config-schema.cjs', () => {
     assert.ok(
-      schema.includes("'review.llama_cpp_host'"),
+      VALID_CONFIG_KEYS.has('review.llama_cpp_host'),
       "review.llama_cpp_host must be in VALID_CONFIG_KEYS so gsd config-set accepts it"
     );
   });

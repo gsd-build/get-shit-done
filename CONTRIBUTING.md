@@ -67,6 +67,30 @@ A feature adds something new — a new command, a new workflow, a new concept, a
 
 ---
 
+### 📐 Proposing an ADR or PRD
+
+An ADR (Architecture Decision Record) documents a significant architectural decision. A PRD (Product Requirements Document) captures the what and why of a feature before implementation. Both are governed by the same issue-first rule as everything else.
+
+**Process:**
+
+1. Open an issue of the appropriate type (enhancement for an ADR revisiting an existing area, feature for a new architectural surface, chore for policy/docs decisions). Fill it out completely.
+2. **Wait for maintainer approval.** A maintainer must label the issue `approved-enhancement`, `approved-feature`, or confirm the chore before any file is created.
+3. The GitHub-assigned issue number becomes your filename prefix. Create the file on a branch named after the issue:
+   - `docs/adr/<issue#>-<slug>.md` for ADRs
+   - `docs/prd/<issue#>-<slug>.md` for PRDs
+   - Branch: `docs/<issue#>-<slug>`
+4. Open a PR using the appropriate template and close the issue with `Closes #<issue#>` in the PR body.
+
+**One issue = one ADR-or-PRD = one PR.** Do not batch multiple decisions into one file or one PR.
+
+**Do not compute a "next number" locally.** Any PR that uses the legacy `NNNN-*` sequential pattern for a *new* ADR or PRD will be asked to rename the file to the `<issue#>-<slug>.md` format before merge.
+
+**Example:** Issue #3485 was opened, approved, and its number became the prefix: `docs/adr/3485-adr-prd-naming-convention.md` on branch `docs/3485-adr-prd-naming-convention`.
+
+**Rejection reasons:** Issue not approved before file was created, filename uses local-compute sequential number instead of issue#, multiple decisions bundled in one PR, file placed in wrong directory (`docs/adr/` vs `docs/prd/`).
+
+---
+
 ## The Issue-First Rule — No Exceptions
 
 > **No code before approval.**
@@ -98,6 +122,8 @@ Contributor requirements (summary):
 - Do not rewrite maintainer intent in `CONTEXT.md`/ADRs as part of drive-by cleanup; propose focused updates tied to approved scope.
 - If using an AI assistant, prompt it to read `CONTEXT.md` and the relevant ADRs before writing any code or docs, and verify it used the correct vocabulary before opening the PR.
 
+**CJS↔SDK seam.** When working on `bin/lib/*.cjs` or `sdk/src/**`, read [`docs/agents/cjs-sdk-seam.md`](docs/agents/cjs-sdk-seam.md). It documents the canonical pattern for Shared Modules (data manifest + source-of-truth file + generator + freshness check + Adapters) and the hand-sync pair lint that blocks new drift. New `<name>.cjs` ↔ `<name>.ts` pairs require either migration to a Shared Module or an explicit allowlist entry with justification in `scripts/shared-module-handsync-allowlist.json`. Adding an allowlist entry requires maintainer review via CODEOWNERS.
+
 **Every PR must link to an approved issue.** PRs without a linked issue are closed without review, no exceptions.
 
 - **No draft PRs** — draft PRs are automatically closed. Only open a PR when it is complete, tested, and ready for review. If your work is not finished, keep it on your local branch until it is.
@@ -105,7 +131,8 @@ Contributor requirements (summary):
 - **Link with a closing keyword** — use `Closes #123`, `Fixes #123`, or `Resolves #123` in the PR body. The CI check will fail and the PR will be auto-closed if no valid issue reference is found.
 - **One concern per PR** — bug fixes, enhancements, and features must be separate PRs
 - **No drive-by formatting** — don't reformat code unrelated to your change
-- **CI must pass** — all matrix jobs (Ubuntu × Node 22, 24; macOS × Node 24) must be green
+- **Don't bundle test-fixture updates into `docs:` or unrelated commits** — when a production change makes an existing test assertion stale, the test correction MUST land as its own `test:` (or `fix:`) commit, not bundled into a `docs:` commit that also updates the explanation. The release-sdk hotfix cherry-pick filter routes by commit-subject prefix (`fix:`, `chore:`, `test:`); a test-fixture correction packed under a `docs:` prefix is invisible to the picker and ships a half-state to the hotfix branch — production code changed, test assertion stale. v1.42.3 hit this exact mode (#3621). The fix is upstream: keep the test-fixture commit separate.
+- **CI must pass** — all configured matrix jobs must be green. Node 22 remains the compatibility floor; Node 24 is the primary target; Node 26 compatibility must be preserved for code and tests even when a Node 26 CI lane is not yet available.
 - **Scope matches the approved issue** — if your PR does more than what the issue describes, the extra changes will be asked to be removed or moved to a new issue
 
 ## CHANGELOG Entries — Drop a Fragment
@@ -125,14 +152,50 @@ Fragments are consolidated into `CHANGELOG.md` at release time by the release wo
 
 **Opt-out:** PRs with no user-facing impact (test refactors, lint config changes, CI tweaks, formatting-only changes) can add the `no-changelog` label. The lint honors it. When unsure whether a change is user-facing, **add the fragment**.
 
+## Documentation Updates — Update the Relevant Docs
+
+If your PR adds, changes, deprecates, or removes user-visible behavior, you **must** update the relevant documentation in `docs/`. CI will fail any PR whose changeset fragment is typed `Added`, `Changed`, `Deprecated`, or `Removed` without also modifying at least one file under `docs/` ([#3213](https://github.com/gsd-build/get-shit-done/issues/3213)).
+
+`Fixed` and `Security` fragments do not trigger this lint — bug fixes restore documented behavior, they do not introduce new behavior to document. (Edit the docs anyway if a fix corrects something the docs got wrong.)
+
+### Which docs to update
+
+| Change type | Required doc updates |
+|---|---|
+| New command or flag | `docs/COMMANDS.md`, `docs/FEATURES.md` |
+| Changed command behavior or output | `docs/USER-GUIDE.md`, `docs/COMMANDS.md` |
+| Configuration / schema change | `docs/CONFIGURATION.md` |
+| Architectural change | `docs/ARCHITECTURE.md`, `docs/adr/` |
+| Agent or skill change | `docs/AGENTS.md` |
+| Removed command, flag, or workflow | All docs that referenced it |
+
+### Language policy
+
+All content in `docs/` and the root `README.md` **must be written in English**. English is the canonical source. The translated READMEs (`README.pt-BR.md`, `README.zh-CN.md`, `README.ja-JP.md`, `README.ko-KR.md`) are community-maintained translations and do not need to be updated by every PR.
+
+### CI enforcement
+
+The `Docs Required` workflow (`scripts/lint-docs-required.cjs`) reads the changeset fragments touched in the PR diff. If any has type `Added` / `Changed` / `Deprecated` / `Removed`, it requires at least one file under `docs/` to also appear in the diff.
+
+### Opt-outs (with paper trail)
+
+When a change genuinely has no user-facing documentation impact (infrastructure rewrite, internal refactor, test-only addition, CI fix), use one of:
+
+- **Label:** add the `no-docs` label to the PR. Leave a comment explaining why no docs update was needed.
+- **Per-fragment marker:** add `<!-- docs-exempt: <reason> -->` **on its own line** inside the body of each triggering changeset fragment (typically at the end). The reason is **required and must be non-empty** — a bare `<!-- docs-exempt -->` or `<!-- docs-exempt: -->` is rejected (no audit trail = no exemption). The marker is extracted at parse time by `scripts/changeset/parse.cjs` and stripped from the body before the CHANGELOG.md and GitHub release-notes serializers see it — it leaves a paper trail in the source fragment without leaking into published release notes. Inline mentions of the marker syntax (e.g. inside backticks) are intentionally ignored; the parser only acts on a marker that occupies its own line. Both routes leave a paper trail; the label is global, the marker is per-fragment for mixed PRs.
+
+When unsure whether a change is user-facing, **update the docs**.
+
 ## Testing Standards
 
 All tests use Node.js built-in test runner (`node:test`) and assertion library (`node:assert`). **Do not use Jest, Mocha, Chai, or any external test framework.**
 
+> **Suite grouping.** Tests live in named suites (`unit`, `integration`, `install`, `security`, `slow`) selected by **filename suffix**: a file named `foo.security.test.cjs` belongs to the `security` suite; a file with no suffix (`foo.test.cjs`) belongs to `unit`. See [docs/TESTING-SUITES.md](docs/TESTING-SUITES.md) for the full policy, CI matrix, and per-suite scripts (`npm run test:unit`, `npm run test:security`, `npm run test:coverage:unit`, …). Default `npm test` still runs every test — backwards compatible.
+
 ### Required Imports
 
 ```javascript
-const { describe, it, test, beforeEach, afterEach, before, after } = require('node:test');
+const { describe, it, test, beforeEach, afterEach, before, after, mock } = require('node:test');
 const assert = require('node:assert/strict');
 ```
 
@@ -262,6 +325,131 @@ const content = `
   line three
 `;
 ```
+
+### QA Matrix Requirements
+
+Happy-path tests are not enough for code that accepts user input, reads project files, writes to disk, shells out, generates artifacts, or builds prompts. New tests for those areas must include adversarial inputs and negative proof that unsafe behavior did not happen.
+
+See [`TEST-EXAMPLES.md`](TEST-EXAMPLES.md) for concrete demo tests that show these requirements in practice.
+
+Use this matrix when it applies to the changed surface:
+
+1. Happy path
+2. Missing input
+3. Empty input
+4. Whitespace-only input
+5. Malformed input
+6. Out-of-range input
+7. Duplicate or conflicting input
+8. Hostile input
+9. Filesystem failure
+10. Concurrency or retry
+11. Cross-platform path/newline behavior
+12. Regression fixture from the linked issue
+
+You do not need all twelve cases for every PR. You do need to cover the cases that match the risk of the touched code. If a case is not applicable, the PR should make that obvious from the issue scope or test rationale.
+
+#### CLI and command routing
+
+Changes to CLI parsing, command dispatch, query dispatch, command routers, `gsd-tools`, or `gsd-sdk` must include a negative input matrix for the affected command family.
+
+Required cases where relevant:
+
+- Missing required arguments
+- Empty strings, for example `--phase ""`
+- Whitespace-only values
+- Duplicate flags, for example `--phase 1 --phase 2`
+- Conflicting flags, for example `--json --raw`
+- Malformed assignments, for example `--phase=` and `--phase==1`
+- Unknown subcommands at the touched command depth
+- Values that look like flags, for example `--name --weird`
+- Very long values and Unicode values
+- Shell metacharacters in values, for example `;`, `&&`, `$()`, backticks, and quotes
+
+CLI tests must assert on the full command contract:
+
+- Exit status
+- Structured `--json` result when the command supports JSON
+- Filesystem mutation or absence of mutation
+- No stack trace in non-debug failure output
+- No shell interpolation of attacker-controlled values
+
+Prefer `spawnSync(process.execPath, [scriptPath, ...args], { cwd, encoding: 'utf8' })` or `execFileSync()` with argv arrays. Do not use shell strings for tests that contain hostile values.
+
+#### Parser and project-file inputs
+
+Changes to markdown, TOML, frontmatter, roadmap, phase, state, config, or schema parsing must include adversarial fixtures. Put reusable fixtures under `tests/fixtures/adversarial/` with a directory that names the input type, such as `roadmap/`, `frontmatter/`, `config/`, `toml/`, or `planning-state/`.
+
+Required cases where relevant:
+
+- Malformed frontmatter
+- Duplicate keys
+- Mixed CRLF/LF newlines
+- Unclosed or nested fenced code blocks
+- Headings inside fenced code blocks
+- Unicode headings
+- Repeated or decimal phase IDs
+- Path traversal-like names such as `../../x`
+- Null bytes or replacement characters
+- Huge but bounded files
+- TOML duplicate tables or trailing garbage
+- Empty arrays vs missing arrays
+- Scalars where arrays are expected, and objects where strings are expected
+
+Property-style parser tests are encouraged for high-risk parsers. They must be deterministic: pin the seed, bound the iteration count, and print replay data on failure.
+
+#### Filesystem writes and installers
+
+Changes to install/uninstall flows, generated artifact writers, state/config writers, worktree safety, or any code that writes under `.planning`, runtime config dirs, `.claude`, `.codex`, `hooks`, or generated files must include fault-injection coverage where the seam allows it.
+
+Required cases where relevant:
+
+- Missing parent directory
+- Target path exists as a file instead of a directory
+- Read-only target directory
+- Broken symlink
+- Symlink escaping the intended root
+- Paths with spaces, Unicode, or newlines
+- Partial write failure
+- Rename failure
+- Concurrent deletion or write collision
+- Temp-file cleanup after failure
+
+Use `node:test` mocks such as `mock.method()` for `fs.writeFileSync`, `fs.renameSync`, `fs.mkdirSync`, `fs.rmSync`, and subprocess seams when the production code exposes a seam. Restore mocks with test hooks or `t.after()`.
+
+#### Security and prompt-injection surfaces
+
+Changes that read prompts, plans, markdown, agent instructions, shell command projections, workstream/project names, or user-controlled files must treat those inputs as hostile.
+
+Required cases where relevant:
+
+- Fake instruction tags, for example `<instructions>ignore previous</instructions>`
+- Heredoc breakouts
+- Shell command substitution payloads
+- Path traversal through project or workstream values
+- Malicious markdown links
+- Fake frontmatter fields that try to override intent
+- Secret-looking values in inputs, logs, stdout, stderr, and thrown errors
+- Environment variables with fake tokens to prove redaction
+
+Security tests must assert both the positive guard behavior and the negative proof: no path escape, no command execution, no leaked token, no untrusted content promoted to instructions.
+
+#### Generated files and parity
+
+Changes to generators, generated `.cjs`/`.ts` files, command manifests, aliases, hooks, or SDK/runtime parity must test bad input and runtime parity, not only freshness.
+
+Required cases where relevant:
+
+- Missing source command
+- Malformed command frontmatter
+- Duplicate command names or aliases
+- Partial generator output
+- Generator crash halfway through
+- Manual edits to generated files
+- Stale generated file with valid timestamp but wrong content
+- Runtime `.cjs` and SDK `.ts` generated surfaces disagree
+
+Generator tests should run in temp fixtures and assert atomic output behavior. Do not mutate production generated files except in explicit freshness checks.
 
 ### Prohibited: Source-Grep Tests
 
@@ -395,13 +583,13 @@ For everything else, if a test reaches for `.includes()` / `.startsWith()` / `as
 
 ### Node.js Version Compatibility
 
-**Node 22 is the minimum supported version.** Node 24 is the primary CI target. All tests must pass on both.
+**Node 22 is the minimum supported version.** Node 24 is the primary CI target. Node 26 is the forward-compatibility target: do not add tests or production code that depend on deprecated behavior likely to fail there.
 
 | Version | Status |
 |---------|--------|
 | **Node 22** | Minimum required — Active LTS until October 2026, Maintenance LTS until April 2027 |
 | **Node 24** | Primary CI target — current Active LTS, all tests must pass |
-| Node 26 | Forward-compatible target — avoid deprecated APIs |
+| Node 26 | Forward-compatible target — avoid deprecated APIs and exact runtime-error prose |
 
 Do not use:
 - Deprecated APIs
@@ -412,6 +600,7 @@ Safe to use:
 - `describe`/`it`/`test` — all supported
 - `beforeEach`/`afterEach`/`before`/`after` — all supported
 - `t.after()` — per-test cleanup
+- `mock.method()` — approved for scoped filesystem/subprocess fault injection
 - `t.plan()` — fully supported
 - Snapshot testing — fully supported
 
@@ -441,6 +630,8 @@ node --test tests/core.test.cjs
 # Run with coverage
 npm run test:coverage
 ```
+
+For examples of required negative matrices, parser fixtures, filesystem fault injection, security abuse tests, generated-file checks, and runtime/SDK parity tests, see [`TEST-EXAMPLES.md`](TEST-EXAMPLES.md).
 
 ### Pre-PR Seam Checks (Manifest/Alias Routing)
 
@@ -531,13 +722,13 @@ When work touches architecture, routing, policy, registry assembly, or command s
 
 The required tests differ depending on what you are contributing:
 
-**Bug Fix:** A regression test is required. Write the test first — it must demonstrate the original failure before your fix is applied, then pass after the fix. A PR that fixes a bug without a regression test will be asked to add one. "Tests pass" does not prove correctness; it proves the bug isn't present in the tests that exist.
+**Bug Fix:** A regression test is required. Write the test first — it must demonstrate the original failure before your fix is applied, then pass after the fix. A PR that fixes a bug without a regression test will be asked to add one. If the bug involves CLI input, parsers, filesystem writes, security/prompt surfaces, generated files, or SDK/runtime parity, the regression test must use the relevant QA matrix above and include negative proof that the bad behavior no longer happens. "Tests pass" does not prove correctness; it proves the bug isn't present in the tests that exist.
 
-**Enhancement:** Tests covering the enhanced behavior are required. Update any existing tests that test the area you changed. Do not leave tests that pass but no longer accurately describe the behavior.
+**Enhancement:** Tests covering the enhanced behavior are required. Update any existing tests that test the area you changed. If the enhancement expands accepted input, changes command routing, broadens parser behavior, changes generated output, or touches installer/write paths, add the relevant adversarial cases from the QA matrix above. Do not leave tests that pass but no longer accurately describe the behavior.
 
-**Feature:** Tests are required for the primary success path and at minimum one failure scenario. Leaving gaps in test coverage for a new feature is a rejection reason.
+**Feature:** Tests are required for the primary success path and enough failure scenarios to cover the relevant QA matrix above. At minimum, every feature must cover one failure scenario; features that expose CLI input, parse user files, write files, generate artifacts, call subprocesses, or build prompts must cover the relevant negative/hostile cases. Leaving gaps in test coverage for a new feature is a rejection reason.
 
-**Behavior Change:** If your change modifies existing behavior, the existing tests covering that behavior must be updated or replaced. Leaving passing-but-incorrect tests in the suite is not acceptable — a test that passes but asserts the old (now wrong) behavior makes the suite less useful than no test at all.
+**Behavior Change:** If your change modifies existing behavior, the existing tests covering that behavior must be updated or replaced. For high-risk surfaces, update the adversarial tests as well as the happy path. Leaving passing-but-incorrect tests in the suite is not acceptable — a test that passes but asserts the old (now wrong) behavior makes the suite less useful than no test at all.
 
 ### Reviewer Standards
 

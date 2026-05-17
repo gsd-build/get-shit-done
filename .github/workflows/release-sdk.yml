@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'publish = normal dev/next/latest publish; hotfix = create hotfix/X.YY.Z branch from latest vX.YY.* tag, cherry-pick fix:/chore: from main, publish to @latest'
+        description: 'publish = normal dev/next/latest publish; hotfix = create hotfix/X.YY.Z branch from latest vX.YY.* tag, cherry-pick fix:/chore:/test: from main, publish to @latest'
         required: true
         type: choice
         default: publish
@@ -51,7 +51,7 @@ on:
         required: false
         type: string
       auto_cherry_pick:
-        description: 'Hotfix only: auto-cherry-pick fix:/chore: commits from origin/main since base tag.'
+        description: 'Hotfix only: auto-cherry-pick fix:/chore:/test: commits from origin/main since base tag.'
         required: false
         type: boolean
         default: true
@@ -74,7 +74,7 @@ jobs:
   #
   # action=publish  → outputs inputs.ref verbatim (may be empty = workflow ref)
   # action=hotfix   → branches hotfix/X.YY.Z from highest existing vX.YY.* tag,
-  #                   auto-cherry-picks fix:/chore: from origin/main, pushes,
+  #                   auto-cherry-picks fix:/chore:/test: from origin/main, pushes,
   #                   and outputs the new branch as ref. Idempotent: if branch
   #                   already exists (operator pre-prepared it via hotfix.yml),
   #                   we just check it out and re-run the cherry-pick step
@@ -179,10 +179,10 @@ jobs:
                 | grep -F -f <(echo "$CANDIDATES") || true)
               INCLUDED=""
               # POLICY_SKIPPED — commits intentionally not picked because they
-              # don't match the fix/chore filter (feat/refactor/docs/etc).
-              # CONFLICT_SKIPPED — fix/chore commits whose cherry-pick failed
+              # don't match the fix/chore/test filter (feat/refactor/docs/etc).
+              # CONFLICT_SKIPPED — fix/chore/test commits whose cherry-pick failed
               # and were skipped per the full-automation policy (#2968).
-              # NON_SHIPPED_SKIPPED — fix/chore commits whose diff doesn't
+              # NON_SHIPPED_SKIPPED — fix/chore/test commits whose diff doesn't
               # touch any path in the npm tarball's `files` whitelist
               # (CI / test / docs / planning-only changes). They can't
               # affect the published package's behavior, so picking them
@@ -199,7 +199,7 @@ jobs:
               while IFS= read -r SHA; do
                 [ -z "$SHA" ] && continue
                 SUBJECT=$(git log -1 --format='%s' "$SHA")
-                if echo "$SUBJECT" | grep -qE '^(fix|chore)(\([^)]+\))?!?: '; then
+                if echo "$SUBJECT" | grep -qE '^(fix|chore|test)(\([^)]+\))?!?: '; then
                   # Merge commits with fix:/chore: titles can't be cherry-picked
                   # without `-m <parent>` and we can't pick the parent
                   # automatically. They fail BEFORE entering cherry-pick state
@@ -358,16 +358,16 @@ jobs:
                 echo "Base: \`$BASE_TAG\` → Branch: \`$BRANCH\`$([ "$DRY_RUN" = "true" ] && echo " (DRY RUN — local only)")"
                 echo ""
                 if [ -n "$INCLUDED" ]; then
-                  echo "### Included (fix/chore)"
+                  echo "### Included (fix/chore/test)"
                   echo ""
                   echo "$INCLUDED"
                 else
-                  echo "_No fix/chore commits to include._"
+                  echo "_No fix/chore/test commits to include._"
                 fi
                 if [ -n "$NON_SHIPPED_SKIPPED" ]; then
                   echo "### Skipped — touches no shipped paths (informational)"
                   echo ""
-                  echo "These fix/chore commits don't touch any path in the npm tarball's \`files\` whitelist (or \`package.json\`), so they cannot change the published package's behavior. CI / test / docs / planning-only changes belong on \`main\`, not in a hotfix. No action needed."
+                  echo "These fix/chore/test commits don't touch any path the hotfix CI cares about — neither the npm tarball's \`files\` whitelist (or \`package.json\`) nor a CI-gating test under \`tests/\` or \`sdk/src/**\` vitest specs (#3621). CI / docs / planning-only changes belong on \`main\`, not in a hotfix. No action needed."
                   echo ""
                   echo "$NON_SHIPPED_SKIPPED"
                 fi

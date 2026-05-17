@@ -36,6 +36,10 @@ const os = require('node:os');
 const path = require('node:path');
 
 const installModule = require('../bin/install.js');
+const { captureConsole } = require('./helpers.cjs');
+
+const isWindows = process.platform === 'win32';
+
 const {
   installSdkIfNeeded,
   isGsdSdkOnPath,
@@ -46,33 +50,6 @@ const {
 // ---------------------------------------------------------------------------
 // Console capture helper (no ANSI)
 // ---------------------------------------------------------------------------
-function captureConsole(fn) {
-  const stdout = [];
-  const stderr = [];
-  const origLog = console.log;
-  const origWarn = console.warn;
-  const origError = console.error;
-  console.log = (...a) => stdout.push(a.join(' '));
-  console.warn = (...a) => stderr.push(a.join(' '));
-  console.error = (...a) => stderr.push(a.join(' '));
-  let threw = null;
-  try {
-    fn();
-  } catch (e) {
-    threw = e;
-  } finally {
-    console.log = origLog;
-    console.warn = origWarn;
-    console.error = origError;
-  }
-  if (threw) throw threw;
-  const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
-  return {
-    stdout: stdout.map(strip).join('\n'),
-    stderr: stderr.map(strip).join('\n'),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Shared fixture helpers
 // ---------------------------------------------------------------------------
@@ -90,7 +67,9 @@ function makeSdkDir(root) {
 // ---------------------------------------------------------------------------
 // Bug 1: transient npx PATH hit + null login-shell PATH → false "GSD SDK ready"
 // ---------------------------------------------------------------------------
-describe('bug #3231: transient npx PATH + null login-shell PATH', () => {
+describe('bug #3231: transient npx PATH + null login-shell PATH',
+  { skip: isWindows ? 'Linux-specific: simulates getUserShellPath()=null + POSIX shebang shim; Windows path is covered by #3211' : false },
+  () => {
   let tmpRoot;
   let sdkDir;
   let savedEnv;
@@ -205,7 +184,9 @@ describe('bug #3231: transient npx PATH + null login-shell PATH', () => {
 // ---------------------------------------------------------------------------
 // Bug 2: stale legacy symlink pointing at gsd-tools.cjs (deprecated binary)
 // ---------------------------------------------------------------------------
-describe('bug #3231: stale legacy symlink to deprecated gsd-tools.cjs', () => {
+describe('bug #3231: stale legacy symlink to deprecated gsd-tools.cjs',
+  { skip: isWindows ? 'POSIX-only: relies on fs.symlinkSync + mode bits + bare shim filename' : false },
+  () => {
   let tmpRoot;
   let sdkDir;
   let savedEnv;
@@ -353,7 +334,9 @@ describe('bug #3231: stale legacy symlink to deprecated gsd-tools.cjs', () => {
 // ---------------------------------------------------------------------------
 // Test 3: clean install with gsd-sdk self-linked into a persistent PATH dir
 // ---------------------------------------------------------------------------
-describe('bug #3231: clean install — gsd-sdk self-linked into persistent PATH dir', () => {
+describe('bug #3231: clean install — gsd-sdk self-linked into persistent PATH dir',
+  { skip: isWindows ? 'POSIX-only: asserts bare gsd-sdk shim in ~/.local/bin' : false },
+  () => {
   let tmpRoot;
   let sdkDir;
   let savedEnv;

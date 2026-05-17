@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GSDToolsError } from '../gsd-tools.js';
+import { GSDToolsError } from '../gsd-tools-error.js';
 import { buildQueryCliOutputFromError } from './query-cli-output.js';
 
 describe('query-cli-output', () => {

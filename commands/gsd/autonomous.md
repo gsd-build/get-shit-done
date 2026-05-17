@@ -10,6 +10,7 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - Agent
+requires: [cleanup, phase, progress]
 ---
 <objective>
 Execute all remaining milestone phases autonomously. For each phase: discuss → plan → execute. Pauses only for user decisions (grey area acceptance, blockers, validation requests).

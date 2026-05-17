@@ -28,7 +28,7 @@ describe('scan-sessions command', () => {
   test('returns empty array for empty sessions directory', () => {
     const sessionsDir = path.join(tmpDir, 'projects');
     fs.mkdirSync(sessionsDir, { recursive: true });
-    const result = runGsdTools(`scan-sessions --path ${sessionsDir} --raw`, tmpDir);
+    const result = runGsdTools(['scan-sessions', '--path', sessionsDir, '--raw'], tmpDir);
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.ok(Array.isArray(out), 'should return an array');
@@ -47,7 +47,7 @@ describe('scan-sessions command', () => {
     ].join('\n');
     fs.writeFileSync(path.join(projectDir, 'session-001.jsonl'), sessionData);
 
-    const result = runGsdTools(`scan-sessions --path ${sessionsDir} --raw`, tmpDir);
+    const result = runGsdTools(['scan-sessions', '--path', sessionsDir, '--raw'], tmpDir);
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.ok(Array.isArray(out), 'should return array');
@@ -65,7 +65,7 @@ describe('scan-sessions command', () => {
       fs.writeFileSync(path.join(projectDir, `session-${i}.jsonl`), data + '\n');
     }
 
-    const result = runGsdTools(`scan-sessions --path ${sessionsDir} --raw`, tmpDir);
+    const result = runGsdTools(['scan-sessions', '--path', sessionsDir, '--raw'], tmpDir);
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.strictEqual(out[0].sessionCount, 3);
@@ -102,7 +102,7 @@ describe('extract-messages command', () => {
       messages.map(m => JSON.stringify(m)).join('\n')
     );
 
-    const result = runGsdTools(`extract-messages my-project --path ${sessionsDir} --raw`, tmpDir);
+    const result = runGsdTools(['extract-messages', 'my-project', '--path', sessionsDir, '--raw'], tmpDir);
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.strictEqual(out.messages_extracted, 2, 'should extract 2 genuine user messages');
@@ -128,7 +128,7 @@ describe('extract-messages command', () => {
       messages.map(m => JSON.stringify(m)).join('\n')
     );
 
-    const result = runGsdTools(`extract-messages filter-test --path ${sessionsDir} --raw`, tmpDir);
+    const result = runGsdTools(['extract-messages', 'filter-test', '--path', sessionsDir, '--raw'], tmpDir);
     assert.ok(result.success, `Failed: ${result.error}`);
     const out = JSON.parse(result.output);
     assert.strictEqual(out.messages_extracted, 2, 'should only extract 2 genuine external messages');

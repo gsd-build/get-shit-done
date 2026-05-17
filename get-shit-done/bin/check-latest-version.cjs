@@ -20,7 +20,7 @@
  * Text Matching on Test Outputs".
  */
 
-const cp = require('node:child_process');
+const { execNpm } = require('./lib/shell-command-projection.cjs');
 
 // Hardcoded. Do not parameterise — the whole point of this script is that
 // the package name is not a runtime choice for the caller.
@@ -36,19 +36,24 @@ const SEMVER_RE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
 /**
  * Pure-ish: takes an injected spawn function so tests don't actually run npm.
- * In production, defaults to cp.spawnSync('npm', ...).
+ * In production, defaults to execNpm() from the shell-projection seam.
  */
 function checkLatestVersion(opts = {}) {
-  const defaultSpawn = () => cp.spawnSync('npm', ['view', PACKAGE_NAME, 'version'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: process.platform === 'win32', // npm is npm.cmd on Windows
-    // Bound the registry call so a hung network/registry doesn't block the
-    // entire /gsd-update workflow indefinitely (#2993 CR). 15s is generous
-    // for `npm view <pkg> version`; on timeout, spawnSync returns with
-    // signal !== null and the existing failure path emits FAIL_NPM_FAILED.
-    timeout: 15_000,
-  });
+  // Default path routes through the shell-projection seam (execNpm owns the
+  // Windows shell-flag policy and timeout default). The injection point
+  // remains spawnSync-shaped for test compatibility — the adapter below
+  // translates { exitCode } → { status } so the consumer logic is unchanged.
+  // Bounded at 15s so a hung registry doesn't block /gsd-update (#2993 CR).
+  const defaultSpawn = () => {
+    const r = execNpm(['view', PACKAGE_NAME, 'version'], { timeout: 15_000 });
+    return {
+      status: r.exitCode,
+      stdout: r.stdout,
+      stderr: r.stderr,
+      signal: r.signal,
+      error: r.error,
+    };
+  };
   const spawn = opts.spawn || defaultSpawn;
 
   const r = spawn();

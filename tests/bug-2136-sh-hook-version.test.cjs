@@ -113,7 +113,7 @@ describe('bug #2136 part 1: bash hook sources carry gsd-hook-version placeholder
     // — POSIX guarantees /bin/sh but not /bin/bash, and distros like NixOS
     // do not ship /bin/bash by default.
     for (const sh of SH_HOOKS) {
-      const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').split('\n');
+      const lines = fs.readFileSync(path.join(HOOKS_DIR, sh), 'utf8').split(/\r?\n/);
       assert.strictEqual(
         lines[0],
         '#!/usr/bin/env bash',

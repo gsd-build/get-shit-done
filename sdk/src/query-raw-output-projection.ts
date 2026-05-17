@@ -67,6 +67,25 @@ export function formatQueryRawOutput(registryCommand: string, data: unknown): st
     return Array.isArray(u) && u.length > 0 ? 'true' : 'false';
   }
 
+  // #3631: CJS handlers projected these to a scalar under --raw. Mirror that
+  // here so SDK dispatch matches CJS behaviour when family routers request
+  // mode: 'raw' on the bridge.
+  if (registryCommand === 'phase.next-decimal') {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const next = (data as Record<string, unknown>).next;
+      if (typeof next === 'string') return next;
+    }
+    return safeStringify(data);
+  }
+
+  if (registryCommand === 'roadmap.get-phase') {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const section = (data as Record<string, unknown>).section;
+      if (typeof section === 'string') return section;
+    }
+    return '';
+  }
+
   if (typeof data === 'string') {
     return data;
   }

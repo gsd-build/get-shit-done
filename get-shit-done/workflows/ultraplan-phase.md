@@ -3,7 +3,7 @@
 Offload GSD's plan phase to Claude Code's ultraplan cloud infrastructure.
 
 ⚠ **BETA feature.** Ultraplan is in research preview and may change. This workflow is
-intentionally isolated from /gsd-plan-phase so upstream changes to ultraplan cannot
+intentionally isolated from /gsd:plan-phase so upstream changes to ultraplan cannot
 affect the core planning pipeline.
 
 ---
@@ -17,7 +17,7 @@ Display the stage banner:
  GSD ► ULTRAPLAN PHASE  ⚠ BETA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Ultraplan is in research preview (Claude Code v2.1.91+).
-Use /gsd-plan-phase for stable local planning.
+Use /gsd:plan-phase for stable local planning.
 ```
 
 </step>
@@ -29,7 +29,16 @@ Use /gsd-plan-phase for stable local planning.
 Check that the session is running inside Claude Code:
 
 ```bash
-echo "$CLAUDE_CODE_VERSION"
+if [ "$CLAUDECODE" = "1" ] || [ -n "$CLAUDE_CODE_ENTRYPOINT" ]; then
+  CC_VERSION="$(claude --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+  if [ -n "$CC_VERSION" ] && [ "$(printf '%s\n' "2.1.91" "$CC_VERSION" | sort -V | head -n1)" = "2.1.91" ]; then
+    echo "claude-code:${CC_VERSION}"
+  else
+    echo ""
+  fi
+else
+  echo ""
+fi
 ```
 
 If the output is empty or unset, display the following error and exit:
@@ -39,10 +48,10 @@ If the output is empty or unset, display the following error and exit:
 ║  RUNTIME ERROR                                               ║
 ╚══════════════════════════════════════════════════════════════╝
 
-/gsd-ultraplan-phase requires Claude Code.
+/gsd:ultraplan-phase requires Claude Code.
 ultraplan is not available in this runtime.
 
-Use /gsd-plan-phase for local planning instead.
+Use /gsd:plan-phase for local planning instead.
 ```
 
 </step>
@@ -52,7 +61,7 @@ Use /gsd-plan-phase for local planning instead.
 <step name="initialize">
 
 Parse phase number from `$ARGUMENTS`. If no phase number is provided, detect the next
-unplanned phase from the roadmap (same logic as /gsd-plan-phase).
+unplanned phase from the roadmap (same logic as /gsd:plan-phase).
 
 Load GSD phase context:
 
@@ -69,7 +78,7 @@ Parse JSON for: `phase_found`, `phase_number`, `phase_name`, `phase_slug`, `padd
 ```text
 No .planning directory found. Initialize the project first:
 
-/gsd-new-project
+/gsd:new-project
 ```
 
 **If `phase_found` is false:** Error with the phase number provided and exit.
@@ -161,9 +170,9 @@ When ◆ ultraplan ready appears in your terminal:
   4. Click "Approve plan and teleport back to terminal"
   5. At the terminal dialog, choose Cancel  ← saves the plan to a file
   6. Note the file path Claude prints
-  7. Run: /gsd-import --from <the file path>
+  7. Run: /gsd:import --from <the file path>
 
-/gsd-import will run conflict detection, convert to GSD format,
+/gsd:import will run conflict detection, convert to GSD format,
 validate via plan-checker, update ROADMAP.md, and commit.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

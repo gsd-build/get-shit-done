@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
+const { cleanup } = require('./helpers.cjs');
 
 const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'gsd-context-monitor.js');
 
@@ -99,7 +100,18 @@ describe('#1974 context exhaustion auto-record', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        cleanup(tmpDir);
+        break;
+      } catch (err) {
+        const code = err && err.code;
+        const transient = code === 'EPERM' || code === 'EBUSY' || code === 'ENOTEMPTY';
+        if (!transient || attempt === 4) throw err;
+        sleep(250 * (attempt + 1));
+      }
+    }
     // Clean up bridge files
     try {
       const warnPath = path.join(os.tmpdir(), `claude-ctx-${sessionId}-warned.json`);

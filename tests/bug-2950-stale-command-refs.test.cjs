@@ -7,12 +7,12 @@
  * gsd-spike-wrap-up, gsd-sketch-wrap-up, gsd-code-review-fix).
  *
  * Fix: Update every occurrence to the new consolidated forms:
- *   /gsd-phase (no flag | --insert | --remove)
- *   /gsd-capture
- *   /gsd-config (--profile | --integrations | --advanced)
- *   /gsd-spike --wrap-up
- *   /gsd-sketch --wrap-up
- *   /gsd-code-review --fix
+ *   /gsd:phase (no flag | --insert | --remove)
+ *   /gsd:capture
+ *   /gsd:config (--profile | --integrations | --advanced)
+ *   /gsd:spike --wrap-up
+ *   /gsd:sketch --wrap-up
+ *   /gsd:code-review --fix
  */
 
 'use strict';
@@ -44,43 +44,43 @@ const DELETED_COMMANDS = [
 
 // Per-file assertions: [file, deletedCmd, newForm]
 const FILE_ASSERTIONS = [
-  // help.md
-  ['help.md', '/gsd-add-phase', '/gsd-phase "Add admin dashboard"'],
-  ['help.md', '/gsd-insert-phase', '/gsd-phase --insert 7 "Fix critical auth bug"'],
-  ['help.md', '/gsd-remove-phase', '/gsd-phase --remove 17'],
-  ['help.md', '/gsd-spike-wrap-up', '/gsd-spike --wrap-up'],
-  ['help.md', '/gsd-sketch-wrap-up', '/gsd-sketch --wrap-up'],
-  ['help.md', '/gsd-add-todo', '/gsd-capture'],
-  ['help.md', '/gsd-set-profile', '/gsd-config --profile budget'],
+  // help.md → moved to help/modes/full.md in #3039 tiered-help refactor
+  ['help/modes/full.md', '/gsd-add-phase', '/gsd:phase "Add admin dashboard"'],
+  ['help/modes/full.md', '/gsd-insert-phase', '/gsd:phase --insert 7 "Fix critical auth bug"'],
+  ['help/modes/full.md', '/gsd-remove-phase', '/gsd:phase --remove 17'],
+  ['help/modes/full.md', '/gsd-spike-wrap-up', '/gsd:spike --wrap-up'],
+  ['help/modes/full.md', '/gsd-sketch-wrap-up', '/gsd:sketch --wrap-up'],
+  ['help/modes/full.md', '/gsd-add-todo', '/gsd:capture'],
+  ['help/modes/full.md', '/gsd-set-profile', '/gsd:config --profile budget'],
 
   // do.md
-  ['do.md', '/gsd-spike-wrap-up', '/gsd-spike --wrap-up'],
-  ['do.md', '/gsd-sketch-wrap-up', '/gsd-sketch --wrap-up'],
-  ['do.md', '/gsd-add-phase', '/gsd-phase'],
-  ['do.md', '/gsd-add-todo', '/gsd-capture'],
+  ['do.md', '/gsd-spike-wrap-up', '/gsd:spike --wrap-up'],
+  ['do.md', '/gsd-sketch-wrap-up', '/gsd:sketch --wrap-up'],
+  ['do.md', '/gsd-add-phase', '/gsd:phase'],
+  ['do.md', '/gsd-add-todo', '/gsd:capture'],
 
   // settings.md
-  ['settings.md', '/gsd-code-review-fix', '/gsd-code-review --fix'],
-  ['settings.md', '/gsd-settings-integrations', '/gsd-config --integrations'],
-  ['settings.md', '/gsd-set-profile', '/gsd-config --profile'],
-  ['settings.md', '/gsd-settings-advanced', '/gsd-config --advanced'],
+  ['settings.md', '/gsd-code-review-fix', '/gsd:code-review --fix'],
+  ['settings.md', '/gsd-settings-integrations', '/gsd:config --integrations'],
+  ['settings.md', '/gsd-set-profile', '/gsd:config --profile'],
+  ['settings.md', '/gsd-settings-advanced', '/gsd:config --advanced'],
 
   // discuss-phase.md
-  ['discuss-phase.md', '/gsd-spike-wrap-up', '/gsd-spike --wrap-up'],
-  ['discuss-phase.md', '/gsd-sketch-wrap-up', '/gsd-sketch --wrap-up'],
+  ['discuss-phase.md', '/gsd-spike-wrap-up', '/gsd:spike --wrap-up'],
+  ['discuss-phase.md', '/gsd-sketch-wrap-up', '/gsd:sketch --wrap-up'],
 
   // new-project.md
-  ['new-project.md', '/gsd-spike-wrap-up', '/gsd-spike --wrap-up'],
-  ['new-project.md', '/gsd-sketch-wrap-up', '/gsd-sketch --wrap-up'],
+  ['new-project.md', '/gsd-spike-wrap-up', '/gsd:spike --wrap-up'],
+  ['new-project.md', '/gsd-sketch-wrap-up', '/gsd:sketch --wrap-up'],
 
   // plan-phase.md
-  ['plan-phase.md', '/gsd-insert-phase', '/gsd-phase --insert'],
+  ['plan-phase.md', '/gsd-insert-phase', '/gsd:phase --insert'],
 
   // spike.md
-  ['spike.md', '/gsd-spike-wrap-up', '/gsd-spike --wrap-up'],
+  ['spike.md', '/gsd-spike-wrap-up', '/gsd:spike --wrap-up'],
 
   // sketch.md
-  ['sketch.md', '/gsd-sketch-wrap-up', '/gsd-sketch --wrap-up'],
+  ['sketch.md', '/gsd-sketch-wrap-up', '/gsd:sketch --wrap-up'],
 ];
 
 describe('bug #2950: stale deleted-command references removed from workflow files', () => {
@@ -117,6 +117,10 @@ describe('bug #2950: stale deleted-command references removed from workflow file
   // (catches any we might have missed in per-file assertions above)
   const affectedFiles = [
     'help.md',
+    'help/modes/full.md',
+    'help/modes/default.md',
+    'help/modes/brief.md',
+    'help/modes/topic.md',
     'do.md',
     'settings.md',
     'discuss-phase.md',

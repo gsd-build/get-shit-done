@@ -77,6 +77,27 @@ function writeCodexConfig(codexHome, content) {
   fs.writeFileSync(path.join(codexHome, 'config.toml'), content, 'utf8');
 }
 
+function readCodexHooksJson(codexHome) {
+  const hooksPath = path.join(codexHome, 'hooks.json');
+  if (!fs.existsSync(hooksPath)) return {};
+  const raw = fs.readFileSync(hooksPath, 'utf8').trim();
+  if (!raw) return {};
+  return JSON.parse(raw);
+}
+
+function readHooksSessionStartCommands(codexHome) {
+  const parsed = readCodexHooksJson(codexHome);
+  const table = (parsed.hooks && typeof parsed.hooks === 'object' && !Array.isArray(parsed.hooks))
+    ? parsed.hooks
+    : parsed;
+  const sessionStart = Array.isArray(table.SessionStart) ? table.SessionStart : [];
+  return sessionStart.flatMap((entry) =>
+    (Array.isArray(entry?.hooks) ? entry.hooks : [])
+      .map((hook) => hook && hook.command)
+      .filter((cmd) => typeof cmd === 'string')
+  );
+}
+
 describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/reinstall', () => {
   let tmpDir;
   let codexHome;
@@ -99,37 +120,16 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     const content = readCodexConfig(codexHome);
     const parsed = parseTomlToObject(content);
 
-    // hooks must be an object (namespaced), NOT a flat array.
+    const sessionStartCommands = readHooksSessionStartCommands(codexHome);
+    const managed = sessionStartCommands.filter((cmd) => /gsd-check-update\.js/.test(cmd));
+    assert.equal(managed.length, 1, 'hooks.json must contain exactly one managed gsd-check-update command');
     assert.ok(
-      parsed.hooks && !Array.isArray(parsed.hooks) && typeof parsed.hooks === 'object',
-      'hooks must be a namespaced object, not a flat array: got ' + JSON.stringify(parsed.hooks)
-    );
-    // hooks.SessionStart must be an array-of-tables.
-    assert.ok(
-      Array.isArray(parsed.hooks.SessionStart),
-      'hooks.SessionStart must be array-of-tables: got ' + typeof parsed.hooks.SessionStart
-    );
-    // Each event entry must have a .hooks sub-array.
-    const eventEntry = parsed.hooks.SessionStart[0];
-    assert.ok(
-      eventEntry && Array.isArray(eventEntry.hooks),
-      'hooks.SessionStart[0].hooks must be an array of handlers: got ' + JSON.stringify(eventEntry)
-    );
-    // The handler must have type = "command" and reference gsd-check-update.js.
-    const handler = eventEntry.hooks[0];
-    assert.strictEqual(handler.type, 'command', 'handler type must be "command"');
-    assert.ok(
-      typeof handler.command === 'string' && /gsd-check-update\.js/.test(handler.command),
-      'handler command must reference gsd-check-update.js: got ' + handler.command
-    );
-    // No flat [[hooks]] entries must exist alongside the namespaced form.
-    assert.ok(
-      !Array.isArray(parsed.hooks),
-      'flat [[hooks]] AoT must not coexist with namespaced [[hooks.SessionStart]]'
+      !parsed.hooks || !Array.isArray(parsed.hooks.SessionStart),
+      'config.toml should not carry managed SessionStart hooks for GSD'
     );
   });
 
-  test('preserves user [[hooks.SessionStart]] entries and adds GSD nested handler', () => {
+  test('preserves user [[hooks.SessionStart]] entries and registers managed GSD handler in hooks.json', () => {
     // Users may have their own [[hooks.SessionStart]] entries using the new schema.
     // GSD must append its own two-level block without disturbing theirs.
     const userConfig = [
@@ -170,9 +170,10 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
       allCommands.includes('echo second user hook'),
       'second user hook preserved: ' + JSON.stringify(allCommands)
     );
+    const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
     assert.ok(
-      allCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
-      'GSD handler must appear in hooks.SessionStart[].hooks: ' + JSON.stringify(allCommands)
+      hooksJsonCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
+      'GSD handler must appear in hooks.json SessionStart entries: ' + JSON.stringify(hooksJsonCommands)
     );
     assert.ok(!Array.isArray(parsed.hooks), 'no flat [[hooks]] entries');
   });
@@ -197,16 +198,9 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
 
     // Old flat form must be gone.
     assert.ok(!Array.isArray(parsed.hooks), 'flat [[hooks]] must be stripped on upgrade');
-    // New nested form must be present.
-    assert.ok(Array.isArray(parsed.hooks && parsed.hooks.SessionStart), 'new [[hooks.SessionStart]] must be present');
-    const handler = parsed.hooks.SessionStart[0].hooks[0];
-    assert.strictEqual(handler.type, 'command');
-    assert.ok(/gsd-check-update\.js/.test(handler.command));
-    // Only one GSD hook entry must exist (no duplication).
-    const sessionStart = parsed.hooks?.SessionStart ?? [];
-    const gsdHandlers = sessionStart.flatMap((entry) =>
-      Array.isArray(entry.hooks) ? entry.hooks : []
-    ).filter((h) => typeof h?.command === 'string' && /gsd-check-update\.js/.test(h.command));
+    // Only one GSD hook entry must exist (no duplication) in hooks.json.
+    const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
+    const gsdHandlers = hooksJsonCommands.filter((cmd) => /gsd-check-update\.js/.test(cmd));
     assert.strictEqual(gsdHandlers.length, 1, 'exactly one managed handler after upgrade');
   });
 
@@ -228,20 +222,9 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     const content = readCodexConfig(codexHome);
     const parsed = parseTomlToObject(content);
 
-    assert.ok(Array.isArray(parsed.hooks && parsed.hooks.SessionStart), '[[hooks.SessionStart]] must be present');
-    const eventEntry = parsed.hooks.SessionStart[0];
-    assert.ok(Array.isArray(eventEntry.hooks), '[[hooks.SessionStart.hooks]] sub-table must be present');
-    const handler = eventEntry.hooks[0];
-    assert.strictEqual(handler.type, 'command');
-    assert.ok(/gsd-check-update\.js/.test(handler.command));
-    const handlers = (parsed.hooks?.SessionStart ?? []).flatMap((entry) =>
-      Array.isArray(entry.hooks) ? entry.hooks : []
-    );
-    assert.strictEqual(
-      handlers.filter((h) => typeof h?.command === 'string' && /gsd-check-update\.js/.test(h.command)).length,
-      1,
-      'exactly one managed handler after upgrade from PR-#2802-shape'
-    );
+    const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
+    const gsdHandlers = hooksJsonCommands.filter((cmd) => /gsd-check-update\.js/.test(cmd));
+    assert.strictEqual(gsdHandlers.length, 1, 'exactly one managed handler after upgrade from PR-#2802-shape');
   });
 
   test('reinstall is idempotent: correct nested schema is stripped and re-emitted cleanly', () => {
@@ -250,12 +233,9 @@ describe('#2760 defect 3 — Hooks AoT preservation across install/uninstall/rei
     runCodexInstall(codexHome); // second install
     const content = readCodexConfig(codexHome);
 
-    const parsed = parseTomlToObject(content);
-    const sessionStart = parsed.hooks?.SessionStart ?? [];
-    assert.strictEqual(sessionStart.length, 1, 'exactly one SessionStart event entry after double install');
-    assert.ok(Array.isArray(sessionStart[0].hooks), 'SessionStart event has nested handlers array');
-    assert.strictEqual(sessionStart[0].hooks.length, 1, 'exactly one handler in SessionStart after double install');
-    assert.ok(/gsd-check-update\.js/.test(sessionStart[0].hooks[0].command), 'managed handler command preserved');
+    const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
+    const gsdHandlers = hooksJsonCommands.filter((cmd) => /gsd-check-update\.js/.test(cmd));
+    assert.strictEqual(gsdHandlers.length, 1, 'exactly one managed SessionStart handler after double install');
   });
 });
 
@@ -686,10 +666,11 @@ describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namesp
       allSessionStartCommands.includes('echo user hook'),
       'user [[hooks.SessionStart]] entry preserved: ' + JSON.stringify(allSessionStartCommands)
     );
+    const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
     assert.ok(
-      allSessionStartCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
-      'GSD entry must appear in hooks.SessionStart array (namespaced AoT form): '
-        + JSON.stringify(allSessionStartCommands)
+      hooksJsonCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
+      'GSD entry must appear in hooks.json SessionStart entries: '
+        + JSON.stringify(hooksJsonCommands)
     );
 
     // The legacy top-level [[hooks]] AoT must NOT coexist with the namespaced
@@ -701,9 +682,7 @@ describe('#2760 CR4 finding 2 — Legacy flat [[hooks]] block migrates to namesp
     );
 
     // No duplicate gsd-check-update entries — exactly one managed entry.
-    const gsdEntries = allSessionStartCommands.filter(
-      (cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)
-    );
+    const gsdEntries = hooksJsonCommands.filter((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd));
     assert.equal(gsdEntries.length, 1,
       'exactly one gsd-check-update entry after migration, got: ' + gsdEntries.length);
   });
@@ -809,7 +788,7 @@ describe('#2760 CR4 finding 1 — atomicWriteFileSync failure aborts install (po
         let isHookWrite = false;
         try {
           const data = fs.readFileSync(src, 'utf8');
-          isHookWrite = /gsd-check-update\.js/.test(data);
+          isHookWrite = /GSD codex_hooks ownership/.test(data);
         } catch (_) { /* ignore */ }
         if (isHookWrite) {
           throw new Error('simulated rename failure');
@@ -1083,10 +1062,11 @@ describe('#2760 CR5 finding 3 — migration emits namespaced AoT (no flat/namesp
         JSON.stringify(ssCommands)
     );
     // GSD's managed gsd-check-update entry also lives in the namespaced array.
+    const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
     assert.ok(
-      ssCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
-      'managed gsd-check-update entry must appear in hooks.SessionStart array: ' +
-        JSON.stringify(ssCommands)
+      hooksJsonCommands.some((cmd) => typeof cmd === 'string' && /gsd-check-update\.js/.test(cmd)),
+      'managed gsd-check-update entry must appear in hooks.json SessionStart entries: ' +
+        JSON.stringify(hooksJsonCommands)
     );
 
     // No flat top-level [[hooks]] AoT may remain.

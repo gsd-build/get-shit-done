@@ -31,7 +31,10 @@ function parseAdr(filePath) {
     throw new Error(`Cannot read ADR file: ${filePath} — ${err.message}`);
   }
 
-  const lines = raw.split('\n');
+  // CRLF-tolerant split: Windows checkouts (autocrlf=true) include \r\n.
+  // Capture groups like /^##\s+(.+)$/ would otherwise pull a trailing \r
+  // into headings (e.g. "decision\r"), breaking heading equality checks.
+  const lines = raw.split(/\r?\n/);
   let title = null;
   const headings = [];
   let status = null;
@@ -59,7 +62,10 @@ function parseReadmeIndex(filePath) {
     throw new Error(`Cannot read ADR README: ${filePath} — ${err.message}`);
   }
 
-  const lines = raw.split('\n');
+  // CRLF-tolerant split: Windows checkouts (autocrlf=true) include \r\n.
+  // Capture groups like /^##\s+(.+)$/ would otherwise pull a trailing \r
+  // into headings (e.g. "decision\r"), breaking heading equality checks.
+  const lines = raw.split(/\r?\n/);
   const linkedFiles = [];
 
   for (const line of lines) {

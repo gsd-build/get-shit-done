@@ -1,0 +1,5 @@
+---
+type: Changed
+pr: 3597
+---
+**Test suites split into named lanes and CI matrix expanded to OS×Node** — `scripts/run-tests.cjs` now accepts `--suite <unit|integration|install|security|slow|all>` and filters by filename suffix (`*.security.test.cjs`, `*.integration.test.cjs`, etc.). New package scripts `test:unit`, `test:integration`, `test:install`, `test:security`, `test:slow`, `test:coverage:unit`, and `test:coverage:all` give callers stable entrypoints; `npm test` and `npm run test:coverage` keep their original behavior (full sweep). CI matrix grew from `ubuntu × {22, 24}` + a single macOS lane to `{ubuntu, macos, windows} × {22, 24, 26}` with Node 26 in `continue-on-error` until `actions/setup-node` stabilises it. `fail-fast: false` so a single lane failure no longer cancels the rest. Install and slow suites only run on `main` push to keep PR CI fast; a dedicated `coverage` job runs `test:coverage:unit` on ubuntu/Node 24 and uploads the report. New grouping policy documented in `docs/TESTING-SUITES.md`. Closes #3597.

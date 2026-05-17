@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 3538
+---
+**Phase state verbs no longer silently no-op on projects with `project_code` set and un-padded ROADMAP prose.** v1.42.1 added the padding-tolerant `phaseMarkdownRegexSource()` helper but wired it into only 1 of 8 call sites that build phase-number regexes against ROADMAP/STATE prose; the other 7 used raw `escapeRegex(phaseNum)` or partial `0*${escapeRegex(...)}` (tolerated extra padding, not missing). When skills passed the resolved padded form (`02.7`) against un-padded ROADMAP headings (`### Phase 2.7:`), `phase complete`, `roadmap get-phase`, `roadmap analyze` checkbox detection, `roadmap annotate-dependencies`, `phase next-decimal`, and `phase insert` all silently returned success while ROADMAP.md stayed unchanged. The helper is now promoted to `core.cjs` and routed through every site. Adds a parity-style regression that runs each verb with padded and un-padded ids against an identical fixture and asserts byte-equal output, so the next call-site cannot drift back undetected. Closes #3537.

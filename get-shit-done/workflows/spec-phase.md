@@ -67,7 +67,7 @@ Parse JSON for: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase
 **If `phase_found` is false:**
 ```
 Phase [X] not found in roadmap.
-Use /gsd-progress to see available phases.
+Use /gsd:progress to see available phases.
 ```
 Exit.
 
@@ -89,7 +89,7 @@ If SPEC.md already exists:
   - "Skip" — Exit (use existing spec as-is)
 
 If "View": Display SPEC.md, then offer Update/Skip.
-If "Skip": Exit with message: "Existing SPEC.md unchanged. Run /gsd-discuss-phase [X] to continue."
+If "Skip": Exit with message: "Existing SPEC.md unchanged. Run /gsd:discuss-phase [X] to continue."
 If "Update": Load existing SPEC.md, continue to Step 3.
 
 ## Step 2: Scout Codebase
@@ -233,7 +233,7 @@ SPEC.md written — {N} requirements locked.
   Phase {X}: {name}
   Ambiguity: {final_score} (gate: ≤ 0.20)
 
-Next: /gsd-discuss-phase {X}
+Next: /gsd:discuss-phase {X}
   discuss-phase will detect SPEC.md and focus on implementation decisions only.
 ```
 
@@ -258,5 +258,5 @@ Next: /gsd-discuss-phase {X}
 - Boundaries are explicit (in scope / out of scope with reasoning)
 - Acceptance criteria are pass/fail checkboxes
 - SPEC.md committed atomically (when commit_docs is true)
-- User directed to /gsd-discuss-phase as next step
+- User directed to /gsd:discuss-phase as next step
 </success_criteria>

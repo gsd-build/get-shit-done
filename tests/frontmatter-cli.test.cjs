@@ -42,7 +42,7 @@ afterEach(() => {
 describe('frontmatter get', () => {
   test('returns all fields as JSON', () => {
     const file = writeTempFile('---\nphase: 01\nplan: 01\ntype: execute\n---\nbody text');
-    const result = runGsdTools(`frontmatter get ${file}`);
+    const result = runGsdTools(['frontmatter', 'get', file]);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.strictEqual(parsed.phase, '01');
@@ -52,7 +52,7 @@ describe('frontmatter get', () => {
 
   test('returns specific field with --field', () => {
     const file = writeTempFile('---\nphase: 01\nplan: 02\ntype: tdd\n---\nbody');
-    const result = runGsdTools(`frontmatter get ${file} --field phase`);
+    const result = runGsdTools(['frontmatter', 'get', file, '--field', 'phase']);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.strictEqual(parsed.phase, '01');
@@ -60,7 +60,7 @@ describe('frontmatter get', () => {
 
   test('returns error for missing field', () => {
     const file = writeTempFile('---\nphase: 01\n---\n');
-    const result = runGsdTools(`frontmatter get ${file} --field nonexistent`);
+    const result = runGsdTools(['frontmatter', 'get', file, '--field', 'nonexistent']);
     // The command succeeds (exit 0) but returns an error object in JSON
     assert.ok(result.success, 'Command should exit 0');
     const parsed = JSON.parse(result.output);
@@ -77,7 +77,7 @@ describe('frontmatter get', () => {
 
   test('handles file with no frontmatter', () => {
     const file = writeTempFile('Plain text with no frontmatter delimiters.');
-    const result = runGsdTools(`frontmatter get ${file}`);
+    const result = runGsdTools(['frontmatter', 'get', file]);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.deepStrictEqual(parsed, {}, 'Should return empty object for no frontmatter');
@@ -89,7 +89,7 @@ describe('frontmatter get', () => {
 describe('frontmatter set', () => {
   test('updates existing field', () => {
     const file = writeTempFile('---\nphase: 01\ntype: execute\n---\nbody');
-    const result = runGsdTools(`frontmatter set ${file} --field phase --value "02"`);
+    const result = runGsdTools(['frontmatter', 'set', file, '--field', 'phase', '--value', '02']);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     // Read back and verify
@@ -101,7 +101,7 @@ describe('frontmatter set', () => {
 
   test('adds new field', () => {
     const file = writeTempFile('---\nphase: 01\n---\nbody');
-    const result = runGsdTools(`frontmatter set ${file} --field status --value "active"`);
+    const result = runGsdTools(['frontmatter', 'set', file, '--field', 'status', '--value', 'active']);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const content = fs.readFileSync(file, 'utf-8');
@@ -132,7 +132,7 @@ describe('frontmatter set', () => {
   test('preserves body content after set', () => {
     const bodyText = '\n\n# My Heading\n\nSome paragraph with special chars: $, %, &.';
     const file = writeTempFile('---\nphase: 01\n---' + bodyText);
-    runGsdTools(`frontmatter set ${file} --field phase --value "02"`);
+    runGsdTools(['frontmatter', 'set', file, '--field', 'phase', '--value', '02']);
 
     const content = fs.readFileSync(file, 'utf-8');
     assert.ok(content.includes('# My Heading'), 'heading should be preserved');
@@ -177,7 +177,7 @@ describe('frontmatter merge', () => {
 
   test('returns error for invalid JSON data', () => {
     const file = writeTempFile('---\nphase: 01\n---\nbody');
-    const result = runGsdTools(`frontmatter merge ${file} --data 'not json'`);
+    const result = runGsdTools(['frontmatter', 'merge', file, '--data', 'not json']);
     // cmdFrontmatterMerge calls error() which exits with code 1
     assert.ok(!result.success, 'Command should fail with non-zero exit code');
     assert.ok(result.error.includes('Invalid JSON'), 'Error should mention invalid JSON');
@@ -202,7 +202,7 @@ must_haves:
 ---
 body`;
     const file = writeTempFile(content);
-    const result = runGsdTools(`frontmatter validate ${file} --schema plan`);
+    const result = runGsdTools(['frontmatter', 'validate', file, '--schema', 'plan']);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.strictEqual(parsed.valid, true, 'Should be valid');
@@ -212,7 +212,7 @@ body`;
 
   test('reports invalid with missing fields', () => {
     const file = writeTempFile('---\nphase: 01\n---\nbody');
-    const result = runGsdTools(`frontmatter validate ${file} --schema plan`);
+    const result = runGsdTools(['frontmatter', 'validate', file, '--schema', 'plan']);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.strictEqual(parsed.valid, false, 'Should be invalid');
@@ -236,7 +236,7 @@ completed: 2026-02-25
 ---
 body`;
     const file = writeTempFile(content);
-    const result = runGsdTools(`frontmatter validate ${file} --schema summary`);
+    const result = runGsdTools(['frontmatter', 'validate', file, '--schema', 'summary']);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.strictEqual(parsed.valid, true, 'Should be valid for summary schema');
@@ -252,7 +252,7 @@ score: 5/5
 ---
 body`;
     const file = writeTempFile(content);
-    const result = runGsdTools(`frontmatter validate ${file} --schema verification`);
+    const result = runGsdTools(['frontmatter', 'validate', file, '--schema', 'verification']);
     assert.ok(result.success, `Command failed: ${result.error}`);
     const parsed = JSON.parse(result.output);
     assert.strictEqual(parsed.valid, true, 'Should be valid for verification schema');
@@ -261,7 +261,7 @@ body`;
 
   test('returns error for unknown schema', () => {
     const file = writeTempFile('---\nphase: 01\n---\n');
-    const result = runGsdTools(`frontmatter validate ${file} --schema unknown`);
+    const result = runGsdTools(['frontmatter', 'validate', file, '--schema', 'unknown']);
     // cmdFrontmatterValidate calls error() which exits with code 1
     assert.ok(!result.success, 'Command should fail with non-zero exit code');
     assert.ok(result.error.includes('Unknown schema'), 'Error should mention unknown schema');

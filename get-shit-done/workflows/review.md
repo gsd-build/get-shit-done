@@ -49,7 +49,19 @@ Parse flags from `$ARGUMENTS`:
 - `--lm-studio` → include LM Studio (local server, OpenAI-compatible)
 - `--llama-cpp` → include llama.cpp (local server, OpenAI-compatible)
 - `--all` → include all available (CLIs + running local servers)
-- No flags → include all available
+- No flags → if `review.default_reviewers` is set, include only configured reviewers that are detected; otherwise include all available
+
+Reviewer-selection precedence:
+1. Individual reviewer flags (`--gemini`, `--codex`, etc.)
+2. `--all`
+3. `review.default_reviewers`
+4. No key + no flags → all detected reviewers
+
+`review.default_reviewers` behavior:
+- Value must be a non-empty array of slug strings (configured via `gsd config-set review.default_reviewers '["gemini","codex"]'`)
+- Unknown slugs warn and are ignored
+- Known-but-undetected slugs emit an info note and are ignored
+- If all configured reviewers are unavailable, fail with an actionable message
 
 If no CLIs are available:
 ```
@@ -61,7 +73,7 @@ No external AI CLIs found. Install at least one:
 - qwen: https://github.com/nicepkg/qwen-code (Alibaba Qwen models)
 - cursor: https://cursor.com (Cursor IDE agent mode)
 
-Then run /gsd-review again.
+Then run /gsd:review again.
 ```
 Exit.
 
@@ -430,7 +442,7 @@ Consensus concerns:
 Full review: {padded_phase}-REVIEWS.md
 
 To incorporate feedback into planning:
-  /gsd-plan-phase {N} --reviews
+  /gsd:plan-phase {N} --reviews
 ```
 
 Clean up temp files.
@@ -443,5 +455,5 @@ Clean up temp files.
 - [ ] REVIEWS.md written with structured feedback
 - [ ] Consensus summary synthesized from multiple reviewers
 - [ ] Temp files cleaned up
-- [ ] User knows how to use feedback (/gsd-plan-phase --reviews)
+- [ ] User knows how to use feedback (/gsd:plan-phase --reviews)
 </success_criteria>
