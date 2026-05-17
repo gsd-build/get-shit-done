@@ -16,9 +16,9 @@ npm install -g get-shit-done-cc@1.45.0
 
 ### What's new
 
-#### `/gsd plan-phase --mvp` — vertical-slice planning ([#2885](https://github.com/gsd-build/get-shit-done/issues/2885), [PR #2867](https://github.com/gsd-build/get-shit-done/pull/2867))
+#### `/gsd-plan-phase --mvp` — vertical-slice planning ([#2885](https://github.com/gsd-build/get-shit-done/issues/2885), [PR #2867](https://github.com/gsd-build/get-shit-done/pull/2867))
 
-`/gsd plan-phase` learns a `--mvp` flag that flips the planner into vertical-slice mode. The planner reads `**Mode:** mvp` from a phase's ROADMAP entry, an explicit `--mvp` CLI override, or `workflow.mvp_mode` in `.planning/config.json` (precedence in that order, with the CLI flag winning). Under MVP mode the planner:
+`/gsd-plan-phase` learns a `--mvp` flag that flips the planner into vertical-slice mode. The planner reads `**Mode:** mvp` from a phase's ROADMAP entry, an explicit `--mvp` CLI override, or `workflow.mvp_mode` in `.planning/config.json` (precedence in that order, with the CLI flag winning). Under MVP mode the planner:
 
 - Surfaces a **Walking Skeleton** template for the very first phase of a new project — a thin end-to-end vertical slice that proves the wiring before any horizontal layer is built
 - Suppresses horizontal-layer language ("data layer first, then business logic, then UI") in favor of user-flow-driven decomposition
@@ -26,12 +26,12 @@ npm install -g get-shit-done-cc@1.45.0
 
 New required-reading injection: `references/planner-mvp-mode.md`. New parser surface: `roadmap.cjs` extracts a `mode` field on every phase lookup.
 
-#### `/gsd mvp-phase <N>` — guided user-story phase framing ([#2875](https://github.com/gsd-build/get-shit-done/issues/2875), [PR #2874](https://github.com/gsd-build/get-shit-done/pull/2874))
+#### `/gsd-mvp-phase <N>` — guided user-story phase framing ([#2875](https://github.com/gsd-build/get-shit-done/issues/2875), [PR #2874](https://github.com/gsd-build/get-shit-done/pull/2874))
 
-A new top-level command that walks the user through framing a phase as a vertical MVP slice before planning. Three structured prompts capture an "As a / I want to / So that" user story. If the story is too large, an interactive **SPIDR** (Spike / Path / Interface / Data / Rule) splitting flow surfaces a list of `/gsd add-phase` invocations to break the work apart. The command then:
+A new top-level command that walks the user through framing a phase as a vertical MVP slice before planning. Three structured prompts capture an "As a / I want to / So that" user story. If the story is too large, an interactive **SPIDR** (Spike / Path / Interface / Data / Rule) splitting flow surfaces a list of `/gsd-phase` invocations to break the work apart. The command then:
 
 - Mutates the ROADMAP entry to set `**Mode:** mvp` and replaces `**Goal:**` with the assembled user story
-- Delegates to `/gsd plan-phase --mvp <N>` to produce the plan
+- Delegates to `/gsd-plan-phase --mvp <N>` to produce the plan
 
 Two new references: [`spidr-splitting.md`](../get-shit-done/references/spidr-splitting.md), [`user-story-template.md`](../get-shit-done/references/user-story-template.md).
 
@@ -43,13 +43,13 @@ When `MVP_MODE` and `TDD_MODE` are both true at execution time, `execute-phase` 
 
 Under MVP mode, `verify-work` flips the UAT script's framing so user-flow steps come **before** technical correctness checks — the inverse of the default order. The verifier agent gains a `mvp_mode_verification` section. New reference: [`verify-mvp-mode.md`](../get-shit-done/references/verify-mvp-mode.md).
 
-A user-story format guard at the top of `extract_tests` will halt verification if a phase claims `**Mode:** mvp` but its `**Goal:**` doesn't parse as `As a … I want to … so that …` — pointing the user at `/gsd mvp-phase <N>` to repair.
+A user-story format guard at the top of `extract_tests` will halt verification if a phase claims `**Mode:** mvp` but its `**Goal:**` doesn't parse as `As a … I want to … so that …` — pointing the user at `/gsd-mvp-phase <N>` to repair.
 
 #### Discovery & progress surfaces ([#2882](https://github.com/gsd-build/get-shit-done/issues/2882), [PR #2883](https://github.com/gsd-build/get-shit-done/pull/2883))
 
 The MVP slice closes out with read-side surfaces:
 
-- **`/gsd new-project`** prompts up front for **Vertical MVP** vs **Horizontal Layers** mode and seeds the milestone accordingly
+- **`/gsd-new-project`** prompts up front for **Vertical MVP** vs **Horizontal Layers** mode and seeds the milestone accordingly
 - **`/gsd-progress`** emits a "User-flow next up" panel for MVP-mode phases, surfacing user-visible task names ahead of internal scaffolding
 - **`/gsd-stats`** adds an `MVP phases: N` summary line when the roadmap contains any
 - **`/gsd-graphify`** visually differentiates MVP-mode phase nodes from horizontal-layer phases in the rendered graph
@@ -64,20 +64,20 @@ The MVP slice closes out with read-side surfaces:
 
 ```bash
 # 1) Pick a phase you want to drive as MVP
-/gsd mvp-phase 1
+/gsd-mvp-phase 1
 
 # 2) Answer the three "As a / I want to / So that" prompts
 # 3) Plan runs automatically with --mvp
 # 4) Execute under TDD to exercise the runtime gate
-/gsd execute-phase 1 --tdd
+/gsd-execute-phase 1 --tdd
 
 # 5) Verify; UAT will lead with user-flow steps
-/gsd verify-work 1
+/gsd-verify-work 1
 
 # 6) See how it surfaces in your project read-side
-/gsd progress
-/gsd stats
-/gsd graphify
+/gsd-progress
+/gsd-stats
+/gsd-graphify
 ```
 
 ---
