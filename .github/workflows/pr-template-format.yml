@@ -18,11 +18,23 @@ jobs:
       - name: Check out policy from base branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
+      - name: Get changed files
+        id: changed_files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          files=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '.files[].path' | tr '\n' '\n')
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$files" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Evaluate PR template format
         id: policy
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          CHANGED_FILES: ${{ steps.changed_files.outputs.files }}
         run: node scripts/pr-template-policy.cjs
 
       - name: Warn trusted contributor about missing template
