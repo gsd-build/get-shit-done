@@ -11,10 +11,8 @@ const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
-const os = require('node:os');
 
-const { cleanup } = require('./helpers.cjs');
+const { cleanup, createTempDir, runNpm } = require('./helpers.cjs');
 const { SMOKE, runSmoke } = require('../scripts/release-tarball-smoke.cjs');
 
 const PKG_PATH = path.join(__dirname, '..', 'package.json');
@@ -30,21 +28,14 @@ describe('release-tarball-smoke', () => {
 
   before(async () => {
     // Pack once into a temp dir.
-    packDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-smoke-pack-'));
-    installPrefix = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-smoke-prefix-'));
-    fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-smoke-fixture-'));
+    packDir = createTempDir('gsd-smoke-pack-');
+    installPrefix = createTempDir('gsd-smoke-prefix-');
+    fixtureDir = createTempDir('gsd-smoke-fixture-');
 
-    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const packOutput = execFileSync(
-      npmCmd,
+    const packOutput = runNpm(
       ['pack', '--pack-destination', packDir],
-      {
-        cwd: path.join(__dirname, '..'),
-        encoding: 'utf-8',
-        shell: process.platform === 'win32',
-        timeout: 55000,
-      },
-    ).trim();
+      { cwd: path.join(__dirname, '..') },
+    );
 
     // npm pack prints the filename as the last line of stdout.
     const lines = packOutput.split(/\r?\n/).filter(Boolean);
@@ -57,16 +48,7 @@ describe('release-tarball-smoke', () => {
     }
 
     // Install once into installPrefix. All tests share this install.
-    const npmCmdI = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    execFileSync(
-      npmCmdI,
-      ['install', '-g', '--prefix', installPrefix, tarballPath],
-      {
-        encoding: 'utf-8',
-        shell: process.platform === 'win32',
-        timeout: 55000,
-      },
-    );
+    runNpm(['install', '-g', '--prefix', installPrefix, tarballPath]);
   });
 
   after(() => {

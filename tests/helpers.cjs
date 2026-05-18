@@ -230,4 +230,29 @@ function toPosixPath(p) {
   return p == null ? p : p.split(path.sep).join('/');
 }
 
-module.exports = { runGsdTools, createTempDir, createTempProject, createTempGitProject, cleanup, parseFrontmatter, isUsageOutput, captureConsole, toPosixPath, TOOLS_PATH };
+/**
+ * Run an npm command via execFileSync with cross-platform portability.
+ *
+ * Handles the Windows `npm.cmd` vs POSIX `npm` distinction and the
+ * `shell: true` requirement on Windows so tests do not need to
+ * re-implement platform detection inline.
+ *
+ * @param {string[]} args - npm subcommand and flags (e.g. ['pack', '--pack-destination', dir]).
+ * @param {object} [options] - execFileSync options merged with platform defaults.
+ *   `cwd`, `encoding`, `timeout`, and `env` are the commonly overridden keys.
+ * @returns {string} trimmed stdout string (encoding: 'utf-8').
+ * @throws {Error} re-throws the execFileSync error on non-zero exit so callers
+ *   get the full stderr in the error message.
+ */
+function runNpm(args, options = {}) {
+  const isWindows = process.platform === 'win32';
+  const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+  const defaults = {
+    encoding: 'utf-8',
+    shell: isWindows,
+    timeout: 55000,
+  };
+  return execFileSync(npmCmd, args, { ...defaults, ...options }).trim();
+}
+
+module.exports = { runGsdTools, createTempDir, createTempProject, createTempGitProject, cleanup, parseFrontmatter, isUsageOutput, captureConsole, toPosixPath, runNpm, TOOLS_PATH };
