@@ -47,9 +47,9 @@ const TOOLING_PATH_ALLOWLIST = [
  *
  * Capture group 1 is the reason (trimmed). Empty/whitespace-only reasons
  * do NOT match because the pattern requires at least one non-whitespace
- * character at the start of the reason ([^\s>-]).
+ * character in the captured body.
  */
-const EXEMPT_MARKER_REGEX = /<!--\s*pr-template-exempt:\s*([^\s>-][^>-]*?)\s*-->/;
+const EXEMPT_MARKER_REGEX = /<!--\s*pr-template-exempt:\s*([\s\S]*?\S)\s*-->/;
 
 const TEMPLATES = [
   {

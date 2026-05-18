@@ -170,6 +170,7 @@ describe('pr-template-policy helper: hasExemptMarker', () => {
   test('matches a marker with a non-empty reason', () => {
     assert.equal(hasExemptMarker('<!-- pr-template-exempt: ci -->', EXEMPT_MARKER_REGEX), true);
     assert.equal(hasExemptMarker('<!-- pr-template-exempt: dropping node 26 lane -->', EXEMPT_MARKER_REGEX), true);
+    assert.equal(hasExemptMarker('<!-- pr-template-exempt: drop node-26 lane -->', EXEMPT_MARKER_REGEX), true);
   });
 
   test('does not match a marker with empty or whitespace-only reason', () => {
