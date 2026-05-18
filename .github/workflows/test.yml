@@ -40,17 +40,13 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    # Node 26 lanes report forward-compat status without gating the workflow
-    # (setup-node may not yet have stable Node 26 images). 22/24 still gate.
-    continue-on-error: ${{ matrix.node-version == 26 }}
-
     strategy:
       # fail-fast disabled so a single lane failure doesn't cancel the rest;
       # makes OS-specific vs version-specific regressions easier to distinguish.
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [22, 24, 26]
+        node-version: [22, 24]
         # Windows path/separator coverage is also reinforced by hardcoded-paths.test.cjs
         # and windows-robustness.test.cjs (static analysis).
         # A dedicated windows-compat workflow runs on a weekly schedule.
