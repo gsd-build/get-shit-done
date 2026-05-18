@@ -6301,6 +6301,13 @@ function copyWithPathReplacement(srcDir, destDir, pathPrefix, runtime, isCommand
       }
       content = processAttribution(content, getCommitAttribution(runtime));
 
+      // #3683 — normalize /gsd:<cmd> → /gsd-<cmd> in any body passing through
+      // copyWithPathReplacement for runtimes that register commands under the
+      // hyphen form; normalizeAgentBodyForRuntime self-gates on
+      // shouldNormalizeHyphenNamespaceInAgentBody(runtime) and is a no-op for
+      // colon-canonical runtimes (Gemini).
+      content = normalizeAgentBodyForRuntime(content, runtime, readGsdCommandNames());
+
       // Convert frontmatter for opencode compatibility
       if (isOpencode || isKilo) {
         content = isKilo
