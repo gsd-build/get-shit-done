@@ -24,8 +24,12 @@ function extractCheckBlock() {
   const stepStart = md.indexOf('<step name="check_incomplete_work">');
   assert.ok(stepStart >= 0, 'resume-project.md must contain a check_incomplete_work step');
   const stepEnd = md.indexOf('</step>', stepStart);
+  assert.ok(
+    stepEnd >= 0,
+    'check_incomplete_work step must have a closing </step> tag',
+  );
   const stepBody = md.slice(stepStart, stepEnd);
-  const fenceMatch = stepBody.match(/```(?:bash|sh)\r?\n([\s\S]*?)```/);
+  const fenceMatch = stepBody.match(/```(?:bash|sh)\r?\n([\s\S]*?)\r?\n```/);
   assert.ok(fenceMatch, 'check_incomplete_work step must embed a ```bash code block');
   return fenceMatch[1];
 }
