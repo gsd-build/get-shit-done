@@ -35,11 +35,11 @@
  *   Non-interactive: --local --claude flags skip all prompts.
  *
  * Workflow-body checks (Cycle 3 — informational until #3668 is fixed):
- *   - Calls `gsd-sdk query state.json --project-dir <fixtureDir>` to verify
+ *   - Calls `gsd-sdk "query" state.json --project-dir <fixtureDir>` to verify
  *     the SDK binary is callable and produces parseable JSON (SDK_BINARY_NOT_CALLABLE).
  *   - Scans all installed get-shit-done/workflows/*.md for:
  *     (a) /gsd:<known-cmd> colon-namespace leaks (WORKFLOW_BODY_COLON_LEAK)
- *     (b) bare `gsd-sdk query` in shell fences without a `command -v gsd-sdk`
+ *     (b) bare `gsd-sdk` query invocations in shell fences without a `command -v gsd-sdk`
  *         guard in the same fence (WORKFLOW_MISSING_SDK_FALLBACK — #3668).
  *   Both checks populate result.details with counters but do NOT return a failure
  *   code by default; they are informational until the upstream fixes land.
@@ -51,6 +51,7 @@ const { execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const CHILD_TIMEOUT_MS = 120000;
 
 // ---------------------------------------------------------------------------
 // Frozen result-code enum
@@ -210,11 +211,11 @@ function scanWorkflowColonLeak(filePath, cmdNames) {
 }
 
 /**
- * Scan a single workflow .md file for bare `gsd-sdk query` invocations inside
+ * Scan a single workflow .md file for bare `gsd-sdk` query invocations inside
  * shell fences that lack a `command -v gsd-sdk` guard in the same fence.
  *
  * Structured check: walks lines, tracks open/close shell fences (```bash /
- * ```sh / ``` alone), collects `gsd-sdk query` lines and the fence's guard
+ * ```sh / ``` alone), collects `gsd-sdk` query lines and the fence's guard
  * state, then emits findings per-fence.
  *
  * Returns the first unguarded { line, lineNumber } or null.
@@ -246,7 +247,7 @@ function scanWorkflowMissingSdkFallback(filePath) {
       }
     } else {
       if (FENCE_CLOSE.test(trimmed)) {
-        // Closing the fence — check if there were gsd-sdk query calls without a guard
+        // Closing the fence — check if there were bare sdk query calls without a guard
         if (firstSdkQueryLineInFence !== null && !fenceHasGuard) {
           return { line: firstSdkQueryLineNumInFence, content: firstSdkQueryLineInFence.trim() };
         }
@@ -306,7 +307,7 @@ function runSmoke({
   const installResult = spawnSync(
     npmCmd,
     ['install', '-g', '--prefix', installPrefix, tarballPath],
-    { encoding: 'utf-8', shell: process.platform === 'win32' },
+    { encoding: 'utf-8', shell: process.platform === 'win32', timeout: CHILD_TIMEOUT_MS },
   );
 
   if (installResult.status !== 0) {
@@ -337,7 +338,7 @@ function runSmoke({
   const versionResult = spawnSync(
     process.execPath,
     [actualBin, '--version'],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', timeout: CHILD_TIMEOUT_MS },
   );
 
   if (versionResult.status !== 0) {
@@ -407,6 +408,7 @@ function runSmoke({
         // Ensure no TTY so the installer's non-interactive fallback fires
         stdio: ['pipe', 'pipe', 'pipe'],
         env: initEnv,
+        timeout: CHILD_TIMEOUT_MS,
       },
     );
 
@@ -494,12 +496,12 @@ function runSmoke({
   // Cycle 3: SDK binary callable + workflow-body validation (informational)
   // ─────────────────────────────────────────────────────────────────────────
 
-  // --- Verify gsd-sdk query is callable and returns parseable JSON ---------
+  // --- Verify `gsd-sdk` query is callable and returns parseable JSON -------
   const sdkQueryDir = fixtureDir || os.tmpdir();
   const sdkQueryResult = spawnSync(
     process.execPath,
     [actualBin, 'query', 'state.json', '--project-dir', sdkQueryDir],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', timeout: CHILD_TIMEOUT_MS },
   );
 
   if (sdkQueryResult.status !== 0) {
@@ -528,7 +530,7 @@ function runSmoke({
       details: {
         ...details,
         sdkBin: actualBin,
-        reason: 'gsd-sdk query state.json output is not valid JSON',
+        reason: 'gsd-sdk query-state output is not valid JSON',
         sdkQueryStdout: sdkQueryResult.stdout,
       },
     };
@@ -616,6 +618,7 @@ function cliMain() {
         cwd: path.join(__dirname, '..'),
         encoding: 'utf-8',
         shell: process.platform === 'win32',
+        timeout: CHILD_TIMEOUT_MS,
       },
     ).trim();
     // npm pack outputs the filename on stdout (last line when verbose)
