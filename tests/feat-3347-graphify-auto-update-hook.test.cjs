@@ -377,6 +377,7 @@ describe('#3347 hook — HEAD-advancing command matchers', () => {
     // so the substring "git commit" never appears in tool_input.command.
     // The hook must match the user-facing SDK invocation directly.
     'gsd-sdk query commit "docs: probe" --files .planning/STATE.md',
+    'npx gsd-sdk query commit "docs: probe" --files .planning/STATE.md',
   ]) {
     test(`dispatches on: ${cmd}`, (t) => {
       const tmpDir = createTempGitRepo({
@@ -395,6 +396,29 @@ describe('#3347 hook — HEAD-advancing command matchers', () => {
       );
     });
   }
+
+  test('does NOT dispatch on SDK commit-to-subrepo prefix collision', (t) => {
+    const tmpDir = createTempGitRepo({
+      config: { graphify: { enabled: true, auto_update: true } },
+    });
+    t.after(() => cleanup(tmpDir));
+    const mockBin = makeMockGraphifyBin(tmpDir, { sleepMs: 100 });
+    const r = runHook(
+      tmpDir,
+      {
+        tool_name: 'Bash',
+        tool_input: {
+          command: 'gsd-sdk query commit-to-subrepo "msg" --files packages/foo',
+        },
+      },
+      { pathPrepend: mockBin },
+    );
+    assert.strictEqual(r.status, 0);
+    assert.ok(
+      !fs.existsSync(path.join(tmpDir, '.planning/graphs/.last-build-status.json')),
+      'must NOT dispatch for commit-to-subrepo, which does not advance the outer repo HEAD',
+    );
+  });
 
   // #3653 — only the SDK `commit` verb invokes git internally. Other
   // `gsd-sdk query` verbs (phase.complete, roadmap.update-plan-progress,
