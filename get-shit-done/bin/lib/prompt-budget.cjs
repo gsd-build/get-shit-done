@@ -246,19 +246,7 @@ function applyBudget({ sections, budget, options = {} }) {
     }
   }
 
-  // ── Trim step 2: drop context ─────────────────────────────────────────────
-  if (computeBaseTokens() > contentBudget && context) {
-    context = null;
-    omitted.push('context');
-  }
-
-  // ── Trim step 3: drop research ────────────────────────────────────────────
-  if (computeBaseTokens() > contentBudget && research) {
-    research = null;
-    omitted.push('research');
-  }
-
-  // ── Trim step 4: proportional plan truncation ─────────────────────────────
+  // ── Trim step 2: proportional plan truncation ─────────────────────────────
   if (computeBaseTokens() > contentBudget) {
     // Compute tokens available for plan content only
     const overhead =
@@ -273,6 +261,12 @@ function applyBudget({ sections, budget, options = {} }) {
         (sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'),
         0
       ) +
+      (context
+        ? estimateTokens('## Context\n\n') + estimateTokens(context)
+        : 0) +
+      (research
+        ? estimateTokens('## Research\n\n') + estimateTokens(research)
+        : 0) +
       (requirements
         ? estimateTokens('## Requirements\n\n') + estimateTokens(requirements)
         : 0);
@@ -290,9 +284,13 @@ function applyBudget({ sections, budget, options = {} }) {
         0
       );
 
-      workingPlans = workingPlans.map((p, i) => {
-        const share = planBudgetTokens / workingPlans.length;
-        const maxChars = Math.max(Math.floor(share * 4), MIN_PLAN_BYTES);
+      const totalPlanCharsBudget = planBudgetTokens * 4;
+      workingPlans = workingPlans.map((p) => {
+        const proportionalShare =
+          totalOriginalChars > 0
+            ? Math.floor((p.content.length / totalOriginalChars) * totalPlanCharsBudget)
+            : 0;
+        const maxChars = Math.max(proportionalShare, MIN_PLAN_BYTES);
         return { file: p.file, content: tailTruncate(p.content, maxChars) };
       });
 
@@ -305,6 +303,18 @@ function applyBudget({ sections, budget, options = {} }) {
           ((totalOriginalChars - newTotalChars) / totalOriginalChars) * 100;
       }
     }
+  }
+
+  // ── Trim step 3: drop context ─────────────────────────────────────────────
+  if (computeBaseTokens() > contentBudget && context) {
+    context = null;
+    omitted.push('context');
+  }
+
+  // ── Trim step 4: drop research ────────────────────────────────────────────
+  if (computeBaseTokens() > contentBudget && research) {
+    research = null;
+    omitted.push('research');
   }
 
   // ── Trim step 5: drop requirements (last resort) ──────────────────────────
@@ -336,6 +346,23 @@ function applyBudget({ sections, budget, options = {} }) {
   });
 
   const estimatedTokens = estimateTokens(prompt);
+
+  if (estimatedTokens > effectiveBudget) {
+    hardFailed = true;
+    return {
+      prompt: '',
+      metadata: {
+        budget,
+        effectiveBudget,
+        estimatedTokens,
+        omitted,
+        projectMdShrunk,
+        planTruncationPct,
+        hardFailed,
+        noteInjected,
+      },
+    };
+  }
 
   return {
     prompt,

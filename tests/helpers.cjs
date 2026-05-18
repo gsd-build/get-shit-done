@@ -60,12 +60,13 @@ function runGsdTools(args, cwd = process.cwd(), env = {}) {
         env: childEnv,
       });
     }
-    return { success: true, output: result.trim() };
+    return { success: true, output: result.trim(), exitCode: 0 };
   } catch (err) {
     return {
       success: false,
       output: err.stdout?.toString().trim() || '',
       error: err.stderr?.toString().trim() || err.message,
+      exitCode: err.status ?? 1,
     };
   }
 }

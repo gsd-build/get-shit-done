@@ -24,9 +24,8 @@ const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('child_process');
 
-const { createTempDir, cleanup, TOOLS_PATH } = require('./helpers.cjs');
+const { createTempDir, cleanup, runGsdTools } = require('./helpers.cjs');
 
 const TEST_INSTRUCTIONS = [
   '# Cross-AI Plan Review Request',
@@ -58,25 +57,12 @@ const TEST_RESEARCH = 'a'.repeat(8000); // ~2000 tokens — large enough to forc
  * Returns { exitCode, stdout, stderr }.
  */
 function runCli(args, cwd) {
-  try {
-    const stdout = execFileSync(process.execPath, [TOOLS_PATH, ...args], {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        GSD_SESSION_KEY: '',
-        CLAUDE_SESSION_ID: '',
-      },
-    });
-    return { exitCode: 0, stdout, stderr: '' };
-  } catch (err) {
-    return {
-      exitCode: err.status ?? 1,
-      stdout: err.stdout?.toString() ?? '',
-      stderr: err.stderr?.toString() ?? '',
-    };
-  }
+  const result = runGsdTools(args, cwd);
+  return {
+    exitCode: result.exitCode ?? (result.success ? 0 : 1),
+    stdout: result.output ?? '',
+    stderr: result.error ?? '',
+  };
 }
 
 describe('prompt-budget CLI', () => {

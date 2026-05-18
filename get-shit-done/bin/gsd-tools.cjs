@@ -1457,7 +1457,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     // Exit codes:
     //   0  success (trim or no-trim)
     //   1  invocation error (missing required arg, missing file, invalid budget)
-    //   2  hardFailed: minimum-set exceeds budget; metadata still written
+    //   2  hardFailed: prompt cannot fit effective budget after trim policy
 
     case 'prompt-budget': {
       const promptBudget = require('./lib/prompt-budget.cjs');

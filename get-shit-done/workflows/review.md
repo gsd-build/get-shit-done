@@ -191,7 +191,7 @@ for PLAN_FILE in "${PHASE_DIR}"/*-PLAN.md; do
 done
 
 # Optional section files (only if content was included in the combined prompt)
-if [ -f "${PHASE_DIR}/"*"-PROJECT.md" ] 2>/dev/null; then
+if [ -f ".planning/PROJECT.md" ]; then
   cp .planning/PROJECT.md "/tmp/gsd-review-${PHASE}-project.md"
 fi
 if ls "${PHASE_DIR}/"*"-CONTEXT.md" >/dev/null 2>&1; then
