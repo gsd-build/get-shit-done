@@ -37,9 +37,9 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { createTempDir, cleanup } = require('./helpers.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const WORKFLOW_PATH = path.join(REPO_ROOT, 'get-shit-done', 'workflows', 'resume-project.md');
@@ -47,17 +47,9 @@ const WORKFLOW_PATH = path.join(REPO_ROOT, 'get-shit-done', 'workflows', 'resume
 // The exact snippet the workflow now embeds. Keep in sync with
 // resume-project.md `check_incomplete_work` step.
 const FIND_SNIPPET = [
-  "find .planning -maxdepth 3 -name '.continue-here*.md' -print 2>/dev/null",
-  "find . -maxdepth 1 -name '.continue-here*.md' -print 2>/dev/null",
+  "find .planning -maxdepth 3 -name '.continue-here*.md' -print 2>/dev/null || true",
+  "find . -maxdepth 1 -name '.continue-here*.md' -print 2>/dev/null || true",
 ].join('\n');
-
-function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-bug-3689-'));
-}
-
-function rmTmpDir(dir) {
-  fs.rmSync(dir, { recursive: true, force: true });
-}
 
 function hasShell(name) {
   const result = spawnSync('which', [name], { encoding: 'utf8' });
@@ -68,7 +60,7 @@ describe('bug #3689 — resume-project.md continue-here scan under zsh NOMATCH',
   let tmpDir;
 
   before(() => {
-    tmpDir = makeTmpDir();
+    tmpDir = createTempDir('gsd-bug-3689-');
     // Reproduce the common new-project layout: a `.planning/` with a
     // suffixed continue-here file and *no* spike / sketch / deliberation
     // subdirectories.
@@ -81,7 +73,7 @@ describe('bug #3689 — resume-project.md continue-here scan under zsh NOMATCH',
   });
 
   after(() => {
-    rmTmpDir(tmpDir);
+    cleanup(tmpDir);
   });
 
   test('zsh -o nomatch lists the .planning/.continue-here-* checkpoint', { skip: !hasShell('zsh') }, () => {
@@ -115,12 +107,12 @@ describe('bug #3689 — empty workspace exits cleanly', () => {
   let tmpDir;
 
   before(() => {
-    tmpDir = makeTmpDir();
+    tmpDir = createTempDir('gsd-bug-3689-');
     // No .planning/ at all, no .continue-here files. Pure greenfield.
   });
 
   after(() => {
-    rmTmpDir(tmpDir);
+    cleanup(tmpDir);
   });
 
   test('zsh -o nomatch with no checkpoints exits 0, empty output', { skip: !hasShell('zsh') }, () => {
