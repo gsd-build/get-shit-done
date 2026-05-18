@@ -73,8 +73,8 @@ cat .planning/HANDOFF.json 2>/dev/null || true
 # pattern after the first miss, including `.planning/.continue-here*.md`.
 # `find` does not use shell glob expansion and tolerates absent
 # directories on both bash and zsh.
-find .planning -maxdepth 3 -name '.continue-here*.md' -print 2>/dev/null
-find . -maxdepth 1 -name '.continue-here*.md' -print 2>/dev/null
+find .planning -maxdepth 3 -name '.continue-here*.md' -print 2>/dev/null || true
+find . -maxdepth 1 -name '.continue-here*.md' -print 2>/dev/null || true
 
 # Check for plans without summaries (incomplete execution)
 for plan in .planning/phases/*/*-PLAN.md; do
