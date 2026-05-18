@@ -133,6 +133,9 @@ function buildNewProjectConfig(userChoices) {
   const exaKeyFile = path.join(homedir, '.gsd', 'exa_api_key');
   const hasExaSearch = !!(process.env.EXA_API_KEY || fs.existsSync(exaKeyFile));
   const perplexityKeyFile = path.join(homedir, '.gsd', 'perplexity_api_key');
+  // Intentional parity with Brave/Exa/Firecrawl: config initialization only
+  // auto-detects ambient env vars and user-level key files, not project
+  // .planning/config.json values in the file it is about to create.
   const hasPerplexity = !!(process.env.PERPLEXITY_API_KEY || fs.existsSync(perplexityKeyFile));
 
   // Load user-level defaults from ~/.gsd/defaults.json if available

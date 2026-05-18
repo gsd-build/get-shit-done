@@ -258,6 +258,39 @@ describe('perplexity HTTP request shape', () => {
     }
   });
 
+  test('invalid JSON response surfaces as a stable provider error', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
+    process.env.PERPLEXITY_API_KEY = 'pplx-invalid-json';
+    try {
+      const fakeFetch = async () => ({ ok: true, async json() { throw new SyntaxError('Unexpected token <'); } });
+      const r = await perplexity.search('q', {}, { fetchImpl: fakeFetch });
+      assert.equal(r.available, false);
+      assert.equal(r.error, 'Invalid JSON response');
+    } finally {
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
+    }
+  });
+
+  test('invalid maxResults is rejected before request construction', async () => {
+    const prevEnv = process.env.PERPLEXITY_API_KEY;
+    process.env.PERPLEXITY_API_KEY = 'pplx-invalid-limit';
+    try {
+      let called = false;
+      const fakeFetch = async () => {
+        called = true;
+        return { ok: true, async json() { return { results: [] }; } };
+      };
+      const r = await perplexity.search('q', { maxResults: NaN }, { fetchImpl: fakeFetch });
+      assert.equal(r.available, false);
+      assert.equal(r.error, 'maxResults requires a positive integer');
+      assert.equal(called, false);
+    } finally {
+      if (prevEnv === undefined) delete process.env.PERPLEXITY_API_KEY;
+      else process.env.PERPLEXITY_API_KEY = prevEnv;
+    }
+  });
+
   test('empty query / input surfaces as available:false with "Query required" / "Input required"', async () => {
     const prevEnv = process.env.PERPLEXITY_API_KEY;
     process.env.PERPLEXITY_API_KEY = 'pplx-validation-key';
@@ -347,6 +380,14 @@ describe('perplexity-search / perplexity-agent CLI surface', () => {
     const parsed = JSON.parse(r.output);
     assert.equal(parsed.available, false);
     assert.equal(parsed.reason, 'PERPLEXITY_API_KEY not set');
+  });
+
+  test('perplexity-search rejects --limit without a following value', (t) => {
+    const tmp = createTempProject();
+    t.after(() => cleanup(tmp));
+    const r = runGsdTools(['perplexity-search', 'myquery', '--limit'], tmp, { HOME: tmp, PERPLEXITY_API_KEY: '' });
+    assert.equal(r.success, false);
+    assert.match(r.error, /--limit requires a positive integer/);
   });
 
   test('perplexity-agent returns available:false when no key set', (t) => {

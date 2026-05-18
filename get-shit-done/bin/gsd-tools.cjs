@@ -319,6 +319,17 @@ function parseMultiwordArg(args, flag) {
   return tokens.length > 0 ? tokens.join(' ') : null;
 }
 
+function parsePositiveIntegerFlag(args, flag, defaultValue) {
+  const idx = args.indexOf(`--${flag}`);
+  if (idx === -1) return defaultValue;
+  const value = args[idx + 1];
+  const parsed = Number(value);
+  if (!value || value.startsWith('--') || !Number.isInteger(parsed) || parsed < 1) {
+    error(`--${flag} requires a positive integer`, ERROR_REASON.USAGE);
+  }
+  return parsed;
+}
+
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1089,10 +1100,9 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
 
     case 'perplexity-search': {
       const query = args[1];
-      const limitIdx = args.indexOf('--limit');
       const recencyIdx = args.indexOf('--recency');
       await commands.cmdPerplexitySearch(cwd, query, {
-        limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
+        limit: parsePositiveIntegerFlag(args, 'limit', 10),
         recency: recencyIdx !== -1 ? args[recencyIdx + 1] : null,
       }, raw);
       break;

@@ -15,12 +15,32 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve as pathResolve } from 'node:path';
+import { dirname, join, parse, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { QueryHandler } from './utils.js';
 
 export const SEARCH_URL = 'https://api.perplexity.ai/search';
 export const AGENT_URL = 'https://api.perplexity.ai/v1/agent';
+const PACKAGE_NAME = 'get-shit-done-cc';
+
+function readPackageVersion(startDir: string): string | null {
+  let dir = pathResolve(startDir);
+  const root = parse(dir).root;
+  let fallbackVersion: string | null = null;
+  while (true) {
+    const candidate = join(dir, 'package.json');
+    if (existsSync(candidate)) {
+      const pkg = JSON.parse(readFileSync(candidate, 'utf-8')) as { name?: unknown; version?: unknown };
+      if (typeof pkg.version === 'string' && pkg.version) {
+        if (pkg.name === PACKAGE_NAME) return pkg.version;
+        fallbackVersion = fallbackVersion || pkg.version;
+      }
+    }
+    if (dir === root) break;
+    dir = dirname(dir);
+  }
+  return fallbackVersion;
+}
 
 /**
  * `X-Pplx-Integration` header value. Slug is fixed for this integration; the
@@ -31,21 +51,7 @@ export function integrationHeader(): string {
   let version = 'unknown';
   try {
     const here = dirname(fileURLToPath(import.meta.url));
-    // Two layouts: src/ (dev) and dist/ (built). Walk up until package.json found.
-    const candidates = [
-      pathResolve(here, '..', '..', '..', 'package.json'),
-      pathResolve(here, '..', '..', 'package.json'),
-      pathResolve(here, '..', 'package.json'),
-    ];
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) {
-        const pkg = JSON.parse(readFileSync(candidate, 'utf-8'));
-        if (pkg && typeof pkg.version === 'string' && pkg.version) {
-          version = pkg.version;
-          break;
-        }
-      }
-    }
+    version = readPackageVersion(here) || version;
   } catch { /* unknown is fine — header still goes out */ }
   return `get-shit-done/${version}`;
 }
@@ -54,9 +60,9 @@ function readKeyFile(filePath: string): string | null {
   try {
     const buf = readFileSync(filePath);
     if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
-      return buf.toString('utf16le').replace(/^﻿/, '').trim();
+      return buf.toString('utf16le').replace(/^\uFEFF/, '').trim();
     }
-    return buf.toString('utf-8').replace(/^﻿/, '').trim();
+    return buf.toString('utf-8').replace(/^\uFEFF/, '').trim();
   } catch {
     return null;
   }
@@ -109,7 +115,11 @@ export async function perplexityFetch<T = unknown>(
   if (!response.ok) {
     throw new Error(`API error: ${response.status}`);
   }
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as T;
+  } catch {
+    throw new Error('Invalid JSON response');
+  }
 }
 
 interface SearchResultItem {
@@ -140,7 +150,11 @@ export const perplexitySearch: QueryHandler = async (args, cwd) => {
   }
   const limitIdx = args.indexOf('--limit');
   const recencyIdx = args.indexOf('--recency');
-  const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10;
+  const limitValue = limitIdx !== -1 ? args[limitIdx + 1] : null;
+  const limit = limitIdx !== -1 ? Number(limitValue) : 10;
+  if (limitIdx !== -1 && (!limitValue || limitValue.startsWith('--') || !Number.isInteger(limit) || limit < 1)) {
+    return { data: { available: false, error: '--limit requires a positive integer' } };
+  }
   const recency = recencyIdx !== -1 ? args[recencyIdx + 1] : null;
 
   const body: Record<string, unknown> = { query, max_results: limit };

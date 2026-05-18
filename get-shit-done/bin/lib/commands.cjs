@@ -492,7 +492,6 @@ async function cmdPerplexitySearch(cwd, query, options, raw) {
   const result = await perplexity.search(query, {
     maxResults: options && options.limit != null ? options.limit : undefined,
     searchRecencyFilter: options && options.recency ? options.recency : undefined,
-    searchDomainFilter: options && options.domainFilter ? options.domainFilter : undefined,
   }, { cwd });
   if (!result.available) {
     output(result, raw, '');

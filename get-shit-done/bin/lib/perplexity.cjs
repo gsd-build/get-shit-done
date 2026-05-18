@@ -24,6 +24,26 @@ const path = require('path');
 
 const SEARCH_URL = 'https://api.perplexity.ai/search';
 const AGENT_URL = 'https://api.perplexity.ai/v1/agent';
+const PACKAGE_NAME = 'get-shit-done-cc';
+
+function readPackageVersion(startDir) {
+  let dir = path.resolve(startDir);
+  const root = path.parse(dir).root;
+  let fallbackVersion = null;
+  while (true) {
+    const candidate = path.join(dir, 'package.json');
+    if (fs.existsSync(candidate)) {
+      const pkg = JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+      if (pkg && typeof pkg.version === 'string' && pkg.version) {
+        if (pkg.name === PACKAGE_NAME) return pkg.version;
+        fallbackVersion = fallbackVersion || pkg.version;
+      }
+    }
+    if (dir === root) break;
+    dir = path.dirname(dir);
+  }
+  return fallbackVersion;
+}
 
 /**
  * Build the attribution header value. The slug is documented for our
@@ -33,12 +53,7 @@ const AGENT_URL = 'https://api.perplexity.ai/v1/agent';
 function integrationHeader() {
   let version = 'unknown';
   try {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), 'utf-8'),
-    );
-    if (pkg && typeof pkg.version === 'string' && pkg.version) {
-      version = pkg.version;
-    }
+    version = readPackageVersion(__dirname) || version;
   } catch { /* unknown is fine — header still goes out */ }
   return `get-shit-done/${version}`;
 }
@@ -111,7 +126,13 @@ async function perplexityFetch(url, body, opts) {
     err.status = response.status;
     throw err;
   }
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    const err = new Error('Invalid JSON response');
+    err.code = 'INVALID_JSON';
+    throw err;
+  }
 }
 
 /**
@@ -128,7 +149,12 @@ async function search(query, options, ctx) {
     return { available: false, error: 'Query required' };
   }
   const body = { query };
-  if (options && options.maxResults != null) body.max_results = options.maxResults;
+  if (options && options.maxResults != null) {
+    if (!Number.isInteger(options.maxResults) || options.maxResults < 1) {
+      return { available: false, error: 'maxResults requires a positive integer' };
+    }
+    body.max_results = options.maxResults;
+  }
   if (options && options.maxTokens != null) body.max_tokens = options.maxTokens;
   if (options && options.maxTokensPerPage != null) body.max_tokens_per_page = options.maxTokensPerPage;
   if (options && options.searchDomainFilter) body.search_domain_filter = options.searchDomainFilter;
