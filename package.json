@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.84",
-    "ws": "^8.20.0"
+    "ws": "8.20.1"
   },
   "devDependencies": {
     "c8": "^11.0.0"

@@ -133,6 +133,12 @@
       "ts": "sdk/src/workstream-name-policy.ts",
       "classification": "ADAPTER-OVER-MODULE",
       "justification": "Phase 6 (#3575): CJS workstream-name-policy.cjs is the generated Adapter reading from sdk/src/workstream-name-policy.ts Shared Module. SDK source-of-truth now exports all three functions used by CJS callers (toWorkstreamSlug, hasInvalidPathSegment, isValidActiveWorkstreamName) plus validateWorkstreamName alias. Freshness check (check-workstream-name-policy-fresh.mjs) enforces alignment."
+    },
+    {
+      "cjs": "get-shit-done/bin/lib/prompt-budget.cjs",
+      "ts": "sdk/src/query/prompt-budget.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS prompt-budget.cjs provides the applyBudget implementation used by gsd-tools.cjs case 'prompt-budget'. SDK prompt-budget.ts is the native QueryHandler port for gsd-sdk query dispatch (#3081). The SDK handler ports the pure budget logic and adds CLI arg parsing / file I/O directly, satisfying the registry-integration drift-guard without duplicating shared state."
     }
   ],
   "migrateMeBacklog": []
