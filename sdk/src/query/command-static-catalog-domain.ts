@@ -21,6 +21,7 @@ import { uatRenderCheckpoint, auditUat } from './uat.js';
 import { writeProfile, generateClaudeProfile, generateDevPreferences, generateClaudeMd } from './profile-output.js';
 import { phaseMvpMode, taskIsBehaviorAdding, userStoryValidate } from './mvp.js';
 import { worktreeCleanupWave } from './worktree.js';
+import { promptBudget } from './prompt-budget.js';
 
 export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['agent-skills', agentSkills],
@@ -104,4 +105,5 @@ export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler
   ['task is-behavior-adding', taskIsBehaviorAdding],
   ['user-story.validate', userStoryValidate],
   ['user-story validate', userStoryValidate],
+  ['prompt-budget', promptBudget],
 ] as const;
