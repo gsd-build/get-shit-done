@@ -769,6 +769,6 @@ Plan execution complete when:
 - [ ] SUMMARY.md created with substantive content
 - [ ] STATE.md updated (position, decisions, issues, session)
 - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
-- [ ] Final metadata commit made (includes SUMMARY.md, STATE.md, ROADMAP.md)
+- [ ] Final metadata commit made (includes SUMMARY.md, STATE.md, ROADMAP.md), or SDK returned an intentional skip (`skipped_commit_docs_false` / `skipped_gitignored`) — record "skipped (<reason>)" in completion notes
 - [ ] Completion format returned to orchestrator
 </success_criteria>

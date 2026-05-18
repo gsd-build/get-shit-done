@@ -175,6 +175,27 @@ describe('bug #3678 — executor must respect commit_docs:false', () => {
     });
   });
 
+  test('checklist carve-out preserved for intentional skip', () => {
+    const body = fs.readFileSync(EXECUTOR_AGENT, 'utf-8');
+    const checklistLine = body
+      .split('\n')
+      .find(line => /Final metadata commit made/.test(line));
+    assert.ok(
+      checklistLine,
+      'agents/gsd-executor.md must contain a "Final metadata commit made" checklist line',
+    );
+    assert.ok(
+      checklistLine.includes('Final metadata commit'),
+      'checklist line must reference "Final metadata commit"',
+    );
+    assert.ok(
+      checklistLine.includes('skipped_commit_docs_false'),
+      'checklist line must carve out the intentional-skip case by referencing '
+      + '"skipped_commit_docs_false" — prevents executor from treating an '
+      + 'unchecked mandatory box as a raw-git TODO (regression guard for #3679)',
+    );
+  });
+
   describe('C — structural ban on raw force-add in GSD-managed bodies', () => {
     function scanForForceAdd(rootDir) {
       const offenders = [];
