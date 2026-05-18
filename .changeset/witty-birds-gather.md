@@ -1,5 +1,0 @@
----
-type: Fixed
-pr: 3666
----
-**`readSurface()` no longer silently degrades partial `.gsd-surface.json` to the `full` profile** — missing optional array fields (`disabledClusters`, `explicitAdds`, `explicitRemoves`) now default to `[]` so a hand-edited surface state with only some fields keeps working. Hard validation failures (unreadable file like `EACCES`, malformed JSON, non-object root, missing/non-string/blank/comma-only `baseProfile`) still return `null` but now emit a `console.warn` diagnostic naming the file and reason instead of failing silently. Unknown profile names in `baseProfile` (e.g. a typo like `"standrad"`) warn — they were previously swallowed by `resolveProfile()`'s fallback-to-`full`. Optional array fields with the wrong type (e.g. `disabledClusters: "utility"`) also warn before being coerced to `[]`. `writeSurface()` normalizes its input symmetrically — partial inputs are completed before being written, blank/non-string/comma-only `baseProfile` throws `TypeError`, and unknown profile names plus wrong-typed optional fields warn — so the writer/reader asymmetry that produced the original bug cannot recur. (#3662)

@@ -34,52 +34,6 @@ const { CLUSTERS, allClusteredSkills } = require('./clusters.cjs');
 const { findInstallSourceRoot } = require('./runtime-artifact-layout.cjs');
 
 const SURFACE_FILE_NAME = '.gsd-surface.json';
-const KNOWN_PROFILE_NAMES = new Set(Object.keys(PROFILES));
-
-/**
- * Split a `baseProfile` string (single name or comma-composed) into the
- * non-empty trimmed mode list that resolveProfile() would see.
- *
- * @param {string} baseProfile
- * @returns {string[]} effective modes after split/trim/empty-strip
- */
-function effectiveProfileModes(baseProfile) {
-  return baseProfile
-    .split(',')
-    .map((m) => m.trim())
-    .filter((m) => m.length > 0);
-}
-
-/**
- * Inspect a `baseProfile` string (single name or comma-composed) and return
- * any modes that aren't registered in PROFILES. Callers keep the raw string —
- * resolveProfile() decides the resolution fallback.
- *
- * @param {string} baseProfile
- * @returns {string[]} unknown modes
- */
-function unknownProfileModes(baseProfile) {
-  return effectiveProfileModes(baseProfile).filter((m) => !KNOWN_PROFILE_NAMES.has(m));
-}
-
-/**
- * Collect optional array fields that are present but not an array, so the
- * reader and writer can emit a single warn diagnostic before coercing them
- * to `[]` in normalizeSurfaceState. A missing field is *not* flagged — it
- * defaults to `[]` silently (that's the lenient #3662 behavior).
- *
- * @param {Object} input
- * @returns {string[]} field names with wrong type
- */
-function mistypedOptionalFields(input) {
-  const wrong = [];
-  for (const field of ['disabledClusters', 'explicitAdds', 'explicitRemoves']) {
-    if (Object.prototype.hasOwnProperty.call(input, field) && !Array.isArray(input[field])) {
-      wrong.push(field);
-    }
-  }
-  return wrong;
-}
 
 // ---------------------------------------------------------------------------
 // State IO
@@ -94,99 +48,41 @@ function mistypedOptionalFields(input) {
  */
 
 /**
- * Normalize a partial SurfaceState into the full four-field shape.
- * Missing or non-array optional fields default to []; baseProfile must already
- * be a non-empty string (callers gate on that before normalizing).
- *
- * @param {Object} input
- * @returns {SurfaceState}
- */
-function normalizeSurfaceState(input) {
-  return {
-    baseProfile: input.baseProfile,
-    disabledClusters: Array.isArray(input.disabledClusters) ? input.disabledClusters.slice() : [],
-    explicitAdds: Array.isArray(input.explicitAdds) ? input.explicitAdds.slice() : [],
-    explicitRemoves: Array.isArray(input.explicitRemoves) ? input.explicitRemoves.slice() : [],
-  };
-}
-
-/**
  * Read the surface state from a runtime config directory.
  *
- * Returns `null` only when there is no usable surface state:
- *   - file is absent (silent — expected when no profile has been pinned),
- *   - file is unreadable, malformed JSON, non-object root, or missing/invalid
- *     `baseProfile` (each of these emits a `console.warn` diagnostic so callers
- *     don't silently fall back to `'full'` with no explanation).
- *
- * Missing or wrong-typed optional array fields (`disabledClusters`,
- * `explicitAdds`, `explicitRemoves`) default to `[]` — they are meaningfully
- * empty and the writer/reader stayed symmetric only by accident before #3662.
- *
  * @param {string} runtimeConfigDir
- * @returns {SurfaceState|null}
+ * @returns {SurfaceState|null} null if file missing or corrupt
  */
 function readSurface(runtimeConfigDir) {
   const filePath = path.join(runtimeConfigDir, SURFACE_FILE_NAME);
-  let raw;
   try {
-    raw = fs.readFileSync(filePath, 'utf8');
-  } catch (err) {
-    if (err && err.code === 'ENOENT') return null;
-    console.warn(`[gsd] readSurface(${filePath}): unreadable (${err && (err.code || err.message)}); falling back to no surface state.`);
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    // Structural validation — must have these fields with expected types
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    if (typeof parsed.baseProfile !== 'string') return null;
+    if (!Array.isArray(parsed.disabledClusters)) return null;
+    if (!Array.isArray(parsed.explicitAdds)) return null;
+    if (!Array.isArray(parsed.explicitRemoves)) return null;
+    return {
+      baseProfile: parsed.baseProfile,
+      disabledClusters: parsed.disabledClusters,
+      explicitAdds: parsed.explicitAdds,
+      explicitRemoves: parsed.explicitRemoves,
+    };
+  } catch {
     return null;
   }
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    console.warn(`[gsd] readSurface(${filePath}): malformed JSON (${err.message}); falling back to no surface state.`);
-    return null;
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    console.warn(`[gsd] readSurface(${filePath}): expected JSON object root; falling back to no surface state.`);
-    return null;
-  }
-  if (typeof parsed.baseProfile !== 'string' || effectiveProfileModes(parsed.baseProfile).length === 0) {
-    console.warn(`[gsd] readSurface(${filePath}): missing, non-string, blank, or comma-only 'baseProfile'; falling back to no surface state.`);
-    return null;
-  }
-  const unknownModes = unknownProfileModes(parsed.baseProfile);
-  if (unknownModes.length > 0) {
-    console.warn(`[gsd] readSurface(${filePath}): unknown profile mode(s) in 'baseProfile': ${unknownModes.join(', ')} (valid: ${[...KNOWN_PROFILE_NAMES].join(', ')}); resolveProfile() will skip unknowns and may fall back to 'full'.`);
-  }
-  const mistyped = mistypedOptionalFields(parsed);
-  if (mistyped.length > 0) {
-    console.warn(`[gsd] readSurface(${filePath}): optional field(s) with wrong type (expected array): ${mistyped.join(', ')}; coercing to [].`);
-  }
-  return normalizeSurfaceState(parsed);
 }
 
 /**
  * Write the surface state atomically via the platform seam (mkdir + tmp+rename).
  *
- * Input is normalized to the full four-field shape so partial / hand-rolled
- * objects cannot land on disk and trip readSurface later (#3662 symmetry fix).
- * `baseProfile` is the only load-bearing field — callers must supply it as a
- * non-empty string.
- *
  * @param {string} runtimeConfigDir
  * @param {SurfaceState} surfaceState
  */
 function writeSurface(runtimeConfigDir, surfaceState) {
-  if (!surfaceState || typeof surfaceState.baseProfile !== 'string' || effectiveProfileModes(surfaceState.baseProfile).length === 0) {
-    throw new TypeError("writeSurface: 'baseProfile' must be a non-blank string with at least one mode");
-  }
-  const unknownModes = unknownProfileModes(surfaceState.baseProfile);
-  if (unknownModes.length > 0) {
-    console.warn(`[gsd] writeSurface: unknown profile mode(s) in 'baseProfile': ${unknownModes.join(', ')} (valid: ${[...KNOWN_PROFILE_NAMES].join(', ')}); persisting anyway — resolveProfile() will skip unknowns.`);
-  }
-  const mistyped = mistypedOptionalFields(surfaceState);
-  if (mistyped.length > 0) {
-    console.warn(`[gsd] writeSurface: optional field(s) with wrong type (expected array): ${mistyped.join(', ')}; coercing to [].`);
-  }
-  const normalized = normalizeSurfaceState(surfaceState);
-  platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(normalized, null, 2) + '\n');
+  platformWriteSync(path.join(runtimeConfigDir, SURFACE_FILE_NAME), JSON.stringify(surfaceState, null, 2) + '\n');
 }
 
 // ---------------------------------------------------------------------------
