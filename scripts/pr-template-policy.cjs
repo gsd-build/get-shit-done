@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { minimatch } = require('minimatch');
+const { matchesGlob } = require('path');
 
 const TRUSTED_AUTHOR_ASSOCIATIONS = new Set([
   'CONTRIBUTOR',
@@ -145,7 +145,7 @@ function matchingTemplate(body) {
 function allPathsAreTooling(changedFiles, allowlist) {
   if (!Array.isArray(changedFiles) || changedFiles.length === 0) return false;
   return changedFiles.every((file) =>
-    allowlist.some((pattern) => minimatch(file, pattern, { matchBase: false, dot: true })),
+    allowlist.some((pattern) => matchesGlob(file, pattern)),
   );
 }
 
