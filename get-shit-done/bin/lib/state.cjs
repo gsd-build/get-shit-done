@@ -942,7 +942,18 @@ function acquireStateLock(statePath) {
         } catch { /* lock was released between check — retry */ }
 
         if (i === maxRetries - 1) {
-          try { fs.unlinkSync(lockPath); } catch {}
+          // Stale-lock recovery: delete the lock and do one final acquisition
+          // attempt. Returning lockPath without holding the lock (the previous
+          // behaviour) allowed two concurrent processes to both "acquire" a
+          // phantom lock, breaking mutual exclusion on Windows-24 where slower
+          // process spawn means concurrent writers overlap for longer (#3705).
+          try { fs.unlinkSync(lockPath); } catch { /* already gone — proceed */ }
+          try {
+            const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
+            fs.writeSync(fd, String(process.pid));
+            fs.closeSync(fd);
+            _heldStateLocks.add(lockPath);
+          } catch { /* another process raced us — proceed without lock as last resort */ }
           return lockPath;
         }
         const jitter = Math.floor(Math.random() * 50);
