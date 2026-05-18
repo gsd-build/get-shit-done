@@ -297,6 +297,7 @@ fi
 
 # Apply budget trim for Ollama if a budget is configured
 OLLAMA_PROMPT_FILE="/tmp/gsd-review-prompt-{phase}.md"
+OLLAMA_SKIP=0
 if [ -n "$OLLAMA_REVIEWER_BUDGET" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "null" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "0" ]; then
   OLLAMA_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-ollama.md"
   OLLAMA_TRIM_META="/tmp/gsd-review-prompt-{phase}-ollama.metadata.json"
@@ -320,13 +321,19 @@ if [ -n "$OLLAMA_REVIEWER_BUDGET" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "null" ] &
     --output-prompt "$OLLAMA_TRIMMED_PROMPT" \
     --output-metadata "$OLLAMA_TRIM_META"
   OLLAMA_EXIT=$?
-  if [ $OLLAMA_EXIT -eq 2 ]; then
-    echo "WARNING: prompt budget for ollama (${OLLAMA_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping Ollama reviewer." >&2
+  if [ $OLLAMA_EXIT -ne 0 ]; then
+    if [ $OLLAMA_EXIT -eq 2 ] || [ $OLLAMA_EXIT -eq 11 ]; then
+      echo "WARNING: prompt budget for ollama (${OLLAMA_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping Ollama reviewer." >&2
+    else
+      echo "WARNING: prompt-budget returned unexpected exit code ${OLLAMA_EXIT} for ollama. Skipping Ollama reviewer." >&2
+    fi
+    OLLAMA_SKIP=1
   else
     OLLAMA_PROMPT_FILE="$OLLAMA_TRIMMED_PROMPT"
   fi
 fi
 
+if [ "$OLLAMA_SKIP" != "1" ]; then
 OLLAMA_HOST=$(gsd-sdk query config-get review.ollama_host 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$OLLAMA_HOST" ] || [ "$OLLAMA_HOST" = "null" ]; then OLLAMA_HOST="http://localhost:11434"; fi
 OLLAMA_MODEL=$(gsd-sdk query config-get review.models.ollama 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
@@ -342,6 +349,7 @@ jq -n --rawfile content "$OLLAMA_PROMPT_FILE" \
   > /tmp/gsd-review-ollama-{phase}.md
 if [ ! -s /tmp/gsd-review-ollama-{phase}.md ]; then
   echo "Ollama review failed or returned empty output." > /tmp/gsd-review-ollama-{phase}.md
+fi
 fi
 ```
 
@@ -379,8 +387,12 @@ if [ -n "$LM_STUDIO_REVIEWER_BUDGET" ] && [ "$LM_STUDIO_REVIEWER_BUDGET" != "nul
     --output-prompt "$LM_STUDIO_TRIMMED_PROMPT" \
     --output-metadata "$LM_STUDIO_TRIM_META"
   LM_STUDIO_EXIT=$?
-  if [ $LM_STUDIO_EXIT -eq 2 ]; then
-    echo "WARNING: prompt budget for lm_studio (${LM_STUDIO_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping LM Studio reviewer." >&2
+  if [ $LM_STUDIO_EXIT -ne 0 ]; then
+    if [ $LM_STUDIO_EXIT -eq 2 ] || [ $LM_STUDIO_EXIT -eq 11 ]; then
+      echo "WARNING: prompt budget for lm_studio (${LM_STUDIO_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping LM Studio reviewer." >&2
+    else
+      echo "WARNING: prompt-budget returned unexpected exit code ${LM_STUDIO_EXIT} for lm_studio. Skipping LM Studio reviewer." >&2
+    fi
     LM_STUDIO_SKIP=1
   else
     LM_STUDIO_PROMPT_FILE="$LM_STUDIO_TRIMMED_PROMPT"
@@ -446,8 +458,12 @@ if [ -n "$LLAMA_CPP_REVIEWER_BUDGET" ] && [ "$LLAMA_CPP_REVIEWER_BUDGET" != "nul
     --output-prompt "$LLAMA_CPP_TRIMMED_PROMPT" \
     --output-metadata "$LLAMA_CPP_TRIM_META"
   LLAMA_CPP_EXIT=$?
-  if [ $LLAMA_CPP_EXIT -eq 2 ]; then
-    echo "WARNING: prompt budget for llama_cpp (${LLAMA_CPP_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping llama.cpp reviewer." >&2
+  if [ $LLAMA_CPP_EXIT -ne 0 ]; then
+    if [ $LLAMA_CPP_EXIT -eq 2 ] || [ $LLAMA_CPP_EXIT -eq 11 ]; then
+      echo "WARNING: prompt budget for llama_cpp (${LLAMA_CPP_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping llama.cpp reviewer." >&2
+    else
+      echo "WARNING: prompt-budget returned unexpected exit code ${LLAMA_CPP_EXIT} for llama_cpp. Skipping llama.cpp reviewer." >&2
+    fi
     LLAMA_CPP_SKIP=1
   else
     LLAMA_CPP_PROMPT_FILE="$LLAMA_CPP_TRIMMED_PROMPT"
