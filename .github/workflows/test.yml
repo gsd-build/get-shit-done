@@ -219,6 +219,8 @@ jobs:
         run: npm run build:sdk
       - name: Unit coverage
         shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run test:coverage:unit
       - name: Upload coverage artifact
         if: always()

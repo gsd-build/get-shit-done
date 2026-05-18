@@ -250,7 +250,7 @@ function runNpm(args, options = {}) {
   const defaults = {
     encoding: 'utf-8',
     shell: isWindows,
-    timeout: 55000,
+    timeout: 180000,
   };
   return execFileSync(npmCmd, args, { ...defaults, ...options }).trim();
 }
