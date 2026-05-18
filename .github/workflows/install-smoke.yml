@@ -24,7 +24,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/release-tarball-smoke.cjs'
-      - 'tests/release-tarball-smoke.test.cjs'
+      - 'tests/release-tarball-smoke.install.test.cjs'
       - '.github/workflows/install-smoke.yml'
       - '.github/workflows/release.yml'
   push:

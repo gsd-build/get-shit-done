@@ -167,10 +167,10 @@ describe('install-smoke.yml structural wiring', () => {
     );
   });
 
-  test('PR path filter includes tests/release-tarball-smoke.test.cjs', () => {
+  test('PR path filter includes tests/release-tarball-smoke.install.test.cjs', () => {
     assert.ok(
-      prPaths.includes('tests/release-tarball-smoke.test.cjs'),
-      `Expected 'tests/release-tarball-smoke.test.cjs' in PR paths filter. Found: ${JSON.stringify(prPaths)}`
+      prPaths.includes('tests/release-tarball-smoke.install.test.cjs'),
+      `Expected 'tests/release-tarball-smoke.install.test.cjs' in PR paths filter. Found: ${JSON.stringify(prPaths)}`
     );
   });
 
