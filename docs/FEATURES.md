@@ -1186,6 +1186,7 @@ When verification returns `human_needed`, items are persisted as a trackable HUM
 **User configuration note:**
 - Set `review.default_reviewers` in `.planning/config.json` (or via `gsd config-set`) to control no-flag `/gsd-review` fan-out.
 - Use `--all` for a full pre-merge sweep without changing project defaults.
+- For local model servers with small context windows, set `review.max_prompt_tokens_per_reviewer` to auto-trim prompts per reviewer — see [Prompt budgets for small-context reviewers](../docs/CONFIGURATION.md#prompt-budgets-for-small-context-reviewers) in CONFIGURATION.md.
 
 ---
 

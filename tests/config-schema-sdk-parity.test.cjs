@@ -136,6 +136,7 @@ test('#2653 — CJS DYNAMIC_KEY_PATTERNS test functions work correctly', () => {
     ['models.planning', 5],
     ['dynamic_routing.enabled', 6],
     ['model_overrides.my-agent', 7],
+    ['review.max_prompt_tokens_per_reviewer.ollama', 8],
   ];
   for (const [key, idx] of samples) {
     assert.ok(

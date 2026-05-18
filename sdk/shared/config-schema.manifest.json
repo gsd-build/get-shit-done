@@ -62,6 +62,8 @@
     "review.lm_studio_host",
     "review.llama_cpp_host",
     "review.default_reviewers",
+    "review.max_prompt_tokens",
+    "review.max_prompt_tokens_per_reviewer",
     "workflow.cross_ai_execution",
     "workflow.cross_ai_command",
     "workflow.cross_ai_timeout",
@@ -139,6 +141,11 @@
       "topLevel": "model_overrides",
       "source": "^model_overrides\\.[a-zA-Z0-9_-]+$",
       "description": "model_overrides.<agent-id>"
+    },
+    {
+      "topLevel": "review",
+      "source": "^review\\.max_prompt_tokens_per_reviewer\\.[a-zA-Z0-9_-]+$",
+      "description": "review.max_prompt_tokens_per_reviewer.<reviewer-slug>"
     }
   ]
 }
