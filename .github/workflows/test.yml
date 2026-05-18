@@ -172,15 +172,22 @@ jobs:
         run: npm run test:security
 
       # Install + slow lanes only on main-branch push (not PR CI) so PRs stay fast.
+      # Windows is excluded from the install lane: `npm install -g <tarball>` runs
+      # 7× per release-tarball-smoke.install.test.cjs invocation (1× before-hook
+      # + 6× per-test) and each takes 60–90 s on windows-latest (NTFS + Defender),
+      # so the lane alone consumes ~10 min and blows the 15-min job budget after
+      # earlier steps. Linux + macOS coverage stays here; Windows tarball install
+      # coverage is provided by the weekly windows-compat workflow.
       - name: Run install tests
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.os != 'windows-latest'
         shell: bash
         run: npm run test:install
 
       - name: Run slow tests
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.os != 'windows-latest'
         shell: bash
         run: npm run test:slow
+
 
   # Dedicated coverage job. Runs only on ubuntu/Node 24 (the canonical lane)
   # because c8 coverage of one suite on one OS is enough signal — running it
