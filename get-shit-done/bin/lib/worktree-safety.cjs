@@ -758,11 +758,18 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
 // ─── reapOrphanWorktrees deps helpers ─────────────────────────────────────────
 
 function defaultIsPidAlive(pid) {
-  // process.kill(pid, 0) returns true if the process exists, throws if it doesn't.
+  // process.kill(pid, 0) probes process existence without sending a real signal.
+  //   - Returns normally → process is alive.
+  //   - Throws ESRCH → process does not exist → dead.
+  //   - Throws EPERM → process exists but we lack permission (alive; fail-closed
+  //     on Windows where cross-user processes throw EPERM, not ESRCH).
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
+  } catch (err) {
+    // EPERM means the process exists but we cannot signal it.
+    // Treat as alive (fail-closed: do not reap a process we cannot confirm dead).
+    if (err && err.code === 'EPERM') return true;
     return false;
   }
 }

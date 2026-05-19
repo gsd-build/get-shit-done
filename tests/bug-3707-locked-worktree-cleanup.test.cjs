@@ -11,13 +11,33 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const {
   executeWorktreeWaveCleanupPlan,
   planWorktreeWaveCleanup,
   reapOrphanWorktrees,
 } = require('../get-shit-done/bin/lib/worktree-safety.cjs');
+
+// ─── PID helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Return a PID that is guaranteed to be dead.
+ * Spawns a short-lived child, captures its PID, waits for it to exit, then
+ * returns that PID.  This is cross-platform and not subject to pid_max races
+ * (unlike a hardcoded high number such as 999999).
+ */
+function deadPid() {
+  // Use the shortest possible no-op: `node -e ""` on all platforms.
+  const nodeExe = process.execPath;
+  const result = spawnSync(nodeExe, ['-e', ''], { stdio: 'ignore' });
+  if (result.pid == null || result.status === null) {
+    // Fallback: use a PID above the system max — 2^31-1 always exceeds any
+    // real OS limit (Linux max: 4194304, macOS max: 99998, Windows: variable).
+    return 2147483647;
+  }
+  return result.pid;
+}
 
 // ─── Git repo helpers ─────────────────────────────────────────────────────────
 
@@ -202,11 +222,12 @@ describe('bug-3707: reapOrphanWorktrees', () => {
     commitInWorktree(wtDir);
     mergeIntoMain(repoDir, branchName);
 
-    // Write a lock file with a definitely-dead PID (> max PID on any supported OS)
+    // Write a lock file with a definitely-dead PID.  Use the deadPid() helper
+    // which spawns and reaps a real child process — avoids pid_max flakiness
+    // on Linux systems where 999999 could be a live PID.
     const metaDir = worktreeMeta(repoDir, wtDir);
     const lockedFile = path.join(metaDir, 'locked');
-    const deadPid = '999999';
-    fs.writeFileSync(lockedFile, deadPid);
+    fs.writeFileSync(lockedFile, String(deadPid()));
 
     // Back-date mtime so the stale-lock guard passes (> 5 minutes old)
     const staleTime = new Date(Date.now() - 10 * 60 * 1000);
@@ -262,7 +283,7 @@ describe('bug-3707: reapOrphanWorktrees', () => {
 
     const metaDir = worktreeMeta(repoDir, wtDir);
     const lockedFile = path.join(metaDir, 'locked');
-    fs.writeFileSync(lockedFile, '999999');
+    fs.writeFileSync(lockedFile, String(deadPid()));
     const staleTime = new Date(Date.now() - 10 * 60 * 1000);
     fs.utimesSync(lockedFile, staleTime, staleTime);
 
@@ -288,7 +309,7 @@ describe('bug-3707: reapOrphanWorktrees', () => {
 
     const metaDir = worktreeMeta(repoDir, wtDir);
     const lockedFile = path.join(metaDir, 'locked');
-    fs.writeFileSync(lockedFile, '999999');
+    fs.writeFileSync(lockedFile, String(deadPid()));
     // Fresh mtime: within the race-guard window (< 5 minutes old); no utimes needed
 
     const result = reapOrphanWorktrees(repoDir);
@@ -313,7 +334,7 @@ describe('bug-3707: reapOrphanWorktrees', () => {
 
     const metaDir = worktreeMeta(repoDir, wtDir);
     const lockedFile = path.join(metaDir, 'locked');
-    fs.writeFileSync(lockedFile, '999999');
+    fs.writeFileSync(lockedFile, String(deadPid()));
     const staleTime = new Date(Date.now() - 10 * 60 * 1000);
     fs.utimesSync(lockedFile, staleTime, staleTime);
 
