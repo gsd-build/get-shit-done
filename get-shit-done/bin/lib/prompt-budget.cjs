@@ -170,14 +170,17 @@ function applyBudget({ sections, budget, options = {} }) {
   let noteInjected = false;
   let hardFailed = false;
 
-  // Minimum-set check: instructions + reserved-note + roadmap + 1KB per plan
+  // Minimum-set check: instructions + roadmap + 1KB per plan.
+  // NOTE_RESERVE_TOKENS is intentionally excluded here: a note is only injected
+  // when trimming actually occurs, and a prompt that fits without any trim needs
+  // no note at all. Including NOTE_RESERVE_TOKENS here would cause false hard-fails
+  // for prompts that genuinely fit the effective budget untrimmed.
   const MIN_PLAN_BYTES = 1024;
   const minPlanTokens = plans.reduce((sum, p) => {
     return sum + estimateTokens(p.content.slice(0, MIN_PLAN_BYTES));
   }, 0);
   const minSet =
     estimateTokens(instructions) +
-    NOTE_RESERVE_TOKENS +
     estimateTokens(roadmap) +
     minPlanTokens;
 
@@ -244,11 +247,13 @@ function applyBudget({ sections, budget, options = {} }) {
   let currentBaseTokens = getCurrentBaseTokens();
 
   // Detect budget pressure: is ANY trim needed?
-  // We need to reserve note tokens whenever we anticipate a trim.
-  // We check against effectiveBudget - NOTE_RESERVE_TOKENS to decide if
-  // pressure exists (i.e. we'd need to trim even before adding the note).
+  // Pressure exists when the current base tokens already exceed the effective
+  // budget. Only when pressure is real do we reserve NOTE_RESERVE_TOKENS so
+  // the note itself fits after trimming. Checking against
+  // effectiveBudget - NOTE_RESERVE_TOKENS (the old threshold) would cause
+  // spurious pressure 80 tokens early, dropping sections that fit fine.
   const baseTokens = currentBaseTokens;
-  const budgetUnderPressure = baseTokens > effectiveBudget - NOTE_RESERVE_TOKENS;
+  const budgetUnderPressure = baseTokens > effectiveBudget;
 
   // Available for content (reserve note slot when under pressure)
   let contentBudget = budgetUnderPressure

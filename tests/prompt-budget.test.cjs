@@ -253,6 +253,60 @@ describe('prompt-budget', () => {
     assert.equal(metadata.hardFailed, false);
   });
 
+  // ── Cycle 11: no false hard-fail when untrimmed prompt fits effectiveBudget ─
+  test('applyBudget — does not hard-fail when untrimmed prompt fits within effectiveBudget', () => {
+    // budget=44 → effectiveBudget=39. Full untrimmed prompt = 32 tokens ≤ 39.
+    // Bug: minSet unconditionally includes NOTE_RESERVE_TOKENS(80), making
+    // minSet=102 > 39 and triggering a spurious hard-fail even though no note
+    // is needed (no trim occurs) and the prompt genuinely fits.
+    // Fix: exclude NOTE_RESERVE_TOKENS from minSet; only account for it if trim
+    // is actually needed.
+    const sections = {
+      instructions: 'i'.repeat(32),   // 8 tokens
+      projectMd: null,
+      roadmap: 'r'.repeat(16),        // 4 tokens
+      plans: [{ file: 'plan.md', content: 'p'.repeat(40) }], // 10 tokens
+      context: null,
+      research: null,
+      requirements: null,
+    };
+
+    const { prompt, metadata } = applyBudget({ sections, budget: 44 });
+
+    assert.equal(metadata.hardFailed, false, 'must not hard-fail when prompt fits effectiveBudget');
+    assert.ok(prompt.length > 0, 'prompt must be non-empty');
+    assert.deepEqual(metadata.omitted, [], 'nothing should be omitted');
+    assert.equal(metadata.noteInjected, false, 'no note needed — no trim occurred');
+  });
+
+  // ── Cycle 12: no unneeded trim when full prompt already fits effectiveBudget ─
+  test('applyBudget — does not drop context or research when full untrimmed prompt already fits effectiveBudget', () => {
+    // budget=156 → effectiveBudget=140. Full prompt (with context+research) ≈ 88 tokens ≤ 140.
+    // Bug: budgetUnderPressure = baseTokens > effectiveBudget - NOTE_RESERVE_TOKENS
+    //   = 89 > 60 → true, sets contentBudget=60, triggers trim steps → drops context/research.
+    // Fix: budgetUnderPressure should check baseTokens > effectiveBudget, not the pre-reserved
+    // threshold. Note reservation happens only after a real trim decision is made.
+    const sections = {
+      instructions: 'i'.repeat(120),  // 30 tokens
+      projectMd: null,
+      roadmap: 'r'.repeat(40),        // 10 tokens
+      plans: [{ file: 'plan-a.md', content: 'p'.repeat(40) }], // 10 tokens
+      context: 'c'.repeat(40),        // 10 tokens + header
+      research: 'x'.repeat(40),       // 10 tokens + header
+      requirements: null,
+    };
+
+    const { prompt, metadata } = applyBudget({ sections, budget: 156 });
+
+    assert.equal(metadata.hardFailed, false, 'must not hard-fail');
+    assert.deepEqual(metadata.omitted, [], 'context and research must NOT be omitted');
+    assert.ok(prompt.length > 0, 'prompt must be non-empty');
+    // context and research must appear in the assembled prompt
+    assert.ok(prompt.includes('## Context'), 'context section must be present');
+    assert.ok(prompt.includes('## Research'), 'research section must be present');
+    assert.equal(metadata.noteInjected, false, 'no note needed — no trim occurred');
+  });
+
   // ── Cycle 10: null optional sections ─────────────────────────────────────
   test('applyBudget — null optional sections are excluded from prompt without counting as omitted', () => {
     // All optionals are null, no projectMd — big budget so no trim.
