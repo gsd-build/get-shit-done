@@ -145,6 +145,8 @@ export async function isPhaseUatPassed(
     const relFile = relative(projectDir, filePath);
     const content = await readFile(filePath, 'utf-8');
     const strippedBody = stripMarkdownInjection(content);
+    const itemsBeforeFile = items.length;
+    const reasonsBeforeFile = reasons.length;
     const parsed = parseAllUatItems(content);
     for (const item of parsed) {
       items.push(item);
@@ -208,6 +210,11 @@ export async function isPhaseUatPassed(
         itemName: name,
         capturedValue: 'human_needed',
       });
+    }
+
+    // If this file contributed no items and no diagnostic reasons, flag it.
+    if (items.length === itemsBeforeFile && reasons.length === reasonsBeforeFile) {
+      reasons.push({ code: REASON_CODE.NO_ITEMS_EXTRACTED, file: relFile });
     }
   }
 

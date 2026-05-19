@@ -306,6 +306,34 @@ result: pass
     }
   });
 
+  it("emits NO_ITEMS_EXTRACTED reason when UAT file has no parseable items, orphans, or placeholders", async () => {
+    const localTmp = await mkdtemp(join(tmpdir(), 'gsd-uat-c14-'));
+    try {
+      const phaseDir = join(localTmp, '.planning', 'phases', '05-no-items');
+      await mkdir(phaseDir, { recursive: true });
+      const content = `---
+status: complete
+phase: 5
+source: roadmap
+started: 2026-05-18T00:00:00Z
+updated: 2026-05-18T00:00:00Z
+---
+
+This phase doesn't have any UAT items yet.
+Prose only.
+`;
+      await writeFile(join(phaseDir, '05-HUMAN-UAT.md'), content);
+
+      const result = await isPhaseUatPassed(localTmp, '5');
+      expect(result.passed).toBe(false);
+      expect(result.items.length).toBe(0);
+      expect(result.reasons.length).toBe(1);
+      expect(result.reasons[0].code).toBe(REASON_CODE.NO_ITEMS_EXTRACTED);
+    } finally {
+      await rm(localTmp, { recursive: true, force: true });
+    }
+  });
+
   it("emits BRACKETED_PLACEHOLDER reason when result value is wrapped in brackets", async () => {
     const localTmp = await mkdtemp(join(tmpdir(), 'gsd-uat-c13-'));
     try {
