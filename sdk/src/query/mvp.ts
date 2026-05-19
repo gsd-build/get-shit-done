@@ -346,9 +346,9 @@ function scanSourceFilesSync(rootDir: string): SourceScanResult {
 
   function walk(dir: string): void {
     if (count >= SOURCE_SCAN_LIMIT) return;
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: string[];
     try {
-      entries = readdirSync(dir);
+      entries = readdirSync(dir) as string[];
     } catch {
       return;
     }
