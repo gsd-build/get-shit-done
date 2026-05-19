@@ -281,6 +281,10 @@ Check if this phase has frontend indicators and whether a UI-SPEC already exists
 
 ```bash
 PHASE_SECTION=$(gsd-sdk query roadmap.get-phase ${PHASE_NUM} 2>/dev/null)
+# Word-boundary-anchored pattern: (^|[^[:alnum:]])TOKEN([^[:alnum:]]|$)
+# Prevents false-positives from substrings: "ui" in "requirements", "view" in "overview",
+# "form" in "performance"/"platform". Compound words without separators (e.g. "microfrontend")
+# are not matched — use hyphenated or spaced forms in roadmap prose ("micro-frontend").
 echo "$PHASE_SECTION" | LC_ALL=C grep -iE "(^|[^[:alnum:]])(UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget)([^[:alnum:]]|$)" > /dev/null 2>&1
 HAS_UI=$?
 UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)

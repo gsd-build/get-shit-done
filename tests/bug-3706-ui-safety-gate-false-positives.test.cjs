@@ -277,6 +277,45 @@ function runBehavioralTests(workflowPath, workflowLabel) {
         `empty phase section must not trigger the UI gate in ${workflowLabel}.`
       );
     });
+
+    // ── Compound-token boundary contract (documented behavior) ─────────────
+    //
+    // The word-boundary fix intentionally does NOT match tokens that appear as
+    // interior substrings of compound alphanumeric words (e.g. "microfrontend",
+    // "dashboardWidget", "uiSpec"). This is the correct behavior: gsd-roadmapper
+    // generates natural English prose, not camelCase compound identifiers.
+    // Genuine UI phases will have "frontend", "UI", "dashboard" as standalone words.
+    //
+    // If a roadmap author writes "microfrontend" (one compound word), the gate
+    // will miss it. The documented workaround: use "micro-frontend" (hyphenated)
+    // or "micro frontend" (spaced), both of which ARE caught by the anchored pattern.
+    //
+    // This test documents the contract (not a bug), and provides a counter-test
+    // confirming hyphenated and spaced forms DO trigger the gate.
+
+    test('compound "microfrontend" (no separator) does NOT trigger gate — documented behavior', () => {
+      const raw = extractUiGateRegexPattern(workflowPath);
+      const regex = posixEreToJsRegex(raw);
+      // "microfrontend" embeds "frontend" as interior substring — no word boundary.
+      // This is intentional: the fix trades false-positives for a narrow class of
+      // compound false-negatives that are unlikely in natural roadmap prose.
+      const phaseSection = 'Build the microfrontend shell application.';
+      assert.strictEqual(
+        hasUiGate(regex, phaseSection), 1,
+        `"microfrontend" (compound, no separator) must NOT trigger the UI gate in ${workflowLabel}. ` +
+        'This is documented behavior: use "micro-frontend" or "micro frontend" in roadmap prose instead.'
+      );
+    });
+
+    test('hyphenated "micro-frontend" DOES trigger gate (word boundary on hyphen)', () => {
+      const raw = extractUiGateRegexPattern(workflowPath);
+      const regex = posixEreToJsRegex(raw);
+      const phaseSection = 'Build the micro-frontend shell application.';
+      assert.strictEqual(
+        hasUiGate(regex, phaseSection), 0,
+        `"micro-frontend" (hyphenated) must match the UI gate in ${workflowLabel}.`
+      );
+    });
   });
 }
 

@@ -622,6 +622,10 @@ Check if phase has frontend indicators:
 
 ```bash
 PHASE_SECTION=$(gsd-sdk query roadmap.get-phase "${PHASE}" 2>/dev/null)
+# Word-boundary-anchored pattern: (^|[^[:alnum:]])TOKEN([^[:alnum:]]|$)
+# Prevents false-positives from substrings: "ui" in "requirements", "view" in "overview",
+# "form" in "performance"/"platform". Compound words without separators (e.g. "microfrontend")
+# are not matched — use hyphenated or spaced forms in roadmap prose ("micro-frontend").
 echo "$PHASE_SECTION" | LC_ALL=C grep -iE "(^|[^[:alnum:]])(UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget)([^[:alnum:]]|$)" > /dev/null 2>&1
 HAS_UI=$?
 ```
