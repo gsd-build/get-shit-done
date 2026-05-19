@@ -131,14 +131,13 @@ if [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG=
 Defer the `phase.mvp-mode` query until `PHASE` is finalized (after explicit argument parsing/fallback phase detection + validation).
 The verb returns `true|false`. Full result also exposes `source` (`cli_flag` | `roadmap` | `config` | `none`) for diagnostics. The mode is **all-or-nothing per phase** (PRD decision Q1) — never selective per task.
 
-**Walking Skeleton gate.** When `MVP_MODE=true` AND `phase_number == "01"` AND there are zero prior phase summaries (new project), the planner runs in **Walking Skeleton mode** (per PRD decision Q2 — new projects only). Detect with:
+**Walking Skeleton gate.** When `MVP_MODE=true` AND `phase_number == 1` AND there are zero prior phase summaries AND no existing source files (new project, not brownfield), the planner runs in **Walking Skeleton mode** (per PRD decision Q2 — new projects only, per ADR `docs/adr/2826-vertical-mvp-slice-planning-mode.md:34`). Detect with:
 
 ```bash
-WALKING_SKELETON=false
-if [ "$MVP_MODE" = "true" ] && [ "$padded_phase" = "01" ]; then
-  PRIOR_SUMMARIES=$(gsd-sdk query phases.list --pick summaries_total 2>/dev/null || echo "0")
-  if [ "$PRIOR_SUMMARIES" = "0" ]; then WALKING_SKELETON=true; fi
-fi
+# new — uses typed phase.walking-skeleton-trigger verb (combines mvp mode + phase 1 + no summaries + no source files)
+WALKING_SKELETON_JSON=$(gsd-sdk query phase.walking-skeleton-trigger "${PHASE}" $MVP_FLAG_ARG --json 2>/dev/null || echo '{"data":{"active":false}}')
+WALKING_SKELETON=$(echo "$WALKING_SKELETON_JSON" | jq -r '.data.active // false')
+WALKING_SKELETON_REASON=$(echo "$WALKING_SKELETON_JSON" | jq -r '.data.reason // empty')
 ```
 
 When `WALKING_SKELETON=true`:

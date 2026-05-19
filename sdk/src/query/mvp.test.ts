@@ -18,6 +18,7 @@ import {
   taskIsBehaviorAdding,
   userStoryValidate,
   USER_STORY_REGEX,
+  phaseWalkingSkeletonTrigger,
 } from './mvp.js';
 import { roadmapGetPhase } from './roadmap.js';
 
@@ -331,5 +332,87 @@ describe('user-story.validate', () => {
     expect(USER_STORY_REGEX.test('As a X, I want to Y, so that Z.')).toBe(true);
     expect(USER_STORY_REGEX.test('As a X, I want to Y, so that Z')).toBe(false);
     expect(USER_STORY_REGEX.test('As X, I want to Y, so that Z.')).toBe(false);
+  });
+});
+
+// ─── phase.walking-skeleton-trigger ─────────────────────────────────────────
+
+describe('phase.walking-skeleton-trigger', () => {
+  it('brownfield project with source files does NOT trigger Walking Skeleton', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 1: Walking Skeleton\n\n**Mode:** mvp\n**Goal:** Ship the walking skeleton.\n`);
+      mkdirSync(join(dir, 'src'), { recursive: true });
+      writeFileSync(join(dir, 'src', 'index.ts'), 'export const hello = "world";');
+      const result = await phaseWalkingSkeletonTrigger(['1', '--cli-flag'], dir);
+      expect(result.data.active).toBe(false);
+      expect(result.data.signals.source_files_count).toBeGreaterThan(0);
+      expect(result.data.signals.mvp_mode_active).toBe(true);
+      expect(result.data.signals.is_phase_one).toBe(true);
+      expect(result.data.signals.summaries_total).toBe(0);
+      expect(result.data.reason).not.toBeNull();
+      expect(result.data.reason).toMatch(/source files/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('greenfield project (no source files) DOES trigger Walking Skeleton', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 1: Walking Skeleton\n\n**Mode:** mvp\n**Goal:** Ship the skeleton.\n`);
+      const result = await phaseWalkingSkeletonTrigger(['1', '--cli-flag'], dir);
+      expect(result.data.active).toBe(true);
+      expect(result.data.signals.source_files_count).toBe(0);
+      expect(result.data.signals.mvp_mode_active).toBe(true);
+      expect(result.data.signals.is_phase_one).toBe(true);
+      expect(result.data.signals.summaries_total).toBe(0);
+      expect(result.data.reason).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Phase 2 of new project does NOT trigger Walking Skeleton', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 2: Auth\n\n**Mode:** mvp\n**Goal:** Auth.\n`);
+      const result = await phaseWalkingSkeletonTrigger(['2', '--cli-flag'], dir);
+      expect(result.data.active).toBe(false);
+      expect(result.data.signals.is_phase_one).toBe(false);
+      expect(result.data.reason).toMatch(/phase 2 is not phase 1/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Phase 1 with prior summaries does NOT trigger', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 1: Walking Skeleton\n\n**Mode:** mvp\n**Goal:** Skeleton.\n`);
+      // Seed a summary file so summaries_total > 0
+      const phasesDir = join(dir, '.planning', 'phases', '01-walking-skeleton');
+      mkdirSync(phasesDir, { recursive: true });
+      writeFileSync(join(phasesDir, 'SUMMARY.md'), '# Phase 1 Summary\nCompleted.');
+      const result = await phaseWalkingSkeletonTrigger(['1', '--cli-flag'], dir);
+      expect(result.data.active).toBe(false);
+      expect(result.data.signals.summaries_total).toBeGreaterThan(0);
+      expect(result.data.reason).toMatch(/summar/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('Phase 1 + mvp mode absent does NOT trigger', async () => {
+    const dir = tmpProject();
+    try {
+      writeRoadmap(dir, `## Phase 1: Walking Skeleton\n\n**Goal:** Skeleton.\n`);
+      const result = await phaseWalkingSkeletonTrigger(['1'], dir);
+      expect(result.data.active).toBe(false);
+      expect(result.data.signals.mvp_mode_active).toBe(false);
+      expect(result.data.reason).toMatch(/mvp mode not active/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -23,13 +23,14 @@
  * Concept index: get-shit-done/references/mvp-concepts.md.
  */
 
-import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { readFile, readdir } from 'node:fs/promises';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { relative, resolve, sep, join } from 'node:path';
 
 import { GSDError, ErrorClassification } from '../errors.js';
 import { loadConfig } from '../config.js';
 import { roadmapGetPhase } from './roadmap.js';
+import { planningPaths } from './helpers.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── phase.mvp-mode ─────────────────────────────────────────────────────────
@@ -287,6 +288,215 @@ export const userStoryValidate: QueryHandler<UserStoryValidateResult> = async (a
       input,
       slots,
       errors,
+    },
+  };
+};
+
+// ─── phase.walking-skeleton-trigger ─────────────────────────────────────────
+
+/**
+ * Extensions to exclude when scanning for source files.
+ * Directories to skip entirely — never descend into these.
+ */
+const SCAN_EXCLUDED_DIRS = new Set([
+  '.git',
+  '.planning',
+  '.gsd',
+  'node_modules',
+  'dist',
+  'build',
+  '.changeset',
+  '.github',
+  'coverage',
+  '.next',
+  '.cache',
+]);
+
+/**
+ * File extensions that count as "source code" for the brownfield-detection
+ * heuristic. A project with zero matching files is treated as greenfield.
+ */
+const SOURCE_CODE_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.cjs', '.mjs',
+  '.py', '.rs', '.go', '.swift', '.java', '.kt',
+  '.rb', '.php', '.c', '.cpp', '.cc', '.h', '.hpp', '.hh',
+  '.html', '.css', '.scss', '.vue',
+  '.ex', '.exs', '.ml', '.scala', '.clj', '.cljs',
+  '.lua', '.nim', '.zig', '.erl',
+]);
+
+const SOURCE_SCAN_LIMIT = 100;
+
+interface SourceScanResult {
+  count: number;
+  sample: string[];
+}
+
+/**
+ * Walk `rootDir` (non-recursively into excluded dirs) and count files whose
+ * extension is in SOURCE_CODE_EXTENSIONS.  Stops after SOURCE_SCAN_LIMIT
+ * matches — we only need "is it zero", not an exact total.
+ *
+ * Returns the count (capped at SOURCE_SCAN_LIMIT) and up to 5 sample paths
+ * for debugging.
+ */
+function scanSourceFilesSync(rootDir: string): SourceScanResult {
+  let count = 0;
+  const sample: string[] = [];
+
+  function walk(dir: string): void {
+    if (count >= SOURCE_SCAN_LIMIT) return;
+    let entries: ReturnType<typeof readdirSync>;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (count >= SOURCE_SCAN_LIMIT) return;
+      if (SCAN_EXCLUDED_DIRS.has(entry)) continue;
+      const fullPath = join(dir, entry);
+      let stat;
+      try {
+        stat = statSync(fullPath);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        walk(fullPath);
+      } else if (stat.isFile()) {
+        const lastDot = entry.lastIndexOf('.');
+        if (lastDot !== -1) {
+          const ext = entry.slice(lastDot).toLowerCase();
+          if (SOURCE_CODE_EXTENSIONS.has(ext)) {
+            count++;
+            if (sample.length < 5) sample.push(fullPath);
+          }
+        }
+      }
+    }
+  }
+
+  walk(rootDir);
+  return { count, sample };
+}
+
+/**
+ * Count summary files across all phase directories under `.planning/phases/`.
+ * A file counts as a summary if it ends with `-SUMMARY.md` or equals `SUMMARY.md`.
+ */
+async function countSummariesTotal(projectDir: string, workstream?: string): Promise<number> {
+  const paths = planningPaths(projectDir, workstream);
+  const phasesDir = paths.phases;
+  if (!existsSync(phasesDir)) return 0;
+  let total = 0;
+  let phaseDirs: string[];
+  try {
+    const entries = await readdir(phasesDir, { withFileTypes: true });
+    phaseDirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+  } catch {
+    return 0;
+  }
+  for (const phaseDir of phaseDirs) {
+    const phasePath = join(phasesDir, phaseDir);
+    let files: string[];
+    try {
+      files = await readdir(phasePath);
+    } catch {
+      continue;
+    }
+    total += files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+  }
+  return total;
+}
+
+interface WalkingSkeletonSignals {
+  mvp_mode_active: boolean;
+  phase_number: number;
+  is_phase_one: boolean;
+  summaries_total: number;
+  source_files_count: number;
+  source_files_sampled: string[];
+}
+
+interface WalkingSkeletonTriggerResult {
+  active: boolean;
+  signals: WalkingSkeletonSignals;
+  reason: string | null;
+}
+
+/**
+ * Evaluate whether Walking Skeleton mode should activate for a phase.
+ *
+ * All four conditions must hold:
+ *   1. MVP mode is active (via phaseMvpMode precedence chain)
+ *   2. Phase number is 1
+ *   3. No prior phase summaries exist (summaries_total === 0)
+ *   4. No source files detected in the project root (source_files_count === 0)
+ *
+ * Condition 4 guards against false-firing on brownfield projects — a repo
+ * with existing source code but no GSD summaries yet.
+ *
+ * Implements ADR docs/adr/2826-vertical-mvp-slice-planning-mode.md:34 which
+ * specifies the trigger as `MVP_MODE=true && PHASE_NUMBER=1 && no-existing-code`.
+ *
+ * @example
+ *   gsd-sdk query phase.walking-skeleton-trigger 1
+ *   gsd-sdk query phase.walking-skeleton-trigger 1 --cli-flag
+ */
+export const phaseWalkingSkeletonTrigger: QueryHandler<WalkingSkeletonTriggerResult> = async (
+  args,
+  projectDir,
+  workstream,
+) => {
+  const phaseArg = args[0];
+  if (!phaseArg) {
+    throw new GSDError(
+      'Usage: phase.walking-skeleton-trigger <phase-number> [--cli-flag]',
+      ErrorClassification.Validation,
+    );
+  }
+
+  const phaseNumber = parseInt(phaseArg, 10);
+  const isPhaseOne = phaseNumber === 1;
+
+  // Signal 1: MVP mode via existing precedence chain
+  const mvpResult = await phaseMvpMode(args, projectDir, workstream);
+  const mvpActive = mvpResult.data.active;
+
+  // Signal 3: prior summaries count
+  const summariesTotal = await countSummariesTotal(projectDir ?? process.cwd(), workstream);
+
+  // Signal 4: source file scan (synchronous walk — stops at SOURCE_SCAN_LIMIT)
+  const sources = scanSourceFilesSync(projectDir ?? process.cwd());
+
+  const active = mvpActive && isPhaseOne && summariesTotal === 0 && sources.count === 0;
+
+  let reason: string | null = null;
+  if (!active) {
+    if (!mvpActive) {
+      reason = 'mvp mode not active for this phase';
+    } else if (!isPhaseOne) {
+      reason = `phase ${phaseNumber} is not phase 1`;
+    } else if (summariesTotal > 0) {
+      reason = `${summariesTotal} prior phase summar${summariesTotal === 1 ? 'y' : 'ies'} exist`;
+    } else if (sources.count > 0) {
+      reason = `${sources.count}+ source files detected (brownfield project)`;
+    }
+  }
+
+  return {
+    data: {
+      active,
+      signals: {
+        mvp_mode_active: mvpActive,
+        phase_number: phaseNumber,
+        is_phase_one: isPhaseOne,
+        summaries_total: summariesTotal,
+        source_files_count: sources.count,
+        source_files_sampled: sources.sample,
+      },
+      reason,
     },
   };
 };
