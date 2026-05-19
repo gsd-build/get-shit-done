@@ -68,6 +68,25 @@ if [ -n "$FILES_OVERRIDE" ]; then
   IFS=',' read -ra FILES_ARRAY <<< "$FILES_OVERRIDE"
 fi
 ```
+
+**--fix, --all, --auto flags (#3727 — wire dispatch the #2790 consolidation promised):**
+
+`/gsd:code-review N --fix` absorbed the deleted `/gsd-code-review-fix` standalone in #2790, but the workflow body was never updated to parse or act on the flag, so the autofix call site silently no-oped. Parse them here; `dispatch_fix` step at the end of `<process>` consumes them.
+
+```bash
+FIX_FLAG=false
+FIX_ALL=false
+AUTO_MODE=false
+for arg in "$@"; do
+  case "$arg" in
+    --fix)  FIX_FLAG=true ;;
+    --all)  FIX_ALL=true ;;
+    --auto) AUTO_MODE=true ;;
+  esac
+done
+```
+
+`--all` and `--auto` are forwarded to `code-review-fix.md` only when `--fix` is also set. Setting them alone has no effect (matches the documented argument shape).
 </step>
 
 <step name="check_config_gate">
@@ -582,6 +601,47 @@ grep -A 3 "^### CR-\|^### BL-\|^### WR-" "${REVIEW_PATH}" | head -n 12
 ═══════════════════════════════════════════════════════════════
 </step>
 
+<step name="dispatch_fix">
+Forward to the autofix workflow when `--fix` was passed (#3727).
+
+`code-review-fix.md` is a fully-implemented workflow (gsd-code-fixer spawn, `--auto` iteration loop capped at 3, REVIEW-FIX.md commit, result presentation) that lost its standalone command entry point in the #2790 consolidation. This step is the dispatcher the consolidation should have shipped.
+
+**Skip if** `FIX_FLAG` is `false` — `/gsd-code-review N` without `--fix` exits here.
+
+**Skip if** `STATUS` is `"clean"` — the review pass found no fixable findings; spawning the fixer would no-op anyway. Print:
+
+```
+✓ No fixable findings — --fix is a no-op on a clean review.
+```
+
+Otherwise, hand off to the fix workflow. The orchestrator reads `@~/.claude/get-shit-done/workflows/code-review-fix.md` (already preloaded via this command's `<execution_context>`) and executes its `<process>` block from `<step name="initialize">` onward, with:
+
+- `$PHASE_ARG` — forwarded unchanged (positional first arg)
+- `--all` — appended to `$ARGUMENTS` when `FIX_ALL=true`
+- `--auto` — appended to `$ARGUMENTS` when `AUTO_MODE=true`
+
+The fix workflow re-parses `--all` / `--auto` itself (its own `initialize` step already handles them — see `code-review-fix.md` lines parsing `FIX_ALL`/`AUTO_MODE`), so the forward is a verbatim string pass. It also re-validates the phase and re-reads REVIEW.md; both are idempotent.
+
+```bash
+if [ "$FIX_FLAG" = "true" ]; then
+  if [ "$STATUS" = "clean" ]; then
+    echo "✓ No fixable findings — --fix is a no-op on a clean review."
+  else
+    # Build forwarded args. Phase number first (positional), then sub-flags.
+    FIX_ARGS="${PHASE_ARG}"
+    if [ "$FIX_ALL" = "true" ];  then FIX_ARGS="${FIX_ARGS} --all";  fi
+    if [ "$AUTO_MODE" = "true" ]; then FIX_ARGS="${FIX_ARGS} --auto"; fi
+    echo "→ Dispatching to autofix workflow with args: ${FIX_ARGS}"
+    # Orchestrator: now execute the <process> in
+    # @~/.claude/get-shit-done/workflows/code-review-fix.md with "$FIX_ARGS"
+    # as $ARGUMENTS. Treat the rest of this workflow as complete.
+  fi
+fi
+```
+
+> **ORCHESTRATOR RULE — DISPATCH**: When `FIX_FLAG=true` and `STATUS != "clean"`, execute the fix workflow's `<process>` block inline using the `FIX_ARGS` string. Do not spawn a new skill invocation (that would re-enter this workflow and re-run the review pass). The fix workflow's `<execution_context>` files are already loaded.
+</step>
+
 </process>
 
 <platform_notes>
@@ -610,4 +670,7 @@ If `--files` validation fails unexpectedly on macOS, install coreutils or use ab
 - [ ] Agent failure handled without partial commits
 - [ ] REVIEW.md committed if created
 - [ ] Results presented inline with next step suggestion
+- [ ] `--fix` / `--all` / `--auto` parsed in initialize step (#3727)
+- [ ] `dispatch_fix` step forwards to `code-review-fix.md` when `FIX_FLAG=true` (#3727)
+- [ ] Dispatch skipped when STATUS=clean (no fixable findings)
 </success_criteria>
