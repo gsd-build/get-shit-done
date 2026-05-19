@@ -599,6 +599,11 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
   if (!entries) return results;
 
   // 2. Discover the default branch (main/master/etc) tip.
+  // Try: remote origin/HEAD → local 'main' → local 'master'.
+  // Intentionally excludes 'HEAD': using HEAD when detached or on a feature
+  // branch would make every branch appear "merged" into it, causing false reaping.
+  // This handles repos without a remote (test fixtures) and non-standard
+  // default-branch names gracefully instead of bailing early.
   const defaultBranchResult = execGit(
     ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'],
     { cwd: repoRoot }
@@ -607,11 +612,45 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
     ? defaultBranchResult.stdout.trim().replace(/^origin\//, '')
     : 'main';
 
-  const mainTipResult = execGit(['rev-parse', defaultBranch], { cwd: repoRoot });
-  if (!gitResultOk(mainTipResult)) return results;
-  const mainTip = mainTipResult.stdout.trim();
+  let mainTip;
+  {
+    const candidates = [defaultBranch, 'main', 'master'];
+    // Deduplicate while preserving order.
+    const seen = new Set();
+    for (const candidate of candidates) {
+      if (seen.has(candidate)) continue;
+      seen.add(candidate);
+      const r = execGit(['rev-parse', candidate], { cwd: repoRoot });
+      if (gitResultOk(r)) {
+        mainTip = r.stdout.trim();
+        break;
+      }
+    }
+    if (!mainTip) return results;
+  }
 
-  // 3. Process each worktree admin entry that has a 'locked' file.
+  // 3. Build a canonical-path → listed-path index from git worktree list.
+  // git worktree list shows paths AS PROVIDED to git worktree add.
+  // On macOS, os.tmpdir() may be /var/folders/... (symlink) while git writes
+  // /private/var/folders/... (real path) in the gitdir file.  We need the
+  // LISTED path for git worktree unlock/remove to find the worktree.
+  const listedResult = execGit(['worktree', 'list', '--porcelain'], { cwd: repoRoot });
+  const canonicalToListed = new Map();
+  if (gitResultOk(listedResult)) {
+    for (const block of listedResult.stdout.split('\n\n').filter(Boolean)) {
+      const wtLine = block.split('\n').find((l) => l.startsWith('worktree '));
+      if (!wtLine) continue;
+      const listed = wtLine.slice('worktree '.length).trim();
+      try {
+        const canonical = fs.realpathSync.native(listed);
+        canonicalToListed.set(canonical, listed);
+      } catch {
+        // If the path doesn't exist (already removed), skip silently.
+      }
+    }
+  }
+
+  // 4. Process each worktree admin entry that has a 'locked' file.
   for (const entryName of entries) {
     const adminDir = path.join(worktreesAdminDir, entryName);
     const lockedFile = path.join(adminDir, 'locked');
@@ -629,14 +668,25 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
       ? path.dirname(resolvedGitFile)
       : resolvedGitFile;
 
-    // 3a. Stale-lock guard: skip if lock is too fresh (PID recycling / race).
+    // Look up the git-list path (the path git knows about) for use in
+    // git worktree unlock/remove commands.  Falls back to worktreePath if
+    // not found (e.g. already removed, or no symlink ambiguity).
+    let gitKnownPath = worktreePath;
+    try {
+      const canonical = fs.realpathSync.native(worktreePath);
+      gitKnownPath = canonicalToListed.get(canonical) || worktreePath;
+    } catch {
+      // worktreePath may not exist yet (already removed); use as-is.
+    }
+
+    // 4a. Stale-lock guard: skip if lock is too fresh (PID recycling / race).
     const lockMtime = mtimeSafe(lockedFile);
     if (!lockMtime || Date.now() - lockMtime.getTime() < reapMtimeGuardMs) {
       results.push({ path: worktreePath, status: 'skipped', reason: 'lock_too_fresh' });
       continue;
     }
 
-    // 3b. PID liveness check.
+    // 4b. PID liveness check.
     const pidStr = lockedContent.trim().match(/^\d+/)?.[0];
     if (pidStr) {
       const pid = parseInt(pidStr, 10);
@@ -647,7 +697,7 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
     }
     // If no parseable PID, treat as dead (legacy lock written without PID).
 
-    // 3c. Ancestry guard: branch-tip must be reachable from main (fail closed).
+    // 4c. Ancestry guard: branch-tip must be reachable from main (fail closed).
     // The admin HEAD file contains either "ref: refs/heads/<branch>" or a bare SHA.
     // We read the file directly (no non-standard git ref parsing).
     let branchTip;
@@ -685,9 +735,12 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
       continue;
     }
 
-    // 3d. Reap: unlock → remove --force.
-    execGit(['worktree', 'unlock', worktreePath], { cwd: repoRoot }); // ignore failure (already unlocked)
-    const removeResult = execGit(['worktree', 'remove', worktreePath, '--force'], { cwd: repoRoot });
+    // 4d. Reap: unlock → remove --force.
+    // Use gitKnownPath (from git worktree list) so that git can locate the
+    // worktree even when the path in the gitdir file differs due to symlinks
+    // (e.g. macOS /var/folders vs /private/var/folders).
+    execGit(['worktree', 'unlock', gitKnownPath], { cwd: repoRoot }); // ignore failure (already unlocked)
+    const removeResult = execGit(['worktree', 'remove', gitKnownPath, '--force'], { cwd: repoRoot });
     if (!gitResultOk(removeResult)) {
       results.push({ path: worktreePath, status: 'skipped', reason: 'remove_failed' });
       continue;
@@ -696,7 +749,7 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
     results.push({ path: worktreePath, status: 'reaped', reason: 'pid_dead_and_merged' });
   }
 
-  // 4. Always prune stale metadata (handles missing-on-disk entries).
+  // 5. Always prune stale metadata (handles missing-on-disk entries).
   execGit(['worktree', 'prune'], { cwd: repoRoot });
 
   return results;

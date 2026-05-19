@@ -60,7 +60,9 @@ function worktreeMeta(repoDir, wtDir) {
   // Return the .git/worktrees/<name>/ directory for a given linked worktree
   const worktrees = git(['worktree', 'list', '--porcelain'], repoDir);
   const canonical = canonicalPath(wtDir);
-  const blocks = worktrees.split('\n\n').filter(Boolean);
+  // Normalize CRLF → LF before splitting (git on Windows may emit CRLF).
+  const normalized = worktrees.replace(/\r\n/g, '\n');
+  const blocks = normalized.split('\n\n').filter(Boolean);
   for (const block of blocks) {
     const lines = block.split('\n');
     const wtLine = lines.find((l) => l.startsWith('worktree '));
@@ -74,7 +76,7 @@ function worktreeMeta(repoDir, wtDir) {
       const gitdirFile = path.join(worktreesDir, entry, 'gitdir');
       if (!fs.existsSync(gitdirFile)) continue;
       const gitdirContent = fs.readFileSync(gitdirFile, 'utf8').trim();
-      const resolvedWtRoot = path.resolve(worktreesDir, entry, gitdirContent).replace(/\/\.git$/, '');
+      const resolvedWtRoot = path.resolve(worktreesDir, entry, gitdirContent).replace(/[/\\]\.git$/, '');
       if (canonicalPath(resolvedWtRoot) === canonical) {
         return path.join(worktreesDir, entry);
       }
