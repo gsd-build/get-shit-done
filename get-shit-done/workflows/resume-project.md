@@ -66,13 +66,15 @@ Look for incomplete work that needs attention:
 # Check for structured handoff (preferred — machine-readable)
 cat .planning/HANDOFF.json 2>/dev/null || true
 
-# Check for continue-here files (phase + non-phase + legacy fallback)
-ls .planning/phases/*/.continue-here*.md \
-   .planning/spikes/*/.continue-here*.md \
-   .planning/sketches/*/.continue-here*.md \
-   .planning/deliberations/.continue-here*.md \
-   .planning/.continue-here*.md \
-   .continue-here*.md 2>/dev/null || true
+# Check for continue-here files (phase + non-phase + legacy fallback).
+# Use `find` rather than a chained `ls` of bare globs: under zsh's default
+# NOMATCH option (macOS default shell), a single non-matching glob aborts
+# the entire command during word-expansion — silently dropping every
+# pattern after the first miss, including `.planning/.continue-here*.md`.
+# `find` does not use shell glob expansion and tolerates absent
+# directories on both bash and zsh.
+find .planning -maxdepth 3 -name '.continue-here*.md' -print 2>/dev/null || true
+find . -maxdepth 1 -name '.continue-here*.md' -print 2>/dev/null || true
 
 # Check for plans without summaries (incomplete execution)
 for plan in .planning/phases/*/*-PLAN.md; do

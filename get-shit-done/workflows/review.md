@@ -173,6 +173,39 @@ Output your review in markdown format.
 ```
 
 Write to a temp file: `/tmp/gsd-review-prompt-{phase}.md`
+
+Also write individual section files so the budget tool can re-trim per reviewer:
+
+```bash
+# Write individual section files for per-reviewer budget trimming
+# These are always written so reviewers with a budget can invoke prompt-budget
+cp "$INSTRUCTIONS_BLOCK_FILE" "/tmp/gsd-review-${PHASE}-instructions.md"
+cp "$ROADMAP_SECTION_FILE" "/tmp/gsd-review-${PHASE}-roadmap.md"
+
+# Plan files: copy each PLAN.md to a predictable numbered path
+PLAN_INDEX=0
+for PLAN_FILE in "${PHASE_DIR}"/*-PLAN.md; do
+  PADDED_IDX=$(printf '%02d' "$PLAN_INDEX")
+  cp "$PLAN_FILE" "/tmp/gsd-review-${PHASE}-plan-${PADDED_IDX}.md"
+  PLAN_INDEX=$((PLAN_INDEX + 1))
+done
+
+# Optional section files (only if content was included in the combined prompt)
+if [ -f ".planning/PROJECT.md" ]; then
+  cp .planning/PROJECT.md "/tmp/gsd-review-${PHASE}-project.md"
+fi
+if ls "${PHASE_DIR}/"*"-CONTEXT.md" >/dev/null 2>&1; then
+  cat "${PHASE_DIR}/"*"-CONTEXT.md" > "/tmp/gsd-review-${PHASE}-context.md"
+fi
+if ls "${PHASE_DIR}/"*"-RESEARCH.md" >/dev/null 2>&1; then
+  cat "${PHASE_DIR}/"*"-RESEARCH.md" > "/tmp/gsd-review-${PHASE}-research.md"
+fi
+if [ -f ".planning/REQUIREMENTS.md" ]; then
+  cp .planning/REQUIREMENTS.md "/tmp/gsd-review-${PHASE}-requirements.md"
+fi
+```
+
+Note: The variable names above (`INSTRUCTIONS_BLOCK_FILE`, `ROADMAP_SECTION_FILE`, `PHASE_DIR`, `PHASE`) reference the variables already established during prompt assembly. In practice the AI implementing this step writes the instruction and roadmap blocks to temp files while assembling the combined prompt, then copies those same temp files to the per-reviewer section paths. If the assembled prompt was built inline (string concatenation rather than file-by-file), write each section to the corresponding path after writing the combined file.
 </step>
 
 <step name="invoke_reviewers">
@@ -256,13 +289,74 @@ fi
 Read host and model from config. All three local backends share the same `/v1/chat/completions` endpoint — only host and model differ. Use `jq --rawfile` to safely encode the multi-line prompt as JSON without shell-escaping issues.
 
 ```bash
+# Shared helper: apply prompt-budget trimming for local reviewers
+prepare_trimmed_prompt_for_reviewer() {
+  REVIEWER_KEY="$1"
+  REVIEWER_BUDGET="$2"
+  OUTPUT_PROMPT="$3"
+  OUTPUT_META="$4"
+
+  [ -z "$REVIEWER_BUDGET" ] && return 0
+  [ "$REVIEWER_BUDGET" = "null" ] && return 0
+  [ "$REVIEWER_BUDGET" = "0" ] && return 0
+
+  PLAN_FILE_ARGS=""
+  for p in /tmp/gsd-review-{phase}-plan-*.md; do
+    [ -f "$p" ] && PLAN_FILE_ARGS="$PLAN_FILE_ARGS --plan-file $p"
+  done
+  PROJECT_ARG=""
+  [ -f "/tmp/gsd-review-{phase}-project.md" ] && PROJECT_ARG="--project-file /tmp/gsd-review-{phase}-project.md"
+  CONTEXT_ARG=""
+  [ -f "/tmp/gsd-review-{phase}-context.md" ] && CONTEXT_ARG="--context-file /tmp/gsd-review-{phase}-context.md"
+  RESEARCH_ARG=""
+  [ -f "/tmp/gsd-review-{phase}-research.md" ] && RESEARCH_ARG="--research-file /tmp/gsd-review-{phase}-research.md"
+  REQUIREMENTS_ARG=""
+  [ -f "/tmp/gsd-review-{phase}-requirements.md" ] && REQUIREMENTS_ARG="--requirements-file /tmp/gsd-review-{phase}-requirements.md"
+
+  gsd-sdk query prompt-budget \
+    --budget "$REVIEWER_BUDGET" \
+    --instructions-file "/tmp/gsd-review-{phase}-instructions.md" \
+    --roadmap-file "/tmp/gsd-review-{phase}-roadmap.md" \
+    $PLAN_FILE_ARGS $PROJECT_ARG $CONTEXT_ARG $RESEARCH_ARG $REQUIREMENTS_ARG \
+    --output-prompt "$OUTPUT_PROMPT" \
+    --output-metadata "$OUTPUT_META"
+  return $?
+}
+
+# Resolve prompt budget for Ollama: per-reviewer override > global default > null
+OLLAMA_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens_per_reviewer.ollama 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+if [ -z "$OLLAMA_REVIEWER_BUDGET" ] || [ "$OLLAMA_REVIEWER_BUDGET" = "null" ]; then
+  OLLAMA_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+fi
+
+# Apply budget trim for Ollama if a budget is configured
+OLLAMA_PROMPT_FILE="/tmp/gsd-review-prompt-{phase}.md"
+OLLAMA_SKIP=0
+if [ -n "$OLLAMA_REVIEWER_BUDGET" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "null" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "0" ]; then
+  OLLAMA_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-ollama.md"
+  OLLAMA_TRIM_META="/tmp/gsd-review-prompt-{phase}-ollama.metadata.json"
+  prepare_trimmed_prompt_for_reviewer "ollama" "$OLLAMA_REVIEWER_BUDGET" "$OLLAMA_TRIMMED_PROMPT" "$OLLAMA_TRIM_META"
+  OLLAMA_EXIT=$?
+  if [ $OLLAMA_EXIT -ne 0 ]; then
+    if [ $OLLAMA_EXIT -eq 2 ] || [ $OLLAMA_EXIT -eq 11 ]; then
+      echo "WARNING: prompt budget for ollama (${OLLAMA_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping Ollama reviewer." >&2
+    else
+      echo "WARNING: prompt-budget returned unexpected exit code ${OLLAMA_EXIT} for ollama. Skipping Ollama reviewer." >&2
+    fi
+    OLLAMA_SKIP=1
+  else
+    OLLAMA_PROMPT_FILE="$OLLAMA_TRIMMED_PROMPT"
+  fi
+fi
+
+if [ "$OLLAMA_SKIP" != "1" ]; then
 OLLAMA_HOST=$(gsd-sdk query config-get review.ollama_host 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$OLLAMA_HOST" ] || [ "$OLLAMA_HOST" = "null" ]; then OLLAMA_HOST="http://localhost:11434"; fi
 OLLAMA_MODEL=$(gsd-sdk query config-get review.models.ollama 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$OLLAMA_MODEL" ] || [ "$OLLAMA_MODEL" = "null" ]; then
   OLLAMA_MODEL=$(curl -s --max-time 2 "${OLLAMA_HOST}/v1/models" 2>/dev/null | jq -r '.data[0].id // "llama3"' 2>/dev/null || echo "llama3")
 fi
-jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
+jq -n --rawfile content "$OLLAMA_PROMPT_FILE" \
   --arg model "$OLLAMA_MODEL" \
   '{model: $model, messages: [{role: "user", content: $content}]}' | \
   curl -s --max-time 120 -X POST "${OLLAMA_HOST}/v1/chat/completions" \
@@ -272,17 +366,45 @@ jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
 if [ ! -s /tmp/gsd-review-ollama-{phase}.md ]; then
   echo "Ollama review failed or returned empty output." > /tmp/gsd-review-ollama-{phase}.md
 fi
+fi
 ```
 
 **LM Studio (local, OpenAI-compatible):**
 ```bash
+# Resolve prompt budget for LM Studio: per-reviewer override > global default > null
+LM_STUDIO_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens_per_reviewer.lm_studio 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+if [ -z "$LM_STUDIO_REVIEWER_BUDGET" ] || [ "$LM_STUDIO_REVIEWER_BUDGET" = "null" ]; then
+  LM_STUDIO_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+fi
+
+# Apply budget trim for LM Studio if a budget is configured
+LM_STUDIO_PROMPT_FILE="/tmp/gsd-review-prompt-{phase}.md"
+LM_STUDIO_SKIP=0
+if [ -n "$LM_STUDIO_REVIEWER_BUDGET" ] && [ "$LM_STUDIO_REVIEWER_BUDGET" != "null" ] && [ "$LM_STUDIO_REVIEWER_BUDGET" != "0" ]; then
+  LM_STUDIO_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-lm_studio.md"
+  LM_STUDIO_TRIM_META="/tmp/gsd-review-prompt-{phase}-lm_studio.metadata.json"
+  prepare_trimmed_prompt_for_reviewer "lm_studio" "$LM_STUDIO_REVIEWER_BUDGET" "$LM_STUDIO_TRIMMED_PROMPT" "$LM_STUDIO_TRIM_META"
+  LM_STUDIO_EXIT=$?
+  if [ $LM_STUDIO_EXIT -ne 0 ]; then
+    if [ $LM_STUDIO_EXIT -eq 2 ] || [ $LM_STUDIO_EXIT -eq 11 ]; then
+      echo "WARNING: prompt budget for lm_studio (${LM_STUDIO_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping LM Studio reviewer." >&2
+    else
+      echo "WARNING: prompt-budget returned unexpected exit code ${LM_STUDIO_EXIT} for lm_studio. Skipping LM Studio reviewer." >&2
+    fi
+    LM_STUDIO_SKIP=1
+  else
+    LM_STUDIO_PROMPT_FILE="$LM_STUDIO_TRIMMED_PROMPT"
+  fi
+fi
+
+if [ "$LM_STUDIO_SKIP" != "1" ]; then
 LM_STUDIO_HOST=$(gsd-sdk query config-get review.lm_studio_host 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$LM_STUDIO_HOST" ] || [ "$LM_STUDIO_HOST" = "null" ]; then LM_STUDIO_HOST="http://localhost:1234"; fi
 LM_STUDIO_MODEL=$(gsd-sdk query config-get review.models.lm_studio 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$LM_STUDIO_MODEL" ] || [ "$LM_STUDIO_MODEL" = "null" ]; then
   LM_STUDIO_MODEL=$(curl -s --max-time 2 "${LM_STUDIO_HOST}/v1/models" 2>/dev/null | jq -r '.data[0].id // "local-model"' 2>/dev/null || echo "local-model")
 fi
-LM_STUDIO_RESPONSE=$(jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
+LM_STUDIO_RESPONSE=$(jq -n --rawfile content "$LM_STUDIO_PROMPT_FILE" \
   --arg model "$LM_STUDIO_MODEL" \
   '{model: $model, messages: [{role: "user", content: $content}]}' | \
   curl -s --max-time 120 -X POST "${LM_STUDIO_HOST}/v1/chat/completions" \
@@ -297,17 +419,45 @@ if [ -n "$LM_STUDIO_CONTENT" ]; then
 else
   echo "Warning: LM Studio returned empty content — skipping review." >&2
 fi
+fi
 ```
 
 **llama.cpp (local, OpenAI-compatible):**
 ```bash
+# Resolve prompt budget for llama.cpp: per-reviewer override > global default > null
+LLAMA_CPP_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens_per_reviewer.llama_cpp 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+if [ -z "$LLAMA_CPP_REVIEWER_BUDGET" ] || [ "$LLAMA_CPP_REVIEWER_BUDGET" = "null" ]; then
+  LLAMA_CPP_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+fi
+
+# Apply budget trim for llama.cpp if a budget is configured
+LLAMA_CPP_PROMPT_FILE="/tmp/gsd-review-prompt-{phase}.md"
+LLAMA_CPP_SKIP=0
+if [ -n "$LLAMA_CPP_REVIEWER_BUDGET" ] && [ "$LLAMA_CPP_REVIEWER_BUDGET" != "null" ] && [ "$LLAMA_CPP_REVIEWER_BUDGET" != "0" ]; then
+  LLAMA_CPP_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-llama_cpp.md"
+  LLAMA_CPP_TRIM_META="/tmp/gsd-review-prompt-{phase}-llama_cpp.metadata.json"
+  prepare_trimmed_prompt_for_reviewer "llama_cpp" "$LLAMA_CPP_REVIEWER_BUDGET" "$LLAMA_CPP_TRIMMED_PROMPT" "$LLAMA_CPP_TRIM_META"
+  LLAMA_CPP_EXIT=$?
+  if [ $LLAMA_CPP_EXIT -ne 0 ]; then
+    if [ $LLAMA_CPP_EXIT -eq 2 ] || [ $LLAMA_CPP_EXIT -eq 11 ]; then
+      echo "WARNING: prompt budget for llama_cpp (${LLAMA_CPP_REVIEWER_BUDGET} tokens) is too small for the minimum review set. Skipping llama.cpp reviewer." >&2
+    else
+      echo "WARNING: prompt-budget returned unexpected exit code ${LLAMA_CPP_EXIT} for llama_cpp. Skipping llama.cpp reviewer." >&2
+    fi
+    LLAMA_CPP_SKIP=1
+  else
+    LLAMA_CPP_PROMPT_FILE="$LLAMA_CPP_TRIMMED_PROMPT"
+  fi
+fi
+
+if [ "$LLAMA_CPP_SKIP" != "1" ]; then
 LLAMA_CPP_HOST=$(gsd-sdk query config-get review.llama_cpp_host 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$LLAMA_CPP_HOST" ] || [ "$LLAMA_CPP_HOST" = "null" ]; then LLAMA_CPP_HOST="http://localhost:8080"; fi
 LLAMA_CPP_MODEL=$(gsd-sdk query config-get review.models.llama_cpp 2>/dev/null | jq -r '.' 2>/dev/null || echo "")
 if [ -z "$LLAMA_CPP_MODEL" ] || [ "$LLAMA_CPP_MODEL" = "null" ]; then
   LLAMA_CPP_MODEL=$(curl -s --max-time 2 "${LLAMA_CPP_HOST}/v1/models" 2>/dev/null | jq -r '.data[0].id // "local-model"' 2>/dev/null || echo "local-model")
 fi
-LLAMA_CPP_CONTENT=$(jq -n --rawfile content /tmp/gsd-review-prompt-{phase}.md \
+LLAMA_CPP_CONTENT=$(jq -n --rawfile content "$LLAMA_CPP_PROMPT_FILE" \
   --arg model "$LLAMA_CPP_MODEL" \
   '{model: $model, messages: [{role: "user", content: $content}]}' | \
   curl -s --max-time 120 -X POST "${LLAMA_CPP_HOST}/v1/chat/completions" \
@@ -317,6 +467,7 @@ if [ -n "$LLAMA_CPP_CONTENT" ]; then
   echo "$LLAMA_CPP_CONTENT" > /tmp/gsd-review-llama_cpp-{phase}.md
 else
   echo "Warning: llama.cpp returned empty content — skipping review." >&2
+fi
 fi
 ```
 
@@ -336,12 +487,24 @@ Display progress:
 <step name="write_reviews">
 Combine all review responses into `{phase_dir}/{padded_phase}-REVIEWS.md`:
 
+After all reviewers complete, collect trim metadata files written during the run. For each reviewer that was trimmed (i.e. a `.metadata.json` file exists and `hardFailed` or `omitted` is non-empty, or `projectMdShrunk` is true, or `planTruncationPct > 0`), include a `trimmed_reviewers` block in the frontmatter. Omit the key entirely if no reviewer was trimmed.
+
 ```markdown
 ---
 phase: {N}
 reviewers: [gemini, claude, codex, coderabbit, opencode, qwen, cursor, ollama, lm_studio, llama_cpp]  # populate at runtime with only the reviewers actually invoked
 reviewed_at: {ISO timestamp}
 plans_reviewed: [{list of PLAN.md files}]
+trimmed_reviewers:        # only present if at least one reviewer was trimmed
+  ollama:
+    budget: 6000
+    effective_budget: 5400
+    estimated_tokens: 5380
+    omitted: [context, research]
+    project_md_shrunk: true
+    plan_truncation_pct: 22
+    hard_failed: false
+    note_injected: true
 ---
 
 # Cross-AI Plan Review — Phase {N}

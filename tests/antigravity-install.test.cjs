@@ -25,9 +25,15 @@ const {
   convertClaudeToAntigravityContent,
   convertClaudeCommandToAntigravitySkill,
   convertClaudeAgentToAntigravityAgent,
-  copyCommandsAsAntigravitySkills,
   writeManifest,
+  installRuntimeArtifacts,
 } = require('../bin/install.js');
+
+// ─── Profile resolution for installRuntimeArtifacts tests ────────────────────
+const _gsdLibDir = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib');
+const { loadSkillsManifest, resolveProfile } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
+const _manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest: _manifest });
 
 // ─── getDirName ─────────────────────────────────────────────────────────────────
 
@@ -285,98 +291,83 @@ Execute plans from ~/.claude/get-shit-done/workflows/execute-phase.md
   });
 });
 
-// ─── copyCommandsAsAntigravitySkills ───────────────────────────────────────────
+// ─── installRuntimeArtifacts (antigravity integration) ────────────────────────
 
-describe('copyCommandsAsAntigravitySkills', () => {
-  let tmpDir;
-  let srcDir;
-  let skillsDir;
+describe('installRuntimeArtifacts (antigravity integration)', () => {
+  // Pivoted from copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false) shim to
+  // installRuntimeArtifacts('antigravity', configDir, 'local'|'global', resolvedProfileFull).
+  // Output layout: <configDir>/skills/gsd-<stem>/SKILL.md (destSubpath='skills', prefix='gsd-').
+  // stageSkillsForRuntimeAsSkills does NOT recurse into subdirectories; the real
+  // commands/gsd/ directory has no subdirs, so subdir-handling is not a production path.
+  let configDir;
 
   beforeEach(() => {
-    tmpDir = createTempDir('gsd-ag-test-');
-    srcDir = path.join(tmpDir, 'commands', 'gsd');
-    skillsDir = path.join(tmpDir, 'skills');
-    fs.mkdirSync(srcDir, { recursive: true });
-
-    // Create a sample command file
-    fs.writeFileSync(path.join(srcDir, 'new-project.md'), `---
-name: gsd:new-project
-description: Initialize a new project
-allowed-tools:
-  - Read
-  - Write
----
-Run /gsd:new-project to start.
-`);
-
-    // Create a subdirectory command
-    const subDir = path.join(srcDir, 'subdir');
-    fs.mkdirSync(subDir, { recursive: true });
-    fs.writeFileSync(path.join(subDir, 'sub-command.md'), `---
-name: gsd:sub-command
-description: A sub-command
-allowed-tools:
-  - Read
----
-Body text.
-`);
+    configDir = createTempDir('gsd-ag-test-');
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(configDir, { recursive: true, force: true });
   });
 
   test('creates skills directory', () => {
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
-    assert.ok(fs.existsSync(skillsDir));
+    installRuntimeArtifacts('antigravity', configDir, 'local', resolvedProfileFull);
+    assert.ok(fs.existsSync(path.join(configDir, 'skills')));
   });
 
   test('creates one skill directory per command with SKILL.md', () => {
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
+    installRuntimeArtifacts('antigravity', configDir, 'local', resolvedProfileFull);
+    const skillsDir = path.join(configDir, 'skills');
     const skillDir = path.join(skillsDir, 'gsd-new-project');
     assert.ok(fs.existsSync(skillDir), 'skill dir should exist');
     assert.ok(fs.existsSync(path.join(skillDir, 'SKILL.md')), 'SKILL.md should exist');
   });
 
-  test('handles subdirectory commands with prefixed names', () => {
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
-    const subSkillDir = path.join(skillsDir, 'gsd-subdir-sub-command');
-    assert.ok(fs.existsSync(subSkillDir), 'subdirectory skill dir should exist');
-  });
+  // NOTE: 'handles subdirectory commands with prefixed names' (gsd-subdir-sub-command) is
+  // DELETED. stageSkillsForRuntimeAsSkills processes only flat .md files in commands/gsd/;
+  // the real commands/gsd/ directory contains no subdirectories. This test had no production
+  // code path and cannot be expressed through the installRuntimeArtifacts seam.
 
   test('SKILL.md has minimal frontmatter (name + description only)', () => {
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-new-project', 'SKILL.md'), 'utf8');
+    installRuntimeArtifacts('antigravity', configDir, 'local', resolvedProfileFull);
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd-new-project', 'SKILL.md'), 'utf8');
     const fm = parseFrontmatter(content);
     assert.equal(fm.name, 'gsd-new-project', content);
-    assert.equal(fm.description, 'Initialize a new project', content);
+    assert.ok(fm.description, 'description field is present');
     assert.ok(!('allowed-tools' in fm), 'no allowed-tools field');
   });
 
   test('SKILL.md body has paths converted for local install', () => {
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-new-project', 'SKILL.md'), 'utf8');
+    installRuntimeArtifacts('antigravity', configDir, 'local', resolvedProfileFull);
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd-new-project', 'SKILL.md'), 'utf8');
     // gsd: → gsd- conversion
     assert.ok(!content.includes('gsd:'), content);
   });
 
   test('removes old gsd-* skill dirs before reinstalling', () => {
-    // Create a stale skill dir
-    const staleDir = path.join(skillsDir, 'gsd-old-skill');
+    const skillsDir = path.join(configDir, 'skills');
+    fs.mkdirSync(skillsDir, { recursive: true });
+    // Stale GSD-managed dir must be pruned
+    const staleDir = path.join(skillsDir, 'gsd-old-stale-skill');
     fs.mkdirSync(staleDir, { recursive: true });
-    fs.writeFileSync(path.join(staleDir, 'SKILL.md'), '---\nname: old\n---\n');
-
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
-
-    assert.ok(!fs.existsSync(staleDir), 'stale skill dir should be removed');
-  });
-
-  test('does not remove non-gsd skill dirs', () => {
-    // Create a non-GSD skill dir
+    fs.writeFileSync(path.join(staleDir, 'SKILL.md'), 'stale content');
+    // Non-GSD dir should survive
     const otherDir = path.join(skillsDir, 'my-custom-skill');
     fs.mkdirSync(otherDir, { recursive: true });
 
-    copyCommandsAsAntigravitySkills(srcDir, skillsDir, 'gsd', false);
+    installRuntimeArtifacts('antigravity', configDir, 'local', resolvedProfileFull);
+
+    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-new-project')), 'real skill dir written');
+    assert.ok(!fs.existsSync(staleDir), 'stale gsd-* dir removed by pre-prune');
+  });
+
+  test('does not remove non-gsd skill dirs', () => {
+    // Create a non-GSD skill dir before install
+    const skillsDir = path.join(configDir, 'skills');
+    fs.mkdirSync(skillsDir, { recursive: true });
+    const otherDir = path.join(skillsDir, 'my-custom-skill');
+    fs.mkdirSync(otherDir, { recursive: true });
+
+    installRuntimeArtifacts('antigravity', configDir, 'local', resolvedProfileFull);
 
     assert.ok(fs.existsSync(otherDir), 'non-GSD skill dir should be preserved');
   });

@@ -19,11 +19,17 @@ const {
   convertClaudeToCodebuddyMarkdown,
   convertClaudeCommandToCodebuddySkill,
   convertClaudeAgentToCodebuddyAgent,
-  copyCommandsAsCodebuddySkills,
   install,
   uninstall,
   writeManifest,
+  installRuntimeArtifacts,
 } = require('../bin/install.js');
+
+// ─── Profile resolution for installRuntimeArtifacts tests ────────────────────
+const _gsdLibDir = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib');
+const { loadSkillsManifest, resolveProfile } = require(path.join(_gsdLibDir, 'install-profiles.cjs'));
+const _manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest: _manifest });
 
 describe('CodeBuddy runtime directory mapping', () => {
   test('maps CodeBuddy to .codebuddy for local installs', () => {
@@ -133,24 +139,24 @@ Read CLAUDE.md before acting.
   });
 });
 
-describe('copyCommandsAsCodebuddySkills', () => {
-  let tmpDir;
+describe('installRuntimeArtifacts (codebuddy integration)', () => {
+  // Pivoted from copyCommandsAsCodebuddySkills(srcDir, skillsDir, 'gsd', '$HOME/.codebuddy/', 'codebuddy')
+  // shim to installRuntimeArtifacts('codebuddy', configDir, 'local', resolvedProfileFull).
+  // Output layout: <configDir>/skills/gsd-<stem>/SKILL.md (destSubpath='skills', prefix='gsd-').
+  let configDir;
 
   beforeEach(() => {
-    tmpDir = createTempDir('gsd-codebuddy-copy-');
+    configDir = createTempDir('gsd-codebuddy-copy-');
   });
 
   afterEach(() => {
-    cleanup(tmpDir);
+    cleanup(configDir);
   });
 
   test('creates one skill directory per GSD command', () => {
-    const srcDir = path.join(__dirname, '..', 'commands', 'gsd');
-    const skillsDir = path.join(tmpDir, '.codebuddy', 'skills');
+    installRuntimeArtifacts('codebuddy', configDir, 'local', resolvedProfileFull);
 
-    copyCommandsAsCodebuddySkills(srcDir, skillsDir, 'gsd', '$HOME/.codebuddy/', 'codebuddy');
-
-    const generated = path.join(skillsDir, 'gsd-help', 'SKILL.md');
+    const generated = path.join(configDir, 'skills', 'gsd-help', 'SKILL.md');
     assert.ok(fs.existsSync(generated), generated);
 
     const content = fs.readFileSync(generated, 'utf8');

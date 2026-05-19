@@ -1,7 +1,7 @@
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { evaluatePrTemplate } = require('../scripts/pr-template-policy.cjs');
+const { evaluatePrTemplate, allPathsAreTooling, hasExemptMarker, TOOLING_PATH_ALLOWLIST, EXEMPT_MARKER_REGEX } = require('../scripts/pr-template-policy.cjs');
 
 const fixBody = [
   '## Fix PR',
@@ -81,6 +81,108 @@ const featureBody = [
   '## Checklist',
   '- [x] Tests pass',
 ].join('\n');
+
+describe('pr-template-policy carve-out', () => {
+  // A. Path-scope auto-skip — CI-only PR is accepted
+  test('auto-skips enforcement for CI-only changed files', () => {
+    const result = evaluatePrTemplate('This is a CI change with no template.', 'NONE', ['.github/workflows/test.yml']);
+    assert.equal(result.valid, true);
+    assert.equal(result.action, 'pass');
+    assert.equal(result.skipped, 'tooling-paths');
+  });
+
+  // B. Path-scope auto-skip — docs-only PR is accepted
+  test('auto-skips enforcement for docs-only changed files', () => {
+    const result = evaluatePrTemplate('Updated documentation.', 'NONE', ['docs/CONFIGURATION.md', 'README.md']);
+    assert.equal(result.valid, true);
+    assert.equal(result.action, 'pass');
+    assert.equal(result.skipped, 'tooling-paths');
+  });
+
+  // C. Path-scope auto-skip — dependency-bump PR is accepted
+  test('auto-skips enforcement for dependency-bump changed files', () => {
+    const result = evaluatePrTemplate('Bump deps.', 'NONE', ['package.json', 'package-lock.json']);
+    assert.equal(result.valid, true);
+    assert.equal(result.action, 'pass');
+    assert.equal(result.skipped, 'tooling-paths');
+  });
+
+  // D. Path-scope auto-skip is path-strict — mixed PR still enforced
+  test('does NOT skip enforcement when any changed file is outside the tooling allowlist', () => {
+    const result = evaluatePrTemplate('Mixed change.', 'NONE', ['.github/workflows/test.yml', 'src/feature.ts']);
+    assert.equal(result.valid, false);
+    assert.equal(result.action, 'close');
+  });
+
+  // E. Explicit marker accepted (non-empty reason)
+  test('auto-skips enforcement when PR body contains a valid exempt marker with a reason', () => {
+    const body = '<!-- pr-template-exempt: dropping node 26 lane -->\n\nThis removes the Node 26 CI lane.';
+    const result = evaluatePrTemplate(body, 'NONE', ['src/anything.ts']);
+    assert.equal(result.valid, true);
+    assert.equal(result.action, 'pass');
+    assert.equal(result.skipped, 'exempt-marker');
+  });
+
+  // F. Explicit marker requires non-empty reason
+  test('does NOT skip enforcement when exempt marker has an empty reason', () => {
+    const bodyEmpty = '<!-- pr-template-exempt:  -->\n\nSome description.';
+    const bodyNoReason = '<!-- pr-template-exempt: -->\n\nSome description.';
+    const r1 = evaluatePrTemplate(bodyEmpty, 'NONE', ['src/anything.ts']);
+    const r2 = evaluatePrTemplate(bodyNoReason, 'NONE', ['src/anything.ts']);
+    assert.equal(r1.valid, false);
+    assert.equal(r2.valid, false);
+  });
+
+  // G. Regression — DEFAULT_TEMPLATE_MARKERS still rejected
+  test('regression: DEFAULT_TEMPLATE_MARKERS body is still rejected when no carve-out applies', () => {
+    const body = 'Wrong template — please use a typed template.\n\nEvery PR must use a typed template.';
+    const result = evaluatePrTemplate(body, 'NONE', ['src/feature.ts']);
+    assert.equal(result.valid, false);
+    assert.match(result.reason, /default wrong-template guidance/);
+  });
+
+  // H. Regression — fix template still accepted
+  test('regression: fix template PR body is still accepted', () => {
+    const result = evaluatePrTemplate(fixBody, 'NONE', ['src/feature.ts']);
+    assert.equal(result.valid, true);
+    assert.equal(result.action, 'pass');
+    assert.equal(result.template, 'fix');
+  });
+});
+
+describe('pr-template-policy helper: allPathsAreTooling', () => {
+  test('returns true when all paths match the allowlist', () => {
+    assert.equal(allPathsAreTooling(['.github/workflows/ci.yml'], TOOLING_PATH_ALLOWLIST), true);
+    assert.equal(allPathsAreTooling(['package.json', 'package-lock.json'], TOOLING_PATH_ALLOWLIST), true);
+    assert.equal(allPathsAreTooling(['README.md'], TOOLING_PATH_ALLOWLIST), true);
+  });
+
+  test('returns false when any path does not match the allowlist', () => {
+    assert.equal(allPathsAreTooling(['.github/workflows/ci.yml', 'src/index.ts'], TOOLING_PATH_ALLOWLIST), false);
+  });
+
+  test('returns false for an empty file list', () => {
+    assert.equal(allPathsAreTooling([], TOOLING_PATH_ALLOWLIST), false);
+  });
+});
+
+describe('pr-template-policy helper: hasExemptMarker', () => {
+  test('matches a marker with a non-empty reason', () => {
+    assert.equal(hasExemptMarker('<!-- pr-template-exempt: ci -->', EXEMPT_MARKER_REGEX), true);
+    assert.equal(hasExemptMarker('<!-- pr-template-exempt: dropping node 26 lane -->', EXEMPT_MARKER_REGEX), true);
+    assert.equal(hasExemptMarker('<!-- pr-template-exempt: drop node-26 lane -->', EXEMPT_MARKER_REGEX), true);
+  });
+
+  test('does not match a marker with empty or whitespace-only reason', () => {
+    assert.equal(hasExemptMarker('<!-- pr-template-exempt:  -->', EXEMPT_MARKER_REGEX), false);
+    assert.equal(hasExemptMarker('<!-- pr-template-exempt: -->', EXEMPT_MARKER_REGEX), false);
+  });
+
+  test('does not match a marker with no pr-template-exempt keyword', () => {
+    assert.equal(hasExemptMarker('<!-- gsd-pr-template-policy -->', EXEMPT_MARKER_REGEX), false);
+    assert.equal(hasExemptMarker('some random text', EXEMPT_MARKER_REGEX), false);
+  });
+});
 
 describe('pr-template-policy', () => {
   test('passes PR bodies that use the fix template', () => {

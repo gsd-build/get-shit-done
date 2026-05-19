@@ -919,40 +919,42 @@ function syncStateFrontmatter(content, cwd) {
  */
 function acquireStateLock(statePath) {
   const lockPath = statePath + '.lock';
-  const maxRetries = 10;
   const retryDelay = 200; // ms
+  const staleThresholdMs = 10000;
+  const maxWaitMs = 30000;
+  const startedAt = Date.now();
 
-  for (let i = 0; i < maxRetries; i++) {
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
     try {
       const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
       fs.writeSync(fd, String(process.pid));
       fs.closeSync(fd);
-      // Register for exit-time cleanup so process.exit(1) inside a locked region
-      // cannot leave a stale lock file (#1916).
+      // Exit-time cleanup keeps a crashed locked region from leaving a stale file (#1916).
       _heldStateLocks.add(lockPath);
       return lockPath;
     } catch (err) {
-      if (err.code === 'EEXIST') {
-        try {
-          const stat = fs.statSync(lockPath);
-          if (Date.now() - stat.mtimeMs > 10000) {
-            fs.unlinkSync(lockPath);
-            continue;
-          }
-        } catch { /* lock was released between check — retry */ }
-
-        if (i === maxRetries - 1) {
-          try { fs.unlinkSync(lockPath); } catch {}
-          return lockPath;
+      if (err.code !== 'EEXIST') return lockPath;
+      // Only unlink a lock we did not place when it has crossed the staleness
+      // threshold (crashed holder). Nuking a fresh lock held by a slow-but-live
+      // writer causes lost updates (#3711 regression).
+      try {
+        const stat = fs.statSync(lockPath);
+        if (Date.now() - stat.mtimeMs > staleThresholdMs) {
+          try { fs.unlinkSync(lockPath); } catch { /* already gone */ }
+          continue;
         }
-        const jitter = Math.floor(Math.random() * 50);
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay + jitter);
-        continue;
+      } catch { continue; /* released between EEXIST and stat */ }
+      if (Date.now() - startedAt >= maxWaitMs) {
+        throw new Error(
+          'acquireStateLock: ' + lockPath + ' held by live process for ' +
+          (Date.now() - startedAt) + 'ms (exceeded ' + maxWaitMs + 'ms budget)'
+        );
       }
-      return lockPath; // non-EEXIST error — proceed without lock
+      const jitter = Math.floor(Math.random() * 50);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay + jitter);
     }
   }
-  return statePath + '.lock';
 }
 
 function releaseStateLock(lockPath) {

@@ -463,7 +463,7 @@ async function main() {
     'from-gsd2, frontmatter, gap-analysis, generate-claude-md, generate-claude-profile, ' +
     'generate-dev-preferences, generate-slug, graphify, history-digest, init, intel, ' +
     'learnings, list-todos, milestone, perplexity-agent, perplexity-search, phase, phase-plan-index, phases, profile-questionnaire, ' +
-    'profile-sample, progress, requirements, resolve-model, roadmap, scaffold, state, ' +
+    'profile-sample, progress, prompt-budget, requirements, resolve-model, roadmap, scaffold, state, ' +
     'template, validate, verify, verify-path-exists, verify-summary, websearch, workstream, worktree\n\n' +
     'Global flags:\n' +
     '  --raw              Emit raw output without post-processing\n' +
@@ -509,7 +509,7 @@ async function main() {
   const SKIP_ROOT_RESOLUTION = new Set([
     'generate-slug', 'current-timestamp', 'verify-path-exists',
     'verify-summary', 'template', 'frontmatter', 'detect-custom-files',
-    'worktree',
+    'worktree', 'prompt-budget',
   ]);
   if (!SKIP_ROOT_RESOLUTION.has(command)) {
     cwd = findProjectRoot(cwd);
@@ -518,14 +518,16 @@ async function main() {
   // When --pick is active, intercept stdout to extract the requested field.
   if (pickField) {
     const origWriteSync = fs.writeSync;
-    const chunks = [];
+    let captured = '';
     fs.writeSync = function (fd, data, ...rest) {
-      if (fd === 1) { chunks.push(String(data)); return; }
+      if (fd === 1) {
+        captured += String(data);
+        return;
+      }
       return origWriteSync.call(fs, fd, data, ...rest);
     };
     const cleanup = () => {
       fs.writeSync = origWriteSync;
-      const captured = chunks.join('');
       let jsonStr = captured;
       if (jsonStr.startsWith('@file:')) {
         jsonStr = fs.readFileSync(jsonStr.slice(6), 'utf-8');
@@ -555,9 +557,12 @@ async function main() {
   // every workflow to have a bash-specific `if [[ "$INIT" == @file:* ]]` check
   // that breaks on PowerShell and other non-bash shells.
   const origWriteSync2 = fs.writeSync;
-  const outChunks = [];
+  let captured = '';
   fs.writeSync = function (fd, data, ...rest) {
-    if (fd === 1) { outChunks.push(String(data)); return; }
+    if (fd === 1) {
+      captured += String(data);
+      return;
+    }
     return origWriteSync2.call(fs, fd, data, ...rest);
   };
   try {
@@ -565,7 +570,6 @@ async function main() {
   } finally {
     fs.writeSync = origWriteSync2;
   }
-  let captured = outChunks.join('');
   if (captured.startsWith('@file:')) {
     captured = fs.readFileSync(captured.slice(6), 'utf-8');
   }
@@ -1404,7 +1408,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
 
       let manifest;
       try {
-        manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
       } catch {
         const out = { custom_files: [], custom_count: 0, manifest_found: false, error: 'manifest parse error' };
         process.stdout.write(JSON.stringify(out, null, 2));
@@ -1423,31 +1427,27 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         'skills',
       ];
 
-      function walkDir(dir, baseDir) {
-        const results = [];
-        if (!fs.existsSync(dir)) return results;
+      function collectCustomFiles(dir, baseDir, manifestKeys, out) {
+        if (!fs.existsSync(dir)) return;
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           const fullPath = path.join(dir, entry.name);
           if (entry.isDirectory()) {
-            results.push(...walkDir(fullPath, baseDir));
-          } else {
-            // Use forward slashes for cross-platform manifest key compatibility
-            const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
-            results.push(relPath);
+            collectCustomFiles(fullPath, baseDir, manifestKeys, out);
+            continue;
+          }
+          // Use forward slashes for cross-platform manifest key compatibility
+          const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+          if (!manifestKeys.has(relPath)) {
+            out.push(relPath);
           }
         }
-        return results;
       }
 
       const customFiles = [];
       for (const managedDir of GSD_MANAGED_DIRS) {
         const absDir = path.join(resolvedConfigDir, managedDir);
         if (!fs.existsSync(absDir)) continue;
-        for (const relPath of walkDir(absDir, resolvedConfigDir)) {
-          if (!manifestKeys.has(relPath)) {
-            customFiles.push(relPath);
-          }
-        }
+        collectCustomFiles(absDir, resolvedConfigDir, manifestKeys, customFiles);
       }
 
       const out = {
@@ -1465,6 +1465,177 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
     case 'from-gsd2': {
       const gsd2Import = require('./lib/gsd2-import.cjs');
       gsd2Import.cmdFromGsd2(args.slice(1), cwd, raw);
+      break;
+    }
+
+    // ─── Prompt Budget ────────────────────────────────────────────────────
+    //
+    // Assemble and deterministically trim review prompt sections to fit a
+    // token budget. Used by the /gsd-review workflow before dispatching to
+    // small-context local model servers (Ollama, llama.cpp, LM Studio).
+    //
+    // Required flags:
+    //   --budget <N>            Token budget (integer > 0)
+    //   --instructions-file <path>  Review instructions
+    //   --roadmap-file <path>   Roadmap section
+    //   --plan-file <path>      Plan file (may be repeated)
+    //   --output-prompt <path>  Write trimmed prompt here
+    //   --output-metadata <path> Write metadata JSON here
+    //
+    // Optional flags:
+    //   --safety-margin-pct <N>     Default 10
+    //   --project-md-head-lines <N> Default 40
+    //   --project-file <path>
+    //   --context-file <path>
+    //   --research-file <path>
+    //   --requirements-file <path>
+    //
+    // Exit codes:
+    //   0  success (trim or no-trim)
+    //   1  invocation error (missing required arg, missing file, invalid budget)
+    //   2  hardFailed: prompt cannot fit effective budget after trim policy
+
+    case 'prompt-budget': {
+      const promptBudget = require('./lib/prompt-budget.cjs');
+
+      // ── Collect multi-value --plan-file flags ──────────────────────────
+      const planFiles = [];
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--plan-file' && args[i + 1] && !args[i + 1].startsWith('--')) {
+          planFiles.push(args[i + 1]);
+          i++;
+        }
+      }
+
+      // ── Parse single-value flags ───────────────────────────────────────
+      const flagMap = new Map();
+      for (let i = 1; i < args.length; i++) {
+        const current = args[i];
+        const next = args[i + 1];
+        if (!current.startsWith('--')) continue;
+        if (!next || next.startsWith('--')) {
+          if (!flagMap.has(current)) flagMap.set(current, null);
+          continue;
+        }
+        if (!flagMap.has(current)) flagMap.set(current, next);
+        i++;
+      }
+      const getFlag = (flag) => flagMap.get(flag) ?? null;
+
+      const budgetStr = getFlag('--budget');
+      const instructionsFile = getFlag('--instructions-file');
+      const roadmapFile = getFlag('--roadmap-file');
+      const outputPromptFile = getFlag('--output-prompt');
+      const outputMetadataFile = getFlag('--output-metadata');
+      const safetyMarginStr = getFlag('--safety-margin-pct');
+      const projectMdHeadLinesStr = getFlag('--project-md-head-lines');
+      const projectFile = getFlag('--project-file');
+      const contextFile = getFlag('--context-file');
+      const researchFile = getFlag('--research-file');
+      const requirementsFile = getFlag('--requirements-file');
+
+      // ── Validate required args ─────────────────────────────────────────
+      if (!budgetStr) {
+        process.stderr.write('Error: --budget <N> is required\n');
+        process.exit(1);
+      }
+      const budget = parseInt(budgetStr, 10);
+      if (!Number.isFinite(budget) || budget <= 0) {
+        process.stderr.write('Error: --budget must be a positive integer\n');
+        process.exit(1);
+      }
+      if (!instructionsFile) {
+        process.stderr.write('Error: --instructions-file <path> is required\n');
+        process.exit(1);
+      }
+      if (!roadmapFile) {
+        process.stderr.write('Error: --roadmap-file <path> is required\n');
+        process.exit(1);
+      }
+      if (planFiles.length === 0) {
+        process.stderr.write('Error: at least one --plan-file <path> is required\n');
+        process.exit(1);
+      }
+      if (!outputPromptFile) {
+        process.stderr.write('Error: --output-prompt <path> is required\n');
+        process.exit(1);
+      }
+      if (!outputMetadataFile) {
+        process.stderr.write('Error: --output-metadata <path> is required\n');
+        process.exit(1);
+      }
+
+      // ── Validate and read required files ──────────────────────────────
+      async function readRequired(filePath, flagName) {
+        const resolved = path.resolve(filePath);
+        try {
+          return await fs.promises.readFile(resolved, 'utf8');
+        } catch (err) {
+          if (err && err.code === 'ENOENT') {
+            process.stderr.write(`Error: file not found for ${flagName}: ${resolved}\n`);
+            process.exit(1);
+          }
+          process.stderr.write(`Error: cannot read file for ${flagName}: ${resolved}\n`);
+          process.exit(1);
+        }
+      }
+
+      async function readOptional(filePath) {
+        if (!filePath) return null;
+        const resolved = path.resolve(filePath);
+        try {
+          return await fs.promises.readFile(resolved, 'utf8');
+        } catch (err) {
+          if (err && err.code === 'ENOENT') return null;
+          process.stderr.write(`Error: cannot read optional file: ${resolved}\n`);
+          process.exit(1);
+        }
+      }
+
+      const instructions = await readRequired(instructionsFile, '--instructions-file');
+      const roadmap = await readRequired(roadmapFile, '--roadmap-file');
+      const plans = await Promise.all(planFiles.map(async (p) => {
+        const resolved = path.resolve(p);
+        try {
+          const content = await fs.promises.readFile(resolved, 'utf8');
+          return { file: path.basename(p), content };
+        } catch (err) {
+          if (err && err.code === 'ENOENT') {
+            process.stderr.write(`Error: plan file not found: ${resolved}\n`);
+            process.exit(1);
+          }
+          process.stderr.write(`Error: cannot read plan file: ${resolved}\n`);
+          process.exit(1);
+        }
+      }));
+
+      const projectMd = await readOptional(projectFile);
+      const context = await readOptional(contextFile);
+      const research = await readOptional(researchFile);
+      const requirements = await readOptional(requirementsFile);
+
+      // ── Build options ─────────────────────────────────────────────────
+      const options = {};
+      if (safetyMarginStr !== null) {
+        const pct = parseInt(safetyMarginStr, 10);
+        if (Number.isFinite(pct)) options.safetyMarginPct = pct;
+      }
+      if (projectMdHeadLinesStr !== null) {
+        const lines = parseInt(projectMdHeadLinesStr, 10);
+        if (Number.isFinite(lines)) options.projectMdHeadLines = lines;
+      }
+
+      // ── Call applyBudget ──────────────────────────────────────────────
+      const sections = { instructions, roadmap, plans, projectMd, context, research, requirements };
+      const { prompt, metadata } = promptBudget.applyBudget({ sections, budget, options });
+
+      // ── Write outputs ─────────────────────────────────────────────────
+      await fs.promises.writeFile(path.resolve(outputMetadataFile), JSON.stringify(metadata, null, 2));
+      await fs.promises.writeFile(path.resolve(outputPromptFile), prompt);
+
+      if (metadata.hardFailed) {
+        process.exit(2);
+      }
       break;
     }
 

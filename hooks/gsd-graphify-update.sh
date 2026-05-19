@@ -10,7 +10,10 @@
 #
 # Gates (in fast-fail order — each shaves work off the common non-dispatch path):
 #   1. Stdin payload present and tool_name == "Bash"
-#   2. tool_input.command matches a HEAD-advancing git op
+#   2. tool_input.command matches a HEAD-advancing git op (shell-direct or
+#      the exact `gsd-sdk query commit` command shape; the SDK command invokes
+#      git internally, so the literal "git commit" substring never appears —
+#      see #3653)
 #   3. $CI is unset/empty
 #   4. Inside a git repo
 #   5. Current branch == default branch (git.base_branch override, else main/master/trunk)
@@ -46,9 +49,10 @@ COMMAND=$(printf '%s\n' "$TOOL_INFO" | sed -n '2p')
 
 [ "$TOOL_NAME" = "Bash" ] || exit 0
 
-# Gate 2 — HEAD-advancing git op
+# Gate 2 — HEAD-advancing git op (shell-direct or exact `gsd-sdk query commit`)
 case "$COMMAND" in
   *"git commit"*|*"git merge"*|*"git pull"*|*"git rebase --continue"*|*"git cherry-pick"*) ;;
+  *"gsd-sdk query commit"|*"gsd-sdk query commit "*) ;;
   *) exit 0 ;;
 esac
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const { matchesGlob } = require('path');
+
 const TRUSTED_AUTHOR_ASSOCIATIONS = new Set([
   'CONTRIBUTOR',
   'COLLABORATOR',
@@ -12,6 +14,42 @@ const DEFAULT_TEMPLATE_MARKERS = [
   'Every PR must use a typed template',
   'Select the template that matches your PR',
 ];
+
+/**
+ * Glob patterns for files that are considered CI/tooling/docs scope.
+ * If ALL changed files in a PR match at least one of these patterns,
+ * template enforcement is skipped automatically.
+ */
+const TOOLING_PATH_ALLOWLIST = [
+  '.github/**',
+  'scripts/**',
+  'docs/**',
+  '*.md',
+  '.changeset/**',
+  'package.json',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'Pipfile',
+  'Pipfile.lock',
+  'requirements.txt',
+  'requirements*.txt',
+  'poetry.lock',
+  'Gemfile',
+  'Gemfile.lock',
+  'go.sum',
+  'go.mod',
+];
+
+/**
+ * Matches an explicit PR-template exemption marker of the form:
+ *   <!-- pr-template-exempt: <non-empty reason> -->
+ *
+ * Capture group 1 is the reason (trimmed). Empty/whitespace-only reasons
+ * do NOT match because the pattern requires at least one non-whitespace
+ * character in the captured body.
+ */
+const EXEMPT_MARKER_REGEX = /<!--\s*pr-template-exempt:\s*([\s\S]*?\S)\s*-->/;
 
 const TEMPLATES = [
   {
@@ -99,10 +137,60 @@ function matchingTemplate(body) {
   };
 }
 
-function evaluatePrTemplate(body, authorAssociation) {
+/**
+ * Returns true iff every path in changedFiles matches at least one glob
+ * pattern in the allowlist. Returns false for an empty file list (no
+ * files means we cannot confirm it is a tooling-only PR).
+ */
+function allPathsAreTooling(changedFiles, allowlist) {
+  if (!Array.isArray(changedFiles) || changedFiles.length === 0) return false;
+  return changedFiles.every((file) =>
+    allowlist.some((pattern) => matchesGlob(file, pattern)),
+  );
+}
+
+/**
+ * Returns true iff the body contains an explicit exemption marker with a
+ * non-empty (non-whitespace) reason.
+ */
+function hasExemptMarker(body, regex) {
+  const match = regex.exec(String(body || ''));
+  if (!match) return false;
+  return match[1].trim().length > 0;
+}
+
+function evaluatePrTemplate(body, authorAssociation, changedFiles) {
   const association = String(authorAssociation || '').toUpperCase();
   const trusted = TRUSTED_AUTHOR_ASSOCIATIONS.has(association);
   const normalizedBody = String(body || '').trim();
+
+  // --- Carve-out 1: all changed files are in the tooling allowlist ---
+  if (allPathsAreTooling(changedFiles, TOOLING_PATH_ALLOWLIST)) {
+    return {
+      valid: true,
+      action: 'pass',
+      trusted,
+      authorAssociation: association || 'UNKNOWN',
+      template: null,
+      reason: null,
+      missingHeadings: [],
+      skipped: 'tooling-paths',
+    };
+  }
+
+  // --- Carve-out 2: explicit exemption marker in the PR body ---
+  if (hasExemptMarker(normalizedBody, EXEMPT_MARKER_REGEX)) {
+    return {
+      valid: true,
+      action: 'pass',
+      trusted,
+      authorAssociation: association || 'UNKNOWN',
+      template: null,
+      reason: null,
+      missingHeadings: [],
+      skipped: 'exempt-marker',
+    };
+  }
 
   let valid = true;
   let reason = 'PR body uses a typed pull request template.';
@@ -147,7 +235,14 @@ function evaluatePrTemplate(body, authorAssociation) {
 }
 
 function main() {
-  const result = evaluatePrTemplate(process.env.PR_BODY || '', process.env.AUTHOR_ASSOCIATION || '');
+  const changedFiles = process.env.CHANGED_FILES
+    ? process.env.CHANGED_FILES.split('\n').map((f) => f.trim()).filter(Boolean)
+    : undefined;
+  const result = evaluatePrTemplate(
+    process.env.PR_BODY || '',
+    process.env.AUTHOR_ASSOCIATION || '',
+    changedFiles,
+  );
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (process.env.GITHUB_OUTPUT) {
     const fs = require('fs');
@@ -166,4 +261,8 @@ module.exports = {
   extractHeadings,
   includesDefaultTemplate,
   matchingTemplate,
+  allPathsAreTooling,
+  hasExemptMarker,
+  TOOLING_PATH_ALLOWLIST,
+  EXEMPT_MARKER_REGEX,
 };

@@ -215,7 +215,15 @@ function assertFreshInstallContract(runtime, targetDir) {
     // the same flat-skills surface as the other runtimes.
     assertHasGsdDirectory(targetDir, 'skills');
   } else if (contract.surface === 'hermes-skills') {
-    assertHasGsdDirectory(targetDir, path.join('skills', 'gsd'));
+    // Hermes layout uses prefix: '' — skill dirs have bare stem names (no gsd- prefix).
+    // Assert that the category dir contains at least one skill dir with SKILL.md.
+    const hermesGsdDir = path.join(targetDir, 'skills', 'gsd');
+    const hermesSkillCount = fs.existsSync(hermesGsdDir)
+      ? fs.readdirSync(hermesGsdDir, { withFileTypes: true })
+          .filter(e => e.isDirectory() && fs.existsSync(path.join(hermesGsdDir, e.name, 'SKILL.md')))
+          .length
+      : 0;
+    assert.ok(hermesSkillCount > 0, `skills/gsd should contain generated GSD entries (got ${hermesSkillCount})`);
     assert.ok(
       fs.existsSync(path.join(targetDir, 'skills', 'gsd', 'DESCRIPTION.md')),
       'Hermes should install the nested GSD category description'

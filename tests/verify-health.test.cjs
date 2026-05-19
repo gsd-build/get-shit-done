@@ -201,6 +201,63 @@ describe('validate health command', () => {
     assert.strictEqual(w002.repairable, false, 'W002 should not be auto-repairable');
   });
 
+  // Regression: #3652 — after /gsd:complete-milestone, phase dirs move into
+  // milestones/vX.Y-phases/ and their `#### Phase N:` headings in ROADMAP.md
+  // get collapsed inside <details> blocks. The heading-scan regex misses
+  // collapsed phases and collectDiskPhases() only walks the active archive,
+  // so W002 used to fire for every historical phase number mentioned in
+  // STATE.md's narrative body. Cross-referencing every milestone archive
+  // suppresses the false positive.
+  test('does not warn W002 for phase refs that live in any milestones archive (#3652)', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeValidConfigJson(tmpDir);
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '23-current'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'milestones', 'v1.3a-phases', '12-old-phase'), { recursive: true });
+    for (const n of ['19-alpha', '20-beta', '21-gamma', '22-delta']) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'milestones', 'v1.3b-phases', n), { recursive: true });
+    }
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      [
+        '# Roadmap', '',
+        '<details><summary>v1.3a: Shipped</summary>', '',
+        '- Phase 12: archived', '',
+        '</details>', '',
+        '<details><summary>v1.3b: Shipped</summary>', '',
+        '- Phase 19, 20, 21, 22: archived', '',
+        '</details>', '',
+        '## v1.4: Current', '',
+        '### Phase 23: Current work', '',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      [
+        '---', 'milestone: v1.4', 'milestone_name: Current', 'status: executing', '---', '',
+        '# State', '',
+        '**Current Phase:** 23', '',
+        '## Recent', '- Phase 19 shipped', '- Phase 20 shipped', '- Phase 21 shipped', '- Phase 22 shipped',
+        '', '## Decisions', '- Decision from Phase 12 still applies',
+      ].join('\n')
+    );
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const w002s = (output.warnings || []).filter(w => w.code === 'W002');
+    assert.strictEqual(w002s.length, 0, `Did not expect W002s for archived phases: ${JSON.stringify(w002s)}`);
+    // Also no W006 for the archived phases — extractCurrentMilestone strips
+    // shipped milestones before the Check 8 heading scan in the CJS path,
+    // so archived phase numbers never reach `roadmapPhases`. Pins the
+    // assumption that drove the decision NOT to mirror the W002 archive
+    // union into Check 8 on the CJS side.
+    const w006s = (output.warnings || []).filter(w =>
+      w.code === 'W006' && /Phase (?:12|19|20|21|22)\b/.test(String(w.message)),
+    );
+    assert.strictEqual(w006s.length, 0, `Did not expect W006s for archived phases: ${JSON.stringify(w006s)}`);
+  });
+
   // ─── Check 5: config.json valid JSON + valid schema ───────────────────────
 
   test('warns when config.json is missing with repairable true', () => {

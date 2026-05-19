@@ -40,17 +40,13 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    # Node 26 lanes report forward-compat status without gating the workflow
-    # (setup-node may not yet have stable Node 26 images). 22/24 still gate.
-    continue-on-error: ${{ matrix.node-version == 26 }}
-
     strategy:
       # fail-fast disabled so a single lane failure doesn't cancel the rest;
       # makes OS-specific vs version-specific regressions easier to distinguish.
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [22, 24, 26]
+        node-version: [22, 24]
         # Windows path/separator coverage is also reinforced by hardcoded-paths.test.cjs
         # and windows-robustness.test.cjs (static analysis).
         # A dedicated windows-compat workflow runs on a weekly schedule.
@@ -90,9 +86,11 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        shell: bash
         run: npm ci
 
       - name: Build SDK dist (required by installer)
+        shell: bash
         run: npm run build:sdk
 
       # Seam contract gate: keep manifest -> generated aliases -> registry/CJS adapters aligned.
@@ -174,15 +172,22 @@ jobs:
         run: npm run test:security
 
       # Install + slow lanes only on main-branch push (not PR CI) so PRs stay fast.
+      # Windows is excluded from the install lane: `npm install -g <tarball>` runs
+      # 7× per release-tarball-smoke.install.test.cjs invocation (1× before-hook
+      # + 6× per-test) and each takes 60–90 s on windows-latest (NTFS + Defender),
+      # so the lane alone consumes ~10 min and blows the 15-min job budget after
+      # earlier steps. Linux + macOS coverage stays here; Windows tarball install
+      # coverage is provided by the weekly windows-compat workflow.
       - name: Run install tests
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.os != 'windows-latest'
         shell: bash
         run: npm run test:install
 
       - name: Run slow tests
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.os != 'windows-latest'
         shell: bash
         run: npm run test:slow
+
 
   # Dedicated coverage job. Runs only on ubuntu/Node 24 (the canonical lane)
   # because c8 coverage of one suite on one OS is enough signal — running it
@@ -214,15 +219,19 @@ jobs:
           node-version: 24
           cache: 'npm'
       - name: Install dependencies
+        shell: bash
         run: npm ci
       - name: Build SDK dist
+        shell: bash
         run: npm run build:sdk
       - name: Unit coverage
         shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run test:coverage:unit
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: coverage-unit
           path: |

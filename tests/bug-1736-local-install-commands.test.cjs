@@ -21,7 +21,7 @@ const { execFileSync } = require('child_process');
 
 const INSTALL_SRC = path.join(__dirname, '..', 'bin', 'install.js');
 const BUILD_SCRIPT = path.join(__dirname, '..', 'scripts', 'build-hooks.js');
-const { install, copyCommandsAsClaudeSkills } = require(INSTALL_SRC);
+const { install } = require(INSTALL_SRC);
 const { cleanup } = require('./helpers.cjs');
 
 // ─── Ensure hooks/dist/ is populated before install tests ────────────────────

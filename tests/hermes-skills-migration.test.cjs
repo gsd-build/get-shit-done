@@ -21,10 +21,18 @@ const fs = require('fs');
 
 const {
   convertClaudeCommandToClaudeSkill,
-  copyCommandsAsClaudeSkills,
+  installRuntimeArtifacts,
 } = require('../bin/install.js');
 const { parseFrontmatter } = require('./helpers.cjs');
 const pkg = require('../package.json');
+
+const {
+  loadSkillsManifest,
+  resolveProfile,
+} = require('../get-shit-done/bin/lib/install-profiles.cjs');
+
+const manifest = loadSkillsManifest();
+const resolvedProfileFull = resolveProfile({ modes: [], manifest });
 
 // ─── convertClaudeCommandToClaudeSkill (used by Hermes via copyCommandsAsClaudeSkills) ──
 
@@ -120,9 +128,9 @@ describe('Hermes Agent: convertClaudeCommandToClaudeSkill', () => {
   });
 });
 
-// ─── copyCommandsAsClaudeSkills (used for Hermes skills install) ─────────────
+// ─── installRuntimeArtifacts (used for Hermes skills install) ────────────────
 
-describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
+describe('Hermes Agent: installRuntimeArtifacts', () => {
   let tmpDir;
 
   beforeEach(() => {
@@ -135,7 +143,7 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
     }
   });
 
-  test('creates skills/gsd-xxx/SKILL.md directory structure', () => {
+  test('creates skills/gsd/quick/SKILL.md directory structure (Hermes bare-stem layout)', () => {
     // Create source command files
     const srcDir = path.join(tmpDir, 'src', 'commands', 'gsd');
     fs.mkdirSync(srcDir, { recursive: true });
@@ -151,17 +159,22 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
       '<objective>Quick task body</objective>',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '/test/prefix/', 'hermes', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    // Redirect findInstallSourceRoot to the test's custom srcDir
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    // Verify SKILL.md was created
-    const skillPath = path.join(skillsDir, 'gsd-quick', 'SKILL.md');
-    assert.ok(fs.existsSync(skillPath), 'gsd-quick/SKILL.md exists');
+    installRuntimeArtifacts('hermes', configDir, 'global', resolvedProfileFull);
+
+    // Hermes layout: skills/gsd/<bare-stem>/SKILL.md (ADR-3660)
+    const skillPath = path.join(configDir, 'skills', 'gsd', 'quick', 'SKILL.md');
+    assert.ok(fs.existsSync(skillPath), 'skills/gsd/quick/SKILL.md exists');
 
     // Verify content (structural — parse frontmatter, don't substring-grep)
+    // Hermes bare-stem: prefix='', so skillName passed to converter = 'quick' (not 'gsd-quick')
     const content = fs.readFileSync(skillPath, 'utf8');
     const fm = parseFrontmatter(content);
-    assert.strictEqual(fm.name, 'gsd-quick', 'frontmatter name uses hyphen form (#2808)');
+    assert.strictEqual(fm.name, 'quick', 'frontmatter name is bare stem for Hermes nested layout');
     assert.ok(fm.description && fm.description.length > 0, 'description present and non-empty');
     assert.strictEqual(fm.version, pkg.version,
       `Hermes SKILL.md must declare version (got ${JSON.stringify(fm.version)})`);
@@ -170,7 +183,7 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
     assert.ok(content.includes('<objective>'), 'body content preserved');
   });
 
-  test('replaces ~/.claude/ paths with pathPrefix', () => {
+  test('replaces ~/.claude/ paths via applyRuntimeContentRewritesInPlace', () => {
     const srcDir = path.join(tmpDir, 'src', 'commands', 'gsd');
     fs.mkdirSync(srcDir, { recursive: true });
     fs.writeFileSync(path.join(srcDir, 'next.md'), [
@@ -182,15 +195,19 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
       'Reference: @~/.claude/get-shit-done/workflows/next.md',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '$HOME/.hermes/', 'hermes', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-next', 'SKILL.md'), 'utf8');
-    assert.ok(content.includes('$HOME/.hermes/'), 'path replaced to .hermes/');
-    assert.ok(!content.includes('~/.claude/'), 'old claude path removed');
+    installRuntimeArtifacts('hermes', configDir, 'global', resolvedProfileFull);
+
+    // Hermes layout: skills/gsd/<bare-stem>/SKILL.md
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd', 'next', 'SKILL.md'), 'utf8');
+    assert.ok(!content.includes('~/.claude/'), 'old claude tilde-path removed');
+    assert.ok(!content.includes('$HOME/.claude/'), 'old claude $HOME-path not present');
   });
 
-  test('replaces $HOME/.claude/ paths with pathPrefix', () => {
+  test('replaces $HOME/.claude/ paths via applyRuntimeContentRewritesInPlace', () => {
     const srcDir = path.join(tmpDir, 'src', 'commands', 'gsd');
     fs.mkdirSync(srcDir, { recursive: true });
     fs.writeFileSync(path.join(srcDir, 'plan.md'), [
@@ -202,12 +219,16 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
       'Reference: $HOME/.claude/get-shit-done/workflows/plan.md',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '$HOME/.hermes/', 'hermes', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-plan', 'SKILL.md'), 'utf8');
-    assert.ok(content.includes('$HOME/.hermes/'), 'path replaced to .hermes/');
-    assert.ok(!content.includes('$HOME/.claude/'), 'old claude path removed');
+    installRuntimeArtifacts('hermes', configDir, 'global', resolvedProfileFull);
+
+    // Hermes layout: skills/gsd/<bare-stem>/SKILL.md
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd', 'plan', 'SKILL.md'), 'utf8');
+    assert.ok(!content.includes('$HOME/.claude/'), 'old claude $HOME-path removed');
+    assert.ok(!content.includes('~/.claude/'), 'old claude tilde-path not present');
   });
 
   test('removes stale gsd- skills before installing new ones', () => {
@@ -222,15 +243,21 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
       'Body',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    // Pre-create a stale skill
-    fs.mkdirSync(path.join(skillsDir, 'gsd-old-skill'), { recursive: true });
-    fs.writeFileSync(path.join(skillsDir, 'gsd-old-skill', 'SKILL.md'), 'old');
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '/test/', 'hermes', false);
+    // Pre-create a stale flat skill (skills/gsd-old-skill) — legacy Hermes layout
+    const staleFlatSkillDir = path.join(configDir, 'skills', 'gsd-old-skill');
+    fs.mkdirSync(staleFlatSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(staleFlatSkillDir, 'SKILL.md'), 'old');
 
-    assert.ok(!fs.existsSync(path.join(skillsDir, 'gsd-old-skill')), 'stale skill removed');
-    assert.ok(fs.existsSync(path.join(skillsDir, 'gsd-quick', 'SKILL.md')), 'new skill installed');
+    installRuntimeArtifacts('hermes', configDir, 'global', resolvedProfileFull);
+
+    // _runLegacyInstallMigrations removes skills/gsd-* flat dirs for hermes
+    assert.ok(!fs.existsSync(staleFlatSkillDir), 'stale flat gsd- skill removed');
+    // New Hermes layout: skills/gsd/<bare-stem>/SKILL.md
+    assert.ok(fs.existsSync(path.join(configDir, 'skills', 'gsd', 'quick', 'SKILL.md')), 'new skill installed at skills/gsd/quick/SKILL.md');
   });
 
   test('preserves agent field in frontmatter', () => {
@@ -250,10 +277,14 @@ describe('Hermes Agent: copyCommandsAsClaudeSkills', () => {
       'Execute body',
     ].join('\n'));
 
-    const skillsDir = path.join(tmpDir, 'dest', 'skills');
-    copyCommandsAsClaudeSkills(srcDir, skillsDir, 'gsd', '/test/', 'hermes', false);
+    const configDir = path.join(tmpDir, 'dest');
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, '.gsd-source'), srcDir);
 
-    const content = fs.readFileSync(path.join(skillsDir, 'gsd-execute', 'SKILL.md'), 'utf8');
+    installRuntimeArtifacts('hermes', configDir, 'global', resolvedProfileFull);
+
+    // Hermes layout: skills/gsd/<bare-stem>/SKILL.md
+    const content = fs.readFileSync(path.join(configDir, 'skills', 'gsd', 'execute', 'SKILL.md'), 'utf8');
     const fm = parseFrontmatter(content);
     assert.strictEqual(fm.agent, 'gsd-executor', 'agent field preserved');
   });

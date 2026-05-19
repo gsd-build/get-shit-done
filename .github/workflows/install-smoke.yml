@@ -23,6 +23,8 @@ on:
       - 'sdk/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/release-tarball-smoke.cjs'
+      - 'tests/release-tarball-smoke.install.test.cjs'
       - '.github/workflows/install-smoke.yml'
       - '.github/workflows/release.yml'
   push:
@@ -200,6 +202,23 @@ jobs:
           set -euo pipefail
           gsd-sdk --version || gsd-sdk --help
           echo "✓ gsd-sdk is executable"
+
+      - name: Lifecycle smoke
+        if: steps.skip.outputs.skip != 'true'
+        id: lifecycle-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-tarball-smoke.cjs --json | tee /tmp/release-smoke.json
+          jq -e '.code == "ok"' /tmp/release-smoke.json
+
+      - name: Upload lifecycle smoke result on failure
+        if: steps.skip.outputs.skip != 'true' && failure() && steps.lifecycle-smoke.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-smoke-${{ matrix.os }}-node${{ matrix.node-version }}
+          path: /tmp/release-smoke.json
+          retention-days: 7
 
   # ---------------------------------------------------------------------------
   # Job 2: unpacked-dir install — reproduces the mode-644 failure class (#2453)

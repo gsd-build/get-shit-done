@@ -1,0 +1,5 @@
+---
+type: Fixed
+pr: 3658
+---
+**`gsd-graphify-update.sh` now matches `gsd-sdk query commit` (#3653)** — the PostToolUse auto-update hook previously substring-matched only direct shell git ops in `tool_input.command`. Because `gsd-sdk query commit` invokes git via `spawnSync('git', [...])` rather than through a shell, the literal `git commit` never appears in the Bash tool's command string, and the hook silently skipped every SDK-issued commit — including the `phase.complete`-following commit that closes every phase. Result: `.planning/graphs/` drifted stale by one or more commits at the end of every phase, with no error and no log. Gate 2 now also accepts the exact `gsd-sdk query commit` command shape, which is the user-facing invocation that triggers the SDK-internal `spawnSync('git', 'commit', ...)`, without matching sibling verbs such as `commit-to-subrepo`. Other `gsd-sdk query` verbs (`phase.complete`, `roadmap.update-plan-progress`, `state.begin-phase`) do not invoke git themselves and remain non-matching to avoid spurious rebuilds per state mutation.
