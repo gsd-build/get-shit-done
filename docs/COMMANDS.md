@@ -207,7 +207,7 @@ Plan a phase as a vertical MVP slice — three structured user-story prompts →
 | `--force` | Override the status guard. Required when the target phase is `in_progress` or `completed` — converting an active phase to MVP mode invalidates existing plans/summaries. |
 
 **What it does:**
-1. **User-story prompts** — three sequential `AskUserQuestion` calls capture an `As a [role] / I want to [capability] / so that [outcome]` story. Validated by `gsd-sdk query user-story.validate` (canonical regex `/^As a .+, I want to .+, so that .+\.$/`); empty fields are re-prompted.
+1. **User-story prompts** — three sequential `AskUserQuestion` calls capture an `As a [role], I want to [capability], so that [outcome].` story. Validated by `gsd-sdk query user-story.validate` (canonical regex `/^As a .+, I want to .+, so that .+\.$/`); empty fields are re-prompted.
 2. **SPIDR splitting check** — if the assembled story is too large (>120 chars, compound capabilities, multi-actor, or vague), walks the user through the **S**pike / **P**aths / **I**nterfaces / **D**ata / **R**ules axes and offers `/gsd-phase` invocations to split.
 3. **ROADMAP mutation** — writes `**Mode:** mvp` and replaces `**Goal:**` with the assembled user story.
 4. **Delegate to `/gsd-plan-phase <N>`** — the planner auto-detects MVP via the roadmap mode field (no `--mvp` flag needed at delegation time).

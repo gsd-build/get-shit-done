@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.45.0...HEAD)
 
-## [1.45.0](https://github.com/gsd-build/get-shit-done/compare/v1.42.1...v1.45.0) - 2026-05-17
+## [1.45.0](https://github.com/gsd-build/get-shit-done/compare/v1.42.3...v1.45.0) - 2026-05-17
 
 ### Feature
 
