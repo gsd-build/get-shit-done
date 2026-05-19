@@ -1,0 +1,5 @@
+---
+type: Added
+pr: 3676
+---
+**Vertical-slice planning mode (MVP audit + test-rigor retrofit, #2826)** — resolves four functional defects (D1: phase-boundary emission ordering; D2: plan-index short-form resolution; D3: state idempotency on re-completion; D4: executor force-commit bypass) and three edge-case gaps (E4: decimal-phase `depends_on` short refs; E7: zsh NOMATCH glob collapse in resume; E8: graphify hook missing `gsd-sdk query commit` shape) surfaced by the #2826 vertical-slice audit. Adds five new SDK verbs (`state.begin-phase`, `state.complete-phase`, `phase.list`, `phase.next`, `roadmap.update-plan-progress`) with full input-validation and idempotency contracts. Retrofits structural regression tests for each fix — banning `git add -f` from agent/workflow bodies, asserting cross-reference invariants for `/gsd-X` command refs, and covering the resume-glob NOMATCH path on both bash and zsh. Updates `docs/USER-GUIDE.md`, `docs/COMMANDS.md`, and `docs/CLI-TOOLS.md` to document the new SDK verbs; adds `docs/adr/2826-mvp-vertical-slice-audit.md` recording the audit findings and resolutions. (#2826, #3676)
