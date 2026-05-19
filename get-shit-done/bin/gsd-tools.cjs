@@ -503,14 +503,16 @@ async function main() {
   // When --pick is active, intercept stdout to extract the requested field.
   if (pickField) {
     const origWriteSync = fs.writeSync;
-    const chunks = [];
+    let captured = '';
     fs.writeSync = function (fd, data, ...rest) {
-      if (fd === 1) { chunks.push(String(data)); return; }
+      if (fd === 1) {
+        captured += String(data);
+        return;
+      }
       return origWriteSync.call(fs, fd, data, ...rest);
     };
     const cleanup = () => {
       fs.writeSync = origWriteSync;
-      const captured = chunks.join('');
       let jsonStr = captured;
       if (jsonStr.startsWith('@file:')) {
         jsonStr = fs.readFileSync(jsonStr.slice(6), 'utf-8');
@@ -540,9 +542,12 @@ async function main() {
   // every workflow to have a bash-specific `if [[ "$INIT" == @file:* ]]` check
   // that breaks on PowerShell and other non-bash shells.
   const origWriteSync2 = fs.writeSync;
-  const outChunks = [];
+  let captured = '';
   fs.writeSync = function (fd, data, ...rest) {
-    if (fd === 1) { outChunks.push(String(data)); return; }
+    if (fd === 1) {
+      captured += String(data);
+      return;
+    }
     return origWriteSync2.call(fs, fd, data, ...rest);
   };
   try {
@@ -550,7 +555,6 @@ async function main() {
   } finally {
     fs.writeSync = origWriteSync2;
   }
-  let captured = outChunks.join('');
   if (captured.startsWith('@file:')) {
     captured = fs.readFileSync(captured.slice(6), 'utf-8');
   }
@@ -1368,7 +1372,7 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
 
       let manifest;
       try {
-        manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
       } catch {
         const out = { custom_files: [], custom_count: 0, manifest_found: false, error: 'manifest parse error' };
         process.stdout.write(JSON.stringify(out, null, 2));
@@ -1387,31 +1391,27 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
         'skills',
       ];
 
-      function walkDir(dir, baseDir) {
-        const results = [];
-        if (!fs.existsSync(dir)) return results;
+      function collectCustomFiles(dir, baseDir, manifestKeys, out) {
+        if (!fs.existsSync(dir)) return;
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           const fullPath = path.join(dir, entry.name);
           if (entry.isDirectory()) {
-            results.push(...walkDir(fullPath, baseDir));
-          } else {
-            // Use forward slashes for cross-platform manifest key compatibility
-            const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
-            results.push(relPath);
+            collectCustomFiles(fullPath, baseDir, manifestKeys, out);
+            continue;
+          }
+          // Use forward slashes for cross-platform manifest key compatibility
+          const relPath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+          if (!manifestKeys.has(relPath)) {
+            out.push(relPath);
           }
         }
-        return results;
       }
 
       const customFiles = [];
       for (const managedDir of GSD_MANAGED_DIRS) {
         const absDir = path.join(resolvedConfigDir, managedDir);
         if (!fs.existsSync(absDir)) continue;
-        for (const relPath of walkDir(absDir, resolvedConfigDir)) {
-          if (!manifestKeys.has(relPath)) {
-            customFiles.push(relPath);
-          }
-        }
+        collectCustomFiles(absDir, resolvedConfigDir, manifestKeys, customFiles);
       }
 
       const out = {
@@ -1472,13 +1472,19 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       }
 
       // ── Parse single-value flags ───────────────────────────────────────
-      function getFlag(flag) {
-        const idx = args.indexOf(flag);
-        if (idx === -1) return null;
-        const val = args[idx + 1];
-        if (val === undefined || val.startsWith('--')) return null;
-        return val;
+      const flagMap = new Map();
+      for (let i = 1; i < args.length; i++) {
+        const current = args[i];
+        const next = args[i + 1];
+        if (!current.startsWith('--')) continue;
+        if (!next || next.startsWith('--')) {
+          if (!flagMap.has(current)) flagMap.set(current, null);
+          continue;
+        }
+        if (!flagMap.has(current)) flagMap.set(current, next);
+        i++;
       }
+      const getFlag = (flag) => flagMap.get(flag) ?? null;
 
       const budgetStr = getFlag('--budget');
       const instructionsFile = getFlag('--instructions-file');
@@ -1524,37 +1530,53 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       }
 
       // ── Validate and read required files ──────────────────────────────
-      function readRequired(filePath, flagName) {
+      async function readRequired(filePath, flagName) {
         const resolved = path.resolve(filePath);
-        if (!fs.existsSync(resolved)) {
-          process.stderr.write(`Error: file not found for ${flagName}: ${resolved}\n`);
+        try {
+          return await fs.promises.readFile(resolved, 'utf8');
+        } catch (err) {
+          if (err && err.code === 'ENOENT') {
+            process.stderr.write(`Error: file not found for ${flagName}: ${resolved}\n`);
+            process.exit(1);
+          }
+          process.stderr.write(`Error: cannot read file for ${flagName}: ${resolved}\n`);
           process.exit(1);
         }
-        return fs.readFileSync(resolved, 'utf8');
       }
 
-      function readOptional(filePath) {
+      async function readOptional(filePath) {
         if (!filePath) return null;
         const resolved = path.resolve(filePath);
-        if (!fs.existsSync(resolved)) return null;
-        return fs.readFileSync(resolved, 'utf8');
-      }
-
-      const instructions = readRequired(instructionsFile, '--instructions-file');
-      const roadmap = readRequired(roadmapFile, '--roadmap-file');
-      const plans = planFiles.map((p) => {
-        const resolved = path.resolve(p);
-        if (!fs.existsSync(resolved)) {
-          process.stderr.write(`Error: plan file not found: ${resolved}\n`);
+        try {
+          return await fs.promises.readFile(resolved, 'utf8');
+        } catch (err) {
+          if (err && err.code === 'ENOENT') return null;
+          process.stderr.write(`Error: cannot read optional file: ${resolved}\n`);
           process.exit(1);
         }
-        return { file: path.basename(p), content: fs.readFileSync(resolved, 'utf8') };
-      });
+      }
 
-      const projectMd = readOptional(projectFile);
-      const context = readOptional(contextFile);
-      const research = readOptional(researchFile);
-      const requirements = readOptional(requirementsFile);
+      const instructions = await readRequired(instructionsFile, '--instructions-file');
+      const roadmap = await readRequired(roadmapFile, '--roadmap-file');
+      const plans = await Promise.all(planFiles.map(async (p) => {
+        const resolved = path.resolve(p);
+        try {
+          const content = await fs.promises.readFile(resolved, 'utf8');
+          return { file: path.basename(p), content };
+        } catch (err) {
+          if (err && err.code === 'ENOENT') {
+            process.stderr.write(`Error: plan file not found: ${resolved}\n`);
+            process.exit(1);
+          }
+          process.stderr.write(`Error: cannot read plan file: ${resolved}\n`);
+          process.exit(1);
+        }
+      }));
+
+      const projectMd = await readOptional(projectFile);
+      const context = await readOptional(contextFile);
+      const research = await readOptional(researchFile);
+      const requirements = await readOptional(requirementsFile);
 
       // ── Build options ─────────────────────────────────────────────────
       const options = {};
@@ -1572,8 +1594,8 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       const { prompt, metadata } = promptBudget.applyBudget({ sections, budget, options });
 
       // ── Write outputs ─────────────────────────────────────────────────
-      fs.writeFileSync(path.resolve(outputMetadataFile), JSON.stringify(metadata, null, 2));
-      fs.writeFileSync(path.resolve(outputPromptFile), prompt);
+      await fs.promises.writeFile(path.resolve(outputMetadataFile), JSON.stringify(metadata, null, 2));
+      await fs.promises.writeFile(path.resolve(outputPromptFile), prompt);
 
       if (metadata.hardFailed) {
         process.exit(2);

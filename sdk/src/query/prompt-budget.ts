@@ -23,10 +23,10 @@
  * Exit codes (propagated through dispatch error):
  *   0  success (trim or no-trim)
  *   1  invocation error (missing required arg, missing file, invalid budget)
- *   2  hardFailed: minimum-set exceeds budget; metadata still written
+ *   2  hardFailed: prompt cannot fit effective budget after trim policy
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { GSDError, ErrorClassification } from '../errors.js';
 import type { QueryHandler } from './utils.js';
@@ -65,9 +65,15 @@ function renderNote(
 }
 
 function headShrink(text: string, maxLines: number): string {
-  const lines = text.split('\n');
-  if (lines.length <= maxLines) return text;
-  return lines.slice(0, maxLines).join('\n');
+  if (maxLines <= 0) return '';
+  let idx = -1;
+  let seen = 0;
+  while (seen < maxLines) {
+    idx = text.indexOf('\n', idx + 1);
+    if (idx === -1) return text;
+    seen += 1;
+  }
+  return text.slice(0, idx);
 }
 
 function tailTruncate(text: string, maxChars: number): string {
@@ -181,7 +187,7 @@ function applyBudget({
   let projectMdShrunk = false;
   let planTruncationPct = 0;
   let noteInjected = false;
-  const hardFailed = false;
+  let hardFailed = false;
 
   // Minimum-set check
   const MIN_PLAN_BYTES = 1024;
@@ -210,71 +216,76 @@ function applyBudget({
     };
   }
 
-  function computeBaseTokens(): number {
-    const planTokens = workingPlans.reduce((sum, p) => sum + estimateTokens(p.content), 0);
-    const planHeaders = workingPlans.reduce(
-      (sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'),
-      0,
-    );
-    return (
-      estimateTokens(instructions) +
-      estimateTokens('## Roadmap\n\n') +
-      estimateTokens(roadmap) +
-      (projectMd ? estimateTokens('## Project\n\n') + estimateTokens(projectMd) : 0) +
-      estimateTokens('## Plans\n\n') +
-      planHeaders +
-      planTokens +
-      (context ? estimateTokens('## Context\n\n') + estimateTokens(context) : 0) +
-      (research ? estimateTokens('## Research\n\n') + estimateTokens(research) : 0) +
-      (requirements ? estimateTokens('## Requirements\n\n') + estimateTokens(requirements) : 0)
-    );
-  }
+  const TOKENS_ROADMAP_HEADER = estimateTokens('## Roadmap\n\n');
+  const TOKENS_PROJECT_HEADER = estimateTokens('## Project\n\n');
+  const TOKENS_PLANS_HEADER = estimateTokens('## Plans\n\n');
+  const TOKENS_CONTEXT_HEADER = estimateTokens('## Context\n\n');
+  const TOKENS_RESEARCH_HEADER = estimateTokens('## Research\n\n');
+  const TOKENS_REQUIREMENTS_HEADER = estimateTokens('## Requirements\n\n');
+  const TOKENS_PLAN_ITEM_HEADERS = workingPlans.reduce(
+    (sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'),
+    0,
+  );
 
-  const baseTokens = computeBaseTokens();
+  const staticBaseTokens =
+    estimateTokens(instructions) +
+    TOKENS_ROADMAP_HEADER +
+    estimateTokens(roadmap) +
+    TOKENS_PLANS_HEADER +
+    TOKENS_PLAN_ITEM_HEADERS;
+
+  let projectTokens = projectMd ? TOKENS_PROJECT_HEADER + estimateTokens(projectMd) : 0;
+  let contextTokens = context ? TOKENS_CONTEXT_HEADER + estimateTokens(context) : 0;
+  let researchTokens = research ? TOKENS_RESEARCH_HEADER + estimateTokens(research) : 0;
+  let requirementsTokens = requirements ? TOKENS_REQUIREMENTS_HEADER + estimateTokens(requirements) : 0;
+  let planContentTokens = workingPlans.reduce((sum, p) => sum + estimateTokens(p.content), 0);
+
+  const getCurrentBaseTokens = (): number =>
+    staticBaseTokens +
+    projectTokens +
+    planContentTokens +
+    contextTokens +
+    researchTokens +
+    requirementsTokens;
+
+  let currentBaseTokens = getCurrentBaseTokens();
+
+  const baseTokens = currentBaseTokens;
   const budgetUnderPressure = baseTokens > effectiveBudget - NOTE_RESERVE_TOKENS;
   let contentBudget = budgetUnderPressure ? effectiveBudget - NOTE_RESERVE_TOKENS : effectiveBudget;
 
   // Trim step 1: head-shrink PROJECT.md
-  if (computeBaseTokens() > contentBudget && projectMd) {
+  if (currentBaseTokens > contentBudget && projectMd) {
     const shrunk = headShrink(projectMd, projectMdHeadLines);
     if (shrunk !== projectMd) {
       projectMd = shrunk;
       projectMdShrunk = true;
+      projectTokens = TOKENS_PROJECT_HEADER + estimateTokens(projectMd);
+      currentBaseTokens = getCurrentBaseTokens();
     }
   }
 
-  // Trim step 2: drop context
-  if (computeBaseTokens() > contentBudget && context) {
-    context = null;
-    omitted.push('context');
-  }
-
-  // Trim step 3: drop research
-  if (computeBaseTokens() > contentBudget && research) {
-    research = null;
-    omitted.push('research');
-  }
-
-  // Trim step 4: proportional plan truncation
-  if (computeBaseTokens() > contentBudget) {
+  // Trim step 2: proportional plan truncation
+  if (currentBaseTokens > contentBudget) {
     const overhead =
-      estimateTokens(instructions) +
-      estimateTokens('## Roadmap\n\n') +
-      estimateTokens(roadmap) +
-      (projectMd ? estimateTokens('## Project\n\n') + estimateTokens(projectMd) : 0) +
-      estimateTokens('## Plans\n\n') +
-      workingPlans.reduce((sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'), 0) +
-      (requirements ? estimateTokens('## Requirements\n\n') + estimateTokens(requirements) : 0);
+      staticBaseTokens +
+      projectTokens +
+      contextTokens +
+      researchTokens +
+      requirementsTokens;
 
     const planBudgetTokens = contentBudget - overhead;
-    const totalPlanTokens = workingPlans.reduce((sum, p) => sum + estimateTokens(p.content), 0);
+    const totalPlanTokens = planContentTokens;
 
     if (planBudgetTokens > 0 && planBudgetTokens < totalPlanTokens) {
       const totalOriginalChars = plans.reduce((sum, p) => sum + p.content.length, 0);
 
       workingPlans = workingPlans.map((p) => {
-        const share = planBudgetTokens / workingPlans.length;
-        const maxChars = Math.max(Math.floor(share * 4), MIN_PLAN_BYTES);
+        const proportionalShare =
+          totalOriginalChars > 0
+            ? Math.floor((p.content.length / totalOriginalChars) * (planBudgetTokens * 4))
+            : 0;
+        const maxChars = Math.max(proportionalShare, MIN_PLAN_BYTES);
         return { file: p.file, content: tailTruncate(p.content, maxChars) };
       });
 
@@ -282,13 +293,33 @@ function applyBudget({
       if (totalOriginalChars > 0) {
         planTruncationPct = ((totalOriginalChars - newTotalChars) / totalOriginalChars) * 100;
       }
+      planContentTokens = workingPlans.reduce((sum, p) => sum + estimateTokens(p.content), 0);
+      currentBaseTokens = getCurrentBaseTokens();
     }
   }
 
+  // Trim step 3: drop context
+  if (currentBaseTokens > contentBudget && context) {
+    context = null;
+    omitted.push('context');
+    contextTokens = 0;
+    currentBaseTokens = getCurrentBaseTokens();
+  }
+
+  // Trim step 4: drop research
+  if (currentBaseTokens > contentBudget && research) {
+    research = null;
+    omitted.push('research');
+    researchTokens = 0;
+    currentBaseTokens = getCurrentBaseTokens();
+  }
+
   // Trim step 5: drop requirements (last resort)
-  if (computeBaseTokens() > contentBudget && requirements) {
+  if (currentBaseTokens > contentBudget && requirements) {
     requirements = null;
     omitted.push('requirements');
+    requirementsTokens = 0;
+    currentBaseTokens = getCurrentBaseTokens();
   }
 
   const anyTrimOccurred = omitted.length > 0 || projectMdShrunk || planTruncationPct > 0;
@@ -311,6 +342,23 @@ function applyBudget({
   });
 
   const estimatedTokens = estimateTokens(prompt);
+
+  if (estimatedTokens > effectiveBudget) {
+    hardFailed = true;
+    return {
+      prompt: '',
+      metadata: {
+        budget,
+        effectiveBudget,
+        estimatedTokens,
+        omitted,
+        projectMdShrunk,
+        planTruncationPct,
+        hardFailed,
+        noteInjected,
+      },
+    };
+  }
 
   return {
     prompt,
@@ -348,22 +396,32 @@ function getPlanFiles(args: string[]): string[] {
   return planFiles;
 }
 
-function readRequired(filePath: string, flagName: string): string {
+async function readRequired(filePath: string, flagName: string): Promise<string> {
   const resolved = resolve(filePath);
-  if (!existsSync(resolved)) {
+  try {
+    return await readFile(resolved, 'utf8');
+  } catch (err) {
+    const msg = err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT'
+      ? `file not found for ${flagName}: ${resolved}`
+      : `cannot read ${flagName}: ${resolved}`;
     throw new GSDError(
-      `file not found for ${flagName}: ${resolved}`,
+      msg,
       ErrorClassification.Validation,
     );
   }
-  return readFileSync(resolved, 'utf8');
 }
 
-function readOptional(filePath: string | null): string | null {
+async function readOptional(filePath: string | null): Promise<string | null> {
   if (!filePath) return null;
   const resolved = resolve(filePath);
-  if (!existsSync(resolved)) return null;
-  return readFileSync(resolved, 'utf8');
+  try {
+    return await readFile(resolved, 'utf8');
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+      return null;
+    }
+    throw err;
+  }
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -424,23 +482,31 @@ export const promptBudget: QueryHandler = async (args, _projectDir) => {
   }
 
   // Read input files
-  const instructions = readRequired(instructionsFile, '--instructions-file');
-  const roadmap = readRequired(roadmapFile, '--roadmap-file');
-  const plans: PlanEntry[] = planFilePaths.map((p) => {
+  const instructions = await readRequired(instructionsFile, '--instructions-file');
+  const roadmap = await readRequired(roadmapFile, '--roadmap-file');
+  const plans: PlanEntry[] = await Promise.all(planFilePaths.map(async (p) => {
     const resolved = resolve(p);
-    if (!existsSync(resolved)) {
+    try {
+      const content = await readFile(resolved, 'utf8');
+      return { file: basename(p), content };
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT') {
+        throw new GSDError(
+          `plan file not found: ${resolved}`,
+          ErrorClassification.Validation,
+        );
+      }
       throw new GSDError(
-        `plan file not found: ${resolved}`,
+        `cannot read plan file: ${resolved}`,
         ErrorClassification.Validation,
       );
     }
-    return { file: basename(p), content: readFileSync(resolved, 'utf8') };
-  });
+  }));
 
-  const projectMd = readOptional(projectFile);
-  const context = readOptional(contextFile);
-  const research = readOptional(researchFile);
-  const requirements = readOptional(requirementsFile);
+  const projectMd = await readOptional(projectFile);
+  const context = await readOptional(contextFile);
+  const research = await readOptional(researchFile);
+  const requirements = await readOptional(requirementsFile);
 
   // Build options
   const options: BudgetOptions = {};
@@ -466,8 +532,8 @@ export const promptBudget: QueryHandler = async (args, _projectDir) => {
   const { prompt, metadata } = applyBudget({ sections, budget, options });
 
   // Write outputs (always write metadata; prompt may be empty on hard-fail)
-  writeFileSync(resolve(outputMetadataFile), JSON.stringify(metadata, null, 2));
-  writeFileSync(resolve(outputPromptFile), prompt);
+  await writeFile(resolve(outputMetadataFile), JSON.stringify(metadata, null, 2));
+  await writeFile(resolve(outputPromptFile), prompt);
 
   // Signal hard-fail
   if (metadata.hardFailed) {

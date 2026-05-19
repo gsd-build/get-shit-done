@@ -289,18 +289,17 @@ fi
 Read host and model from config. All three local backends share the same `/v1/chat/completions` endpoint — only host and model differ. Use `jq --rawfile` to safely encode the multi-line prompt as JSON without shell-escaping issues.
 
 ```bash
-# Resolve prompt budget for Ollama: per-reviewer override > global default > null
-OLLAMA_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens_per_reviewer.ollama 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
-if [ -z "$OLLAMA_REVIEWER_BUDGET" ] || [ "$OLLAMA_REVIEWER_BUDGET" = "null" ]; then
-  OLLAMA_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
-fi
+# Shared helper: apply prompt-budget trimming for local reviewers
+prepare_trimmed_prompt_for_reviewer() {
+  REVIEWER_KEY="$1"
+  REVIEWER_BUDGET="$2"
+  OUTPUT_PROMPT="$3"
+  OUTPUT_META="$4"
 
-# Apply budget trim for Ollama if a budget is configured
-OLLAMA_PROMPT_FILE="/tmp/gsd-review-prompt-{phase}.md"
-OLLAMA_SKIP=0
-if [ -n "$OLLAMA_REVIEWER_BUDGET" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "null" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "0" ]; then
-  OLLAMA_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-ollama.md"
-  OLLAMA_TRIM_META="/tmp/gsd-review-prompt-{phase}-ollama.metadata.json"
+  [ -z "$REVIEWER_BUDGET" ] && return 0
+  [ "$REVIEWER_BUDGET" = "null" ] && return 0
+  [ "$REVIEWER_BUDGET" = "0" ] && return 0
+
   PLAN_FILE_ARGS=""
   for p in /tmp/gsd-review-{phase}-plan-*.md; do
     [ -f "$p" ] && PLAN_FILE_ARGS="$PLAN_FILE_ARGS --plan-file $p"
@@ -313,13 +312,30 @@ if [ -n "$OLLAMA_REVIEWER_BUDGET" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "null" ] &
   [ -f "/tmp/gsd-review-{phase}-research.md" ] && RESEARCH_ARG="--research-file /tmp/gsd-review-{phase}-research.md"
   REQUIREMENTS_ARG=""
   [ -f "/tmp/gsd-review-{phase}-requirements.md" ] && REQUIREMENTS_ARG="--requirements-file /tmp/gsd-review-{phase}-requirements.md"
+
   gsd-sdk query prompt-budget \
-    --budget "$OLLAMA_REVIEWER_BUDGET" \
+    --budget "$REVIEWER_BUDGET" \
     --instructions-file "/tmp/gsd-review-{phase}-instructions.md" \
     --roadmap-file "/tmp/gsd-review-{phase}-roadmap.md" \
     $PLAN_FILE_ARGS $PROJECT_ARG $CONTEXT_ARG $RESEARCH_ARG $REQUIREMENTS_ARG \
-    --output-prompt "$OLLAMA_TRIMMED_PROMPT" \
-    --output-metadata "$OLLAMA_TRIM_META"
+    --output-prompt "$OUTPUT_PROMPT" \
+    --output-metadata "$OUTPUT_META"
+  return $?
+}
+
+# Resolve prompt budget for Ollama: per-reviewer override > global default > null
+OLLAMA_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens_per_reviewer.ollama 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+if [ -z "$OLLAMA_REVIEWER_BUDGET" ] || [ "$OLLAMA_REVIEWER_BUDGET" = "null" ]; then
+  OLLAMA_REVIEWER_BUDGET=$(gsd-sdk query config-get review.max_prompt_tokens 2>/dev/null | jq -r '.' 2>/dev/null || echo "null")
+fi
+
+# Apply budget trim for Ollama if a budget is configured
+OLLAMA_PROMPT_FILE="/tmp/gsd-review-prompt-{phase}.md"
+OLLAMA_SKIP=0
+if [ -n "$OLLAMA_REVIEWER_BUDGET" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "null" ] && [ "$OLLAMA_REVIEWER_BUDGET" != "0" ]; then
+  OLLAMA_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-ollama.md"
+  OLLAMA_TRIM_META="/tmp/gsd-review-prompt-{phase}-ollama.metadata.json"
+  prepare_trimmed_prompt_for_reviewer "ollama" "$OLLAMA_REVIEWER_BUDGET" "$OLLAMA_TRIMMED_PROMPT" "$OLLAMA_TRIM_META"
   OLLAMA_EXIT=$?
   if [ $OLLAMA_EXIT -ne 0 ]; then
     if [ $OLLAMA_EXIT -eq 2 ] || [ $OLLAMA_EXIT -eq 11 ]; then
@@ -367,25 +383,7 @@ LM_STUDIO_SKIP=0
 if [ -n "$LM_STUDIO_REVIEWER_BUDGET" ] && [ "$LM_STUDIO_REVIEWER_BUDGET" != "null" ] && [ "$LM_STUDIO_REVIEWER_BUDGET" != "0" ]; then
   LM_STUDIO_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-lm_studio.md"
   LM_STUDIO_TRIM_META="/tmp/gsd-review-prompt-{phase}-lm_studio.metadata.json"
-  PLAN_FILE_ARGS=""
-  for p in /tmp/gsd-review-{phase}-plan-*.md; do
-    [ -f "$p" ] && PLAN_FILE_ARGS="$PLAN_FILE_ARGS --plan-file $p"
-  done
-  PROJECT_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-project.md" ] && PROJECT_ARG="--project-file /tmp/gsd-review-{phase}-project.md"
-  CONTEXT_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-context.md" ] && CONTEXT_ARG="--context-file /tmp/gsd-review-{phase}-context.md"
-  RESEARCH_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-research.md" ] && RESEARCH_ARG="--research-file /tmp/gsd-review-{phase}-research.md"
-  REQUIREMENTS_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-requirements.md" ] && REQUIREMENTS_ARG="--requirements-file /tmp/gsd-review-{phase}-requirements.md"
-  gsd-sdk query prompt-budget \
-    --budget "$LM_STUDIO_REVIEWER_BUDGET" \
-    --instructions-file "/tmp/gsd-review-{phase}-instructions.md" \
-    --roadmap-file "/tmp/gsd-review-{phase}-roadmap.md" \
-    $PLAN_FILE_ARGS $PROJECT_ARG $CONTEXT_ARG $RESEARCH_ARG $REQUIREMENTS_ARG \
-    --output-prompt "$LM_STUDIO_TRIMMED_PROMPT" \
-    --output-metadata "$LM_STUDIO_TRIM_META"
+  prepare_trimmed_prompt_for_reviewer "lm_studio" "$LM_STUDIO_REVIEWER_BUDGET" "$LM_STUDIO_TRIMMED_PROMPT" "$LM_STUDIO_TRIM_META"
   LM_STUDIO_EXIT=$?
   if [ $LM_STUDIO_EXIT -ne 0 ]; then
     if [ $LM_STUDIO_EXIT -eq 2 ] || [ $LM_STUDIO_EXIT -eq 11 ]; then
@@ -438,25 +436,7 @@ LLAMA_CPP_SKIP=0
 if [ -n "$LLAMA_CPP_REVIEWER_BUDGET" ] && [ "$LLAMA_CPP_REVIEWER_BUDGET" != "null" ] && [ "$LLAMA_CPP_REVIEWER_BUDGET" != "0" ]; then
   LLAMA_CPP_TRIMMED_PROMPT="/tmp/gsd-review-prompt-{phase}-llama_cpp.md"
   LLAMA_CPP_TRIM_META="/tmp/gsd-review-prompt-{phase}-llama_cpp.metadata.json"
-  PLAN_FILE_ARGS=""
-  for p in /tmp/gsd-review-{phase}-plan-*.md; do
-    [ -f "$p" ] && PLAN_FILE_ARGS="$PLAN_FILE_ARGS --plan-file $p"
-  done
-  PROJECT_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-project.md" ] && PROJECT_ARG="--project-file /tmp/gsd-review-{phase}-project.md"
-  CONTEXT_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-context.md" ] && CONTEXT_ARG="--context-file /tmp/gsd-review-{phase}-context.md"
-  RESEARCH_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-research.md" ] && RESEARCH_ARG="--research-file /tmp/gsd-review-{phase}-research.md"
-  REQUIREMENTS_ARG=""
-  [ -f "/tmp/gsd-review-{phase}-requirements.md" ] && REQUIREMENTS_ARG="--requirements-file /tmp/gsd-review-{phase}-requirements.md"
-  gsd-sdk query prompt-budget \
-    --budget "$LLAMA_CPP_REVIEWER_BUDGET" \
-    --instructions-file "/tmp/gsd-review-{phase}-instructions.md" \
-    --roadmap-file "/tmp/gsd-review-{phase}-roadmap.md" \
-    $PLAN_FILE_ARGS $PROJECT_ARG $CONTEXT_ARG $RESEARCH_ARG $REQUIREMENTS_ARG \
-    --output-prompt "$LLAMA_CPP_TRIMMED_PROMPT" \
-    --output-metadata "$LLAMA_CPP_TRIM_META"
+  prepare_trimmed_prompt_for_reviewer "llama_cpp" "$LLAMA_CPP_REVIEWER_BUDGET" "$LLAMA_CPP_TRIMMED_PROMPT" "$LLAMA_CPP_TRIM_META"
   LLAMA_CPP_EXIT=$?
   if [ $LLAMA_CPP_EXIT -ne 0 ]; then
     if [ $LLAMA_CPP_EXIT -eq 2 ] || [ $LLAMA_CPP_EXIT -eq 11 ]; then

@@ -65,9 +65,15 @@ function renderNote(template, budget, omitted, planTruncationPct) {
  * @returns {string}
  */
 function headShrink(text, maxLines) {
-  const lines = text.split('\n');
-  if (lines.length <= maxLines) return text;
-  return lines.slice(0, maxLines).join('\n');
+  if (maxLines <= 0) return '';
+  let idx = -1;
+  let seen = 0;
+  while (seen < maxLines) {
+    idx = text.indexOf('\n', idx + 1);
+    if (idx === -1) return text;
+    seen += 1;
+  }
+  return text.slice(0, idx);
 }
 
 /**
@@ -192,44 +198,56 @@ function applyBudget({ sections, budget, options = {} }) {
   }
 
   // ── Budget accounting ──────────────────────────────────────────────────────
+  const TOKENS_ROADMAP_HEADER = estimateTokens('## Roadmap\n\n');
+  const TOKENS_PROJECT_HEADER = estimateTokens('## Project\n\n');
+  const TOKENS_PLANS_HEADER = estimateTokens('## Plans\n\n');
+  const TOKENS_CONTEXT_HEADER = estimateTokens('## Context\n\n');
+  const TOKENS_RESEARCH_HEADER = estimateTokens('## Research\n\n');
+  const TOKENS_REQUIREMENTS_HEADER = estimateTokens('## Requirements\n\n');
+  const TOKENS_PLAN_ITEM_HEADERS = workingPlans.reduce(
+    (sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'),
+    0
+  );
 
-  // Helper: compute current total WITHOUT note (we handle note separately)
-  function computeBaseTokens() {
-    const planTokens = workingPlans.reduce(
-      (sum, p) => sum + estimateTokens(p.content),
-      0
-    );
-    const planHeaders = workingPlans.reduce(
-      (sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'),
-      0
-    );
-    return (
-      estimateTokens(instructions) +
-      estimateTokens('## Roadmap\n\n') +
-      estimateTokens(roadmap) +
-      (projectMd
-        ? estimateTokens('## Project\n\n') + estimateTokens(projectMd)
-        : 0) +
-      estimateTokens('## Plans\n\n') +
-      planHeaders +
-      planTokens +
-      (context
-        ? estimateTokens('## Context\n\n') + estimateTokens(context)
-        : 0) +
-      (research
-        ? estimateTokens('## Research\n\n') + estimateTokens(research)
-        : 0) +
-      (requirements
-        ? estimateTokens('## Requirements\n\n') + estimateTokens(requirements)
-        : 0)
-    );
-  }
+  const staticBaseTokens =
+    estimateTokens(instructions) +
+    TOKENS_ROADMAP_HEADER +
+    estimateTokens(roadmap) +
+    TOKENS_PLANS_HEADER +
+    TOKENS_PLAN_ITEM_HEADERS;
+
+  let projectTokens = projectMd
+    ? TOKENS_PROJECT_HEADER + estimateTokens(projectMd)
+    : 0;
+  let contextTokens = context
+    ? TOKENS_CONTEXT_HEADER + estimateTokens(context)
+    : 0;
+  let researchTokens = research
+    ? TOKENS_RESEARCH_HEADER + estimateTokens(research)
+    : 0;
+  let requirementsTokens = requirements
+    ? TOKENS_REQUIREMENTS_HEADER + estimateTokens(requirements)
+    : 0;
+  let planContentTokens = workingPlans.reduce(
+    (sum, p) => sum + estimateTokens(p.content),
+    0
+  );
+
+  const getCurrentBaseTokens = () =>
+    staticBaseTokens +
+    projectTokens +
+    planContentTokens +
+    contextTokens +
+    researchTokens +
+    requirementsTokens;
+
+  let currentBaseTokens = getCurrentBaseTokens();
 
   // Detect budget pressure: is ANY trim needed?
   // We need to reserve note tokens whenever we anticipate a trim.
   // We check against effectiveBudget - NOTE_RESERVE_TOKENS to decide if
   // pressure exists (i.e. we'd need to trim even before adding the note).
-  const baseTokens = computeBaseTokens();
+  const baseTokens = currentBaseTokens;
   const budgetUnderPressure = baseTokens > effectiveBudget - NOTE_RESERVE_TOKENS;
 
   // Available for content (reserve note slot when under pressure)
@@ -238,44 +256,27 @@ function applyBudget({ sections, budget, options = {} }) {
     : effectiveBudget;
 
   // ── Trim step 1: head-shrink PROJECT.md ───────────────────────────────────
-  if (computeBaseTokens() > contentBudget && projectMd) {
+  if (currentBaseTokens > contentBudget && projectMd) {
     const shrunk = headShrink(projectMd, projectMdHeadLines);
     if (shrunk !== projectMd) {
       projectMd = shrunk;
       projectMdShrunk = true;
+      projectTokens = TOKENS_PROJECT_HEADER + estimateTokens(projectMd);
+      currentBaseTokens = getCurrentBaseTokens();
     }
   }
 
   // ── Trim step 2: proportional plan truncation ─────────────────────────────
-  if (computeBaseTokens() > contentBudget) {
+  if (currentBaseTokens > contentBudget) {
     // Compute tokens available for plan content only
     const overhead =
-      estimateTokens(instructions) +
-      estimateTokens('## Roadmap\n\n') +
-      estimateTokens(roadmap) +
-      (projectMd
-        ? estimateTokens('## Project\n\n') + estimateTokens(projectMd)
-        : 0) +
-      estimateTokens('## Plans\n\n') +
-      workingPlans.reduce(
-        (sum, p) => sum + estimateTokens('### ' + p.file + '\n\n'),
-        0
-      ) +
-      (context
-        ? estimateTokens('## Context\n\n') + estimateTokens(context)
-        : 0) +
-      (research
-        ? estimateTokens('## Research\n\n') + estimateTokens(research)
-        : 0) +
-      (requirements
-        ? estimateTokens('## Requirements\n\n') + estimateTokens(requirements)
-        : 0);
-
+      staticBaseTokens +
+      projectTokens +
+      contextTokens +
+      researchTokens +
+      requirementsTokens;
     const planBudgetTokens = contentBudget - overhead;
-    const totalPlanTokens = workingPlans.reduce(
-      (sum, p) => sum + estimateTokens(p.content),
-      0
-    );
+    const totalPlanTokens = planContentTokens;
 
     if (planBudgetTokens > 0 && planBudgetTokens < totalPlanTokens) {
       // Proportional share per plan (at least 1KB per plan)
@@ -302,25 +303,36 @@ function applyBudget({ sections, budget, options = {} }) {
         planTruncationPct =
           ((totalOriginalChars - newTotalChars) / totalOriginalChars) * 100;
       }
+      planContentTokens = workingPlans.reduce(
+        (sum, p) => sum + estimateTokens(p.content),
+        0
+      );
+      currentBaseTokens = getCurrentBaseTokens();
     }
   }
 
   // ── Trim step 3: drop context ─────────────────────────────────────────────
-  if (computeBaseTokens() > contentBudget && context) {
+  if (currentBaseTokens > contentBudget && context) {
     context = null;
     omitted.push('context');
+    contextTokens = 0;
+    currentBaseTokens = getCurrentBaseTokens();
   }
 
   // ── Trim step 4: drop research ────────────────────────────────────────────
-  if (computeBaseTokens() > contentBudget && research) {
+  if (currentBaseTokens > contentBudget && research) {
     research = null;
     omitted.push('research');
+    researchTokens = 0;
+    currentBaseTokens = getCurrentBaseTokens();
   }
 
   // ── Trim step 5: drop requirements (last resort) ──────────────────────────
-  if (computeBaseTokens() > contentBudget && requirements) {
+  if (currentBaseTokens > contentBudget && requirements) {
     requirements = null;
     omitted.push('requirements');
+    requirementsTokens = 0;
+    currentBaseTokens = getCurrentBaseTokens();
   }
 
   // ── Decide whether note is actually needed ────────────────────────────────
