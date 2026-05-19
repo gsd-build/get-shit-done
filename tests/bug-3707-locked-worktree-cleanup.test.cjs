@@ -246,14 +246,22 @@ describe('bug-3707: reapOrphanWorktrees', () => {
     const staleTime = new Date(Date.now() - 10 * 60 * 1000);
     fs.utimesSync(lockedFile, staleTime, staleTime);
 
+    // Pre-compute canonical path BEFORE reaping — the directory will be gone
+    // afterward, so fs.realpathSync.native will fail and canonicalPath falls
+    // back to path.resolve (non-symlink-resolved).  On macOS CI, git internally
+    // resolves /var/folders → /private/var/folders when writing the gitdir file,
+    // so r.path uses the real path while wtDir uses the symlink form.  Computing
+    // canonical before removal ensures we compare the resolved forms.
+    const wtDirCanonical = canonicalPath(wtDir);
+
     const result = reapOrphanWorktrees(repoDir);
 
     assert.ok(Array.isArray(result), 'reapOrphanWorktrees should return an array');
-    const reaped = result.find((r) => canonicalPath(r.path) === canonicalPath(wtDir));
+    const reaped = result.find((r) => canonicalPath(r.path) === wtDirCanonical);
     assert.ok(reaped, `worktree ${wtDir} should appear in reaped list`);
     assert.equal(reaped.status, 'reaped');
     assert.ok(!fs.existsSync(wtDir), 'worktree directory should be removed');
-    assert.ok(!listedWorktreePaths(repoDir).has(canonicalPath(wtDir)), 'git worktree list should not show reaped worktree');
+    assert.ok(!listedWorktreePaths(repoDir).has(wtDirCanonical), 'git worktree list should not show reaped worktree');
   });
 
   // ── Live PID → skip ────────────────────────────────────────────────────────
@@ -403,5 +411,143 @@ describe('bug-3707: startup orphan sweep is wired into workflow entry points', (
   test('worktree-safety module exports cmdWorktreeReapOrphans', () => {
     const mod = require('../get-shit-done/bin/lib/worktree-safety.cjs');
     assert.strictEqual(typeof mod.cmdWorktreeReapOrphans, 'function');
+  });
+});
+
+// ─── Suite 4: Adversarial gap tests ──────────────────────────────────────────
+
+describe('bug-3707: reapOrphanWorktrees — adversarial edge cases', () => {
+  let tmpBase;
+
+  beforeEach(() => {
+    tmpBase = fs.mkdtempSync(path.join(resolvedTmpDir(), 'gsd-3707-adv-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpBase, { recursive: true, force: true });
+  });
+
+  // ── Gap 1: Non-numeric lock content (real Claude Code format) → ALIVE (fail-closed) ──
+  test('does NOT reap a worktree whose lock contains non-numeric Claude Code content', () => {
+    // Claude Code writes "Locked by claude-code agent-<id>" as the lock content.
+    // This is non-numeric and MUST be treated as ALIVE (fail-closed) — we cannot
+    // confirm the owner is dead, so reaping would risk data loss.
+    const repoDir = path.join(tmpBase, 'repo');
+    const wtDir = path.join(tmpBase, 'wt-claude-lock');
+    const branchName = 'worktree-agent-claude-lock';
+
+    initRepo(repoDir);
+    addWorktree(repoDir, wtDir, branchName);
+    commitInWorktree(wtDir, 'claude-work.txt');
+    mergeIntoMain(repoDir, branchName);
+
+    const metaDir = worktreeMeta(repoDir, wtDir);
+    const lockedFile = path.join(metaDir, 'locked');
+    // Write the real Claude Code lock format (non-numeric)
+    fs.writeFileSync(lockedFile, 'Locked by claude-code agent-a1b2c3d4e5f6');
+
+    // Back-date mtime so the stale-lock guard passes
+    const staleTime = new Date(Date.now() - 10 * 60 * 1000);
+    fs.utimesSync(lockedFile, staleTime, staleTime);
+
+    const result = reapOrphanWorktrees(repoDir);
+
+    const entry = result.find((r) => canonicalPath(r.path) === canonicalPath(wtDir));
+    if (entry) {
+      assert.notEqual(
+        entry.status,
+        'reaped',
+        'non-numeric Claude Code lock must NOT be reaped (fail-closed: owner unknown)'
+      );
+      assert.equal(entry.status, 'skipped', 'non-numeric lock entry should have status=skipped');
+      assert.equal(entry.reason, 'lock_owner_unknown', 'reason must be lock_owner_unknown');
+    }
+    assert.ok(fs.existsSync(wtDir), 'worktree with Claude Code lock must NOT be removed');
+  });
+
+  // ── Gap 2: EPERM in defaultIsPidAlive → ALIVE (fail-closed) ─────────────────
+  test('treats EPERM from isPidAlive as ALIVE (fail-closed)', () => {
+    // On Windows, signalling cross-user processes throws EPERM, not ESRCH.
+    // The reaper must treat EPERM as ALIVE to avoid false reaping.
+    const repoDir = path.join(tmpBase, 'repo2');
+    const wtDir = path.join(tmpBase, 'wt-eperm');
+    const branchName = 'worktree-agent-eperm';
+
+    initRepo(repoDir);
+    addWorktree(repoDir, wtDir, branchName);
+    commitInWorktree(wtDir, 'eperm-work.txt');
+    mergeIntoMain(repoDir, branchName);
+
+    const metaDir = worktreeMeta(repoDir, wtDir);
+    const lockedFile = path.join(metaDir, 'locked');
+    fs.writeFileSync(lockedFile, String(deadPid()));
+    const staleTime = new Date(Date.now() - 10 * 60 * 1000);
+    fs.utimesSync(lockedFile, staleTime, staleTime);
+
+    // Inject an isPidAlive that always throws EPERM — simulates Windows cross-user scenario
+    const epermIsPidAlive = (_pid) => {
+      const err = new Error('EPERM: operation not permitted');
+      err.code = 'EPERM';
+      throw err;
+    };
+
+    const result = reapOrphanWorktrees(repoDir, { isPidAlive: epermIsPidAlive });
+
+    const entry = result.find((r) => canonicalPath(r.path) === canonicalPath(wtDir));
+    if (entry) {
+      assert.notEqual(entry.status, 'reaped', 'EPERM from isPidAlive must be treated as ALIVE — must not reap');
+    }
+    assert.ok(fs.existsSync(wtDir), 'worktree must still exist when isPidAlive throws EPERM');
+  });
+
+  // ── Gap 3: Non-main/master default branch via init.defaultBranch ─────────────
+  test('uses init.defaultBranch config when default branch is not main or master', () => {
+    // Repos configured with init.defaultBranch=trunk (or dev, etc.) were
+    // previously unreachable by the main/master fallback, causing the reaper
+    // to bail out and silently skip all orphan detection.
+    const repoDir = path.join(tmpBase, 'repo3');
+    const wtDir = path.join(tmpBase, 'wt-trunk-default');
+    const branchName = 'worktree-agent-trunk-merged';
+
+    // Create a repo whose default branch is 'trunk'
+    fs.mkdirSync(repoDir, { recursive: true });
+    git(['init'], repoDir);
+    git(['config', 'user.email', 'test@test.com'], repoDir);
+    git(['config', 'user.name', 'Test'], repoDir);
+    git(['config', 'commit.gpgsign', 'false'], repoDir);
+    // Set init.defaultBranch to 'trunk' so the reaper discovers it
+    git(['config', 'init.defaultBranch', 'trunk'], repoDir);
+    fs.writeFileSync(path.join(repoDir, 'README.md'), '# Trunk Test\n');
+    git(['add', '-A'], repoDir);
+    git(['commit', '-m', 'initial commit'], repoDir);
+    // Rename to trunk (may fail if already trunk)
+    try { git(['branch', '-m', 'master', 'trunk'], repoDir); } catch { /* already trunk or main */ }
+    try { git(['branch', '-m', 'main', 'trunk'], repoDir); } catch { /* already trunk */ }
+
+    addWorktree(repoDir, wtDir, branchName);
+    commitInWorktree(wtDir, 'trunk-work.txt');
+    // Merge branch into trunk
+    git(['merge', branchName, '--no-ff', '-m', 'merge into trunk'], repoDir);
+
+    const metaDir = worktreeMeta(repoDir, wtDir);
+    const lockedFile = path.join(metaDir, 'locked');
+    fs.writeFileSync(lockedFile, String(deadPid()));
+    const staleTime = new Date(Date.now() - 10 * 60 * 1000);
+    fs.utimesSync(lockedFile, staleTime, staleTime);
+
+    // Pre-compute canonical before reaping (symlink resolution may fail post-removal)
+    const wtDirCanonical = canonicalPath(wtDir);
+
+    const result = reapOrphanWorktrees(repoDir);
+
+    // The reaper must either reap the worktree (using trunk as the default branch)
+    // OR skip it for a safe reason — it must NOT return an empty result (which
+    // would mean it bailed out entirely, silently skipping orphan detection).
+    assert.ok(Array.isArray(result), 'reapOrphanWorktrees must return an array');
+    assert.ok(result.length > 0, 'reaper must not bail out entirely for trunk-default repos — must inspect the worktree');
+    const entry = result.find((r) => canonicalPath(r.path) === wtDirCanonical);
+    assert.ok(entry, 'worktree must appear in results (reaped or skipped with reason)');
+    // The branch IS merged into trunk, and the PID is dead, so it should be reaped.
+    assert.equal(entry.status, 'reaped', 'worktree with dead pid merged into trunk must be reaped');
   });
 });

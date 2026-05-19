@@ -631,7 +631,27 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
       // Remote exists but origin/HEAD not set — ambiguous; fail closed.
       return results;
     }
-    for (const candidate of ['main', 'master']) {
+    // Build candidate list: init.defaultBranch config, HEAD symref, then main, master.
+    const candidateBranches = [];
+    // Try git config init.defaultBranch first (user-configured default)
+    const configResult = execGit(['config', '--get', 'init.defaultBranch'], { cwd: repoRoot });
+    if (gitResultOk(configResult) && configResult.stdout.trim()) {
+      candidateBranches.push(configResult.stdout.trim());
+    }
+    // Try HEAD symref (the branch the repo is currently on — valid for local repos
+    // without detached HEAD; do not use when detached since it could be a feature branch)
+    const headSymref = execGit(['symbolic-ref', '--quiet', '--short', 'HEAD'], { cwd: repoRoot });
+    if (gitResultOk(headSymref) && headSymref.stdout.trim()) {
+      const headBranch = headSymref.stdout.trim();
+      if (!candidateBranches.includes(headBranch)) {
+        candidateBranches.push(headBranch);
+      }
+    }
+    // Always include main and master as universal fallbacks
+    for (const b of ['main', 'master']) {
+      if (!candidateBranches.includes(b)) candidateBranches.push(b);
+    }
+    for (const candidate of candidateBranches) {
       const r = execGit(['rev-parse', candidate], { cwd: repoRoot });
       if (gitResultOk(r)) {
         mainTip = r.stdout.trim();
@@ -702,15 +722,28 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
     }
 
     // 4b. PID liveness check.
+    // Fail-closed: any lock content that does not parse as a numeric PID (e.g.
+    // "Locked by claude-code agent-xxxx") is treated as ALIVE — we cannot
+    // confirm the owner is dead, so we must not reap.  This includes the real
+    // Claude Code lock format which is non-numeric text.
     const pidStr = lockedContent.trim().match(/^\d+/)?.[0];
-    if (pidStr) {
-      const pid = parseInt(pidStr, 10);
-      if (!Number.isNaN(pid) && isPidAlive(pid)) {
-        results.push({ path: worktreePath, status: 'skipped', reason: 'pid_alive' });
-        continue;
-      }
+    if (!pidStr) {
+      results.push({ path: worktreePath, status: 'skipped', reason: 'lock_owner_unknown' });
+      continue;
     }
-    // If no parseable PID, treat as dead (legacy lock written without PID).
+    const pid = parseInt(pidStr, 10);
+    // Wrap isPidAlive in try/catch: any error (e.g. EPERM on Windows when the process
+    // exists but is owned by another user) must be treated as ALIVE (fail-closed).
+    let pidIsAlive;
+    try {
+      pidIsAlive = Number.isNaN(pid) || isPidAlive(pid);
+    } catch {
+      pidIsAlive = true; // Cannot determine liveness — treat as alive, do not reap.
+    }
+    if (pidIsAlive) {
+      results.push({ path: worktreePath, status: 'skipped', reason: 'pid_alive' });
+      continue;
+    }
 
     // 4c. Ancestry guard: branch-tip must be reachable from main (fail closed).
     // The admin HEAD file contains either "ref: refs/heads/<branch>" or a bare SHA.
@@ -761,7 +794,9 @@ function reapOrphanWorktrees(repoRoot, deps = {}) {
       continue;
     }
 
-    results.push({ path: worktreePath, status: 'reaped', reason: 'pid_dead_and_merged' });
+    // Use the git-listed path so the result is consistent with what callers see
+    // from 'git worktree list', avoiding symlink vs real-path mismatches on macOS.
+    results.push({ path: gitKnownPath, status: 'reaped', reason: 'pid_dead_and_merged' });
   }
 
   // 5. Always prune stale metadata (handles missing-on-disk entries).
@@ -802,7 +837,19 @@ function defaultMtimeSafe(file) {
 }
 
 function cmdWorktreeReapOrphans(cwd) {
-  const result = reapOrphanWorktrees(cwd);
+  let result;
+  try {
+    result = reapOrphanWorktrees(cwd);
+  } catch (err) {
+    // Surface failure as a one-line warning; keep exit-zero so workflows don't break.
+    process.stderr.write(`[gsd] worktree.reap-orphans failed: ${err && err.message ? err.message : String(err)}\n`);
+    result = [];
+  }
+  const skippedCount = result.filter((r) => r.status === 'skipped').length;
+  if (skippedCount > 0) {
+    // Surface skipped entries so operators are aware of unresolved orphans.
+    process.stderr.write(`[gsd] worktree.reap-orphans: ${skippedCount} orphan(s) skipped (run with DEBUG=1 for details)\n`);
+  }
   process.stdout.write(`${JSON.stringify({ ok: true, reaped: result.filter((r) => r.status === 'reaped').length, entries: result }, null, 2)}\n`);
 }
 
