@@ -151,7 +151,7 @@ describe('mvp-phase workflow', () => {
       const cTerm = synIr.terms.find(t => t.term === 'completed');
       assert.strictEqual(cTerm.count, 0, 'synthetic workflow must not mention completed');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -166,7 +166,7 @@ describe('mvp-phase workflow', () => {
       const spidrSection = synIr.sections.find(s => s.heading.toLowerCase().includes('spidr'));
       assert.ok(!spidrSection, 'synthetic workflow must not have an SPIDR section');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -179,7 +179,7 @@ describe('mvp-phase workflow', () => {
       const modeTerm = synIr.terms.find(t => t.term === '**Mode:** mvp');
       assert.strictEqual(modeTerm.count, 0, 'synthetic non-MVP workflow must not contain **Mode:** mvp');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

@@ -116,7 +116,7 @@ describe('gsd-executor — MVP+TDD gate section', () => {
       const haltTerm = synIr.terms.find(t => t.term === 'halt');
       assert.strictEqual(haltTerm.count, 0, 'synthetic agent must not mention halt');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -136,7 +136,7 @@ describe('gsd-executor — MVP+TDD gate section', () => {
       const reportTerm = synIr.terms.find(t => t.term === 'report');
       assert.strictEqual(reportTerm.count, 0, 'synthetic agent must not mention report');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

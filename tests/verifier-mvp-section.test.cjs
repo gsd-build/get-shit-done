@@ -110,7 +110,7 @@ describe('gsd-verifier — MVP Mode Verification section', () => {
       const mvpRef = synIr.references.find(r => r.path.includes('verify-mvp-mode.md'));
       assert.ok(!mvpRef, 'synthetic agent must not reference verify-mvp-mode.md');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -127,7 +127,7 @@ describe('gsd-verifier — MVP Mode Verification section', () => {
       const mvpTerm = synIr.terms.find(t => t.term === 'MVP Mode Verification');
       assert.strictEqual(mvpTerm.count, 0, 'synthetic agent must not mention MVP Mode Verification');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

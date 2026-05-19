@@ -107,7 +107,7 @@ describe('progress — MVP mode display', () => {
       const userFlowTerm = synIr.terms.find(t => t.term === 'user-flow');
       assert.strictEqual(userFlowTerm.count, 0, 'synthetic non-MVP workflow must not use user-flow framing');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -141,7 +141,7 @@ describe('progress — MVP mode display', () => {
       const mvpSdkCall = synIr.sdk_calls.find(c => c.verb === 'phase.mvp-mode');
       assert.ok(!mvpSdkCall, 'synthetic workflow without SDK call must not have phase.mvp-mode sdk_call');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

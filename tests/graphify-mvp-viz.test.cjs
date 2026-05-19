@@ -112,7 +112,7 @@ describe('graphify — MVP visualization', () => {
       const fillTerm = synIr.terms.find(t => t.term === 'fill');
       assert.strictEqual(fillTerm.count, 0, 'synthetic non-MVP workflow must not reference fill');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -128,7 +128,7 @@ describe('graphify — MVP visualization', () => {
       const suffixTerm = synIr.terms.find(t => t.term === 'suffix');
       assert.strictEqual(suffixTerm.count, 0, 'synthetic workflow must not reference suffix');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 

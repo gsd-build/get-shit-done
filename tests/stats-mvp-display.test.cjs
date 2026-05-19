@@ -109,7 +109,7 @@ describe('stats — MVP mode summary', () => {
       const analyzeTerm = synIr.terms.find(t => t.term === 'roadmap.analyze');
       assert.strictEqual(analyzeTerm.count, 0, 'synthetic workflow must not reference roadmap.analyze');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -146,7 +146,7 @@ describe('stats — MVP mode summary', () => {
       const mvpCountAssign = synIr.bash_assignments.find(a => a.var === 'MVP_COUNT');
       assert.ok(!mvpCountAssign, 'synthetic workflow must not have MVP_COUNT assignment');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

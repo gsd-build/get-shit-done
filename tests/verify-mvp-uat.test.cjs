@@ -216,7 +216,7 @@ describe('verify-work — MVP mode UAT framing', () => {
         `precedes user-flow (line ${userFlowFirstTerm.first_line}) — ordering assertion would FAIL on this file`
       );
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -251,7 +251,7 @@ describe('verify-work — MVP mode UAT framing', () => {
       // This proves: the fallback assertion would FAIL on this synthetic file,
       // because neither explicit marker is present.
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -284,7 +284,7 @@ describe('verify-work — MVP mode UAT framing', () => {
 
       // This proves: the sdk_calls assertion would FAIL on this synthetic file.
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

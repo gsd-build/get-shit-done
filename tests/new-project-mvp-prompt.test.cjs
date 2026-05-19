@@ -87,7 +87,7 @@ describe('new-project — MVP mode prompt', () => {
       const hLayersTerm = synIr.terms.find(t => t.term === 'Horizontal Layers');
       assert.strictEqual(hLayersTerm.count, 0, 'synthetic workflow must not mention Horizontal Layers');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -102,7 +102,7 @@ describe('new-project — MVP mode prompt', () => {
       const stdTerm = synIr.terms.find(t => t.term === 'PROJECT_MODE=standard');
       assert.strictEqual(stdTerm.count, 0, 'synthetic workflow must not contain PROJECT_MODE=standard');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

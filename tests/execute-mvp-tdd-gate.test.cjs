@@ -128,7 +128,7 @@ describe('execute-phase — MVP+TDD gate', () => {
       const mvpTddTerm = synIr.terms.find(t => t.term === 'MVP+TDD');
       assert.strictEqual(mvpTddTerm.count, 0, 'synthetic non-MVP workflow must not mention MVP+TDD');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -143,7 +143,7 @@ describe('execute-phase — MVP+TDD gate', () => {
       const refTerm = synIr.terms.find(t => t.term === 'execute-mvp-tdd.md');
       assert.strictEqual(refTerm.count, 0, 'synthetic workflow must not reference execute-mvp-tdd.md');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

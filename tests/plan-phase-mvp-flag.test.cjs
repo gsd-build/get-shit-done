@@ -126,7 +126,7 @@ describe('plan-phase workflow — --mvp flag', () => {
       const mvpTerm = synIr.terms.find(t => t.term === '--mvp');
       assert.strictEqual(mvpTerm.count, 0, 'synthetic non-MVP workflow must not mention --mvp');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -141,7 +141,7 @@ describe('plan-phase workflow — --mvp flag', () => {
       const wsTerm = synIr.terms.find(t => t.term === 'Walking Skeleton');
       assert.strictEqual(wsTerm.count, 0, 'synthetic workflow must not mention Walking Skeleton');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });

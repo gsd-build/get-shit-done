@@ -164,7 +164,7 @@ describe('gsd-planner — MVP-mode branch', () => {
       const wsTerm = synIr.terms.find(t => t.term === 'Walking Skeleton');
       assert.strictEqual(wsTerm.count, 0, 'synthetic agent must not mention Walking Skeleton');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -184,7 +184,7 @@ describe('gsd-planner — MVP-mode branch', () => {
       const ustRef = synIr.references.find(r => r.path.includes('user-story-template.md'));
       assert.ok(!ustRef, 'synthetic agent must not reference user-story-template.md');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -201,7 +201,7 @@ describe('gsd-planner — MVP-mode branch', () => {
       const skelTerm = synIr.terms.find(t => t.term === 'SKELETON.md');
       assert.strictEqual(skelTerm.count, 0, 'synthetic agent must not mention SKELETON.md');
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 });
