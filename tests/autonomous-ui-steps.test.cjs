@@ -29,11 +29,14 @@ describe('autonomous workflow ui-phase and ui-review integration (#1375)', () =>
       );
     });
 
-    test('UI design contract step detects frontend indicators via grep pattern', () => {
-      // Same grep pattern as plan-phase step 5.6
+    test('UI design contract step detects frontend indicators via word-boundary-anchored grep pattern', () => {
+      // The pattern must use word-boundary anchoring to avoid false-positives on
+      // "Requirements" (ui), "overview" (view), "performance"/"platform" (form) — bug #3706.
+      // Portable POSIX ERE form: (^|[^[:alnum:]])(TOKEN)([^[:alnum:]]|$)
       assert.ok(
-        content.includes('grep -iE "UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget"'),
-        'should use the same frontend detection grep pattern as plan-phase step 5.6'
+        content.includes('grep -iE "(^|[^[:alnum:]])(UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget)([^[:alnum:]]|$)"') ||
+        content.includes("grep -iE '(^|[^[:alnum:]])(UI|interface|frontend|component|layout|page|screen|view|form|dashboard|widget)([^[:alnum:]]|$)'"),
+        'should use word-boundary-anchored grep pattern to avoid false-positives (bug #3706)'
       );
     });
 
