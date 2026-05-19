@@ -8,6 +8,9 @@
 
 ## Glossary — Domain modules and seams
 
+### Dispatch Pipeline Module
+Module that composes Dispatch Policy Module, Query Execution Policy Module, and per-stage handlers (input-validation, plan, execution, result-builder, formatting, error-mapping, observability) into the end-to-end pipeline that produces a `QueryDispatchResult`. Entry point: `sdk/src/query/query-dispatch.ts`. Typed contract: `sdk/src/query/query-dispatch-contract.ts`.
+
 ### Dispatch Policy Module
 Module owning dispatch error mapping, fallback policy, timeout classification, and CLI exit mapping contract.
 
