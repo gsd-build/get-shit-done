@@ -99,7 +99,11 @@ describe('bug #2767 (behavioral): gsd-sdk query commit --files', () => {
     cleanup(tmpDir);
   });
 
-  test('well-formed: --files <paths> stages exactly those files with clean subject', () => {
+  test('well-formed: --files <paths> stages exactly those files with clean subject', (t) => {
+    if (!fs.existsSync(SDK_CLI)) {
+      t.skip('sdk/dist/cli.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     const message = 'test(#2767): well-formed commit';
     const result = runSdkQuery('commit', [message, '--files', 'foo.md', 'bar.md'], tmpDir);
 
@@ -118,7 +122,11 @@ describe('bug #2767 (behavioral): gsd-sdk query commit --files', () => {
       `.planning/STATE.md should remain unstaged, got status:\n${stillDirty}`);
   });
 
-  test('buggy form (positional, no --files): paths leak into subject AND .planning/ fallback fires', () => {
+  test('buggy form (positional, no --files): paths leak into subject AND .planning/ fallback fires', (t) => {
+    if (!fs.existsSync(SDK_CLI)) {
+      t.skip('sdk/dist/cli.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     // Documents the misbehavior #2767 prevents at every workflow call site.
     // Any future change that makes the buggy form silently "do the right thing"
     // trips this test and must justify the change.
@@ -142,7 +150,11 @@ describe('bug #2767 (behavioral): gsd-sdk query commit --files', () => {
       `foo.md/bar.md should remain unstaged under the buggy form, got:\n${dirty}`);
   });
 
-  test('positional form with no .planning/ change: returns "nothing staged"', () => {
+  test('positional form with no .planning/ change: returns "nothing staged"', (t) => {
+    if (!fs.existsSync(SDK_CLI)) {
+      t.skip('sdk/dist/cli.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     // Reset the .planning/STATE.md change so the fallback has nothing to stage.
     fs.rmSync(path.join(tmpDir, '.planning', 'STATE.md'), { force: true });
 
@@ -172,7 +184,11 @@ describe('bug #2767 (behavioral): commit-to-subrepo requires --files', () => {
     cleanup(tmpDir);
   });
 
-  test('rejects with explicit error when --files is omitted', () => {
+  test('rejects with explicit error when --files is omitted', (t) => {
+    if (!fs.existsSync(SDK_CLI)) {
+      t.skip('sdk/dist/cli.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     const result = runSdkQuery('commit-to-subrepo', ['only message, no files'], tmpDir);
     assert.equal(result.exitCode, 0);
     assert.ok(result.json, `expected JSON body, got:\n${result.stdout}`);
