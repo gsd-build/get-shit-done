@@ -71,6 +71,19 @@ function createFixture() {
   return { configDir, skillsDir, gsdExplore, gsdHelp, userSkill };
 }
 
+/**
+ * Extended fixture that also includes a user-created gsd-* directory.
+ * Used by the all-clusters-disabled counter-test to prove the manifest-membership
+ * gate (Finding 1 fix) protects user-owned gsd-* dirs from data loss.
+ */
+function createFixtureWithUserGsdDir() {
+  const base = createFixture();
+  const userGsdDir = path.join(base.skillsDir, 'gsd-mything');
+  fs.mkdirSync(userGsdDir, { recursive: true });
+  fs.writeFileSync(path.join(userGsdDir, 'SKILL.md'), '# user skill\n', 'utf8');
+  return { ...base, userGsdDir };
+}
+
 describe('bug-3659: applySurface prunes ~/.claude/skills/gsd-*/ on cluster disable', () => {
   test('(a) disabled cluster gsd-* dirs are removed from skills dir', (t) => {
     const { configDir, skillsDir, gsdExplore, gsdHelp } = createFixture();
@@ -189,6 +202,58 @@ describe('bug-3659: applySurface prunes ~/.claude/skills/gsd-*/ on cluster disab
     assert.ok(
       fs.existsSync(userSkill),
       'my-custom-skill/ must survive both applySurface calls'
+    );
+  });
+
+  test('(e) all-clusters-disabled: all gsd-owned dirs removed; user dirs and user gsd-* dirs survive', (t) => {
+    // Counter-test for Finding 1 (data-loss class) and Finding 3 (missing coverage).
+    //
+    // Disables EVERY cluster so the resolved skill set is empty.
+    // Assertions:
+    //   1. gsd-explore/ — GSD-owned, disabled cluster → REMOVED
+    //   2. gsd-help/    — GSD-owned, disabled cluster → REMOVED
+    //   3. my-custom-skill/ — user-owned, no gsd- prefix → PRESERVED
+    //   4. gsd-mything/ — prefix match but NOT in manifest → PRESERVED (Finding 1 fix)
+    const { configDir, skillsDir, gsdExplore, gsdHelp, userSkill, userGsdDir } =
+      createFixtureWithUserGsdDir();
+    t.after(() => cleanup(configDir));
+
+    const allClusters = Object.keys(CLUSTERS);
+
+    writeSurface(configDir, {
+      baseProfile: 'full',
+      disabledClusters: allClusters,
+      explicitAdds: [],
+      explicitRemoves: [],
+    });
+
+    const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
+    const layout = resolveRuntimeArtifactLayout('claude', configDir, 'global');
+    applySurface(configDir, layout, manifest, CLUSTERS);
+
+    // 1. GSD-owned dirs in now-disabled clusters must be removed.
+    assert.ok(
+      !fs.existsSync(gsdExplore),
+      'gsd-explore/ must be removed when all clusters are disabled'
+    );
+    assert.ok(
+      !fs.existsSync(gsdHelp),
+      'gsd-help/ must be removed when all clusters are disabled'
+    );
+
+    // 2. Non-gsd user dir must be preserved regardless.
+    assert.ok(
+      fs.existsSync(userSkill),
+      'my-custom-skill/ (non-gsd user dir) must survive when all clusters are disabled'
+    );
+
+    // 3. User-created gsd-* dir NOT in the manifest must be preserved.
+    //    This is the critical Finding 1 regression guard: without the manifest-membership
+    //    gate, gsd-mything/ would have been silently deleted.
+    assert.ok(
+      fs.existsSync(userGsdDir),
+      'gsd-mything/ (user-created gsd-* dir not in manifest) must be preserved — ' +
+      'prefix match alone must not trigger deletion (Finding 1 data-loss fix)'
     );
   });
 });
