@@ -79,6 +79,12 @@ Shared CJS/SDK Module owning project-root resolution from any starting directory
 ### Planning Path Projection Module
 SDK query Module owning projection from project/workstream context to concrete `.planning` paths. Policy precedence is `explicit workstream > env workstream > env project > root`. Invalid workspace context is a validation error at this seam rather than a silent fallback.
 
+### Worktree Safety Policy Module
+CJS Module owning worktree lifecycle safety policy for the GSD orchestration layer. Interface: `resolveWorktreeContext(cwd, deps) → WorktreeContext` (linked-worktree root mapping), `parseWorktreePorcelain(output) → WorktreeEntry[]` (porcelain parser, skips detached HEAD), `planWorktreePrune(repoRoot, opts, deps) → PrunePlan` (metadata-prune plan, never destructive by default), `executeWorktreePrunePlan(plan, deps) → PruneResult` (executes prune; degrades gracefully on git timeout), `listLinkedWorktreePaths(repoRoot, deps) → LinkedPathsResult`, `inspectWorktreeHealth(repoRoot, opts, deps) → HealthResult` (orphan + stale detection), `snapshotWorktreeInventory(repoRoot, opts, deps) → InventoryResult`, `planWorktreeWaveCleanup(repoRoot, manifest) → CleanupPlan` (manifest-scoped, fail-closed), `executeWorktreeWaveCleanupPlan(plan, deps) → CleanupResult`. Source of truth: `get-shit-done/bin/lib/worktree-safety.cjs`. Timeout path: all git subprocess calls are bounded; callers receive `ok:false, reason:'git_timed_out'` rather than a thrown exception. Test anchor: `tests/worktree-safety.test.cjs`.
+
+### Worktree Lifecycle Module
+Workflow contract seam covering agent worktree lifecycle orchestration rules embedded in `get-shit-done/workflows/execute-phase.md`, `quick.md`, `execute-plan.md`, and `agents/gsd-executor.md`. Key invariants: `worktree_branch_check` uses `git reset --hard` (not `--soft`); HEAD attachment verified via `git symbolic-ref` before any reset; positive allow-list `^worktree-agent-*` enforced; `git update-ref` on protected refs is prohibited; cleanup is manifest-scoped (`WAVE_WORKTREE_MANIFEST`) not global-discovery-based; worktree spawning is sequential (one `run_in_background` at a time to avoid `config.lock` contention). Test anchor: `tests/worktree.test.cjs`.
+
 ### Worktree Root Resolution Adapter Module
 Adapter Module owning linked-worktree root mapping and metadata-prune policy (`git worktree prune` non-destructive default) for planning/workstream callers.
 
