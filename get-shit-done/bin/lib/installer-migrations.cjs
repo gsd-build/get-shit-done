@@ -223,6 +223,40 @@ function sleepSync(ms) {
   Atomics.wait(new Int32Array(buffer), 0, 0, ms);
 }
 
+/**
+ * Check whether a given PID is alive on the current host.
+ * Uses process.kill(pid, 0) which works on POSIX and Windows (Node's
+ * implementation maps it to OpenProcess + GetExitCodeProcess on win32).
+ * Returns true if alive or permission-denied (live but not ours),
+ * false if ESRCH (no such process).
+ */
+function isPidAlive(pid) {
+  if (typeof pid !== 'number' || !Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true; // alive (or permission denied — treat as live)
+  } catch (err) {
+    return err.code !== 'ESRCH';
+  }
+}
+
+/**
+ * Try to read and parse the lock file JSON. Returns null on any error
+ * (missing, invalid JSON, I/O failure).
+ */
+function readLockFile(lockPath) {
+  try {
+    const raw = fs.readFileSync(lockPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && typeof parsed.pid === 'number') {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEOUT_MS } = {}) {
   fs.mkdirSync(configDir, { recursive: true });
   const lockPath = path.join(configDir, INSTALL_MIGRATION_LOCK_NAME);
@@ -232,14 +266,23 @@ function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEO
     let fd = null;
     try {
       fd = fs.openSync(lockPath, 'wx');
-      fs.writeFileSync(fd, JSON.stringify({
+      // Close the open descriptor before writing so the file handle is
+      // released on Windows before the release closure unlinks it.
+      // Write payload via writeFileSync with the path (not the fd) so we
+      // don't hold an open fd across the lifetime of the lock.
+      fs.closeSync(fd);
+      fd = null;
+      fs.writeFileSync(lockPath, JSON.stringify({
         pid: process.pid,
         acquiredAt: new Date().toISOString(),
       }) + '\n');
       return () => {
         const failures = [];
-        try { fs.closeSync(fd); } catch (error) { failures.push(error); }
-        try { fs.rmSync(lockPath, { force: true }); } catch (error) { failures.push(error); }
+        // Use unlinkSync (not rmSync with { force: true }) so EPERM errors
+        // are NOT silently swallowed. On Windows, if the unlink fails
+        // transiently, the error surfaces via releaseError so the caller
+        // can observe and surface it rather than leaving a stale lock.
+        try { fs.unlinkSync(lockPath); } catch (error) { failures.push(error); }
         if (failures.length > 0) {
           const releaseError = new Error(`failed to release installer migration lock: ${lockPath}`);
           releaseError.failures = failures;
@@ -249,11 +292,29 @@ function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEO
     } catch (error) {
       if (fd !== null) {
         try { fs.closeSync(fd); } catch { /* best-effort */ }
-        try { fs.rmSync(lockPath, { force: true }); } catch { /* best-effort */ }
+        try { fs.unlinkSync(lockPath); } catch { /* best-effort */ }
+        fd = null;
       }
       if (error && error.code === 'EEXIST') {
+        // Stale-lock reclamation: read the on-disk PID and check liveness.
+        // If the PID is dead (ESRCH) or is our own process (same-process
+        // re-entry caused by rmSync silently swallowing an unlink error on
+        // a previous call in the same invocation — the root cause of #3670),
+        // reclaim the lock by removing the stale file and retrying.
+        const lockData = readLockFile(lockPath);
+        if (lockData !== null) {
+          const holderPid = lockData.pid;
+          const isSameProcess = holderPid === process.pid;
+          const isDeadProcess = !isPidAlive(holderPid);
+          if (isSameProcess || isDeadProcess) {
+            // Reclaim: remove the stale lock and loop back to openSync.
+            try { fs.unlinkSync(lockPath); } catch { /* best-effort — may already be gone */ }
+            continue;
+          }
+        }
         if (Date.now() - started >= timeoutMs) {
-          throw new Error(`installer migration lock is held: ${lockPath}`);
+          const holderInfo = lockData ? ` (held by pid ${lockData.pid} since ${lockData.acquiredAt})` : '';
+          throw new Error(`installer migration lock is held: ${lockPath}${holderInfo}`);
         }
         sleepSync(Math.min(50, Math.max(1, timeoutMs - (Date.now() - started))));
         continue;
