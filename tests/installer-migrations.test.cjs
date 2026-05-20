@@ -681,17 +681,20 @@ test('refuses to run migrations while another installer owns the migration lock'
 
 test('reports lock release failures after migration work completes', (t) => {
   const configDir = createTempInstall();
-  const originalRmSync = fs.rmSync;
+  const originalUnlinkSync = fs.unlinkSync;
   t.after(() => {
-    fs.rmSync = originalRmSync;
+    fs.unlinkSync = originalUnlinkSync;
     cleanup(configDir);
   });
 
-  fs.rmSync = (targetPath, ...args) => {
+  // The release closure uses fs.unlinkSync (not fs.rmSync) so that EPERM is
+  // NOT silently swallowed on Windows (#3670). Mock unlinkSync to simulate
+  // a Windows NTFS EPERM condition when the lock file is removed.
+  fs.unlinkSync = (targetPath) => {
     if (path.basename(String(targetPath)) === 'gsd-install-migration.lock') {
       throw new Error('simulated lock unlink failure');
     }
-    return originalRmSync.call(fs, targetPath, ...args);
+    return originalUnlinkSync.call(fs, targetPath);
   };
 
   assert.throws(
