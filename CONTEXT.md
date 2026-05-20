@@ -8,6 +8,9 @@
 
 ## Glossary — Domain modules and seams
 
+### Milestone Module
+Module owning `milestone complete` (archive roadmap/requirements/phases, build MILESTONES.md entry, update STATE.md), `requirements mark-complete` (checkbox + table update with regex-global-state fix), and `phases clear`. Key behaviors: milestone-phase scoping (extract phases from ROADMAP.md milestone slice, support project-code-prefix dirs e.g. CK-01-name, exclude prior-milestone phases), milestone-archive layout (resolve phase dirs from `.planning/milestones/v*-phases/` when `.planning/phases/` absent), fenced-code-block boundary tracking in `extractCurrentMilestone`. Source of truth: `get-shit-done/bin/lib/milestone.cjs`; SDK surface: `sdk/src/query/milestone.ts` (query handlers for `milestone.complete`, `phases.archive`). SDK milestone runner (`GSD.run()`) lives in `sdk/src/index.ts` — discovers phases via `roadmapAnalyze`, runs each incomplete phase, emits `MilestoneStart`/`MilestoneComplete` events. Test consolidation: PR #3753 (10 files → 4).
+
 ### Dispatch Pipeline Module
 Module that composes Dispatch Policy Module, Query Execution Policy Module, and per-stage handlers (input-validation, plan, execution, result-builder, formatting, error-mapping, observability) into the end-to-end pipeline that produces a `QueryDispatchResult`. Entry point: `sdk/src/query/query-dispatch.ts`. Typed contract: `sdk/src/query/query-dispatch-contract.ts`.
 
