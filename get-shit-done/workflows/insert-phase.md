@@ -13,7 +13,7 @@ Parse the command arguments:
 - First argument: integer phase number to insert after
 - Remaining arguments: phase description
 
-Example: `/gsd-insert-phase 72 Fix critical auth bug`
+Example: `/gsd:phase --insert 72 Fix critical auth bug`
 -> after = 72
 -> description = "Fix critical auth bug"
 
@@ -21,8 +21,8 @@ If arguments missing:
 
 ```
 ERROR: Both phase number and description required
-Usage: /gsd-insert-phase <after> <description>
-Example: /gsd-insert-phase 72 Fix critical auth bug
+Usage: /gsd:phase --insert <after> <description>
+Example: /gsd:phase --insert 72 Fix critical auth bug
 ```
 
 Exit.
