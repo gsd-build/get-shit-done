@@ -166,4 +166,41 @@ describe('bug #3739 — gap-analysis padded-prefix CONTEXT.md', () => {
     assert.strictEqual(found, null,
       'findContextMdIn must return null when no CONTEXT.md exists');
   });
+
+  // ── Test 6: dual-file precedence — bare CONTEXT.md wins over padded form ──
+
+  test('findContextMdIn prefers bare CONTEXT.md over padded form (helper level)', () => {
+    const { findContextMdIn } = require('../get-shit-done/bin/lib/planning-workspace.cjs');
+    // Write BOTH forms into the phase directory
+    fs.writeFileSync(path.join(phaseDir, 'CONTEXT.md'), '# bare context\n');
+    fs.writeFileSync(path.join(phaseDir, '01-CONTEXT.md'), '# padded context\n');
+
+    const found = findContextMdIn(phaseDir);
+    assert.strictEqual(found, 'CONTEXT.md',
+      'findContextMdIn must return bare CONTEXT.md when both forms exist — matches pre-refactor gap-checker behavior');
+  });
+
+  test('gap-analysis uses bare CONTEXT.md decisions when both forms exist (integration level)', () => {
+    // Bare form has D-BARE; padded form has D-PADDED.
+    // If the integration path resolves bare correctly, only D-BARE appears in the report.
+    const bareContent =
+      '# Phase Context\n\n<decisions>\n## Implementation Decisions\n\n- **D-BARE:** From bare form\n</decisions>\n';
+    const paddedContent =
+      '# Phase Context\n\n<decisions>\n## Implementation Decisions\n\n- **D-PADDED:** From padded form\n</decisions>\n';
+    fs.writeFileSync(path.join(phaseDir, 'CONTEXT.md'), bareContent);
+    fs.writeFileSync(path.join(phaseDir, '01-CONTEXT.md'), paddedContent);
+
+    writePlan('01', '# Plan\n\nImplements D-BARE.\n');
+
+    const r = runGsdTools(['gap-analysis', '--phase-dir', phaseDir], tmpDir);
+    assert.ok(r.success, `gap-analysis failed: ${r.error}`);
+    const out = JSON.parse(r.output);
+
+    const dBare = out.rows.find(x => x.item === 'D-BARE');
+    const dPadded = out.rows.find(x => x.item === 'D-PADDED');
+
+    assert.ok(dBare, 'D-BARE (from bare CONTEXT.md) must appear in gap report');
+    assert.ok(!dPadded, 'D-PADDED (from 01-CONTEXT.md) must NOT appear — bare form takes precedence');
+    assert.strictEqual(dBare.status, 'Covered', 'D-BARE must be Covered');
+  });
 });
