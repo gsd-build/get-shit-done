@@ -28,8 +28,12 @@ import {
 } from './init.js';
 
 let tmpDir: string;
+let previousGsdAgentsDir: string | undefined;
+let previousClaudeConfigDir: string | undefined;
 
 beforeEach(async () => {
+  previousGsdAgentsDir = process.env.GSD_AGENTS_DIR;
+  previousClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
   tmpDir = await mkdtemp(join(tmpdir(), 'gsd-init-'));
   // Create minimal .planning structure
   await mkdir(join(tmpDir, '.planning', 'phases', '09-foundation'), { recursive: true });
@@ -92,6 +96,10 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (previousGsdAgentsDir === undefined) delete process.env.GSD_AGENTS_DIR;
+  else process.env.GSD_AGENTS_DIR = previousGsdAgentsDir;
+  if (previousClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+  else process.env.CLAUDE_CONFIG_DIR = previousClaudeConfigDir;
   await rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -283,6 +291,41 @@ describe('withProjectRoot', () => {
       if (prevRuntime === undefined) delete process.env.GSD_RUNTIME;
       else process.env.GSD_RUNTIME = prevRuntime;
     }
+  });
+
+  it('falls back to project-local .claude/agents when runtime-global agents are missing', async () => {
+    const { MODEL_PROFILES } = await import('./config-query.js');
+    const localAgentsDir = join(tmpDir, '.claude', 'agents');
+    const emptyClaudeConfigDir = join(tmpDir, 'empty-claude-config');
+    await mkdir(localAgentsDir, { recursive: true });
+    await mkdir(emptyClaudeConfigDir, { recursive: true });
+    for (const name of Object.keys(MODEL_PROFILES)) {
+      await writeFile(join(localAgentsDir, `${name}.md`), '# stub');
+    }
+
+    delete process.env.GSD_AGENTS_DIR;
+    process.env.CLAUDE_CONFIG_DIR = emptyClaudeConfigDir;
+
+    const enriched = withProjectRoot(tmpDir, {}) as Record<string, unknown>;
+    expect(enriched.agents_installed).toBe(true);
+    expect(enriched.missing_agents).toEqual([]);
+  });
+
+  it('keeps explicit GSD_AGENTS_DIR override ahead of project-local .claude/agents', async () => {
+    const { MODEL_PROFILES } = await import('./config-query.js');
+    const localAgentsDir = join(tmpDir, '.claude', 'agents');
+    const explicitAgentsDir = join(tmpDir, 'explicit-empty-agents');
+    await mkdir(localAgentsDir, { recursive: true });
+    await mkdir(explicitAgentsDir, { recursive: true });
+    for (const name of Object.keys(MODEL_PROFILES)) {
+      await writeFile(join(localAgentsDir, `${name}.md`), '# stub');
+    }
+
+    process.env.GSD_AGENTS_DIR = explicitAgentsDir;
+
+    const enriched = withProjectRoot(tmpDir, {}) as Record<string, unknown>;
+    expect(enriched.agents_installed).toBe(false);
+    expect((enriched.missing_agents as string[]).length).toBeGreaterThan(0);
   });
 
   it('GSD_AGENTS_DIR takes precedence over CLAUDE_CONFIG_DIR', async () => {

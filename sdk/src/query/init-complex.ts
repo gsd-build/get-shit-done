@@ -41,7 +41,7 @@ import {
   extractPhasesFromSection,
 } from './roadmap.js';
 import { agentSkills } from './skills.js';
-import { withProjectRoot } from './init.js';
+import { withProjectRoot, getAgentInstallStatus } from './init.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
@@ -126,11 +126,6 @@ const NEW_PROJECT_REQUIRED_AGENTS = [
   'gsd-research-synthesizer',
   'gsd-roadmapper',
 ];
-
-function hasAgentDefinition(agentsDir: string, agent: string): boolean {
-  return existsSync(join(agentsDir, `${agent}.md`)) ||
-    existsSync(join(agentsDir, `${agent}.agent.md`));
-}
 
 async function resolveAgentSkillPayloadAgents(
   requiredAgents: string[],
@@ -305,9 +300,7 @@ export const initNewProject: QueryHandler = async (_args, projectDir, workstream
   const runtime = detectRuntime(config as { runtime?: unknown });
   const agentsDir = resolveAgentsDir(runtime);
   const gitInfo = gitWorktreeInfo(projectDir);
-  const missingRequiredAgents = NEW_PROJECT_REQUIRED_AGENTS.filter(
-    agent => !hasAgentDefinition(agentsDir, agent),
-  );
+  const requiredAgentStatus = getAgentInstallStatus(projectDir, NEW_PROJECT_REQUIRED_AGENTS, config as { runtime?: unknown });
   const agentSkillPayloadAgents = await resolveAgentSkillPayloadAgents(
     NEW_PROJECT_REQUIRED_AGENTS,
     projectDir,
@@ -343,8 +336,8 @@ export const initNewProject: QueryHandler = async (_args, projectDir, workstream
     agent_runtime: runtime,
     agents_dir: agentsDir,
     required_agents: NEW_PROJECT_REQUIRED_AGENTS,
-    required_agents_installed: missingRequiredAgents.length === 0,
-    missing_required_agents: missingRequiredAgents,
+    required_agents_installed: requiredAgentStatus.agents_installed,
+    missing_required_agents: requiredAgentStatus.missing_agents,
     agent_skill_payloads_available: agentSkillPayloadAgents.length === NEW_PROJECT_REQUIRED_AGENTS.length,
     agent_skill_payload_agents: agentSkillPayloadAgents,
   };

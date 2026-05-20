@@ -202,30 +202,43 @@ function getLatestCompletedMilestone(projectDir: string): { version: string; nam
  * (`GSD_RUNTIME` → `config.runtime` → 'claude') and probes that runtime's
  * canonical `agents/` directory. `GSD_AGENTS_DIR` still short-circuits.
  *
- * Port of checkAgentsInstalled from core.cjs lines 1274-1306.
+ * When no explicit override is present, repo-local `.claude/agents` can satisfy
+ * missing runtime-global agents for local/dev installs.
+ *
+ * Port of checkAgentsInstalled from core.cjs lines 1274-1306, with the
+ * repo-local fallback added for SDK init workflows.
  */
-function checkAgentsInstalled(config?: { runtime?: unknown }): { agents_installed: boolean; missing_agents: string[] } {
+export function getAgentInstallStatus(
+  projectDir: string,
+  expectedAgents: string[],
+  config?: { runtime?: unknown },
+): { agents_installed: boolean; missing_agents: string[] } {
   const runtime = detectRuntime(config);
-  const agentsDir = resolveAgentsDir(runtime);
-  const expectedAgents = Object.keys(MODEL_PROFILES);
+  const hasExplicitAgentsDir = Object.prototype.hasOwnProperty.call(process.env, 'GSD_AGENTS_DIR');
+  const explicitAgentsDir = process.env.GSD_AGENTS_DIR;
+  const runtimeAgentsDir = resolveAgentsDir(runtime);
+  const candidateDirs = hasExplicitAgentsDir
+    ? (explicitAgentsDir ? [explicitAgentsDir] : [])
+    : [runtimeAgentsDir, join(projectDir, '.claude', 'agents')];
 
-  if (!existsSync(agentsDir)) {
-    return { agents_installed: false, missing_agents: expectedAgents };
-  }
-
-  const missing: string[] = [];
-  for (const agent of expectedAgents) {
-    const agentFile = join(agentsDir, `${agent}.md`);
-    const agentFileCopilot = join(agentsDir, `${agent}.agent.md`);
-    if (!existsSync(agentFile) && !existsSync(agentFileCopilot)) {
-      missing.push(agent);
-    }
-  }
+  const missing = expectedAgents.filter((agent) => {
+    return !candidateDirs.some((agentsDir) => {
+      return existsSync(join(agentsDir, `${agent}.md`)) ||
+        existsSync(join(agentsDir, `${agent}.agent.md`));
+    });
+  });
 
   return {
     agents_installed: missing.length === 0,
     missing_agents: missing,
   };
+}
+
+function checkAgentsInstalled(
+  projectDir: string,
+  config?: { runtime?: unknown },
+): { agents_installed: boolean; missing_agents: string[] } {
+  return getAgentInstallStatus(projectDir, Object.keys(MODEL_PROFILES), config);
 }
 
 /**
@@ -351,7 +364,7 @@ export function withProjectRoot(
 ): Record<string, unknown> {
   result.project_root = projectDir;
 
-  const agentStatus = checkAgentsInstalled(config);
+  const agentStatus = checkAgentsInstalled(projectDir, config);
   result.agents_installed = agentStatus.agents_installed;
   result.missing_agents = agentStatus.missing_agents;
 

@@ -13,9 +13,11 @@ import { initNewProject, initProgress, initManager } from './init-complex.js';
 
 let tmpDir: string;
 let previousGsdAgentsDir: string | undefined;
+let previousClaudeConfigDir: string | undefined;
 
 beforeEach(async () => {
   previousGsdAgentsDir = process.env.GSD_AGENTS_DIR;
+  previousClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
   tmpDir = await mkdtemp(join(tmpdir(), 'gsd-init-complex-'));
 
   // Create minimal .planning structure
@@ -87,6 +89,8 @@ beforeEach(async () => {
 afterEach(async () => {
   if (previousGsdAgentsDir === undefined) delete process.env.GSD_AGENTS_DIR;
   else process.env.GSD_AGENTS_DIR = previousGsdAgentsDir;
+  if (previousClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+  else process.env.CLAUDE_CONFIG_DIR = previousClaudeConfigDir;
   await rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -122,6 +126,56 @@ describe('initNewProject', () => {
     const result = await initNewProject([], tmpDir);
     const data = result.data as Record<string, unknown>;
     expect(data.planning_exists).toBe(true);
+  });
+
+  it('uses project-local required agents when runtime-global agents are missing', async () => {
+    const { MODEL_PROFILES } = await import('./config-query.js');
+    const localAgentsDir = join(tmpDir, '.claude', 'agents');
+    const emptyClaudeConfigDir = join(tmpDir, 'empty-claude-config');
+    const requiredAgents = [
+      'gsd-project-researcher',
+      'gsd-research-synthesizer',
+      'gsd-roadmapper',
+    ];
+    await mkdir(localAgentsDir, { recursive: true });
+    await mkdir(emptyClaudeConfigDir, { recursive: true });
+    for (const agent of Object.keys(MODEL_PROFILES)) {
+      await writeFile(join(localAgentsDir, `${agent}.md`), '# stub');
+    }
+
+    delete process.env.GSD_AGENTS_DIR;
+    process.env.CLAUDE_CONFIG_DIR = emptyClaudeConfigDir;
+
+    const result = await initNewProject([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.agents_installed).toBe(true);
+    expect(data.missing_agents).toEqual([]);
+    expect(data.required_agents).toEqual(requiredAgents);
+    expect(data.required_agents_installed).toBe(true);
+    expect(data.missing_required_agents).toEqual([]);
+    expect(data.agents_dir).toBe(join(emptyClaudeConfigDir, 'agents'));
+  });
+
+  it('reports missing required agents from a partial project-local .claude/agents fallback', async () => {
+    const localAgentsDir = join(tmpDir, '.claude', 'agents');
+    const emptyClaudeConfigDir = join(tmpDir, 'empty-claude-config');
+    await mkdir(localAgentsDir, { recursive: true });
+    await mkdir(emptyClaudeConfigDir, { recursive: true });
+    await writeFile(join(localAgentsDir, 'gsd-project-researcher.md'), '# stub');
+
+    delete process.env.GSD_AGENTS_DIR;
+    process.env.CLAUDE_CONFIG_DIR = emptyClaudeConfigDir;
+
+    const result = await initNewProject([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.agents_installed).toBe(false);
+    expect(data.required_agents_installed).toBe(false);
+    expect(data.missing_required_agents).toEqual([
+      'gsd-research-synthesizer',
+      'gsd-roadmapper',
+    ]);
   });
 
   it('separates required agent registration from skill payload availability (#3388)', async () => {
