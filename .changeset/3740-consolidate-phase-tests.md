@@ -1,3 +1,7 @@
+---
+type: Added
+pr: 3740
+---
 <!-- docs-exempt: internal test refactor only — no user-facing surface changed -->
 
 ## Summary
