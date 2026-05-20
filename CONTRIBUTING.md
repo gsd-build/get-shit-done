@@ -16,6 +16,13 @@ npm test
 
 ---
 
+## Development Commands
+
+- `node scripts/lint-descriptions.cjs` — checks that every `commands/gsd/*.md` frontmatter `description` field is ≤ 100 characters. Descriptions beyond the limit bloat the skill listing UI and dilute model attention. Flag docs belong in `argument-hint:` instead.
+- `node scripts/lint-skill-deps.cjs` — verifies two constraints: (a) for each GSD skill, any `gsd:<stem>` reference in the body is declared in `requires:`; (b) every non-full install profile's skill closure is self-contained (no missing transitive dependencies). Run this before opening a PR that touches `commands/gsd/` or `get-shit-done/bin/lib/install-profiles.cjs`.
+
+---
+
 ## Types of Contributions
 
 GSD accepts three types of contributions. Each type has a different process and a different bar for acceptance. **Read this section before opening anything.**
