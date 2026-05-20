@@ -47,6 +47,7 @@ describe('install-profiles: MINIMAL_SKILL_ALLOWLIST', () => {
         'new-project',
         'phase',
         'plan-phase',
+        'surface',
         'update',
       ],
     );
@@ -128,6 +129,8 @@ describe('install-profiles: stageSkillsForMode', () => {
 
   test('minimal mode returns a new dir containing only allowlisted skills', () => {
     const src = createFixtureSkillsDir();
+    // Add surface.md to the fixture so it can be staged (it is now in MINIMAL_SKILL_ALLOWLIST)
+    fs.writeFileSync(path.join(src, 'surface.md'), '# surface\n');
     let staged;
     try {
       staged = stageSkillsForMode(src, 'minimal');
@@ -140,6 +143,7 @@ describe('install-profiles: stageSkillsForMode', () => {
         'new-project.md',
         'phase.md',
         'plan-phase.md',
+        'surface.md',
         'update.md',
       ]);
     } finally {
@@ -546,17 +550,17 @@ describe('install: manifest records mode for both profiles', () => {
     assert.ok(r.agentCount > 0, `full install should have agents, got ${r.agentCount}`);
   });
 
-  test('--minimal records mode: "minimal" with exactly 7 skills and 0 agents', () => {
+  test('--minimal records mode: "minimal" with exactly 8 skills and 0 agents', () => {
     const r = manifestModeAfterInstall(['--minimal']);
     assert.strictEqual(r.mode, 'minimal');
-    assert.strictEqual(r.skillCount, 7);
+    assert.strictEqual(r.skillCount, 8);
     assert.strictEqual(r.agentCount, 0);
   });
 
   test('--core-only is an alias for --minimal', () => {
     const r = manifestModeAfterInstall(['--core-only']);
     assert.strictEqual(r.mode, 'minimal');
-    assert.strictEqual(r.skillCount, 7);
+    assert.strictEqual(r.skillCount, 8);
     assert.strictEqual(r.agentCount, 0);
   });
 });

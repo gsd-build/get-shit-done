@@ -26,7 +26,7 @@ describe('PROFILES map', () => {
     assert.ok('full' in PROFILES, 'PROFILES.full missing');
   });
 
-  test('PROFILES.core contains the 7 main-loop skills (including phase)', () => {
+  test('PROFILES.core contains the 8 main-loop skills (including phase and surface)', () => {
     const core = PROFILES.core;
     assert.ok(Array.isArray(core), 'core should be an array');
     const sorted = [...core].sort();
@@ -37,6 +37,7 @@ describe('PROFILES map', () => {
       'new-project',
       'phase',
       'plan-phase',
+      'surface',
       'update',
     ]);
   });
@@ -67,13 +68,13 @@ describe('resolveProfile', () => {
     assert.strictEqual(result.skills, '*');
   });
 
-  test('resolves core profile — returns 7+ skills', () => {
+  test('resolves core profile — returns 8+ skills', () => {
     const manifest = loadSkillsManifest(REAL_COMMANDS_DIR);
     const result = resolveProfile({ modes: ['core'], manifest });
     assert.strictEqual(result.name, 'core');
     assert.ok(result.skills instanceof Set, 'skills should be a Set');
-    // core has 7 base skills.
-    assert.ok(result.skills.size >= 7, `core closure should have >=7 skills, got ${result.skills.size}`);
+    // core has 8 base skills (includes surface as of #3735).
+    assert.ok(result.skills.size >= 8, `core closure should have >=8 skills, got ${result.skills.size}`);
     // All base skills must be present
     for (const s of PROFILES.core) {
       assert.ok(result.skills.has(s), `core closure should include ${s}`);
