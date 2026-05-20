@@ -217,13 +217,62 @@ function applySurface(runtimeConfigDir, layout, manifest, clusterMap) {
 }
 
 /**
+ * Prune GSD-managed skill directories from a skills directory.
+ *
+ * Removes every directory in `skillsDir` that is GSD-owned but NOT listed
+ * in `retainedNames`. User-owned dirs (not matching the GSD ownership criteria)
+ * are always preserved.
+ *
+ * Ownership criteria:
+ *   - Non-empty prefix (e.g. 'gsd-'): dir name starts with that prefix.
+ *   - Empty prefix (Hermes): dir name appears as a canonical skill stem in the
+ *     manifest. User dirs not in the manifest are preserved.
+ *   - Empty prefix without manifest: conservative; no dirs are removed.
+ *
+ * This is the single point of truth for skill-dir pruning. Both _syncGsdDir
+ * (surface apply) and callers that need stand-alone pruning use this function.
+ *
+ * @param {string} skillsDir        directory that contains the gsd-STEM sub-dirs
+ * @param {Set<string>} retainedNames set of directory names to keep (e.g. 'gsd-help')
+ * @param {string} prefix           GSD dir prefix, e.g. 'gsd-' (or '' for Hermes)
+ * @param {Map<string, string[]>} [manifest] optional; required for Hermes empty-prefix case
+ */
+function pruneSkillDirs(skillsDir, retainedNames, prefix, manifest) {
+  if (!fs.existsSync(skillsDir)) return;
+
+  const canonicalStems = (prefix === '' && manifest)
+    ? new Set([...manifest.keys()].filter(k => !k.startsWith('_calls_agents_')))
+    : null;
+
+  for (const entry of fs.readdirSync(skillsDir)) {
+    const entryPath = path.join(skillsDir, entry);
+    if (!fs.statSync(entryPath).isDirectory()) continue;
+
+    let isGsdOwned;
+    if (prefix !== '') {
+      isGsdOwned = entry.startsWith(prefix);
+    } else if (canonicalStems) {
+      // Hermes: GSD-owned iff the directory name appears in the canonical manifest.
+      isGsdOwned = canonicalStems.has(entry);
+    } else {
+      // No manifest available: be conservative, don't remove anything.
+      continue;
+    }
+
+    if (!isGsdOwned) continue;         // preserve user-owned dirs
+    if (retainedNames.has(entry)) continue; // GSD-owned and in retain set
+    try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch {}
+  }
+}
+
+/**
  * Sync destination directory from staged source.
  *
  * For 'commands' kind: iterate *.md files in destDir, remove if not in staged set.
  * For 'agents' kind: same, but only remove files starting with 'gsd-' prefix.
  * For 'skills' kind: iterate directories in destDir matching kind.prefix; add missing
  *   by copying recursively; remove dirs not in staged set. Preserves dirs not matching
- *   the prefix (user-owned skills).
+ *   the prefix (user-owned skills). Pruning is delegated to pruneSkillDirs().
  *
  * For Hermes (empty prefix): uses manifest membership to discriminate GSD-owned vs
  * user-owned dirs. GSD-owned = stem in manifest; removal targets = in manifest AND
@@ -262,36 +311,9 @@ function _syncGsdDir(stagedDir, destDir, kind, manifest) {
       }
     }
 
-    // Removal: discriminator depends on prefix shape.
-    // Non-empty prefix: GSD namespace IS the prefix; remove prefix-matching dirs not in staged set.
-    // Empty prefix (Hermes): GSD-owned = stem in manifest (i.e. canonically-shipped GSD skill).
-    //                        User-owned skills not in manifest are preserved.
-    // No manifest available: be conservative, don't remove anything.
-    const canonicalStems = manifest
-      ? new Set([...manifest.keys()].filter(k => !k.startsWith('_calls_agents_')))
-      : null;
-
-    const destEntries = fs.readdirSync(destDir);
-    for (const entry of destEntries) {
-      const entryPath = path.join(destDir, entry);
-      if (!fs.statSync(entryPath).isDirectory()) continue;
-
-      let isGsdOwned;
-      if (kindPrefix !== '') {
-        isGsdOwned = entry.startsWith(kindPrefix);
-      } else if (canonicalStems) {
-        // Hermes: empty prefix, destSubpath is the namespace.
-        // GSD-owned iff the directory name (stem) appears in the canonical manifest.
-        isGsdOwned = canonicalStems.has(entry);
-      } else {
-        // No manifest available: be conservative, don't remove anything.
-        continue;
-      }
-
-      if (!isGsdOwned) continue;           // preserve user-owned
-      if (stagedDirs.has(entry)) continue; // current GSD-owned, keep
-      try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch {}
-    }
+    // Prune GSD-owned dirs that are no longer in the staged set.
+    // pruneSkillDirs() is the single point of truth for this logic.
+    pruneSkillDirs(destDir, stagedDirs, kindPrefix, manifest);
   } else {
     // commands / agents kind: work with .md files
     const stagedFiles = new Set(
@@ -372,6 +394,7 @@ module.exports = {
   resolveSurface,
   applySurface,
   listSurface,
-  // Exported for testing
+  // Exported for testing and for callers that need stand-alone pruning
+  pruneSkillDirs,
   _syncGsdDir,
 };
