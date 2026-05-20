@@ -86,6 +86,7 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
   test('REASON enum exposes the documented set of stable codes', () => {
     // Locks the public diagnostic surface — adding a code requires updating
     // this assertion, removing one breaks consumers that switch on the enum.
+    // Bug #3657 added OK_PRISTINE_DRIFT_DETECTED.
     assert.deepEqual(
       Object.keys(REASON).sort(),
       [
@@ -95,6 +96,7 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
         'FAIL_USER_LINES_MISSING',
         'OK_NO_SIGNIFICANT_BACKUP_LINES',
         'OK_NO_USER_LINES_VS_PRISTINE',
+        'OK_PRISTINE_DRIFT_DETECTED',
       ],
     );
   });
