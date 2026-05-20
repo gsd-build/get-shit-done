@@ -303,7 +303,7 @@ export const initNewProject: QueryHandler = async (_args, projectDir, workstream
     getModelAlias('gsd-roadmapper', projectDir),
   ]);
   const runtime = detectRuntime(config as { runtime?: unknown });
-  const agentsDir = resolveAgentsDir(runtime);
+  const agentsDir = resolveAgentsDir(runtime, projectDir);
   const gitInfo = gitWorktreeInfo(projectDir);
   const missingRequiredAgents = NEW_PROJECT_REQUIRED_AGENTS.filter(
     agent => !hasAgentDefinition(agentsDir, agent),

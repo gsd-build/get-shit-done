@@ -202,11 +202,14 @@ function getLatestCompletedMilestone(projectDir: string): { version: string; nam
  * (`GSD_RUNTIME` → `config.runtime` → 'claude') and probes that runtime's
  * canonical `agents/` directory. `GSD_AGENTS_DIR` still short-circuits.
  *
+ * The optional `projectDir` parameter enables the repo-local `.claude/agents`
+ * fallback for Claude `--local` installs (bug #3751).
+ *
  * Port of checkAgentsInstalled from core.cjs lines 1274-1306.
  */
-function checkAgentsInstalled(config?: { runtime?: unknown }): { agents_installed: boolean; missing_agents: string[] } {
+function checkAgentsInstalled(config?: { runtime?: unknown }, projectDir?: string): { agents_installed: boolean; missing_agents: string[] } {
   const runtime = detectRuntime(config);
-  const agentsDir = resolveAgentsDir(runtime);
+  const agentsDir = resolveAgentsDir(runtime, projectDir);
   const expectedAgents = Object.keys(MODEL_PROFILES);
 
   if (!existsSync(agentsDir)) {
@@ -351,7 +354,7 @@ export function withProjectRoot(
 ): Record<string, unknown> {
   result.project_root = projectDir;
 
-  const agentStatus = checkAgentsInstalled(config);
+  const agentStatus = checkAgentsInstalled(config, projectDir);
   result.agents_installed = agentStatus.agents_installed;
   result.missing_agents = agentStatus.missing_agents;
 

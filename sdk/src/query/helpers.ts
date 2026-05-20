@@ -109,14 +109,28 @@ export function detectRuntime(config?: { runtime?: unknown }): Runtime {
  *
  * Precedence:
  *   1. `GSD_AGENTS_DIR` — explicit SDK override (wins over runtime selection)
- *   2. `<getRuntimeConfigDir(runtime)>/agents` — installer-parity default
+ *   2. `<getRuntimeConfigDir(runtime)>/agents` — installer-parity default (when the dir exists)
+ *   3. `<projectDir>/.claude/agents` — repo-local fallback for `--local` Claude installs
+ *      (only probed when the global runtime dir is absent or empty, and `projectDir` is given)
  *
  * Defaults to Claude when no runtime is passed, matching prior behavior
  * (see `init-runner.ts`, which is Claude-only by design).
+ *
+ * The repo-local fallback was added for bug #3751: Claude Code `--local` installs
+ * place agent definitions under `./.claude/agents` rather than `~/.claude/agents`,
+ * but the SDK agent-detection path only probed the global directory.
  */
-export function resolveAgentsDir(runtime: Runtime = 'claude'): string {
+export function resolveAgentsDir(runtime: Runtime = 'claude', projectDir?: string): string {
   if (process.env.GSD_AGENTS_DIR) return process.env.GSD_AGENTS_DIR;
-  return join(getRuntimeConfigDir(runtime), 'agents');
+  const globalDir = join(getRuntimeConfigDir(runtime), 'agents');
+  if (existsSync(globalDir)) return globalDir;
+  // Repo-local fallback: <projectDir>/.claude/agents for --local Claude installs (#3751).
+  // Only applicable when a projectDir is known; other runtimes don't use .claude/.
+  if (projectDir && runtime === 'claude') {
+    const localDir = join(projectDir, '.claude', 'agents');
+    if (existsSync(localDir)) return localDir;
+  }
+  return globalDir;
 }
 
 /**
