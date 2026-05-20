@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { escapeRegex, normalizePhaseName, phaseMarkdownRegexSource, phaseMarkdownRegexSourceExact, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches } = require('./core.cjs');
 const { platformWriteSync } = require('./shell-command-projection.cjs');
-const { planningPaths, withPlanningLock } = require('./planning-workspace.cjs');
+const { planningPaths, withPlanningLock, findContextMdIn } = require('./planning-workspace.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
 
 /**
@@ -47,7 +47,7 @@ function countPhasePlansAndSummaries(phaseDir) {
   return {
     planCount,
     summaryCount,
-    hasContext: phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md'),
+    hasContext: findContextMdIn(phaseDir) !== null,
     hasResearch: phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
   };
 }
