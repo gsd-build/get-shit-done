@@ -20,7 +20,10 @@
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { GSDError } from '../errors.js';
+import { loadConfig } from '../config.js';
 import { planningPaths, resolvePathUnderProject } from './helpers.js';
+import { findPhaseByNumber } from './phase.js';
+import { getMilestoneInfo } from './roadmap.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── execGit ──────────────────────────────────────────────────────────────
@@ -83,6 +86,93 @@ export function sanitizeCommitMessage(text: string): string {
   return sanitized;
 }
 
+// ─── ensureStrategyBranch ────────────────────────────────────────────────
+
+/**
+ * Create or switch to the configured strategy branch before a commit.
+ *
+ * Port of the branching-strategy block in cmdCommit() at
+ * get-shit-done/bin/lib/commands.cjs:285-320 (added in PR #1279 for CJS;
+ * ported here to close the SDK gap — bug #3749).
+ *
+ * Does nothing when:
+ * - branching_strategy is absent, "none", or unrecognised
+ * - the current branch is already the target branch
+ * - the target branch cannot be determined (phase not found, milestone missing)
+ *
+ * The function is intentionally best-effort: failures to resolve the branch
+ * name or switch to it are silently swallowed so that the commit itself is
+ * never blocked by a strategy misconfiguration.
+ *
+ * @param projectDir - Project root directory
+ * @param workstream - Optional workstream scope
+ * @param filePaths  - Explicit file paths being committed (used to infer phase)
+ */
+async function ensureStrategyBranch(
+  projectDir: string,
+  workstream: string | undefined,
+  filePaths: string[],
+): Promise<void> {
+  let config: Awaited<ReturnType<typeof loadConfig>>;
+  try {
+    config = await loadConfig(projectDir, workstream);
+  } catch {
+    return; // Malformed or missing config — skip strategy logic
+  }
+
+  const strategy = config.git.branching_strategy;
+  if (!strategy || strategy === 'none') return;
+
+  let branchName: string | null = null;
+
+  if (strategy === 'phase') {
+    // Infer the phase number from the file paths being committed.
+    // CJS parity: join paths and match the first numeric phase token.
+    const phaseMatch = filePaths.join(' ').match(/(\d+(?:\.\d+)*)-/);
+    if (phaseMatch) {
+      const phaseNum = phaseMatch[1];
+      try {
+        const phaseInfo = await findPhaseByNumber(projectDir, phaseNum, workstream);
+        if (phaseInfo && phaseInfo.phase_number) {
+          branchName = config.git.phase_branch_template
+            .replace('{phase}', phaseInfo.phase_number)
+            .replace('{slug}', phaseInfo.phase_slug ?? 'phase');
+        }
+      } catch {
+        return; // Phase lookup failure — skip strategy switch
+      }
+    }
+  } else if (strategy === 'milestone') {
+    try {
+      const milestone = await getMilestoneInfo(projectDir, workstream);
+      if (milestone && milestone.version) {
+        const slug = milestone.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .substring(0, 60) || 'milestone';
+        branchName = config.git.milestone_branch_template
+          .replace('{milestone}', milestone.version)
+          .replace('{slug}', slug);
+      }
+    } catch {
+      return; // Milestone lookup failure — skip strategy switch
+    }
+  }
+
+  if (!branchName) return;
+
+  // Only switch when we are not already on the target branch.
+  const currentBranch = execGit(projectDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (currentBranch.exitCode !== 0 || currentBranch.stdout.trim() === branchName) return;
+
+  // Try to create the branch; fall back to switching to an existing one.
+  const create = execGit(projectDir, ['checkout', '-b', branchName]);
+  if (create.exitCode !== 0) {
+    execGit(projectDir, ['checkout', branchName]);
+  }
+}
+
 // ─── commit ───────────────────────────────────────────────────────────────
 
 /**
@@ -141,6 +231,12 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
       // No config or malformed — allow commit
     }
   }
+
+  // Ensure the strategy branch exists before the first commit (#3749 / CJS #1278).
+  // Pre-execution workflows (discuss-phase, plan-phase) commit artifacts but the
+  // branch was only created during execute-phase in the CJS path — PR #1279 fixed
+  // the CJS side; this block ports that fix to the SDK handler.
+  await ensureStrategyBranch(projectDir, workstream, filePaths);
 
   // Sanitize message
   const sanitized = message ? sanitizeCommitMessage(message) : message;

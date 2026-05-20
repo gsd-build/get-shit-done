@@ -207,6 +207,63 @@ function extractObjective(content: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+// ─── Exported internal helper ──────────────────────────────────────────────
+
+/**
+ * Locate a phase by number without the QueryHandler wrapper.
+ *
+ * Returns the PhaseInfo (including phase_number, phase_slug) for the given
+ * phase identifier, or null when the phase cannot be found.  Searches current
+ * phases first, then archived milestone phase directories (newest-first) —
+ * identical logic to the `findPhase` QueryHandler and the CJS
+ * `findPhaseInternal` from core.cjs lines 838-874.
+ *
+ * Exported so that `commit.ts` can call it without going through the full
+ * QueryHandler dispatch stack (which would require a registered query context).
+ *
+ * @param projectDir - Project root directory
+ * @param phase      - Phase identifier string (e.g. "1", "02", "2.1")
+ * @param workstream - Optional workstream scope
+ */
+export async function findPhaseByNumber(
+  projectDir: string,
+  phase: string,
+  workstream?: string,
+): Promise<PhaseInfo | null> {
+  if (!phase) return null;
+
+  const phasesDir = planningPaths(projectDir, workstream).phases;
+  const normalized = normalizePhaseName(phase);
+  const relPhasesDir = relPlanningPath(workstream) + '/phases';
+
+  const current = await searchPhaseInDir(phasesDir, relPhasesDir, normalized);
+  if (current) return current;
+
+  const milestonesDir = join(projectDir, '.planning', 'milestones');
+  try {
+    const milestoneEntries = await readdir(milestonesDir, { withFileTypes: true });
+    const archiveDirs = milestoneEntries
+      .filter(e => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name))
+      .map(e => e.name)
+      .sort()
+      .reverse();
+
+    for (const archiveName of archiveDirs) {
+      const versionMatch = archiveName.match(/^(v[\d.]+)-phases$/);
+      const version = versionMatch ? versionMatch[1] : archiveName;
+      const archivePath = join(milestonesDir, archiveName);
+      const relBase = '.planning/milestones/' + archiveName;
+      const result = await searchPhaseInDir(archivePath, relBase, normalized);
+      if (result) {
+        result.archived = version;
+        return result;
+      }
+    }
+  } catch { /* milestones dir doesn't exist — not an error */ }
+
+  return null;
+}
+
 // ─── Exported handlers ─────────────────────────────────────────────────────
 
 /**
