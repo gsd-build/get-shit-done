@@ -255,61 +255,69 @@ test('T4: normal (non-recursive) runInstallerMigrations acquires and releases lo
 });
 
 // ---------------------------------------------------------------------------
-// T5: Counter-test — genuinely-held live lock still surfaces a clear error
+// T5: Counter-test — unreclaimable live lock must surface a bounded error
 // ---------------------------------------------------------------------------
-test('T5: a lock held by a genuinely live concurrent process throws with PID in the error message', (t) => {
+// This test guards against over-reclamation: if the reclaim-unlink fails
+// (e.g. Windows EPERM on a live open handle), the fix must NOT spin
+// indefinitely — it must fall through to the timeout path and throw.
+//
+// Conditions forced by this test:
+//   1. Lock file contains the CURRENT process.pid (triggers isSameProcess branch).
+//   2. fs.unlinkSync is mocked to throw EPERM for the lock file (reclaim fails).
+//   3. lockTimeoutMs: 200 — timeout must fire within a short wall-clock window.
+//
+// Expected outcome: throws with /installer migration lock is held/ within
+// ~200ms. SUCCESS (no throw) is NOT acceptable here — that would mean the fix
+// over-reclaimed a lock that it couldn't actually remove.
+test('T5: unreclaimable same-PID lock throws bounded error (reclaim-unlink failure falls through to timeout)', (t) => {
   const configDir = createTempDir();
-  t.after(() => cleanup(configDir));
-
-  // Open the lock file ourselves so the FD is live (simulates a concurrent installer).
-  // We use 'wx' to create it exclusively, then leave the FD open.
-  fs.mkdirSync(configDir, { recursive: true });
-  const lp = lockPath(configDir);
-  const fd = fs.openSync(lp, 'wx');
-  fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }) + '\n');
-  // Intentionally do NOT close fd here — simulates a live holder with open handle.
+  const originalUnlinkSync = fs.unlinkSync;
 
   t.after(() => {
-    try { fs.closeSync(fd); } catch { /* already closed */ }
-    try { fs.rmSync(lp, { force: true }); } catch { /* cleanup */ }
+    mock.restoreAll();
+    fs.unlinkSync = originalUnlinkSync;
+    cleanup(configDir);
   });
 
-  // With the fix: stale-PID reclamation should NOT kick in here because the PID
-  // IS alive. But we need lockTimeoutMs: 0 to fail fast.
-  //
-  // The tricky part: if the fix reclaims based solely on matching process.pid,
-  // it would incorrectly reclaim this genuinely-held lock. The fix must distinguish
-  // "same process, no open fd / stale from prior failed release" from "same process,
-  // fd currently open". On most platforms this requires either:
-  //   (a) a re-entrant lock table (in-process Map tracking currently-held locks), or
-  //   (b) checking PID liveness plus an acquiredAt TTL.
-  //
-  // For this test we verify the minimal acceptable behavior: the call either
-  // succeeds (if the fix treats same-PID as always re-entrant — acceptable) OR
-  // throws with a clear message. It must NOT deadlock (hang >500ms).
-  //
-  // lockTimeoutMs: 200 ensures a hang would cause the test to fail via the
-  // external test runner's timeout, not silently succeed.
-  let threw = false;
-  let thrownError = null;
-  try {
-    runInstallerMigrations({
+  // Pre-seed lock file with the CURRENT process's PID.
+  // This triggers the isSameProcess reclamation path inside acquireInstallerMigrationLock.
+  writeLockFile(configDir, process.pid);
+
+  // Mock unlinkSync to throw EPERM for the lock file only.
+  // This simulates Windows NTFS refusing to delete a file with an open handle.
+  // With the fix: reclaim-unlink fails → reclaimed=false → falls through to
+  //   the timeout check → throws "installer migration lock is held" after ≤200ms.
+  // Without the fix (original code): unlink throws but continue runs anyway →
+  //   spins indefinitely, never reaches the timeout check → deadlock.
+  mock.method(fs, 'unlinkSync', function faultInjectUnlinkSync(targetPath) {
+    const isLock = path.basename(String(targetPath)) === INSTALL_MIGRATION_LOCK_NAME;
+    if (isLock) {
+      const err = Object.assign(
+        new Error('EPERM: operation not permitted, unlink ' + targetPath),
+        { code: 'EPERM' }
+      );
+      throw err;
+    }
+    return originalUnlinkSync.call(fs, targetPath);
+  });
+
+  const startMs = Date.now();
+  assert.throws(
+    () => runInstallerMigrations({
       configDir,
       migrations: [],
       lockTimeoutMs: 200,
-    });
-  } catch (err) {
-    threw = true;
-    thrownError = err;
-  }
+    }),
+    (err) => {
+      assert.match(err.message, /installer migration lock is held/, 'error must name the held lock');
+      return true;
+    },
+    'must throw "installer migration lock is held" when reclaim-unlink fails — not spin indefinitely'
+  );
+  const elapsedMs = Date.now() - startMs;
 
-  if (threw) {
-    assert.match(
-      thrownError.message,
-      /installer migration lock is held/,
-      'error message must mention "installer migration lock is held"'
-    );
-  }
-  // Whether it throws or reclaims (same-pid re-entrant), it must NOT hang.
-  // The test framework will surface a hang via overall test timeout.
+  // Must resolve within a generous but finite window (fix + timeout overhead).
+  // If it spins (deadlock regression), the process-level test timeout fires instead.
+  t.diagnostic(`T5 elapsed: ${elapsedMs}ms (expected ≤500ms for lockTimeoutMs:200 + overhead)`);
+  assert.ok(elapsedMs < 500, `T5 must resolve within 500ms; actual ${elapsedMs}ms — possible spin-loop regression`);
 });
