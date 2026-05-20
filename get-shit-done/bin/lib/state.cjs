@@ -934,7 +934,7 @@ function acquireStateLock(statePath) {
       _heldStateLocks.add(lockPath);
       return lockPath;
     } catch (err) {
-      if (err.code !== 'EEXIST') return lockPath;
+      if (err.code !== 'EEXIST') throw err; // propagate — silent bypass causes lost updates
       // Only unlink a lock we did not place when it has crossed the staleness
       // threshold (crashed holder). Nuking a fresh lock held by a slow-but-live
       // writer causes lost updates (#3711 regression).
