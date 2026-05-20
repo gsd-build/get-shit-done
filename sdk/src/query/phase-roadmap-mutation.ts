@@ -7,19 +7,17 @@ import { acquireStateLock, releaseStateLock } from './state-mutation.js';
  *
  * Port of replaceInCurrentMilestone from core.cjs lines 1013-1022.
  *
- * Semantics (byte-for-byte CJS parity):
+ * Semantics:
  *   • No `</details>` in the content  → plain `content.replace(pattern, replacement)`.
  *   • Otherwise → split at the last `</details>` and replace only in the
  *     content AFTER it.
- *
- * INTENTIONALLY DOES NOT fall back to "search the last <details> block when
- * the after-slice didn't match." That fallback existed in an earlier SDK
- * port and would silently corrupt shipped-milestone content when the current
- * milestone is itself wrapped in `<details open>...</details>` and there's
- * nothing after the close tag. CJS callers handle the "milestone inside
- * <details>" case by passing the unscoped `content.replace(...)` directly
- * (see phase.cjs:1080 for plan-count update). Keep this function in
- * lockstep with core.cjs — deviations are how bug-2005 slipped in.
+ *   • If the after-slice produces no replacement (pattern not found there),
+ *     fall back to replacing inside the last `<details>...</details>` block.
+ *     This handles the case where the active milestone is itself wrapped in
+ *     a `<details>` block (e.g. collapsed by the user or during a milestone
+ *     transition). Earlier shipped-milestone blocks are left untouched because
+ *     only the last `<details>` block is targeted by the fallback.
+ *     (Fixes #2641.)
  */
 export function replaceInCurrentMilestone(
   content: string,
@@ -33,7 +31,23 @@ export function replaceInCurrentMilestone(
   const offset = lastDetailsClose + '</details>'.length;
   const before = content.slice(0, offset);
   const after = content.slice(offset);
-  return before + after.replace(pattern, replacement);
+  const afterReplaced = after.replace(pattern, replacement);
+  if (afterReplaced !== after) {
+    // Pattern matched in the after-slice (normal case: active milestone is
+    // outside/after the last </details>).
+    return before + afterReplaced;
+  }
+  // Pattern did not match after the last </details>. Fall back to replacing
+  // inside the last <details> block (active milestone is wrapped in <details>).
+  const lastDetailsOpen = content.lastIndexOf('<details>');
+  if (lastDetailsOpen === -1 || lastDetailsOpen >= lastDetailsClose) {
+    // Malformed or no proper block — return unchanged.
+    return content;
+  }
+  const blockBefore = content.slice(0, lastDetailsOpen);
+  const blockInner = content.slice(lastDetailsOpen, offset);
+  const blockAfter = content.slice(offset);
+  return blockBefore + blockInner.replace(pattern, replacement) + blockAfter;
 }
 
 /**
