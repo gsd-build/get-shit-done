@@ -1036,6 +1036,11 @@ function buildCodexHookWindowsShimIR(scriptAbsPath, absoluteRunnerToken) {
     invocation: { interpreter, target: scriptAbsPath },
     cmdPath,
     hookCommand,
+    // Typed fields for IR-level assertions (CONTRIBUTING.md L558-L565).
+    // These describe the render semantics in a structured way so tests can
+    // assert on the generator contract without coupling to rendered text.
+    eol: { cmd: '\r\n' },            // CRLF — canonical for cmd.exe .cmd files
+    passthroughArgs: true,           // the shim forwards all args via %*
     render: {
       // Mirror buildWindowsShimTriple's CRLF line endings for strict
       // cmd.exe compatibility (LF-only .cmd files work in modern Windows but
@@ -1083,18 +1088,20 @@ function ensureCodexHooksJsonSessionStart(targetDir, opts = {}) {
     if (!shimIR) return { changed: false, wrote: false, path: hooksJsonPath };
     try {
       atomicWriteFileSync(shimIR.cmdPath, shimIR.render.cmd(), 'utf8');
-    } catch {
-      // Shim write failed — fall back to the node-runner command so the
-      // installer does not silently drop the hook. The fallback may still fail
-      // at runtime on Windows but is better than no hook at all.
-      const fallback = projectManagedHookCommand({
-        absoluteRunner,
-        scriptPath,
-        runtime: 'codex',
-        platform,
-      });
-      if (!fallback) return { changed: false, wrote: false, path: hooksJsonPath };
-      return reconcileCodexHooksJsonSessionStart(targetDir, { managedCommand: fallback });
+    } catch (shimWriteErr) {
+      // Shim write failed — do NOT fall back to the old "node.exe script.js"
+      // command. That form triggers the `bash.exe: cannot execute binary file`
+      // failure that #3426 exists to fix, so a silent fallback would silently
+      // restore the original bug. Instead: warn loudly and skip the registration
+      // for this runtime so the user sees an actionable message rather than a
+      // successful install that fails at hook-dispatch time.
+      const reason = shimWriteErr && shimWriteErr.message ? shimWriteErr.message : String(shimWriteErr);
+      console.warn(
+        `  ${yellow}⚠${reset}  Codex Windows hook NOT installed — .cmd shim write failed: ${reason}. ` +
+          `Fix the write error (permissions? disk full?) and re-run the installer. ` +
+          `Do NOT use the legacy node.exe command path — it triggers the #3426 bash.exe POSIX-exec failure.`,
+      );
+      return { changed: false, wrote: false, path: hooksJsonPath };
     }
     managedCommand = shimIR.hookCommand;
   } else {
