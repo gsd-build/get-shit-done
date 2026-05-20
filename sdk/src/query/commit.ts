@@ -86,7 +86,98 @@ export function sanitizeCommitMessage(text: string): string {
   return sanitized;
 }
 
+// ─── Typed-IR helpers (exported for unit testing) ────────────────────────
+
+/**
+ * Parse phase identifiers from an array of file paths.
+ *
+ * Each path is matched INDIVIDUALLY against the phase-directory convention
+ * `<N>-` at the start of a path segment (e.g. `1-setup/file.md`).
+ * Returns the set of all distinct phase IDs found across all paths.
+ *
+ * Empty input → empty Set (strategy will be skipped by the caller).
+ * All paths from the same phase → Set of size 1.
+ * Paths spanning multiple phases → Set of size > 1 (caller must reject).
+ *
+ * @param filePaths - File paths passed to the commit handler via --files
+ * @returns Set of phase numeric identifiers (e.g. `{"1"}`, `{"1", "2"}`)
+ */
+export function parsePhasesFromFiles(filePaths: string[]): Set<string> {
+  const phases = new Set<string>();
+  // Match the FIRST path segment that looks like `<phase>-` where phase is a
+  // positive integer or dotted number.  We anchor to path separators so that
+  // a file named `output-results.md` at the root does NOT match.
+  const segmentRe = /(?:^|[/\\])(\d+(?:\.\d+)*)-/;
+  for (const p of filePaths) {
+    const m = p.match(segmentRe);
+    if (m) phases.add(m[1]);
+  }
+  return phases;
+}
+
+/**
+ * Validate a branch template string.
+ *
+ * A template is valid when it is a non-empty string.  After substitution
+ * the caller should separately check that no `{placeholder}` tokens remain.
+ *
+ * @param template - Template value from config (may be undefined/empty)
+ * @returns `{ ok: true }` if the template is usable, or
+ *          `{ ok: false, reason: string, template: string | undefined }`
+ */
+export function validateBranchTemplate(
+  template: string | undefined,
+): { ok: true } | { ok: false; reason: string; template: string | undefined } {
+  if (!template || typeof template !== 'string' || template.trim() === '') {
+    return {
+      ok: false,
+      reason: 'phase_branch_template is missing or empty',
+      template,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Resolve the final branch name from a config template and a phase's data.
+ *
+ * Returns `{ ok: false }` if the resolved name still contains unsubstituted
+ * `{placeholder}` tokens (which would indicate a broken template).
+ *
+ * @param template - Raw template string (pre-validated)
+ * @param phaseNumber - Phase number string (e.g. `"1"`)
+ * @param phaseSlug   - Phase slug (e.g. `"setup"`) — falls back to `"phase"`
+ * @returns `{ ok: true; branch: string }` or `{ ok: false; reason: string; branch: string }`
+ */
+export function resolveStrategyBranchName(
+  template: string,
+  phaseNumber: string,
+  phaseSlug: string,
+): { ok: true; branch: string } | { ok: false; reason: string; branch: string } {
+  const branch = template
+    .replace('{phase}', phaseNumber)
+    .replace('{slug}', phaseSlug);
+  if (/\{[^}]+\}/.test(branch)) {
+    return {
+      ok: false,
+      reason: `phase_branch_template produced unresolved placeholders: "${branch}"`,
+      branch,
+    };
+  }
+  return { ok: true, branch };
+}
+
 // ─── ensureStrategyBranch ────────────────────────────────────────────────
+
+/**
+ * Result shape returned by ensureStrategyBranch.
+ *
+ * `ok: true`  — branch was already correct or the switch succeeded.
+ * `ok: false` — a hard failure occurred; the caller MUST NOT proceed with the commit.
+ */
+export type StrategyBranchResult =
+  | { ok: true; reason?: string }
+  | { ok: false; reason: string; branch?: string; err?: string };
 
 /**
  * Create or switch to the configured strategy branch before a commit.
@@ -95,54 +186,115 @@ export function sanitizeCommitMessage(text: string): string {
  * get-shit-done/bin/lib/commands.cjs:285-320 (added in PR #1279 for CJS;
  * ported here to close the SDK gap — bug #3749).
  *
- * Does nothing when:
+ * This version (post codex adversarial review) surfaces every skip
+ * distinctly — no silent swallows.  Callers receive a typed result and
+ * MUST halt on `ok: false`.
+ *
+ * Does nothing (ok: true, with reason logged) when:
  * - branching_strategy is absent, "none", or unrecognised
  * - the current branch is already the target branch
- * - the target branch cannot be determined (phase not found, milestone missing)
+ * - --files was empty and phase cannot be inferred
  *
- * The function is intentionally best-effort: failures to resolve the branch
- * name or switch to it are silently swallowed so that the commit itself is
- * never blocked by a strategy misconfiguration.
+ * Returns ok: false when:
+ * - phase_branch_template is missing/invalid
+ * - --files spans multiple phases (cross-phase commit guard)
+ * - git checkout -b fails for reasons other than "branch already exists"
+ * - git checkout fallback also fails
  *
  * @param projectDir - Project root directory
  * @param workstream - Optional workstream scope
  * @param filePaths  - Explicit file paths being committed (used to infer phase)
  */
-async function ensureStrategyBranch(
+export async function ensureStrategyBranch(
   projectDir: string,
   workstream: string | undefined,
   filePaths: string[],
-): Promise<void> {
+): Promise<StrategyBranchResult> {
   let config: Awaited<ReturnType<typeof loadConfig>>;
   try {
     config = await loadConfig(projectDir, workstream);
   } catch {
-    return; // Malformed or missing config — skip strategy logic
+    // Malformed or missing config — strategy cannot be applied; do not block commit
+    return { ok: true, reason: 'strategy-skipped: config load failed' };
   }
 
   const strategy = config.git.branching_strategy;
-  if (!strategy || strategy === 'none') return;
+  if (!strategy || strategy === 'none') return { ok: true };
 
   let branchName: string | null = null;
 
   if (strategy === 'phase') {
-    // Infer the phase number from the file paths being committed.
-    // CJS parity: join paths and match the first numeric phase token.
-    const phaseMatch = filePaths.join(' ').match(/(\d+(?:\.\d+)*)-/);
-    if (phaseMatch) {
-      const phaseNum = phaseMatch[1];
-      try {
-        const phaseInfo = await findPhaseByNumber(projectDir, phaseNum, workstream);
-        if (phaseInfo && phaseInfo.phase_number) {
-          branchName = config.git.phase_branch_template
-            .replace('{phase}', phaseInfo.phase_number)
-            .replace('{slug}', phaseInfo.phase_slug ?? 'phase');
+    // Finding 1 fix: parse each path INDIVIDUALLY; collect the full set.
+    const phases = parsePhasesFromFiles(filePaths);
+
+    if (phases.size === 0) {
+      // No phase token found in any file path — strategy cannot be applied.
+      // Log the skip distinctly so it is observable (no-silent-skip contract).
+      return {
+        ok: true,
+        reason: 'strategy-skipped: no phase directory token found in --files paths',
+      };
+    }
+
+    if (phases.size > 1) {
+      // Finding 1 fix: mixed-phase --files — hard rejection.
+      return {
+        ok: false,
+        reason: `branching_strategy: phase requires --files to come from a single phase; got phases [${[...phases].sort().join(', ')}]`,
+      };
+    }
+
+    const [phaseNum] = [...phases];
+
+    // Finding 3 fix: validate template BEFORE calling .replace().
+    const templateCheck = validateBranchTemplate(config.git.phase_branch_template);
+    if (!templateCheck.ok) {
+      return {
+        ok: false,
+        reason: `strategy-skipped: ${templateCheck.reason}`,
+        branch: undefined,
+      };
+    }
+
+    try {
+      const phaseInfo = await findPhaseByNumber(projectDir, phaseNum, workstream);
+      if (phaseInfo && phaseInfo.phase_number) {
+        const resolved = resolveStrategyBranchName(
+          config.git.phase_branch_template,
+          phaseInfo.phase_number,
+          phaseInfo.phase_slug ?? 'phase',
+        );
+        if (!resolved.ok) {
+          return {
+            ok: false,
+            reason: resolved.reason,
+            branch: resolved.branch,
+          };
         }
-      } catch {
-        return; // Phase lookup failure — skip strategy switch
+        branchName = resolved.branch;
+      } else {
+        return {
+          ok: true,
+          reason: `strategy-skipped: phase "${phaseNum}" not found in project`,
+        };
       }
+    } catch (err) {
+      // Phase lookup failure — skip strategy switch but do not block commit
+      return {
+        ok: true,
+        reason: `strategy-skipped: phase lookup threw — ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   } else if (strategy === 'milestone') {
+    // Finding 3 fix: validate milestone template before use.
+    const templateCheck = validateBranchTemplate(config.git.milestone_branch_template);
+    if (!templateCheck.ok) {
+      return {
+        ok: false,
+        reason: `strategy-skipped: ${templateCheck.reason}`,
+      };
+    }
+
     try {
       const milestone = await getMilestoneInfo(projectDir, workstream);
       if (milestone && milestone.version) {
@@ -151,26 +303,77 @@ async function ensureStrategyBranch(
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '')
           .substring(0, 60) || 'milestone';
-        branchName = config.git.milestone_branch_template
+        const resolved = config.git.milestone_branch_template
           .replace('{milestone}', milestone.version)
           .replace('{slug}', slug);
+        if (/\{[^}]+\}/.test(resolved)) {
+          return {
+            ok: false,
+            reason: `milestone_branch_template produced unresolved placeholders: "${resolved}"`,
+            branch: resolved,
+          };
+        }
+        branchName = resolved;
+      } else {
+        return {
+          ok: true,
+          reason: 'strategy-skipped: no active milestone found',
+        };
       }
-    } catch {
-      return; // Milestone lookup failure — skip strategy switch
+    } catch (err) {
+      // Milestone lookup failure — skip strategy switch but do not block commit
+      return {
+        ok: true,
+        reason: `strategy-skipped: milestone lookup threw — ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   }
 
-  if (!branchName) return;
+  if (!branchName) return { ok: true, reason: 'strategy-skipped: branch name could not be resolved' };
 
   // Only switch when we are not already on the target branch.
   const currentBranch = execGit(projectDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  if (currentBranch.exitCode !== 0 || currentBranch.stdout.trim() === branchName) return;
-
-  // Try to create the branch; fall back to switching to an existing one.
-  const create = execGit(projectDir, ['checkout', '-b', branchName]);
-  if (create.exitCode !== 0) {
-    execGit(projectDir, ['checkout', branchName]);
+  if (currentBranch.exitCode !== 0) {
+    // Cannot determine current branch — skip strategy switch, do not block commit
+    return { ok: true, reason: 'strategy-skipped: could not read current branch' };
   }
+  if (currentBranch.stdout.trim() === branchName) return { ok: true };
+
+  // Finding 2 fix: Try to create the branch; distinguish "already exists" from
+  // other failures.  If the fallback checkout also fails, return a hard failure.
+  const create = execGit(projectDir, ['checkout', '-b', branchName]);
+  if (create.exitCode === 0) return { ok: true };
+
+  // Determine whether -b failed because the branch already exists or for some
+  // other reason (e.g. dirty index, missing object).
+  const alreadyExists =
+    create.stderr.includes('already exists') ||
+    create.stderr.includes('already a branch named');
+
+  if (!alreadyExists) {
+    // Finding 2 fix: surface non-existence checkout failure as a hard error.
+    return {
+      ok: false,
+      reason: 'branch_switch_failed',
+      branch: branchName,
+      err: create.stderr || create.stdout || 'git checkout -b failed for an unexpected reason',
+    };
+  }
+
+  // Branch exists — try to switch to it.
+  const fallback = execGit(projectDir, ['checkout', branchName]);
+  if (fallback.exitCode !== 0) {
+    // Finding 2 fix: fallback failure is also a hard error — original #3749 bug
+    // under a different code path.
+    return {
+      ok: false,
+      reason: 'branch_switch_failed',
+      branch: branchName,
+      err: fallback.stderr || fallback.stdout || 'git checkout fallback failed',
+    };
+  }
+
+  return { ok: true };
 }
 
 // ─── commit ───────────────────────────────────────────────────────────────
@@ -236,7 +439,21 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
   // Pre-execution workflows (discuss-phase, plan-phase) commit artifacts but the
   // branch was only created during execute-phase in the CJS path — PR #1279 fixed
   // the CJS side; this block ports that fix to the SDK handler.
-  await ensureStrategyBranch(projectDir, workstream, filePaths);
+  //
+  // Finding 2 fix: ensureStrategyBranch now returns a structured result.  A hard
+  // failure (ok: false) means the branch switch could not complete — proceeding
+  // would silently commit on the wrong branch (the original #3749 bug).  Halt.
+  const strategyResult = await ensureStrategyBranch(projectDir, workstream, filePaths);
+  if (!strategyResult.ok) {
+    return {
+      data: {
+        committed: false,
+        reason: strategyResult.reason,
+        ...(strategyResult.branch ? { branch: strategyResult.branch } : {}),
+        ...(strategyResult.err ? { err: strategyResult.err } : {}),
+      },
+    };
+  }
 
   // Sanitize message
   const sanitized = message ? sanitizeCommitMessage(message) : message;
