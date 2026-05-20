@@ -1,5 +1,5 @@
 <purpose>
-Review source files changed during a phase for bugs, security issues, and code quality problems. Computes file scope (--files override > SUMMARY.md > git diff fallback), checks config gate, spawns gsd-code-reviewer agent, commits REVIEW.md, and presents results to user.
+Review source files changed during a phase for bugs, security issues, and code quality problems. Computes file scope (--files override > SUMMARY.md > git diff fallback), checks config gate, spawns gsd-code-reviewer agent, commits REVIEW.md, and presents results to user. When --fix is passed, delegates to code-review-fix.md after review to auto-apply findings via gsd-code-fixer.
 </purpose>
 
 <required_reading>
@@ -8,6 +8,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <available_agent_types>
 - gsd-code-reviewer: Reviews source files for bugs and quality issues
+- gsd-code-fixer: Applies fixes to code review findings (used via dispatch_fix → code-review-fix.md when --fix is passed)
 </available_agent_types>
 
 <process>
@@ -40,26 +41,25 @@ Error: Phase ${PHASE_ARG} not found. Run /gsd:progress to see available phases.
 
 This runs BEFORE config gate check so user errors are surfaced immediately regardless of config state.
 
-Parse optional flags from $ARGUMENTS:
+Parse optional flags from $ARGUMENTS using the typed flag parser:
 
-**--depth flag:**
 ```bash
-DEPTH_OVERRIDE=""
-for arg in "$@"; do
-  if [[ "$arg" == --depth=* ]]; then
-    DEPTH_OVERRIDE="${arg#--depth=}"
-  fi
-done
-```
+# Parse all code-review flags into a structured IR via code-review-flags.cjs.
+# This is the canonical flag-parsing surface — do not replicate inline bash parsing
+# for --fix/--all/--auto here; the module handles all flag extraction and implication
+# logic (e.g., --all and --auto imply --fix).
+FLAGS_JSON=$(node -e "
+  const { parseCodeReviewFlags } = require('./get-shit-done/bin/lib/code-review-flags.cjs');
+  const flags = parseCodeReviewFlags(process.argv.slice(1));
+  process.stdout.write(JSON.stringify(flags));
+" -- "$@" 2>/dev/null)
 
-**--files flag:**
-```bash
-FILES_OVERRIDE=""
-for arg in "$@"; do
-  if [[ "$arg" == --files=* ]]; then
-    FILES_OVERRIDE="${arg#--files=}"
-  fi
-done
+# Extract individual flag values from the IR
+FIX_FLAG=$(echo "$FLAGS_JSON" | node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).fix))")
+FIX_ALL=$(echo "$FLAGS_JSON" | node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).all))")
+FIX_AUTO=$(echo "$FLAGS_JSON" | node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).auto))")
+DEPTH_OVERRIDE=$(echo "$FLAGS_JSON" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).depth)")
+FILES_OVERRIDE=$(echo "$FLAGS_JSON" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).files)")
 ```
 
 If FILES_OVERRIDE is set, split by comma into array:
@@ -508,6 +508,46 @@ fi
 ```
 </step>
 
+<step name="dispatch_fix">
+If the `--fix` flag was passed (`FIX_FLAG=true`), delegate to the `code-review-fix.md` workflow
+to auto-apply findings from the REVIEW.md that was just written (or that already existed).
+
+This step runs AFTER `commit_review` so REVIEW.md is guaranteed to be on disk before the fixer
+is invoked. If REVIEW.md was not created (agent failed, scope was empty, etc.), the `code-review-fix.md`
+workflow handles the missing-review error and exits cleanly.
+
+```bash
+if [ "$FIX_FLAG" = "true" ]; then
+  echo ""
+  echo "─────────────────────────────────────────────────────────────────"
+  echo "  --fix: delegating to code-review-fix.md"
+  echo "─────────────────────────────────────────────────────────────────"
+  echo ""
+
+  # Build the fix sub-arguments: pass phase arg plus any --all/--auto flags
+  FIX_ARGS="${PHASE_ARG}"
+  if [ "$FIX_ALL" = "true" ]; then
+    FIX_ARGS="${FIX_ARGS} --all"
+  fi
+  if [ "$FIX_AUTO" = "true" ]; then
+    FIX_ARGS="${FIX_ARGS} --auto"
+  fi
+
+  # Load and execute the code-review-fix workflow.
+  # The fix workflow is the canonical implementation for all fix logic:
+  # gsd-code-fixer agent dispatch, --auto iteration loop, REVIEW-FIX.md commit,
+  # and result presentation. Do not duplicate that logic here.
+  Workflow(workflow="get-shit-done/workflows/code-review-fix.md", args="${FIX_ARGS}")
+
+  # Exit after fix workflow completes — present_results is for review-only output.
+  # The fix workflow has its own present_results step.
+  # Exit workflow.
+fi
+```
+
+If `FIX_FLAG` is false, skip this step entirely and proceed to `present_results`.
+</step>
+
 <step name="present_results">
 Read the REVIEW.md YAML frontmatter to extract finding counts.
 
@@ -600,6 +640,7 @@ If `--files` validation fails unexpectedly on macOS, install coreutils or use ab
 <success_criteria>
 - [ ] Phase validated before config gate check
 - [ ] Config gate checked (workflow.code_review)
+- [ ] --fix/--all/--auto flags parsed via code-review-flags.cjs typed IR (not ad-hoc bash)
 - [ ] Depth resolved with validation (quick|standard|deep)
 - [ ] File scope computed with 3 tiers: --files > SUMMARY.md > git diff
 - [ ] Malformed/missing SUMMARY.md handled gracefully with fallback
@@ -609,5 +650,6 @@ If `--files` validation fails unexpectedly on macOS, install coreutils or use ab
 - [ ] Agent spawned with explicit file list, depth, review_path, diff_base
 - [ ] Agent failure handled without partial commits
 - [ ] REVIEW.md committed if created
-- [ ] Results presented inline with next step suggestion
+- [ ] When --fix: dispatch_fix step delegates to code-review-fix.md with --all/--auto forwarded
+- [ ] Results presented inline with next step suggestion (review-only path)
 </success_criteria>
