@@ -389,7 +389,8 @@ function setActiveWorkstream(cwd, name) {
 function findContextMdIn(absDir) {
   try {
     const files = fs.readdirSync(absDir);
-    return files.find(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md') ?? null;
+    if (files.includes('CONTEXT.md')) return 'CONTEXT.md';
+    return files.find(f => f.endsWith('-CONTEXT.md')) ?? null;
   } catch {
     return null;
   }
