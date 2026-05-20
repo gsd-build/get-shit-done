@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { escapeRegex, output, error } = require('./core.cjs');
-const { planningPaths, planningDir } = require('./planning-workspace.cjs');
+const { planningPaths, planningDir, findContextMdIn } = require('./planning-workspace.cjs');
 const { parseDecisions } = require('./decisions.cjs');
 
 /**
@@ -133,8 +133,9 @@ function runGapAnalysis(cwd, phaseDir) {
   const reqMd = fs.existsSync(reqPath) ? fs.readFileSync(reqPath, 'utf-8') : '';
   const reqItems = parseRequirements(reqMd).map(r => ({ ...r, source: 'REQUIREMENTS.md' }));
 
-  const ctxPath = path.join(absPhaseDir, 'CONTEXT.md');
-  const ctxMd = fs.existsSync(ctxPath) ? fs.readFileSync(ctxPath, 'utf-8') : '';
+  const ctxFile = findContextMdIn(absPhaseDir);
+  const ctxPath = ctxFile ? path.join(absPhaseDir, ctxFile) : null;
+  const ctxMd = ctxPath ? fs.readFileSync(ctxPath, 'utf-8') : '';
   const dItems = parseDecisions(ctxMd).map(d => ({ ...d, source: 'CONTEXT.md' }));
 
   const items = [...reqItems, ...dItems];
