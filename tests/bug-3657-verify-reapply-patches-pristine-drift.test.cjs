@@ -334,4 +334,190 @@ describe('Bug #3657: pristine-drift does not produce false FAIL_USER_LINES_MISSI
       ],
     );
   });
+
+  // ---------------------------------------------------------------------------
+  // Finding 1 (BLOCKER) — drifted_files report shape
+  // Asserts that the JSON report top-level carries `drifted` count +
+  // `drifted_files` array so that workflow Step 5a has structured data to gate
+  // on.  Per-file shape is unchanged (backward compat).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Single drifted file: the top-level `drifted` count must be 1 and
+   * `drifted_files` must contain the relative path of the drifted file.
+   * The `failures` count must remain 0 (drift ≠ failure).
+   */
+  test('Finding 1: JSON report includes top-level drifted count and drifted_files when drift is detected', () => {
+    resetFixture();
+
+    const FILE = 'agents/gsd-executor.md';
+    const oldPristineContent = 'old pristine line that was present when backup was captured\n';
+    const newPristineContent = 'new upstream line in the refreshed pristine snapshot version\n';
+    const userLine = 'user customisation line that should be preserved across updates';
+    const backupContent = oldPristineContent + userLine + '\n';
+    const installedContent = newPristineContent + userLine + '\n';
+
+    writeBackupMeta({ pristine_hashes: { [FILE]: sha256(oldPristineContent) } });
+    writeFile(path.join(patchesDir, FILE), backupContent);
+    writeFile(path.join(configDir, FILE), installedContent);
+    writeFile(path.join(pristineDir, FILE), newPristineContent); // hash mismatch → drift
+
+    const { status, report } = runVerifier();
+
+    // Script exits 0 — drift is not a failure.
+    assert.equal(status, 0, `expected exit 0; got ${status}`);
+    assert.equal(report.failures, 0, 'failures must be 0 — drift is not a failure');
+
+    // Finding 1: top-level drifted fields must be present and accurate.
+    assert.equal(typeof report.drifted, 'number', 'report.drifted must be a number');
+    assert.equal(report.drifted, 1, `expected drifted=1; got ${report.drifted}`);
+    assert.ok(Array.isArray(report.drifted_files), 'report.drifted_files must be an array');
+    assert.equal(report.drifted_files.length, 1, `expected 1 drifted_files entry; got ${report.drifted_files.length}`);
+    // Normalize path separator so test passes on Windows worktrees too.
+    assert.equal(
+      report.drifted_files[0].replace(/\\/g, '/'),
+      FILE,
+      `drifted_files[0] must equal the drifted file path; got ${report.drifted_files[0]}`,
+    );
+
+    // Per-file shape is unchanged for backward compat.
+    const r0 = report.results.find((r) => r.file.replace(/\\/g, '/') === FILE);
+    assert.ok(r0, 'per-file result must be present');
+    assert.equal(r0.status, 'ok');
+    assert.equal(r0.reason, REASON.OK_PRISTINE_DRIFT_DETECTED);
+  });
+
+  /**
+   * Multi-file drift: two files drifted, one clean pass. Asserts that the
+   * `drifted` count is 2 and `drifted_files` lists both relative paths.
+   * Confirms `failures` stays at 0.
+   */
+  test('Finding 1: drifted count and drifted_files aggregate correctly across multiple drifted files', () => {
+    resetFixture();
+
+    const FILE_A = 'agents/gsd-executor.md';
+    const FILE_B = 'workflows/update.md';
+    const FILE_C = 'skills/custom/SKILL.md';
+
+    const oldPristineA = 'old pristine content for file A that was captured at backup time\n';
+    const newPristineA = 'refreshed upstream content for file A in the newer GSD snapshot\n';
+    const oldPristineB = 'old pristine content for file B that was captured at backup time\n';
+    const newPristineB = 'refreshed upstream content for file B in the newer GSD snapshot\n';
+    const pristineC   = 'stable pristine for file C — this one did not drift between versions\n';
+    const userLineC   = 'user customisation for file C that survived the merge successfully';
+
+    writeBackupMeta({
+      pristine_hashes: {
+        [FILE_A]: sha256(oldPristineA),
+        [FILE_B]: sha256(oldPristineB),
+        [FILE_C]: sha256(pristineC),
+      },
+    });
+
+    // FILE_A: drifted (hash mismatch)
+    writeFile(path.join(patchesDir, FILE_A), oldPristineA + 'user line A\n');
+    writeFile(path.join(configDir,  FILE_A), newPristineA + 'user line A\n');
+    writeFile(path.join(pristineDir, FILE_A), newPristineA); // mismatch
+
+    // FILE_B: drifted (hash mismatch)
+    writeFile(path.join(patchesDir, FILE_B), oldPristineB + 'user line B\n');
+    writeFile(path.join(configDir,  FILE_B), newPristineB + 'user line B\n');
+    writeFile(path.join(pristineDir, FILE_B), newPristineB); // mismatch
+
+    // FILE_C: clean (hash matches, user line present)
+    writeFile(path.join(patchesDir, FILE_C), pristineC + userLineC + '\n');
+    writeFile(path.join(configDir,  FILE_C), pristineC + userLineC + '\n');
+    writeFile(path.join(pristineDir, FILE_C), pristineC); // matches
+
+    const { status, report } = runVerifier();
+
+    assert.equal(status, 0, `expected exit 0; got ${status}`);
+    assert.equal(report.failures, 0, 'failures must be 0');
+    assert.equal(report.drifted, 2, `expected drifted=2; got ${report.drifted}`);
+    assert.ok(Array.isArray(report.drifted_files), 'drifted_files must be an array');
+    assert.equal(report.drifted_files.length, 2);
+    const normalised = report.drifted_files.map((f) => f.replace(/\\/g, '/'));
+    assert.ok(normalised.includes(FILE_A), `drifted_files must include ${FILE_A}`);
+    assert.ok(normalised.includes(FILE_B), `drifted_files must include ${FILE_B}`);
+    assert.ok(!normalised.includes(FILE_C), `drifted_files must NOT include the clean file ${FILE_C}`);
+  });
+
+  /**
+   * No-drift baseline: when no files have hash mismatch, the top-level
+   * `drifted` field must be 0 and `drifted_files` must be an empty array.
+   * Verifies the additive fields are always present (not omitted on clean runs).
+   */
+  test('Finding 1: drifted=0 and drifted_files=[] when no files have pristine drift', () => {
+    resetFixture();
+
+    const FILE = 'skills/custom/SKILL.md';
+    const pristineContent = 'stable pristine content that did not change between versions\n';
+    const userLine = 'user customisation that survived correctly into the merged file';
+    const backupContent = pristineContent + userLine + '\n';
+    const installedContent = backupContent; // user line survived
+
+    writeBackupMeta({ pristine_hashes: { [FILE]: sha256(pristineContent) } });
+    writeFile(path.join(patchesDir, FILE), backupContent);
+    writeFile(path.join(configDir,  FILE), installedContent);
+    writeFile(path.join(pristineDir, FILE), pristineContent);
+
+    const { status, report } = runVerifier();
+
+    assert.equal(status, 0);
+    assert.equal(report.failures, 0);
+    assert.equal(report.drifted, 0, `expected drifted=0 on clean run; got ${report.drifted}`);
+    assert.ok(Array.isArray(report.drifted_files), 'drifted_files must always be an array');
+    assert.equal(report.drifted_files.length, 0, 'drifted_files must be empty on clean run');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Finding 2 (WARNING) — workflow Step 5a drift-check structural test
+  // Asserts that the workflow markdown source now contains the drift-check
+  // section that gates on `DRIFTED_COUNT > 0`.  Treating the .md source as
+  // the product per allow-test-rule:source-text-is-the-product.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Structural assertion: the workflow source must now contain the drift-check
+   * block that Step 5a uses to halt on drifted files.  This guarantees that the
+   * workflow consumer gate exists and uses the structured `drifted` / `drifted_files`
+   * fields that Finding 1 added to the JSON report.
+   */
+  test('Finding 2: workflow Step 5a source contains drift-check section for DRIFTED_COUNT gate', () => {
+    const workflowPath = path.join(ROOT, 'get-shit-done', 'workflows', 'reapply-patches.md');
+    const workflowSource = fs.readFileSync(workflowPath, 'utf8');
+
+    // The drift-check block must be present in Step 5a.
+    assert.ok(
+      workflowSource.includes('Step 5a: drift check'),
+      'workflow must contain "Step 5a: drift check" heading',
+    );
+
+    // Must gate on the drifted count field from the JSON report.
+    assert.ok(
+      workflowSource.includes('DRIFTED_COUNT'),
+      'workflow must reference DRIFTED_COUNT so it gates on the structured drifted field',
+    );
+
+    // Must reference drifted_files so the halt message names each drifted path.
+    assert.ok(
+      workflowSource.includes('drifted_files'),
+      'workflow must reference drifted_files to name each drifted path in the halt message',
+    );
+
+    // Must instruct the user to resolve drift before re-running.
+    assert.ok(
+      workflowSource.includes('DRIFT_DETECTED'),
+      'workflow must set DRIFT_DETECTED flag when drift is found (signals halt to subsequent steps)',
+    );
+
+    // The drift check must appear BEFORE the VERIFY_STATUS non-zero check.
+    // (Drift can be present even when exit code is 0.)
+    const driftCheckPos    = workflowSource.indexOf('Step 5a: drift check');
+    const verifyStatusPos  = workflowSource.indexOf('If `VERIFY_STATUS` is non-zero');
+    assert.ok(
+      driftCheckPos < verifyStatusPos,
+      'drift-check block must appear before the VERIFY_STATUS non-zero check in Step 5a',
+    );
+  });
 });

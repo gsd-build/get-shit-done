@@ -175,7 +175,9 @@ describe('Bug #2969: deterministic Step 5 verification gate', () => {
 
     const { status, report } = runVerifier();
     assert.equal(status, 1);
-    assert.deepEqual(Object.keys(report).sort(), ['checked', 'failures', 'results']);
+    // Bug #3657 (Finding 1): drifted + drifted_files are additive fields added to surface
+    // pristine-drift skips distinctly from failures.  Shape-lock updated to include them.
+    assert.deepEqual(Object.keys(report).sort(), ['checked', 'drifted', 'drifted_files', 'failures', 'results']);
     const r0 = report.results[0];
     assert.deepEqual(Object.keys(r0).sort(), ['file', 'missing', 'reason', 'status']);
     assert.equal(typeof r0.file, 'string');
