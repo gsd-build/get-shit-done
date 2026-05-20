@@ -289,8 +289,20 @@ function main() {
 
   const failures = results.filter((r) => r.status === 'fail');
 
+  // Bug #3657 (Finding 1): aggregate drifted files into top-level report fields
+  // so workflow Step 5a can gate on drift distinctly from failures.  Drift is
+  // NOT a failure (exit code stays 0) but the workflow now has structured data
+  // to decide whether to proceed.  Per-file shape is unchanged: each drifted
+  // result still has status:'ok' + reason:OK_PRISTINE_DRIFT_DETECTED for
+  // backward compat.  The new top-level fields are purely additive.
+  const driftedResults = results.filter((r) => r.reason === REASON.OK_PRISTINE_DRIFT_DETECTED);
+  const drifted = driftedResults.length;
+  const drifted_files = driftedResults.map((r) => r.file);
+
   if (opts.json) {
-    process.stdout.write(JSON.stringify({ checked: results.length, failures: failures.length, results }, null, 2) + '\n');
+    process.stdout.write(
+      JSON.stringify({ checked: results.length, failures: failures.length, drifted, drifted_files, results }, null, 2) + '\n',
+    );
   } else {
     process.stdout.write(`# Hunk Verification Gate (#2969)\n\n`);
     process.stdout.write(`Checked: ${results.length} file(s)\n`);
