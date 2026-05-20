@@ -984,6 +984,68 @@ function reconcileCodexHooksJsonSessionStart(targetDir, opts = {}) {
 }
 
 /**
+ * Build a typed IR for the Codex hook .cmd shim used on Windows (#3426).
+ *
+ * On Windows, Codex runs hook commands from a PowerShell/cmd execution
+ * environment. The previous command format was:
+ *
+ *   "C:/Program Files/nodejs/node.exe" "C:/path/.codex/hooks/gsd-check-update.js"
+ *
+ * This caused `bash.exe: bash.exe: cannot execute binary file` because
+ * Codex's hook dispatch shell (Git Bash / MSYS) tried to POSIX-exec node.exe
+ * (a Windows PE binary) via execvp(), which fails with ENOEXEC on Windows PE
+ * binaries that the MSYS layer doesn't know how to fork-exec natively.
+ *
+ * Fix: write a .cmd shim (same IR pattern as buildWindowsShimTriple for
+ * gsd-sdk.cmd) whose content is `@node "script.js" %*`. cmd.exe executes
+ * .cmd natively via CreateProcess — no POSIX exec layer, no MSYS shebang
+ * walk, no PE binary fork-exec failure.
+ *
+ * Returns the typed IR `{ invocation, cmdPath, hookCommand, render }` so
+ * callers can assert on the structured shape (CONTRIBUTING.md L558–L565
+ * IR-first discipline).  Returns null when absoluteRunnerToken is null so
+ * callers can warn-and-skip instead of writing a broken hook.
+ *
+ * @param {string} scriptAbsPath - Absolute path to the .js hook script.
+ * @param {string|null} absoluteRunnerToken - JSON-quoted absolute node path
+ *   (result of resolveNodeRunner()), e.g. `"C:/Program Files/nodejs/node.exe"`.
+ * @returns {{ invocation: { interpreter: string, target: string }, cmdPath: string, hookCommand: string, render: { cmd: () => string } }|null}
+ */
+function buildCodexHookWindowsShimIR(scriptAbsPath, absoluteRunnerToken) {
+  if (!absoluteRunnerToken) return null;
+  // absoluteRunnerToken is JSON-quoted (e.g. '"C:/path/node.exe"'). Unwrap to
+  // get the raw interpreter path for the invocation record and render output.
+  let interpreter;
+  try {
+    interpreter = JSON.parse(absoluteRunnerToken);
+  } catch {
+    interpreter = absoluteRunnerToken;
+  }
+  // Normalise to forward slashes for cross-shell safety (same as other Windows
+  // hook path normalisations in this codebase).
+  const targetAbs = scriptAbsPath.replace(/\\/g, '/');
+  const scriptQuoted = JSON.stringify(targetAbs);
+  // .cmd shim lives alongside the .js file, replacing the extension.
+  const cmdPath = scriptAbsPath.replace(/\.js$/, '.cmd');
+  // The hook command written to hooks.json is just the .cmd path (double-quoted
+  // for spaces-in-path safety). cmd.exe executes .cmd files natively via
+  // CreateProcess — no runner prefix required.
+  const hookCommand = JSON.stringify(cmdPath.replace(/\\/g, '/'));
+  const runnerQuoted = JSON.stringify(interpreter);
+  return {
+    invocation: { interpreter, target: scriptAbsPath },
+    cmdPath,
+    hookCommand,
+    render: {
+      // Mirror buildWindowsShimTriple's CRLF line endings for strict
+      // cmd.exe compatibility (LF-only .cmd files work in modern Windows but
+      // CRLF is canonical and what the existing gsd-sdk.cmd triple emits).
+      cmd: () => `@ECHO OFF\r\n@SETLOCAL\r\n@${runnerQuoted} ${scriptQuoted} %*\r\n`,
+    },
+  };
+}
+
+/**
  * Ensure Codex hooks.json contains exactly one managed SessionStart
  * gsd-check-update hook entry, while preserving user-owned entries.
  *
@@ -996,6 +1058,10 @@ function reconcileCodexHooksJsonSessionStart(targetDir, opts = {}) {
  *   1) { "SessionStart": [...] }
  *   2) { "hooks": { "SessionStart": [...] } }
  *
+ * On Windows, writes a .cmd shim alongside the .js hook file and uses the
+ * .cmd path as the hook command to avoid the `bash.exe: cannot execute binary
+ * file` failure (#3426).
+ *
  * @param {string} targetDir
  * @param {{ absoluteRunner: string|null, platform?: NodeJS.Platform }} opts
  * @returns {{ changed: boolean, wrote: boolean, path: string }}
@@ -1005,12 +1071,41 @@ function ensureCodexHooksJsonSessionStart(targetDir, opts = {}) {
   const absoluteRunner = opts.absoluteRunner || null;
   const hooksJsonPath = path.join(targetDir, 'hooks.json');
   if (!absoluteRunner) return { changed: false, wrote: false, path: hooksJsonPath };
-  const managedCommand = projectManagedHookCommand({
-    absoluteRunner,
-    scriptPath: path.resolve(targetDir, 'hooks', 'gsd-check-update.js'),
-    runtime: 'codex',
-    platform,
-  });
+
+  const scriptPath = path.resolve(targetDir, 'hooks', 'gsd-check-update.js');
+
+  let managedCommand;
+  if (platform === 'win32') {
+    // #3426 fix: on Windows, write a .cmd shim and use its path as the hook
+    // command. This avoids the MSYS bash.exe POSIX-exec failure when Codex's
+    // hook dispatcher tries to run node.exe through the Git Bash exec layer.
+    const shimIR = buildCodexHookWindowsShimIR(scriptPath, absoluteRunner);
+    if (!shimIR) return { changed: false, wrote: false, path: hooksJsonPath };
+    try {
+      atomicWriteFileSync(shimIR.cmdPath, shimIR.render.cmd(), 'utf8');
+    } catch {
+      // Shim write failed — fall back to the node-runner command so the
+      // installer does not silently drop the hook. The fallback may still fail
+      // at runtime on Windows but is better than no hook at all.
+      const fallback = projectManagedHookCommand({
+        absoluteRunner,
+        scriptPath,
+        runtime: 'codex',
+        platform,
+      });
+      if (!fallback) return { changed: false, wrote: false, path: hooksJsonPath };
+      return reconcileCodexHooksJsonSessionStart(targetDir, { managedCommand: fallback });
+    }
+    managedCommand = shimIR.hookCommand;
+  } else {
+    managedCommand = projectManagedHookCommand({
+      absoluteRunner,
+      scriptPath,
+      runtime: 'codex',
+      platform,
+    });
+  }
+
   if (!managedCommand) return { changed: false, wrote: false, path: hooksJsonPath };
   return reconcileCodexHooksJsonSessionStart(targetDir, { managedCommand });
 }
@@ -11210,6 +11305,8 @@ module.exports = {
     rewriteLegacyManagedNodeHookCommands,
     buildCodexHookBlock,
     rewriteLegacyCodexHookBlock,
+    buildCodexHookWindowsShimIR,
+    ensureCodexHooksJsonSessionStart,
     readGsdCommandNames,
     installRuntimeArtifacts,
     uninstallRuntimeArtifacts,

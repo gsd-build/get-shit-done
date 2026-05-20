@@ -125,6 +125,10 @@ const MANAGED_HOOK_COMMAND_BASENAMES_BY_SURFACE = {
   ]),
   'codex-hooks-json': new Set([
     'gsd-check-update.js',
+    // #3426: Windows .cmd shim for Codex hook — must be treated as managed so
+    // reconcileCodexHooksJsonSessionStart can replace stale node-runner commands
+    // with the .cmd shim on reinstall (and vice-versa on cross-platform moves).
+    'gsd-check-update.cmd',
   ]),
 };
 
