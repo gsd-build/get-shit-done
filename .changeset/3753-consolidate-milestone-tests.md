@@ -1,3 +1,7 @@
+---
+type: Fixed
+pr: 3753
+---
 <!-- docs-exempt: internal test refactor only — no user-facing surface changed -->
 
 ## Summary
