@@ -934,6 +934,10 @@ function acquireStateLock(statePath) {
       _heldStateLocks.add(lockPath);
       return lockPath;
     } catch (err) {
+      // EPERM / EBUSY occur transiently on some OS + AV scanner combinations when
+      // the lock file is briefly held open by the process that is deleting it.
+      // These are recoverable — retry the acquisition loop.
+      if (err.code === 'EPERM' || err.code === 'EBUSY') { continue; }
       if (err.code !== 'EEXIST') throw err; // propagate — silent bypass causes lost updates
       // Only unlink a lock we did not place when it has crossed the staleness
       // threshold (crashed holder). Nuking a fresh lock held by a slow-but-live

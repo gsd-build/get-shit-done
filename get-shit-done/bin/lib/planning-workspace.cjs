@@ -259,6 +259,13 @@ function withPlanningLock(cwd, fn) {
     try {
       return runWithHeldLock();
     } catch (err) {
+      // EPERM / EBUSY occur transiently on some OS + AV scanner combinations when
+      // the lock file is briefly held open by the deleting process.  Treat as EEXIST
+      // (file contention) — wait and retry rather than propagating.
+      if (err.code === 'EPERM' || err.code === 'EBUSY') {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+        continue;
+      }
       if (err.code === 'EEXIST') {
         // Lock exists — check if stale (>30s old)
         try {
