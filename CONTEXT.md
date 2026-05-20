@@ -14,6 +14,9 @@ Module owning `milestone complete` (archive roadmap/requirements/phases, build M
 ### Dispatch Pipeline Module
 Module that composes Dispatch Policy Module, Query Execution Policy Module, and per-stage handlers (input-validation, plan, execution, result-builder, formatting, error-mapping, observability) into the end-to-end pipeline that produces a `QueryDispatchResult`. Entry point: `sdk/src/query/query-dispatch.ts`. Typed contract: `sdk/src/query/query-dispatch-contract.ts`.
 
+### Phase Lifecycle Module
+Module owning phase create, rename, complete, remove, list, and plan-index operations, plus phase-dir prefix validation, STATE.md staleness detection, and auto-prune behaviour. Entry points: `get-shit-done/bin/lib/phase.cjs` (CJS surface) and `sdk/src/query/phase.ts` (SDK native query). Typed events: `GSDPhaseStartEvent`, `GSDPhaseStepStartEvent`, `GSDPhaseStepCompleteEvent`, `GSDPhaseCompleteEvent` (see `sdk/src/types.ts`). Phase execution is driven by `sdk/src/phase-runner.ts`; prompt construction by `sdk/src/phase-prompt.ts`.
+
 ### Dispatch Policy Module
 Module owning dispatch error mapping, fallback policy, timeout classification, and CLI exit mapping contract.
 
