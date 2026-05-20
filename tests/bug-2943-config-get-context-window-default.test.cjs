@@ -52,10 +52,13 @@ describe('bug-2943: config-get returns schema default for context_window', () =>
     let stderr = '';
     let exitCode = 0;
     try {
+      // Windows/Node 22 under --test-concurrency=4 can starve subprocess slots when
+      // sharing a wave with bug-2760-codex-install (8–15s install subtests). 15s covers
+      // observed worst case (13.5s) with headroom.
       stdout = execFileSync(process.execPath, args, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 5000,
+        timeout: 15000,
       });
     } catch (err) {
       exitCode = err.status ?? 1;
