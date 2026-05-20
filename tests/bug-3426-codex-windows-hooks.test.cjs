@@ -140,6 +140,51 @@ describe('#3426 — buildCodexHookWindowsShimIR: typed IR (not rendered text)', 
   });
 });
 
+// ─── Step 2b: Typed IR — eol / quoting / passthroughArgs ─────────────────────
+// Per CONTRIBUTING.md L558-L565: assert on the typed IR, not on rendered text.
+// These assertions cover the three bug-critical render semantics that
+// text-matching tests would miss (silent EOL/quoting/passthrough regressions).
+
+describe('#3426 — buildCodexHookWindowsShimIR: typed IR eol / quoting / passthroughArgs', () => {
+  const FAKE_SCRIPT = 'C:/Users/me/.codex/hooks/gsd-check-update.js';
+  const FAKE_RUNNER = '"C:/Program Files/nodejs/node.exe"';
+
+  test('eol.cmd is CRLF (\\r\\n) — canonical for cmd.exe .cmd files', () => {
+    const ir = buildCodexHookWindowsShimIR(FAKE_SCRIPT, FAKE_RUNNER);
+    assert.ok(ir && typeof ir.eol === 'object', 'IR must expose an eol field');
+    assert.strictEqual(
+      ir.eol.cmd,
+      '\r\n',
+      'eol.cmd must be CRLF (\\r\\n) — LF-only .cmd files risk silent parse failures on some Windows versions',
+    );
+  });
+
+  test('invocation.target has no shell-metachar leakage (clean absolute path)', () => {
+    const ir = buildCodexHookWindowsShimIR(FAKE_SCRIPT, FAKE_RUNNER);
+    const target = ir.invocation.target;
+    assert.ok(typeof target === 'string' && target.length > 0, 'invocation.target must be a non-empty string');
+    // The target stored in the IR is the raw unquoted path — quoting happens at
+    // render time. A metachar in the raw value means the IR is already corrupted.
+    assert.ok(
+      !target.includes('"') && !target.includes("'") && !target.includes('`'),
+      `invocation.target must be the raw path without shell quoting, got: ${target}`,
+    );
+    assert.ok(
+      target.endsWith('.js'),
+      `invocation.target must resolve to the .js script, got: ${target}`,
+    );
+  });
+
+  test('passthroughArgs is true — shim forwards all args via %*', () => {
+    const ir = buildCodexHookWindowsShimIR(FAKE_SCRIPT, FAKE_RUNNER);
+    assert.strictEqual(
+      ir.passthroughArgs,
+      true,
+      'passthroughArgs must be true: the .cmd shim must forward all arguments to the node script via %*',
+    );
+  });
+});
+
 // ─── Step 3: Counter-test — non-Windows platforms use node-runner command ────
 
 describe('#3426 counter-test: darwin/linux Codex paths use node-runner command (not .cmd shim)', () => {
