@@ -1,6 +1,6 @@
 ---
 type: Changed
-pr: 3738
+pr: 3752
 ---
 <!-- docs-exempt: internal test refactor only — no user-facing surface changed -->
 
