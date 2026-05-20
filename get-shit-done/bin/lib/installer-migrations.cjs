@@ -308,8 +308,12 @@ function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEO
           const isDeadProcess = !isPidAlive(holderPid);
           if (isSameProcess || isDeadProcess) {
             // Reclaim: remove the stale lock and loop back to openSync.
-            try { fs.unlinkSync(lockPath); } catch { /* best-effort — may already be gone */ }
-            continue;
+            // Only continue (retry) when unlink actually succeeds — a silent
+            // continue on reclaim failure recreates the original deadlock:
+            // the lock stays on disk and we spin indefinitely.
+            let reclaimed = false;
+            try { fs.unlinkSync(lockPath); reclaimed = true; } catch { /* unlink failed — fall through to timeout path */ }
+            if (reclaimed) continue;
           }
         }
         if (Date.now() - started >= timeoutMs) {
