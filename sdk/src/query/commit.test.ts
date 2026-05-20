@@ -483,3 +483,129 @@ describe('commit --respect-staged (#3522)', () => {
     expect(diff).toContain('// modified in working tree');
   });
 });
+
+// ─── branching strategy (#1279, #3749) ─────────────────────────────────────
+
+describe('commit branching strategy (#1279, #3749)', () => {
+  function currentBranch(cwd: string): string {
+    return execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf-8' }).trim();
+  }
+
+  beforeEach(() => {
+    // Pin the initial branch name so the assertion does not depend on the
+    // local `init.defaultBranch` git config (defaults vary across machines).
+    execSync('git checkout -b main', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git config user.name "Test User"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  async function seedInitialCommit(): Promise<void> {
+    // Seed an initial commit so HEAD is resolvable when the handler runs
+    // `git rev-parse --abbrev-ref HEAD` before staging.
+    await writeFile(join(tmpDir, 'README.md'), '# repro');
+    execSync('git add README.md', { cwd: tmpDir, stdio: 'pipe' });
+    execSync('git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+  }
+
+  it('creates strategy branch before first commit when branching_strategy is phase', async () => {
+    await seedInitialCommit();
+    const { commit } = await import('./commit.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        commit_docs: true,
+        git: { branching_strategy: 'phase', phase_branch_template: 'gsd/phase-{phase}-{slug}' },
+      }),
+    );
+    await mkdir(join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+    await writeFile(
+      join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n## Phase 1: Setup\nGoal: Initial setup\n',
+    );
+    await writeFile(join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context\n');
+
+    const result = await commit(
+      ['docs(01): add context', '--files', '.planning/phases/01-setup/01-CONTEXT.md'],
+      tmpDir,
+    );
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+    expect(currentBranch(tmpDir)).toBe('gsd/phase-01-setup');
+  });
+
+  it('creates strategy branch before first commit when branching_strategy is milestone', async () => {
+    await seedInitialCommit();
+    const { commit } = await import('./commit.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        commit_docs: true,
+        git: {
+          branching_strategy: 'milestone',
+          milestone_branch_template: 'gsd/{milestone}-{slug}',
+        },
+      }),
+    );
+    // getMilestoneInfo() reads ROADMAP.md for the version and name.
+    await writeFile(
+      join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## v1.0: Initial Release\n\n### Phase 1: Setup\n',
+    );
+    await writeFile(join(tmpDir, '.planning', 'test-context.md'), '# Context\n');
+
+    const result = await commit(
+      ['docs: add context', '--files', '.planning/test-context.md'],
+      tmpDir,
+    );
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+    expect(currentBranch(tmpDir)).toBe('gsd/v1.0-initial-release');
+  });
+
+  it('captures decimal phase numbers in the strategy branch name', async () => {
+    await seedInitialCommit();
+    const { commit } = await import('./commit.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({
+        commit_docs: true,
+        git: { branching_strategy: 'phase', phase_branch_template: 'gsd/phase-{phase}-{slug}' },
+      }),
+    );
+    await mkdir(join(tmpDir, '.planning', 'phases', '45.14-golden-capture'), { recursive: true });
+    await writeFile(
+      join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n## Phase 45.14: Golden Capture\nGoal: Capture golden standard\n',
+    );
+    await writeFile(
+      join(tmpDir, '.planning', 'phases', '45.14-golden-capture', '45.14-CONTEXT.md'),
+      '# Context\n',
+    );
+
+    const result = await commit(
+      [
+        'docs(45.14): add context',
+        '--files',
+        '.planning/phases/45.14-golden-capture/45.14-CONTEXT.md',
+      ],
+      tmpDir,
+    );
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+    expect(currentBranch(tmpDir)).toBe('gsd/phase-45.14-golden-capture');
+  });
+
+  it('does not switch branches when branching_strategy is none', async () => {
+    await seedInitialCommit();
+    const { commit } = await import('./commit.js');
+    await writeFile(
+      join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ commit_docs: true, git: { branching_strategy: 'none' } }),
+    );
+    await writeFile(join(tmpDir, '.planning', 'note.md'), '# Note\n');
+
+    const result = await commit(
+      ['docs: add note', '--files', '.planning/note.md'],
+      tmpDir,
+    );
+    expect((result.data as { committed: boolean }).committed).toBe(true);
+    expect(currentBranch(tmpDir)).toBe('main');
+  });
+});

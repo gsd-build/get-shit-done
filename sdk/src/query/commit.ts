@@ -20,7 +20,10 @@
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { GSDError } from '../errors.js';
+import { loadConfig } from '../config.js';
 import { planningPaths, resolvePathUnderProject } from './helpers.js';
+import { findPhase } from './phase.js';
+import { getMilestoneInfo } from './roadmap.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── execGit ──────────────────────────────────────────────────────────────
@@ -81,6 +84,84 @@ export function sanitizeCommitMessage(text: string): string {
   sanitized = sanitized.replace(/<<\s*SYS\s*>>/gi, '\u00ABSYS-TEXT\u00BB');
 
   return sanitized;
+}
+
+// ─── ensureStrategyBranch ─────────────────────────────────────────────────
+
+/**
+ * Ensure the configured branching-strategy branch exists before the first
+ * pre-execution commit. Ported from `cmdCommit` in
+ * `get-shit-done/bin/lib/commands.cjs:285-320` (PR #1279) so the SDK commit
+ * handler creates the same branch the CJS path does. Without this port,
+ * pre-execution workflows (`/gsd-discuss-phase`, `/gsd-plan-phase`) that
+ * commit through `gsd-sdk query commit` land their artifacts on whatever
+ * branch the user happened to be on — typically `main` (#3749).
+ *
+ * No-ops when `branching_strategy` is `none` or unset, or when the resolved
+ * branch matches the current branch. Failures to read config, locate the
+ * phase, or run git are swallowed so a config-resolution problem never
+ * blocks an otherwise-valid commit.
+ */
+async function ensureStrategyBranch(
+  projectDir: string,
+  files: string[],
+  workstream?: string,
+): Promise<void> {
+  let config;
+  try {
+    config = await loadConfig(projectDir, workstream);
+  } catch {
+    return;
+  }
+  const strategy = config.git?.branching_strategy;
+  if (!strategy || strategy === 'none') return;
+
+  let branchName: string | null = null;
+
+  if (strategy === 'phase') {
+    const phaseMatch = files.join(' ').match(/(\d+(?:\.\d+)*)-/);
+    if (!phaseMatch) return;
+    const phaseNum = phaseMatch[1];
+    let phaseInfo;
+    try {
+      const result = await findPhase([phaseNum], projectDir, workstream);
+      phaseInfo = result.data as { found: boolean; phase_number: string | null; phase_slug: string | null };
+    } catch {
+      return;
+    }
+    if (!phaseInfo || !phaseInfo.found || !phaseInfo.phase_number) return;
+    branchName = config.git.phase_branch_template
+      .replace('{phase}', phaseInfo.phase_number)
+      .replace('{slug}', phaseInfo.phase_slug || 'phase');
+  } else if (strategy === 'milestone') {
+    let milestone;
+    try {
+      milestone = await getMilestoneInfo(projectDir, workstream);
+    } catch {
+      return;
+    }
+    if (!milestone || !milestone.version) return;
+    const slug = (milestone.name || 'milestone')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 60) || 'milestone';
+    branchName = config.git.milestone_branch_template
+      .replace('{milestone}', milestone.version)
+      .replace('{slug}', slug);
+  }
+
+  if (!branchName) return;
+
+  const currentBranch = execGit(projectDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (currentBranch.exitCode !== 0) return;
+  if (currentBranch.stdout === branchName) return;
+
+  // Try to create the branch; if it already exists, switch to it instead.
+  const create = execGit(projectDir, ['checkout', '-b', branchName]);
+  if (create.exitCode !== 0) {
+    execGit(projectDir, ['checkout', branchName]);
+  }
 }
 
 // ─── commit ───────────────────────────────────────────────────────────────
@@ -155,6 +236,12 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
   // Compute pathspec once: the handler commits exactly the paths it staged,
   // never anything that was pre-staged externally (#3061).
   const pathsToCommit = filePaths.length > 0 ? filePaths : ['.planning/'];
+
+  // Create the configured branching-strategy branch before staging so the
+  // first pre-execution commit lands on it instead of whatever branch the
+  // user started from. Ported from CJS cmdCommit (#1279) — see
+  // ensureStrategyBranch for #3749 context.
+  await ensureStrategyBranch(projectDir, pathsToCommit, workstream);
 
   // When --respect-staged is set, skip re-staging so that per-hunk staging
   // from `git add -p` is preserved. Without the flag, run git add for each
