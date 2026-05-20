@@ -1,5 +1,5 @@
 ---
-type: Chore
+type: Changed
 pr: 3758
 ---
 <!-- docs-exempt: internal test refactor, no API/behavior change -->
