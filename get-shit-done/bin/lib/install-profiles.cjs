@@ -64,6 +64,7 @@ const PROFILES = Object.freeze({
     'phase',
     'help',
     'update',
+    'surface',
   ]),
   standard: Object.freeze([
     // Core loop
@@ -73,6 +74,7 @@ const PROFILES = Object.freeze({
     'execute-phase',
     'help',
     'update',
+    'surface',
     // Phase management (hot nodes from audit — required by 38+ skills)
     'phase',
     'review',
