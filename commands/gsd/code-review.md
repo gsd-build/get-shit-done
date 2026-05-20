@@ -32,6 +32,7 @@ Output: {padded_phase}-REVIEW.md in phase directory + inline summary of findings
 
 <execution_context>
 @~/.claude/get-shit-done/workflows/code-review.md
+@~/.claude/get-shit-done/workflows/code-review-fix.md
 </execution_context>
 
 <context>
@@ -56,4 +57,5 @@ The workflow (not this command) enforces these gates:
 - Empty scope check (skip if no files)
 - Agent spawning (gsd-code-reviewer)
 - Result presentation (inline summary + next steps)
+- `--fix` dispatch to `code-review-fix.md` when present (#3727) — fix workflow re-parses `--all` / `--auto` from forwarded args and runs the gsd-code-fixer spawn + optional iteration loop
 </process>
