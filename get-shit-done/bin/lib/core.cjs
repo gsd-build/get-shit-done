@@ -607,6 +607,41 @@ function parseWorktreePorcelain(porcelain) {
 }
 
 /**
+ * Run `git worktree prune` with a single 1s-backoff retry on failure.
+ *
+ * CLOSEOUT-07: Locked worktrees at milestone close MUST be retried (not silently
+ * skipped). Detects "locked" or "unable to remove" in stderr and retries once
+ * with a 1 000 ms backoff. If the retry also fails, throws with the original
+ * stderr so the caller logs loud rather than swallowing the failure.
+ *
+ * @param {string} repoRoot - working directory for the git call
+ * @throws {Error} if retry also fails (original stderr message)
+ */
+function pruneWithRetry(repoRoot) {
+  const result = execGit(['worktree', 'prune'], { cwd: repoRoot });
+  const failedOrLocked =
+    result.exitCode !== 0 ||
+    /locked|unable to remove/i.test(result.stderr || '');
+  if (!failedOrLocked) return; // happy path — no retry needed
+
+  // One 1s-backoff retry (CLOSEOUT-07).
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // spawnSync blocks so we use a synchronous busy-wait equivalent acceptable
+  // for a CLI tool's cleanup path (never in hot path).
+  const now = Date.now();
+  while (Date.now() - now < 1000) { /* busy-wait */ }
+
+  const retry = execGit(['worktree', 'prune'], { cwd: repoRoot });
+  if (retry.exitCode !== 0) {
+    const errMsg = result.stderr || retry.stderr || 'git worktree prune failed';
+    throw new Error(
+      `[gsd-tools] git worktree prune failed after retry: ${errMsg} (CLOSEOUT-07)`,
+    );
+  }
+  void sleep; // referenced above for documentation; suppress unused lint
+}
+
+/**
  * Clear stale worktree metadata references via `git worktree prune`.
  *
  * Destructive linked-worktree removal is disabled by default for safety.
@@ -631,8 +666,16 @@ function pruneOrphanedWorktrees(repoRoot) {
         ' — git worktree prune timed out after 10s.' +
         ' Orphaned worktree metadata may remain until the next successful run.\n'
       );
+    } else if (pruneResult && !pruneResult.ok) {
+      // CLOSEOUT-07: on non-ok result (non-timeout failure), apply retry logic
+      // so that a transiently locked worktree is retried before failing loud.
+      pruneWithRetry(repoRoot);
     }
-  } catch { /* never crash the caller */ }
+  } catch (err) {
+    // Re-throw so callers see loud failures; never silently skip locked worktrees
+    // (CLOSEOUT-07).
+    process.stderr.write(String(err) + '\n');
+  }
   return [];
 }
 

@@ -1201,6 +1201,8 @@ describe('phaseComplete', () => {
     await writeFile(join(p10Dir, '10-01-SUMMARY.md'), 'summary1', 'utf-8');
     await writeFile(join(p10Dir, '10-02-SUMMARY.md'), 'summary2', 'utf-8');
     await writeFile(join(p10Dir, '10-03-SUMMARY.md'), 'summary3', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p10Dir, '10-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
     // Create REQUIREMENTS.md
     await writeFile(join(tmpDir, '.planning', 'REQUIREMENTS.md'), REQUIREMENTS_FOR_COMPLETE, 'utf-8');
 
@@ -1241,6 +1243,8 @@ describe('phaseComplete', () => {
     await writeFile(join(p10Dir, '10-01-SUMMARY.md'), 'summary1', 'utf-8');
     await writeFile(join(p10Dir, '10-02-SUMMARY.md'), 'summary2', 'utf-8');
     await writeFile(join(p10Dir, '10-03-SUMMARY.md'), 'summary3', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p10Dir, '10-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
     await writeFile(join(tmpDir, '.planning', 'REQUIREMENTS.md'), REQUIREMENTS_FOR_COMPLETE, 'utf-8');
 
     await phaseComplete(['10'], tmpDir);
@@ -1268,6 +1272,8 @@ describe('phaseComplete', () => {
     await writeFile(join(p10Dir, '10-01-SUMMARY.md'), 'summary', 'utf-8');
     await writeFile(join(p10Dir, '10-02-SUMMARY.md'), 'summary', 'utf-8');
     await writeFile(join(p10Dir, '10-03-SUMMARY.md'), 'summary', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p10Dir, '10-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
     await writeFile(join(tmpDir, '.planning', 'REQUIREMENTS.md'), REQUIREMENTS_FOR_COMPLETE, 'utf-8');
 
     await phaseComplete(['10'], tmpDir);
@@ -1293,6 +1299,8 @@ describe('phaseComplete', () => {
     const p10Dir = join(tmpDir, '.planning', 'phases', '10-read-only-queries');
     await writeFile(join(p10Dir, '10-01-PLAN.md'), 'plan', 'utf-8');
     await writeFile(join(p10Dir, '10-01-SUMMARY.md'), 'summary', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p10Dir, '10-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
     await writeFile(join(tmpDir, '.planning', 'REQUIREMENTS.md'), REQUIREMENTS_FOR_COMPLETE, 'utf-8');
 
     const result = await phaseComplete(['10'], tmpDir);
@@ -1313,6 +1321,8 @@ describe('phaseComplete', () => {
     const p11Dir = join(tmpDir, '.planning', 'phases', '11-final-phase');
     await writeFile(join(p11Dir, '11-01-PLAN.md'), 'plan', 'utf-8');
     await writeFile(join(p11Dir, '11-01-SUMMARY.md'), 'summary', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p11Dir, '11-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
     await writeFile(join(tmpDir, '.planning', 'REQUIREMENTS.md'), REQUIREMENTS_FOR_COMPLETE, 'utf-8');
 
     const result = await phaseComplete(['11'], tmpDir);
@@ -1380,6 +1390,8 @@ describe('phaseComplete', () => {
     await writeFile(join(p10Dir, '10-01-SUMMARY.md'), 'summary', 'utf-8');
     await writeFile(join(p10Dir, '10-02-SUMMARY.md'), 'summary', 'utf-8');
     await writeFile(join(p10Dir, '10-03-SUMMARY.md'), 'summary', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p10Dir, '10-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
     await writeFile(join(tmpDir, '.planning', 'REQUIREMENTS.md'), REQUIREMENTS_FOR_COMPLETE, 'utf-8');
 
     await phaseComplete(['10'], tmpDir);
@@ -1445,6 +1457,8 @@ describe('phaseComplete', () => {
     await writeFile(join(p7Dir, '07-02-PLAN.md'), 'plan2', 'utf-8');
     await writeFile(join(p7Dir, '07-01-SUMMARY.md'), 'summary1', 'utf-8');
     await writeFile(join(p7Dir, '07-02-SUMMARY.md'), 'summary2', 'utf-8');
+    // CLOSEOUT-06: VERIFICATION.md required by phaseComplete precondition
+    await writeFile(join(p7Dir, '07-VERIFICATION.md'), '---\nstatus: passed\n---\n', 'utf-8');
 
     await phaseComplete(['7'], tmpDir);
 

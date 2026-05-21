@@ -18,10 +18,47 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
-import { GSDError } from '../errors.js';
+import { execSync, spawnSync } from 'node:child_process';
+import { GSDError, ErrorClassification } from '../errors.js';
 import { planningPaths, resolvePathUnderProject } from './helpers.js';
 import type { QueryHandler } from './utils.js';
+
+// ─── Branch-name allow-list (CLOSEOUT-07 / T-21-01-c) ────────────────────
+/**
+ * Validate a branch name before it is used in any shell invocation.
+ *
+ * Rejects names containing characters outside [A-Za-z0-9._/-] to prevent
+ * branch-name injection into shell commands (threat T-21-01-c).
+ *
+ * @throws {GSDError} if the name contains disallowed characters
+ */
+function assertBranchNameSafe(branchName: string): void {
+  if (!/^[A-Za-z0-9._\-/]+$/.test(branchName)) {
+    throw new GSDError(
+      `Branch name "${branchName}" contains characters outside the allow-list [A-Za-z0-9._/-] (CLOSEOUT-07)`,
+      ErrorClassification.Validation,
+    );
+  }
+}
+
+// ─── Spawn-time HEAD capture helper ───────────────────────────────────────
+/**
+ * Capture the current git branch name synchronously.
+ *
+ * Returns null when git is unavailable or the repo is in detached-HEAD
+ * state (in which case drift detection is skipped).
+ */
+function captureCurrentBranch(cwd: string): string | null {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
 
 // ─── execGit ──────────────────────────────────────────────────────────────
 
@@ -108,6 +145,11 @@ export function sanitizeCommitMessage(text: string): string {
  * @returns QueryResult with commit result
  */
 export const commit: QueryHandler = async (args, projectDir, workstream) => {
+  // CLOSEOUT-07 Gate 2: Capture spawn-time branch for positive-HEAD assertion.
+  // Done at handler entry so any stray `git checkout` in a deviation handler
+  // cannot move HEAD before we observe it.
+  const spawnBranch = captureCurrentBranch(projectDir);
+
   const allArgs = [...args];
 
   // Extract flags
@@ -243,6 +285,23 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
   // Get short hash
   const hashResult = execGit(projectDir, ['rev-parse', '--short', 'HEAD']);
   const hash = hashResult.exitCode === 0 ? hashResult.stdout : null;
+
+  // CLOSEOUT-07 Gate 2: Positive-HEAD post-commit assertion.
+  // Detect branch drift caused by stray `git checkout` calls that may have
+  // run during a deviation handler after this handler captured spawnBranch.
+  if (spawnBranch !== null && spawnBranch !== 'HEAD') {
+    const currentBranch = captureCurrentBranch(projectDir);
+    if (currentBranch !== null && currentBranch !== 'HEAD') {
+      // Validate allow-list before any further use (T-21-01-c).
+      assertBranchNameSafe(spawnBranch);
+      if (currentBranch !== spawnBranch) {
+        throw new GSDError(
+          `Branch drift detected: spawn-time branch was "${spawnBranch}" but HEAD is now "${currentBranch}" — aborting to prevent accidental commits on the wrong branch (CLOSEOUT-07)`,
+          ErrorClassification.Validation,
+        );
+      }
+    }
+  }
 
   return { data: { committed: true, hash, message: sanitized, files: stagedFiles } };
 };

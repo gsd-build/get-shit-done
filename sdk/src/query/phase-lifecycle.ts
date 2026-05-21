@@ -1214,6 +1214,19 @@ export const phaseComplete: QueryHandler = async (args, projectDir, workstream) 
     phaseFiles = [];
   }
 
+  // CLOSEOUT-06 gate: phase.complete MUST NOT advance when no *-VERIFICATION.md exists.
+  // This is a hard precondition — verify before any state mutation so a phase with
+  // un-verified work can never be silently marked complete.
+  const verificationFile = phaseFiles.find(
+    f => f === 'VERIFICATION.md' || f.endsWith('-VERIFICATION.md'),
+  );
+  if (!verificationFile) {
+    throw new GSDError(
+      `VERIFICATION.md not found in ${phaseDir} — run /gsd-verify-work first (CLOSEOUT-06)`,
+      ErrorClassification.Validation,
+    );
+  }
+
   const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
   const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
   const planCount = plans.length;
