@@ -296,12 +296,17 @@ export function extractPhaseToken(dirName: string): string {
  */
 export function phaseTokenMatches(dirName: string, normalized: string): boolean {
   const token = extractPhaseToken(dirName);
-  if (token.toUpperCase() === normalized.toUpperCase()) return true;
+  // Normalize the extracted token so that single-digit phase numbers compare
+  // correctly against their padded counterparts (e.g. "1" matches "01").
+  // Without this, parsePhasesFromFiles("…/1-setup/file") produces "1" which
+  // normalizePhaseName pads to "01", causing phaseTokenMatches("1-setup","01")
+  // to miss the directory entirely (bug #3749 integration path).
+  if (normalizePhaseName(token).toUpperCase() === normalized.toUpperCase()) return true;
   // Strip optional project_code prefix from dir and retry
   const stripped = dirName.replace(/^[A-Z]{1,6}-(?=\d)/i, '');
   if (stripped !== dirName) {
     const strippedToken = extractPhaseToken(stripped);
-    if (strippedToken.toUpperCase() === normalized.toUpperCase()) return true;
+    if (normalizePhaseName(strippedToken).toUpperCase() === normalized.toUpperCase()) return true;
   }
   return false;
 }
