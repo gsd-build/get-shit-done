@@ -32,7 +32,7 @@ process.env.GSD_TEST_MODE = '1';
  * Closes: #3407
  */
 
-const { test, describe, beforeEach, afterEach } = require('node:test');
+const { test, describe, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -212,6 +212,86 @@ describe('Bug #3407: saveLocalPatches preserves old-release pristine across upgr
   });
 
   /**
+   * Stale-pristine recovery test (pre-fix bug artifact).
+   *
+   * Timeline:
+   *   Buggy run:  gsd-pristine/<rel> was written with NEW_RELEASE_CONTENT
+   *               (the exact #3407 artifact — stale bytes from a buggy populatePristineDir).
+   *   Fix run:    saveLocalPatches detects the hash mismatch
+   *               (sha256(NEW_RELEASE_CONTENT) !== originalHash recorded in manifest),
+   *               removes the stale entry, then attempts regeneration.
+   *
+   * When the file CHANGED between releases (NEW !== OLD):
+   *   - The stale entry is removed.
+   *   - Regeneration discards the new-release candidate (hash mismatch).
+   *   - gsd-pristine/<rel> must be ABSENT (over-broad fallback — correct).
+   *
+   * When the file is UNCHANGED between releases (NEW === OLD):
+   *   - The stale entry (which happens to have correct bytes despite the bug) is
+   *     detected as correct (hash matches originalHash) and PRESERVED.
+   *   - gsd-pristine/<rel> must remain present with the correct bytes.
+   *
+   * This test covers the "file changed across release boundary" case.
+   * The "unchanged" case is already covered by the regeneration test above.
+   */
+  test('stale gsd-pristine/ entry (new-release bytes) is removed when file changed between releases', () => {
+    const OLD_RELEASE_CONTENT = '# Old Release\nv1 content here.\n';
+    const NEW_RELEASE_CONTENT = '# New Release\nv2 content — upstream changed this.\n';
+    const USER_MODIFIED_CONTENT = '# Old Release\nv1 content here.\n## User section\nCustom work.\n';
+
+    const oldHash = sha256(OLD_RELEASE_CONTENT);
+    const relPath = 'test-stale-recovery.md';
+
+    // configDir: user-modified file + manifest recording OLD hash
+    fs.writeFileSync(path.join(configDir, relPath), USER_MODIFIED_CONTENT);
+    fs.writeFileSync(
+      path.join(configDir, MANIFEST_NAME),
+      JSON.stringify({ version: '1.0.0', files: { [relPath]: oldHash } }, null, 2)
+    );
+
+    // fakeSrcDir (new release): contains the NEW content
+    fs.writeFileSync(path.join(fakeSrcDir, relPath), NEW_RELEASE_CONTENT);
+
+    // Pre-populate gsd-pristine/ with NEW_RELEASE_CONTENT — the exact pre-fix bug artifact.
+    // This simulates a prior buggy run that wrote new-release bytes into the pristine baseline.
+    const STALE_BYTES = NEW_RELEASE_CONTENT; // named constant for clarity
+    const pristineDir = path.join(configDir, 'gsd-pristine');
+    fs.mkdirSync(pristineDir, { recursive: true });
+    fs.writeFileSync(path.join(pristineDir, relPath), STALE_BYTES);
+
+    // Verify the pre-condition: stale bytes do NOT match the original hash.
+    // If this assert fails, the test fixture is wrong (not a fix regression).
+    assert.notEqual(
+      sha256(STALE_BYTES),
+      oldHash,
+      'test fixture check: stale bytes must differ from originalHash'
+    );
+
+    INSTALL.saveLocalPatches(configDir, {
+      packageSrc: fakeSrcDir,
+      runtime: 'claude',
+      pathPrefix: '$HOME/.claude/',
+      isGlobal: true,
+    });
+
+    // The fix must detect the hash mismatch (stale entry) and remove it.
+    // The regeneration path discards the new-release candidate (its hash !== oldHash).
+    // Result: gsd-pristine/<rel> must be ABSENT — over-broad fallback is the safe outcome.
+    const pristineFile = path.join(pristineDir, relPath);
+    assert.strictEqual(
+      fs.existsSync(pristineFile),
+      false,
+      [
+        `expected gsd-pristine/${relPath} to be absent after stale-pristine recovery.`,
+        `The stale entry (new-release bytes, sha256=${sha256(STALE_BYTES).slice(0, 12)}…)`,
+        `must be removed; regeneration must discard the candidate because`,
+        `sha256(new-release)=${sha256(NEW_RELEASE_CONTENT).slice(0, 12)}… !== originalHash=${oldHash.slice(0, 12)}….`,
+        `Presence of the file means the stale bytes were NOT cleaned up (pre-fix behavior).`,
+      ].join(' ')
+    );
+  });
+
+  /**
    * Second scenario: gsd-pristine/ does NOT pre-exist (first upgrade with no
    * prior pristine population).  In this case there is no way to obtain the
    * old-release pristine bytes — populatePristineDir must NOT write the new-
@@ -246,48 +326,19 @@ describe('Bug #3407: saveLocalPatches preserves old-release pristine across upgr
     });
 
     const pristineFile = path.join(configDir, 'gsd-pristine', relPath);
-    if (fs.existsSync(pristineFile)) {
-      // If a pristine file was written, it must NOT be the new-release bytes
-      const writtenContent = fs.readFileSync(pristineFile, 'utf8');
-      assert.notEqual(
-        sha256(writtenContent),
-        sha256(NEW_RELEASE_CONTENT),
-        [
-          `gsd-pristine/${relPath} must not contain new-release bytes when no prior pristine exists.`,
-          `Writing new-release bytes as pristine for a file whose hash is unknown leads to`,
-          `false FAIL_USER_LINES_MISSING in the reapply-patches verifier (#3407).`,
-        ].join(' ')
-      );
-    }
-    // If gsd-pristine/ is absent/empty for this file: over-broad fallback mode — acceptable.
-  });
-});
-
-// ─── Antipattern hunt: no other populate/save routine conflates old/new state ─
-
-describe('Bug #3407: populatePristineDir does not corrupt existing correct pristine', () => {
-  let tmpDir;
-
-  beforeEach((t) => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3407-anti-'));
-    t.after(() => {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best-effort */ }
-    });
-  });
-
-  test('populatePristineDir is still exported (structural)', () => {
-    assert.equal(
-      typeof INSTALL.populatePristineDir,
-      'function',
-      'populatePristineDir must remain exported for direct unit testing'
-    );
-  });
-
-  test('saveLocalPatches is still exported (structural)', () => {
-    assert.equal(
-      typeof INSTALL.saveLocalPatches,
-      'function',
-      'saveLocalPatches must remain exported for direct unit testing'
+    assert.strictEqual(
+      fs.existsSync(pristineFile),
+      false,
+      [
+        `expected gsd-pristine/${relPath} to be absent when file changed across release boundary.`,
+        `Writing new-release bytes as pristine for a file whose hash is unknown leads to`,
+        `false FAIL_USER_LINES_MISSING in the reapply-patches verifier (#3407).`,
+        `Over-broad fallback mode is the correct outcome here.`,
+      ].join(' ')
     );
   });
 });
+
+// The former "Antipattern hunt" describe block (structural typeof checks only) was
+// removed — it provided no real behavioral coverage and was a vacuous-truth pattern
+// per /test-rigor skill. Behavioral tests for populatePristineDir are covered above.
