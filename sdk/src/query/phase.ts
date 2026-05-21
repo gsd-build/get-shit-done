@@ -501,10 +501,19 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   // Build a map from plan ID → RawPlan for fast lookup.
   // Deps that reference plans outside this phase are silently ignored (treated
   // as already-satisfied external deps — the plan becomes a source node).
-  const planMap = new Map<string, RawPlan>(rawPlans.map(p => [p.id, p]));
+  // Plan-id lookups are case-insensitive: map keys are lowercased and dep
+  // lookups are lowercased at query time so that depends_on: ['05c-01'] resolves
+  // to a plan with on-disk ID '05C-01-foo'. Plan-id namespace is narrow enough
+  // (NN, NN-NN, NN-NN-slug, plus optional letter suffix on phase) that
+  // case-folding collisions are not a practical concern, and a single phase
+  // directory cannot host two plans whose IDs differ only in case (canonical-
+  // prefix indexing would collide first).
+  const planMap = new Map<string, RawPlan>(rawPlans.map(p => [p.id.toLowerCase(), p]));
   // Secondary index: canonical prefix → full plan ID, so depends_on: ['03-01'] resolves
   // to '03-01-auth-hardening-PLAN.md'-derived ID '03-01-auth-hardening' (k015).
-  const canonicalToId = new Map<string, string>(rawPlans.map(p => [extractCanonicalPlanId(p.id), p.id]));
+  const canonicalToId = new Map<string, string>(
+    rawPlans.map(p => [extractCanonicalPlanId(p.id).toLowerCase(), p.id]),
+  );
   // Tertiary index: same-phase short-form ('01') → full plan ID, derived from each plan's
   // canonical '<phase>-<plan>' by splitting on the LAST '-'. The phase segment may
   // contain dots (e.g. '99.9') or letters (e.g. '02A'); only the trailing '-NN' is the
@@ -515,7 +524,7 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
     const canonical = extractCanonicalPlanId(p.id);
     const lastDash = canonical.lastIndexOf('-');
     if (lastDash > 0 && lastDash < canonical.length - 1) {
-      const shortForm = canonical.slice(lastDash + 1);
+      const shortForm = canonical.slice(lastDash + 1).toLowerCase();
       // First write wins — preserve deterministic ordering from sorted planFiles.
       if (!shortFormToId.has(shortForm)) {
         shortFormToId.set(shortForm, p.id);
@@ -536,14 +545,17 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
       // Accept full-stem ('03-01-auth-hardening'), canonical-prefix ('03-01'),
       // and same-phase short-form ('01') forms. The short-form lookup (#3488)
       // is keyed off the plan-id suffix so it works for integer ('99'), letter
-      // ('02A'), and decimal ('99.9') phase IDs alike.
+      // ('02A'), and decimal ('99.9') phase IDs alike. Lookups are case-
+      // insensitive; see map construction above. depKey is lowercased;
+      // resolvedDep keeps the canonical-cased plan ID stored as map value.
+      const depKey = dep.toLowerCase();
       let resolvedDep: string | undefined;
-      if (planMap.has(dep)) {
-        resolvedDep = dep;
-      } else if (canonicalToId.has(dep)) {
-        resolvedDep = canonicalToId.get(dep);
-      } else if (shortFormToId.has(dep)) {
-        resolvedDep = shortFormToId.get(dep);
+      if (planMap.has(depKey)) {
+        resolvedDep = planMap.get(depKey)!.id;
+      } else if (canonicalToId.has(depKey)) {
+        resolvedDep = canonicalToId.get(depKey);
+      } else if (shortFormToId.has(depKey)) {
+        resolvedDep = shortFormToId.get(depKey);
       }
       if (!resolvedDep) {
         // Looks like an in-phase short-form / canonical reference that didn't resolve.
