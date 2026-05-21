@@ -40,6 +40,23 @@ process.on('exit', () => {
   }
 });
 
+// Transient errno codes that indicate a temporary filesystem condition under
+// concurrent O_EXCL races — Docker overlay-fs (ENOENT/EINVAL/EIO), NFS
+// (ESTALE), and OS-level interrupt/retry signals (EAGAIN/EINTR).  These are
+// recoverable; withPlanningLock retries instead of propagating them.
+// Truly fatal codes (EMFILE, ENOSPC, EROFS, EACCES) are NOT in this set and
+// will still throw immediately.
+const PLANNING_LOCK_RETRY_ERRNOS = new Set([
+  'EPERM',   // Windows / macOS AV scanner holds the file open during delete
+  'EBUSY',   // Windows: file in use by another process
+  'EAGAIN',  // POSIX: resource temporarily unavailable
+  'EINTR',   // POSIX: syscall interrupted by signal
+  'EINVAL',  // Docker overlay-fs: transient during concurrent O_EXCL creation
+  'EIO',     // Docker overlay-fs / NFS: transient I/O error
+  'ENOENT',  // Docker overlay-fs: parent dir transiently missing during race
+  'ESTALE',  // NFS: stale file handle (self-resolves on retry)
+]);
+
 function planningDir(cwd, ws, project) {
   if (project === undefined) project = process.env.GSD_PROJECT || null;
   if (ws === undefined) ws = process.env.GSD_WORKSTREAM || null;
@@ -259,6 +276,13 @@ function withPlanningLock(cwd, fn) {
     try {
       return runWithHeldLock();
     } catch (err) {
+      // Transient filesystem errors (Docker overlay-fs, NFS, OS signals, AV scanners)
+      // are recoverable — wait and retry rather than propagating.
+      // See PLANNING_LOCK_RETRY_ERRNOS for the full list and rationale.
+      if (PLANNING_LOCK_RETRY_ERRNOS.has(err.code)) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+        continue;
+      }
       if (err.code === 'EEXIST') {
         // Lock exists — check if stale (>30s old)
         try {

@@ -36,7 +36,9 @@ const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 // in execute-phase.md (1727 → ) and plan-phase.md (1714 → ) from #3178.
 // Follow-up #3182 (TBD): extract MVP-mode bodies to `<workflow>/modes/mvp.md`
 // per the discuss-phase/modes/ precedent and revert this back to 1700.
-const XL_BUDGET = 1800;
+// Bumped from 1800 → 1810 in #3707 to absorb the startup orphan-sweep
+// block added to execute-phase.md (+2 lines: one comment + one bash command).
+const XL_BUDGET = 1810;
 const LARGE_BUDGET = 1500;
 const DEFAULT_BUDGET = 1000;
 

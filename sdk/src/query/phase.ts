@@ -347,9 +347,18 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   const phaseFiles = await readdir(phaseDir);
   const planFiles = phaseFiles.filter(isCanonicalPlanFile).sort();
   const summaryFiles = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-  // #2893 parity — same diagnostic format as find-phase / phases-list. Use the
-  // centralised helper so the message shape never drifts between read sites.
-  const planNamingWarning = describeNonCanonicalPlans(phaseFiles, planFiles);
+  // #3430 — identify non-canonical plan-shaped files that were skipped so
+  // callers get an explicit warning rather than a silent plan_count: 0.
+  // Uses a concise format ("Ignored noncanonical plan files: <name,...>")
+  // for the warnings[] array; find-phase / phases-list use the verbose
+  // describeNonCanonicalPlans format which includes remediation guidance.
+  const matchedPlanSet = new Set(planFiles);
+  const nonCanonicalPlanFiles = phaseFiles.filter(
+    f => looksLikePlanFile(f) && !matchedPlanSet.has(f),
+  );
+  const planNamingWarning = nonCanonicalPlanFiles.length > 0
+    ? `Ignored noncanonical plan files: ${nonCanonicalPlanFiles.join(', ')}`
+    : null;
 
   // Build set of plan IDs with summaries — match the planId derivation logic
   const completedPlanIds = new Set(
@@ -589,6 +598,12 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
     waves[waveKey].push(raw.id);
   }
 
+  // #3430 — non-canonical plan filename warning flows through the same
+  // `warnings` array as other diagnostics (unresolved deps, wave mismatches).
+  if (planNamingWarning) {
+    warnings.push(planNamingWarning);
+  }
+
   const result: Record<string, unknown> = {
     phase: normalized,
     plans,
@@ -596,12 +611,6 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
     incomplete,
     has_checkpoints: hasCheckpoints,
   };
-  // #2893 — non-canonical plan filename warning is a singular `warning` field;
-  // see describeNonCanonicalPlans above. Other diagnostics (unresolved deps,
-  // wave-declaration mismatches) flow through the existing `warnings` array.
-  if (planNamingWarning) {
-    result['warning'] = planNamingWarning;
-  }
   if (warnings.length > 0) {
     result['warnings'] = warnings;
   }
