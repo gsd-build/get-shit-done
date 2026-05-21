@@ -392,6 +392,52 @@ describe('phaseAdd', () => {
     expect(data.phase_number).toBe(1501);
   });
 
+  it('distinguishes === 999 guard from === 1000 off-by-one: [999, 1000] fixture must yield 1001 (regression #3774)', async () => {
+    // Distinguishing fixture: phases [999, 1000] on disk + in ROADMAP.
+    // With correct guard (=== 999): skips 999, keeps 1000 as max → next = 1001 ✓
+    // With off-by-one guard (=== 1000): skips 1000, keeps 999 → max = 999 but
+    //   999 is itself skipped by the equality guard (999 === 999 is true when
+    //   the guard fires), so actually keeps nothing → max = 0 → next = 1 ✗.
+    //   Either way, the result diverges from 1001, catching the regression.
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    const roadmapWith999and1000 = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v1.0',
+      '',
+      '### Phase 999: Backlog',
+      '',
+      '**Goal:** Backlog sentinel',
+      '**Plans:** 0 plans',
+      '',
+      '### Phase 1000: First Four-Digit Phase',
+      '',
+      '**Goal:** First canonical phase above backlog sentinel',
+      '**Requirements**: TBD',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 1000-01 (initial work)',
+      '',
+      '---',
+      '*Last updated: 2026-05-21*',
+      '',
+    ].join('\n');
+
+    const phases = [
+      '999-backlog',
+      '1000-first-four-digit',
+    ];
+
+    await setupTestProject(tmpDir, { roadmap: roadmapWith999and1000, phases });
+
+    const result = await phaseAdd(['After One Thousand'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    // Must be 1001: skips 999 (backlog sentinel), keeps 1000 as max, adds 1
+    expect(data.phase_number).toBe(1001);
+  });
+
   it('throws GSDError with Validation for empty description', async () => {
     const { phaseAdd } = await import('./phase-lifecycle.js');
     await setupTestProject(tmpDir);
