@@ -284,4 +284,13 @@ describe('checkUiPresence() return value API', () => {
     assert.deepStrictEqual(checkUiPresence(undefined), { hasUI: false, tokens: [] });
     assert.deepStrictEqual(checkUiPresence(42), { hasUI: false, tokens: [] });
   });
+
+  test('multiple distinct UI tokens on same line are ALL captured', () => {
+    // "form" and "view" both appear as standalone words on one line.
+    // Prior exec()-based impl only captured the first match per line.
+    const result = checkUiPresence('Build a sign-up form with a view controller');
+    assert.strictEqual(result.hasUI, true, 'hasUI must be true');
+    assert.ok(result.tokens.includes('form'), `Expected "form" in tokens, got: ${JSON.stringify(result.tokens)}`);
+    assert.ok(result.tokens.includes('view'), `Expected "view" in tokens, got: ${JSON.stringify(result.tokens)}`);
+  });
 });

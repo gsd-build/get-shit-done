@@ -40,12 +40,17 @@ const UI_TOKENS = [
 
 /**
  * Built once at module load — no per-call compilation overhead.
- * [^a-zA-Z0-9] is the exact JS equivalent of POSIX [^[:alnum:]].
+ * ASCII word boundaries — matches the original ASCII-grep intent of #3706.
+ * Note: JS [a-zA-Z0-9] is ASCII-only and NOT equivalent to POSIX [[:alnum:]],
+ * which is locale-sensitive and includes accented characters.
  */
 const UI_GATE_PATTERN = new RegExp(
   '(^|[^a-zA-Z0-9])(' + UI_TOKENS.join('|') + ')([^a-zA-Z0-9]|$)',
   'i'
 );
+
+// Global-flagged variant for extracting ALL matches per line (matchAll).
+const UI_GATE_PATTERN_GLOBAL = new RegExp(UI_GATE_PATTERN.source, 'gi');
 
 /**
  * Check a roadmap phase section string for frontend UI indicators.
@@ -65,8 +70,9 @@ function checkUiPresence(text) {
 
   const found = new Set();
   for (const line of normalised.split('\n')) {
-    const m = UI_GATE_PATTERN.exec(line);
-    if (m) {
+    // Reset lastIndex before each line so the global pattern restarts from 0.
+    UI_GATE_PATTERN_GLOBAL.lastIndex = 0;
+    for (const m of line.matchAll(UI_GATE_PATTERN_GLOBAL)) {
       found.add(m[2].toLowerCase());
     }
   }
@@ -74,7 +80,7 @@ function checkUiPresence(text) {
   return { hasUI: found.size > 0, tokens: [...found] };
 }
 
-module.exports = { checkUiPresence, UI_TOKENS, UI_GATE_PATTERN };
+module.exports = { checkUiPresence, UI_TOKENS };
 
 // ── CLI entry point ─────────────────────────────────────────────────────────
 // Reads phase-section text from STDIN (not argv) to avoid OS ARG_MAX limits.
