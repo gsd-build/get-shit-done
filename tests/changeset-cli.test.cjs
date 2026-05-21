@@ -128,12 +128,21 @@ describe('changeset cli extract: version-range changelog extraction (#3496)', ()
     assert.ok(prs.includes(102), 'multi-line bullet pr=102 must be captured');
   });
 
-  test('emits markdown when --json is not passed', (t) => {
+  test('emits markdown text (non-JSON) when --json is not passed', (t) => {
+    // Without --json the output is human-readable markdown, not JSON.
+    // Assert on structural facts derivable from the text: exactly the two
+    // matched releases appear as ## headers, using parseChangelog so we
+    // assert on version strings via the production parser rather than
+    // raw substring matches.
+    const { parseChangelog: _pc } = require(path.join(ROOT, 'scripts', 'changeset', 'serialize.cjs'));
     const r = runExtract(['--from', '1.5.13', '--to', '1.5.15'], EXTRACT_CHANGELOG);
     assert.equal(r.status, 0, `stderr=${r.stderr}`);
-    assert.ok(r.stdout.includes('1.5.15'), 'stdout markdown must contain 1.5.15');
-    assert.ok(r.stdout.includes('1.5.14'), 'stdout markdown must contain 1.5.14');
-    assert.ok(!r.stdout.includes('1.5.13'), 'stdout must not contain excluded from-version');
+    assert.ok(r.stdout.trim().length > 0, 'stdout must be non-empty');
+    const parsed = _pc(r.stdout);
+    const versions = parsed.releases.map((rel) => rel.version);
+    assert.ok(versions.includes('1.5.15'), '1.5.15 in markdown output');
+    assert.ok(versions.includes('1.5.14'), '1.5.14 in markdown output');
+    assert.ok(!versions.includes('1.5.13'), '1.5.13 must not appear in output (excluded by --from)');
   });
 
   test('missing --from or --to emits usage and exits non-zero', (t) => {
