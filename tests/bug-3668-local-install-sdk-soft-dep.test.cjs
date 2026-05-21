@@ -1,3 +1,4 @@
+// allow-test-rule: reads workflow .md files (product content, not source .cjs) to assert structural invariants — file-presence check is the only viable IR for markdown guard patterns
 /**
  * Regression test for #3668: --local install has soft dependency on global gsd-sdk
  *
