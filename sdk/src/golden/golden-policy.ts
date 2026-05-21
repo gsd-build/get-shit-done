@@ -55,10 +55,20 @@ const NO_CJS_SUBPROCESS_REASON: Record<string, string> = {
     'SDK-only registry introspection (no gsd-tools.cjs equivalent — the CJS layer has no self-describing verb). Covered in sdk/src/query/commands-list.test.ts. Closes #3121.',
   'phase.mvp-mode':
     'SDK-only MVP precedence resolver (CLI flag → roadmap → config → false). Centralizes the chain previously duplicated across plan-phase/execute-phase/verify-work/progress workflows. Covered in sdk/src/query/mvp.test.ts.',
+  'phase.tdd-mode':
+    'SDK-only TDD precedence resolver (CLI flag → roadmap **TDD:** → config → false). Symmetric with phase.mvp-mode. Closes E4 from #2826 audit. Covered in sdk/src/query/mvp.test.ts.',
   'task.is-behavior-adding':
     'SDK-only Behavior-Adding Task predicate for the MVP+TDD Gate (tdd=true + <behavior> block + non-test source files). Replaces prose-only specification in references/execute-mvp-tdd.md. Covered in sdk/src/query/mvp.test.ts.',
   'user-story.validate':
     'SDK-only User Story regex validator. Centralizes /^As a .+, I want to .+, so that .+\\.$/ previously hardcoded in verify-work workflow. Covered in sdk/src/query/mvp.test.ts.',
+  'phase.walking-skeleton-trigger':
+    'SDK-only: filesystem scan for source-file detection (brownfield guard). Combines mvp-mode precedence chain + phase-1 check + summaries count + project-root source scan. No CJS mirror — the scan walks the live project tree and is not representable as a gsd-tools.cjs parity test. Covered in sdk/src/query/mvp.test.ts.',
+  'task.tdd-gate-check':
+    'SDK-only: combines phase-mode, tdd-mode, behavior-adding, and git log inspection. No CJS port — git operations are environment-dependent and parity-tested via the in-process integration tests in sdk/src/query/mvp.test.ts.',
+  'phase.skeleton-status':
+    'SDK-only filesystem probe returning {exists, path, last_modified_ms, size_bytes} for the Walking Skeleton re-emission gate (E8 from #2826 audit). No CJS mirror — statSync over a live project tree is not representable as a gsd-tools.cjs parity test. Covered in sdk/src/query/mvp.test.ts.',
+  'workflow.parse':
+    'SDK-only structural markdown parser for workflow/agent/reference files. Foundation for retrofitting 11 source-grep tests in the #2826 audit. Covered in sdk/src/query/workflow.test.ts.',
 };
 
 const READ_HANDLER_ONLY_REASON = (cmd: string) =>

@@ -110,6 +110,11 @@ function searchPhaseInContent(content, escapedPhase, phaseNum) {
   const modeMatch = section.match(/\*\*Mode(?::\*\*|\*\*:)\s*([^\n]+)/i);
   const mode = modeMatch ? modeMatch[1].trim().toLowerCase() : null;
 
+  // TDD: opt-in flag. Lowercased + trimmed. 'true' means opt-in; anything else is false/absent.
+  // Symmetric with **Mode:** pattern above (E4 fix, #2826 audit).
+  const tddMatch = section.match(/\*\*TDD(?::\*\*|\*\*:)\s*([^\n]+)/i);
+  const tdd = tddMatch ? tddMatch[1].trim().toLowerCase() : null;
+
   // Extract success criteria as structured array
   const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
   const success_criteria = criteriaMatch
@@ -122,6 +127,7 @@ function searchPhaseInContent(content, escapedPhase, phaseNum) {
     phase_name: phaseName,
     goal,
     mode,
+    tdd,
     success_criteria,
     section,
   };

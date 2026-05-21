@@ -32,16 +32,7 @@ export const READ_ONLY_JSON_PARITY_ROWS: JsonParityRow[] = [
   { canonical: 'workstream.list', sdkArgs: [], cjs: 'workstream', cjsArgs: ['list'] },
   { canonical: 'workstream.status', sdkArgs: ['default'], cjs: 'workstream', cjsArgs: ['status', 'default'] },
   { canonical: 'learnings.list', sdkArgs: [], cjs: 'learnings', cjsArgs: ['list'] },
-  { canonical: 'intel.status', sdkArgs: [], cjs: 'intel', cjsArgs: ['status'] },
-  { canonical: 'intel.diff', sdkArgs: [], cjs: 'intel', cjsArgs: ['diff'] },
-  { canonical: 'intel.validate', sdkArgs: [], cjs: 'intel', cjsArgs: ['validate'] },
-  { canonical: 'intel.query', sdkArgs: ['gsd'], cjs: 'intel', cjsArgs: ['query', 'gsd'] },
-  {
-    canonical: 'intel.extract-exports',
-    sdkArgs: ['sdk/src/query/utils.ts'],
-    cjs: 'intel',
-    cjsArgs: ['extract-exports', 'sdk/src/query/utils.ts'],
-  },
+
   { canonical: 'init.list-workspaces', sdkArgs: [], cjs: 'init', cjsArgs: ['list-workspaces'] },
   { canonical: 'agent-skills', sdkArgs: [], cjs: 'agent-skills', cjsArgs: [] },
   { canonical: 'scan-sessions', sdkArgs: ['--json'], cjs: 'scan-sessions', cjsArgs: ['--json'] },

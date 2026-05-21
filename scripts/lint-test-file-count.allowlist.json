@@ -30,6 +30,7 @@
     "gsd-tools":              { "current": 3,  "issue": "TBD" },
     "runtime-artifact-layout":{ "current": 3,  "issue": "TBD" },
     "security":               { "current": 3,  "issue": "TBD" },
-    "gsd-sdk":                { "current": 3,  "issue": "TBD" }
+    "gsd-sdk":                { "current": 3,  "issue": "TBD" },
+    "workflow":               { "current": 8,  "issue": "3676" }
   }
 }

@@ -37,7 +37,6 @@ AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-phase-researcher)
 AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
 AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
 CONTEXT_WINDOW=$(gsd-sdk query config-get context_window 2>/dev/null || echo "200000")
-TDD_MODE=$(gsd-sdk query config-get workflow.tdd_mode 2>/dev/null || echo "false")
 MVP_MODE_CFG=$(gsd-sdk query config-get workflow.mvp_mode 2>/dev/null || echo "false")
 ```
 
@@ -121,24 +120,31 @@ fi
 
 Set `TEXT_MODE=true` if `--text` is present in $ARGUMENTS OR `text_mode` from init JSON is `true`. When `TEXT_MODE` is active, replace every `AskUserQuestion` call with a plain-text numbered list and ask the user to type their choice number. This is required for Claude Code remote sessions (`/rc` mode) where TUI menus don't work through the Claude App.
 
-**MVP_MODE resolution.** Resolve `MVP_MODE` once via the centralized `phase.mvp-mode` query verb. Precedence (first hit wins): CLI flag → ROADMAP.md `**Mode:** mvp` → `workflow.mvp_mode` config → false. The verb is the single source of truth — do not re-implement the chain.
+**MVP_MODE / TDD_MODE resolution.** Resolve each once via the centralized query verbs (`phase.mvp-mode`, `phase.tdd-mode`). Precedence (first hit wins): CLI no-flag → CLI flag → ROADMAP.md marker → config → false. Check `--no-X` before `--X` to avoid substring false-match.
 
 ```bash
 MVP_FLAG_ARG=""
-if [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG="--cli-flag"; fi
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--no-mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG="--cli-no-flag";
+elif [[ "$ARGUMENTS" =~ (^|[[:space:]])--mvp([[:space:]]|$) ]]; then MVP_FLAG_ARG="--cli-flag"; fi
+TDD_FLAG_ARG=""
+if [[ "$ARGUMENTS" =~ (^|[[:space:]])--no-tdd([[:space:]]|$) ]]; then TDD_FLAG_ARG="--cli-no-flag";
+elif [[ "$ARGUMENTS" =~ (^|[[:space:]])--tdd([[:space:]]|$) ]]; then TDD_FLAG_ARG="--cli-flag"; fi
 ```
 
-Defer the `phase.mvp-mode` query until `PHASE` is finalized (after explicit argument parsing/fallback phase detection + validation).
-The verb returns `true|false`. Full result also exposes `source` (`cli_flag` | `roadmap` | `config` | `none`) for diagnostics. The mode is **all-or-nothing per phase** (PRD decision Q1) — never selective per task.
+Defer the `phase.mvp-mode` and `phase.tdd-mode` queries until `PHASE` is finalized (after explicit argument parsing/fallback phase detection + validation).
+The verbs return `true|false`. Full result also exposes `source` (`cli_no_flag` | `cli_flag` | `roadmap` | `config` | `none`) for diagnostics. The mode is **all-or-nothing per phase** (PRD decision Q1) — never selective per task.
 
-**Walking Skeleton gate.** When `MVP_MODE=true` AND `phase_number == "01"` AND there are zero prior phase summaries (new project), the planner runs in **Walking Skeleton mode** (per PRD decision Q2 — new projects only). Detect with:
+**Walking Skeleton gate.** When `MVP_MODE=true` AND `phase_number == 1` AND there are zero prior phase summaries AND no existing source files (new project, not brownfield), the planner runs in **Walking Skeleton mode** (per PRD decision Q2 — new projects only, per ADR `docs/adr/2826-vertical-mvp-slice-planning-mode.md:34`). Detect with:
 
 ```bash
-WALKING_SKELETON=false
-if [ "$MVP_MODE" = "true" ] && [ "$padded_phase" = "01" ]; then
-  PRIOR_SUMMARIES=$(gsd-sdk query phases.list --pick summaries_total 2>/dev/null || echo "0")
-  if [ "$PRIOR_SUMMARIES" = "0" ]; then WALKING_SKELETON=true; fi
-fi
+WALKING_SKELETON_JSON=$(gsd-sdk query phase.walking-skeleton-trigger "${PHASE}" $MVP_FLAG_ARG --json 2>/dev/null || echo '{"data":{"active":false}}')
+WALKING_SKELETON=$(echo "$WALKING_SKELETON_JSON" | jq -r '.data.active // false')
+WALKING_SKELETON_REASON=$(echo "$WALKING_SKELETON_JSON" | jq -r '.data.reason // empty')
+# SKELETON.md re-emission gate (E8)
+SKELETON_EXISTS="false"
+[ "$WALKING_SKELETON" = "true" ] && SKELETON_EXISTS=$(gsd-sdk query phase.skeleton-status "${PHASE}" --pick exists 2>/dev/null || echo "false")
+REGEN_SKELETON="false"
+[[ "$ARGUMENTS" =~ (^|[[:space:]])--regenerate-skeleton([[:space:]]|$) ]] && REGEN_SKELETON="true"
 ```
 
 When `WALKING_SKELETON=true`:
@@ -198,9 +204,10 @@ PHASE_INFO=$(gsd-sdk query roadmap.get-phase "${PHASE}")
 
 **If `found` is false:** Error with available phases. **If `found` is true:** Extract `phase_number`, `phase_name`, `goal` from JSON.
 
-Now that `PHASE` is finalized, resolve MVP mode:
+Now that `PHASE` is finalized, resolve MVP and TDD modes:
 ```bash
 MVP_MODE=$(gsd-sdk query phase.mvp-mode "${PHASE}" $MVP_FLAG_ARG --pick active)
+TDD_MODE=$(gsd-sdk query phase.tdd-mode "${PHASE}" $TDD_FLAG_ARG --pick active 2>/dev/null || echo "false")
 ```
 
 ## 3.5. Handle PRD Express Path
@@ -912,6 +919,8 @@ Each TDD plan gets one feature with RED/GREEN/REFACTOR gate sequence.
 
 **MVP_MODE:** ${MVP_MODE} (when true, follow vertical-slice rules from `@~/.claude/get-shit-done/references/planner-mvp-mode.md`; when false, ignore MVP guidance entirely.)
 **WALKING_SKELETON:** ${WALKING_SKELETON} (when true, the first deliverable must be a Walking Skeleton — produce SKELETON.md alongside PLAN.md.)
+**SKELETON_EXISTS:** ${SKELETON_EXISTS} (when true, a SKELETON.md already exists from a prior planning/execution pass — see SKELETON.md preservation rules in `@~/.claude/get-shit-done/references/planner-mvp-mode.md`.)
+**REGEN_SKELETON:** ${REGEN_SKELETON} (when true, user explicitly passed --regenerate-skeleton; overwrite existing SKELETON.md is permitted.)
 
 ${MVP_MODE === 'true' ? `
 <mvp_mode_active>

@@ -19,9 +19,10 @@ import { uatRenderCheckpoint, auditUat } from './uat.js';
 // by the `case 'intel':` branch in get-shit-done/bin/gsd-tools.cjs which
 // requires('./lib/intel.cjs') and calls the CJS functions in-process.
 import { writeProfile, generateClaudeProfile, generateDevPreferences, generateClaudeMd } from './profile-output.js';
-import { phaseMvpMode, taskIsBehaviorAdding, userStoryValidate } from './mvp.js';
+import { phaseMvpMode, phaseTddMode, taskIsBehaviorAdding, userStoryValidate, phaseWalkingSkeletonTrigger, taskTddGateCheck, phaseSkeletonStatus } from './mvp.js';
 import { worktreeCleanupWave, worktreeReapOrphans } from './worktree.js';
 import { promptBudget } from './prompt-budget.js';
+import { workflowParse } from './workflow.js';
 
 export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler]> = [
   ['agent-skills', agentSkills],
@@ -103,9 +104,20 @@ export const DOMAIN_STATIC_CATALOG: ReadonlyArray<readonly [string, QueryHandler
   // ── MVP umbrella (#2826) — centralized resolution seams ──
   ['phase.mvp-mode', phaseMvpMode],
   ['phase mvp-mode', phaseMvpMode],
+  ['phase.tdd-mode', phaseTddMode],
+  ['phase tdd-mode', phaseTddMode],
   ['task.is-behavior-adding', taskIsBehaviorAdding],
   ['task is-behavior-adding', taskIsBehaviorAdding],
   ['user-story.validate', userStoryValidate],
   ['user-story validate', userStoryValidate],
   ['prompt-budget', promptBudget],
+  ['phase.walking-skeleton-trigger', phaseWalkingSkeletonTrigger],
+  ['phase walking-skeleton-trigger', phaseWalkingSkeletonTrigger],
+  ['task.tdd-gate-check', taskTddGateCheck],
+  ['task tdd-gate-check', taskTddGateCheck],
+  ['phase.skeleton-status', phaseSkeletonStatus],
+  ['phase skeleton-status', phaseSkeletonStatus],
+  // ── Workflow structural parse (#2826 audit — foundation for 11 retrofit commits) ──
+  ['workflow.parse', workflowParse],
+  ['workflow parse', workflowParse],
 ] as const;

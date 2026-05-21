@@ -54,7 +54,7 @@ module.exports = {
   id: '2026-05-11-codex-legacy-hooks-json',
   title: 'Remove legacy Codex hooks.json GSD hook registrations',
   description: 'Remove legacy Codex hooks.json GSD hook registrations after config.toml migration.',
-  introducedIn: '1.50.0',
+  introducedIn: '1.45.0',
   runtimes: ['codex'],
   scopes: ['global', 'local'],
   destructive: true,

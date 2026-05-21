@@ -4,7 +4,27 @@ All notable changes to GSD will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.42.1...HEAD)
+## [Unreleased](https://github.com/gsd-build/get-shit-done/compare/v1.45.0...HEAD)
+
+## [1.45.0](https://github.com/gsd-build/get-shit-done/compare/v1.42.3...v1.45.0) - 2026-05-17
+
+### Feature
+
+- **Vertical MVP Slice mode — umbrella feature (#2826).** New end-to-end MVP planning track across the GSD pipeline. The five sub-phases shipped as PRs #2867 (#2885), #2874 (#2875), #2878 (#2877), #2880 (#2879), #2883 (#2882) — squash-merged together via #3206, surfaced for the v1.45.0 release here.
+
+- **`--mvp` flag on `/gsd-plan-phase`** — opt-in vertical-slice planning. Plans are organized as feature slices (UI→API→DB) instead of horizontal layers, so each task moves a real user-visible capability forward. Persistable per-phase via `**Mode:** mvp` in ROADMAP.md. Resolution order: CLI flag → ROADMAP `**Mode:**` field → `workflow.mvp_mode` config → false. New-project Phase 1 + `--mvp` triggers Walking Skeleton output (`SKELETON.md`) capturing architectural decisions for subsequent phases. Single planner agent, mode-switched. (#2885)
+
+- **`/gsd-mvp-phase <N>` command** — guided MVP planning entry point. Prompts for an "As a / I want to / So that" user story (three structured fields), runs SPIDR splitting if the story is too large, writes `**Mode:** mvp` and the formatted goal to ROADMAP.md, then delegates to `/gsd-plan-phase <N>` (auto-detects MVP via the roadmap mode field). The `gsd-planner` agent emits a `## Phase Goal` section with bolded **As a** / **I want to** / **so that** keywords at the top of `PLAN.md` when `MVP_MODE` is active. New references: `spidr-splitting.md`, `user-story-template.md`. (#2875)
+
+- **MVP+TDD runtime gate in `/gsd-execute-phase`** — when both `MVP_MODE` and `TDD_MODE` are active for a phase, the executor refuses to advance a behavior-adding task until a failing-test commit exists for it. The end-of-phase TDD review (advisory by default) escalates to **blocking** under the same condition: phases with missing RED→GREEN commits cannot be marked complete without `--force-mvp-gate`. Pure doc-only / config-only / test-only tasks are exempt. New reference: `execute-mvp-tdd.md`. (#2877)
+
+- **MVP-mode UAT framing in `/gsd-verify-work`** — under MVP mode, the generated UAT script asks "can a real user complete the feature?" before any technical checks. User-flow steps (open, fill, click, observe) run first; technical checks (endpoint schemas, error states) only run after. Adds a goal-backward "User Flow Coverage" section to `VERIFICATION.md` mapping user-story steps to evidence in the codebase. A user-story-format guard refuses to verify a `mode: mvp` phase whose `**Goal:**` line is not in user-story format. New reference: `verify-mvp-mode.md`. (#2879)
+
+- **Vertical MVP discovery & progress surfaces.** `/gsd-new-project` prompts the user to choose between **Vertical MVP** (each phase delivers an end-to-end user capability — recommended for new products) and **Horizontal Layers** (build complete technical layers, assemble at the end). Picking Vertical MVP writes `**Mode:** mvp` on every initial roadmap phase. `/gsd-progress` adds a user-flow status sub-block sourced from `PLAN.md` task names when a phase has `**Mode:** mvp`. `/gsd-stats` adds a `Phases: N total | M MVP | K standard` summary line when at least one MVP phase exists. `/gsd-graphify` renders MVP-mode phase nodes with a distinct green fill (`#22c55e`) and a `(MVP)` label suffix — two-channel signaling for color-blind and grayscale renders. (#2882)
+
+### Documentation
+
+- **User-facing MVP docs across `USER-GUIDE.md`, `COMMANDS.md`, and `CLI-TOOLS.md`** — `USER-GUIDE.md` gains an MVP Mode section with when-to-pick guidance, a 5-row diff table vs the standard walkthrough, a worked example, and configuration knob reference. `COMMANDS.md` gains `/gsd-mvp-phase` documentation, the `--mvp` flag on `/gsd-plan-phase`, and the Vertical MVP / Horizontal Layers prompt on `/gsd-new-project`. `CLI-TOOLS.md` gains an MVP Commands section documenting `phase.mvp-mode`, `task.is-behavior-adding`, and `user-story.validate` SDK query verbs. Closes the MVP umbrella documentation gap that landed silently with #3206.
 
 ## [1.42.1](https://github.com/gsd-build/get-shit-done/compare/v1.41.0...v1.42.1) - 2026-05-15
 
@@ -2748,7 +2768,8 @@ Technical implementation details for Phase 2 appear in the **Changed** section b
 - YOLO mode for autonomous execution
 - Interactive mode with checkpoints
 
-[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.42.1...HEAD
+[Unreleased]: https://github.com/gsd-build/get-shit-done/compare/v1.45.0...HEAD
+[1.45.0]: https://github.com/gsd-build/get-shit-done/compare/v1.42.1...v1.45.0
 [1.42.1]: https://github.com/gsd-build/get-shit-done/compare/v1.41.0...v1.42.1
 [1.38.4]: https://github.com/gsd-build/get-shit-done/compare/v1.38.2...v1.38.4
 [1.38.2]: https://github.com/gsd-build/get-shit-done/compare/v1.37.1...v1.38.2

@@ -18,7 +18,6 @@ export const GOLDEN_INTEGRATION_MAIN_FILE_CANONICALS: readonly string[] = [
   'init.quick',
   'init.resume',
   'init.verify-work',
-  'intel.update',
   'progress.json',
   'roadmap.analyze',
   'state.sync',

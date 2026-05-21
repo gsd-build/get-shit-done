@@ -42,6 +42,11 @@ When the orchestrator sets `WALKING_SKELETON=true` (Phase 1 of a new project und
 
 `SKELETON.md` is the architectural backbone for every later vertical slice; treat it as a contract, not a scratchpad.
 
+**SKELETON.md preservation:** When `SKELETON_EXISTS=true` and `REGEN_SKELETON=false`,
+treat the existing SKELETON.md at the path emitted by `phase.skeleton-status` as the
+architectural baseline. Reference it; do not overwrite. To regenerate from scratch,
+the user must pass `--regenerate-skeleton` explicitly.
+
 ## Anti-Patterns to Reject
 
 - **Layer cake disguised as slices.** Three "vertical" tasks where Task 1 is "all the schemas", Task 2 is "all the endpoints", Task 3 is "all the UI" — that is horizontal planning with new labels. Reject.

@@ -9,7 +9,7 @@ module.exports = {
   id: '2026-05-11-legacy-orphan-files',
   title: 'Remove manifest-managed legacy orphan hook files',
   description: 'Remove legacy orphan hook files that are still manifest-managed.',
-  introducedIn: '1.50.0',
+  introducedIn: '1.45.0',
   scopes: ['global', 'local'],
   destructive: true,
   // Retired generated hook files are removed only with manifest-managed

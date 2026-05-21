@@ -34,6 +34,8 @@ const WORKFLOWS_DIR = path.join(__dirname, '..', 'get-shit-done', 'workflows');
 
 // Bumped from 1700 → 1800 in #3181 to absorb MVP-mode verb-call additions
 // in execute-phase.md (1727 → ) and plan-phase.md (1714 → ) from #3178.
+// Bumped from 1800 → 1810 in #3676 to absorb --no-mvp/--no-tdd flag parsing and
+// phase.tdd-mode verb wiring into execute-phase.md (four net lines).
 // Follow-up #3182 (TBD): extract MVP-mode bodies to `<workflow>/modes/mvp.md`
 // per the discuss-phase/modes/ precedent and revert this back to 1700.
 // Bumped from 1800 → 1810 in #3707 to absorb the startup orphan-sweep
@@ -46,7 +48,7 @@ const DEFAULT_BUDGET = 1000;
 // Grandfathered at current sizes — see PR #2551 for #2551 progressive-disclosure
 // pattern that future shrinks should follow.
 const XL_WORKFLOWS = new Set([
-  'execute-phase',  // 1727 (post-MVP-verb-integration; was 1622)
+  'execute-phase',  // 1803 (post-#3676 --no-mvp/--no-tdd + phase.tdd-mode; was 1727)
   'plan-phase',     // 1714 (post-MVP-verb-integration; was 1493)
   'new-project',    // 1391
 ]);

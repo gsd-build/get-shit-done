@@ -44,6 +44,12 @@ interface PhaseSection {
    * Read by the `phase.mvp-mode` resolver and downstream MVP-aware workflows.
    */
   mode?: string | null;
+  /**
+   * Phase-level TDD opt-in flag from `**TDD:** true` in ROADMAP.md.
+   * Lowercased + trimmed. 'true' means opt-in; anything else is treated as false.
+   * Null when the field is absent. Read by the `phase.tdd-mode` resolver.
+   */
+  tdd?: string | null;
   success_criteria?: string[];
   section?: string;
   error?: string;
@@ -637,6 +643,11 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
   const modeMatch = section.match(/\*\*Mode(?::\*\*|\*\*:)\s*([^\n]+)/i);
   const mode = modeMatch ? modeMatch[1].trim().toLowerCase() : null;
 
+  // TDD: opt-in flag. Lowercased + trimmed. 'true' means opt-in; anything else is false/absent.
+  // Mirrors the **Mode:** pattern above. Symmetric with E4 fix (#2826 audit).
+  const tddMatch = section.match(/\*\*TDD(?::\*\*|\*\*:)\s*([^\n]+)/i);
+  const tdd = tddMatch ? tddMatch[1].trim().toLowerCase() : null;
+
   // Extract success criteria as structured array
   const criteriaMatch = section.match(/\*\*Success Criteria\*\*[^\n]*:\s*\n((?:\s*\d+\.\s*[^\n]+\n?)+)/i);
   const success_criteria = criteriaMatch
@@ -653,6 +664,7 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
     phase_name: phaseName,
     goal,
     mode,
+    tdd,
     success_criteria,
     section,
   };
