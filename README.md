@@ -130,6 +130,24 @@ Loop discuss → plan → execute → verify → ship until the milestone is don
 
 ## Getting Started
 
+### Prerequisites
+
+- **Node.js** ≥ 18 (required by the installer and some post-install hooks)
+- **npm** ≥ 9 (used for skill package installs and updates)
+- **Git** (required for version management and worktree operations)
+
+Check your versions:
+
+```bash
+node --version   # should be ≥ 18
+npm --version     # should be ≥ 9
+git --version
+```
+
+If you are using **Claude Code** or **Codex**, you also need the CLI for that runtime installed and authenticated. See [docs/USER-GUIDE.md](docs/USER-GUIDE.md) for the full list of supported runtimes and their minimum versions.
+
+### Install
+
 ```bash
 npx get-shit-done-cc@latest
 ```
@@ -141,6 +159,19 @@ claude --dangerously-skip-permissions
 ```
 
 GSD is built for frictionless automation. Skip-permissions is how it's intended to run.
+
+### Verify your install
+
+After the installer completes, restart your terminal (or reload your runtime), then run:
+
+```bash
+# Should respond with the GSD skill index
+gsd-tools --help
+```
+
+If commands don't appear, see [Troubleshooting](#troubleshooting) or [docs/USER-GUIDE.md](docs/USER-GUIDE.md#troubleshooting).
+
+### Install only the skills you need
 
 Install only the skills you need with `--profile=core` (six core-loop skills), `--profile=standard` (core + phase management), or the default full install. Profiles compose: `--profile=core,audit`. `--minimal` is an alias for `--profile=core`. See **[docs/USER-GUIDE.md](docs/USER-GUIDE.md)** for the full walkthrough, non-interactive install flags for all 15 runtimes, and permissions configuration. See [ADR-0011](docs/adr/0011-skill-surface-budget-module.md) for the profile model and runtime surface control.
 
