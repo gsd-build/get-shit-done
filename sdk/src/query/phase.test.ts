@@ -648,4 +648,57 @@ describe('phasePlanIndex', () => {
     // A clear, dedicated warning naming the unresolved reference must surface.
     expect(warnings.some(w => /unresolved/i.test(w) && w.includes('does-not-exist'))).toBe(true);
   });
+
+  it('#3785: depends_on resolution is case-insensitive — mixed-case plan ID resolves correctly', async () => {
+    // Regression: planMap / canonicalToId / shortFormToId used strict Map.has() with no
+    // case normalization. A depends_on ref in lowercase against an uppercase-suffix plan
+    // ID dropped the DAG edge, causing the dependent plan to land in wave 1 instead of
+    // wave 2 (wrong ordering).
+    const phase20 = join(tmpDir, '.planning', 'phases', '20-case-insensitive');
+    await mkdir(phase20, { recursive: true });
+    // Plan A: filename uses uppercase suffix (e.g. user named it "Phase-2-FOO")
+    await writeFile(join(phase20, '20-01-Auth-PLAN.md'), [
+      '---',
+      'phase: 20',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A — uppercase suffix in filename.</objective>',
+    ].join('\n'));
+    // Plan B: depends_on references Plan A using a different case than the plan ID
+    await writeFile(join(phase20, '20-02-PLAN.md'), [
+      '---',
+      'phase: 20',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on:',
+      '  - 20-01-auth',
+      '---',
+      '<objective>Plan B — lowercase dep ref to mixed-case plan A.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['20'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const plans = data.plans as Array<Record<string, unknown>>;
+    const waves = data.waves as Record<string, string[]>;
+    const warnings = (data.warnings as string[] | undefined) ?? [];
+
+    const planA = plans.find(p => (p.id as string).startsWith('20-01'));
+    const planB = plans.find(p => p.id === '20-02');
+    expect(planA).toBeDefined();
+    expect(planB).toBeDefined();
+
+    // The DAG edge must resolve: B must be in a later wave than A.
+    expect(planA!.wave).toBeLessThan(planB!.wave as number);
+    // Structurally: A in wave 1, B in wave 2.
+    expect(waves['1']).toBeDefined();
+    expect(waves['2']).toBeDefined();
+    expect((waves['1'] as string[]).some(id => (id as string).startsWith('20-01'))).toBe(true);
+    expect(waves['2']).toContain('20-02');
+    // No unresolved-dep warning should be emitted.
+    expect(warnings.some(w => /unresolved/i.test(w))).toBe(false);
+  });
 });
