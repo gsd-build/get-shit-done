@@ -208,6 +208,143 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
   });
 
   // -------------------------------------------------------------------------
+  // R — #3646 routing-block positive assertion: ▶-prefixed lines use hyphen
+  //
+  // User repro: workflow output ends with "▶ /gsd:validate-phase {N}" (colon
+  // form) which does not resolve in Claude Code — the installed skill is
+  // /gsd-validate-phase (hyphen). Workflows emit routing blocks verbatim, so
+  // the colon form reaches the model and is echoed to the user unchanged.
+  //
+  // This suite checks the POSITIVE invariant: lines starting with ▶ that
+  // reference a GSD slash command must use /gsd-<cmd> (hyphen) in the staged
+  // output. This is a stricter assertion than W3 (which only checks absence
+  // of colon globally) because it confirms the routing-position strings were
+  // NOT omitted — they must be present AND use the correct form.
+  //
+  // Source files with known ▶-prefixed routing-block colon refs (#3646):
+  //   - get-shit-done/workflows/validate-phase.md:151 ▶ Next: /gsd:audit-milestone
+  //   - get-shit-done/workflows/validate-phase.md:158 ▶ Retry: /gsd:validate-phase
+  //   - get-shit-done/workflows/secure-phase.md:140   ▶ Fix mitigations: /gsd:secure-phase
+  //   - get-shit-done/workflows/secure-phase.md:158   ▶ /gsd:validate-phase
+  //   - get-shit-done/workflows/secure-phase.md:159   ▶ /gsd:verify-work
+  // -------------------------------------------------------------------------
+  describe('R — #3646 routing-block: ▶-prefixed lines use hyphen form in staged claude install', () => {
+    let tmpDir;
+
+    before(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3646-rt-'));
+      runClaudeLocalInstall(tmpDir);
+    });
+
+    after(() => {
+      if (tmpDir) {
+        fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
+    });
+
+    /**
+     * Collect all lines starting with the ▶ routing marker from a file.
+     * Returns an array of { lineNo, text } objects.
+     */
+    function collectRoutingLines(filePath) {
+      if (!fs.existsSync(filePath)) return [];
+      return fs.readFileSync(filePath, 'utf-8')
+        .split('\n')
+        .map((text, i) => ({ lineNo: i + 1, text }))
+        .filter(({ text }) => text.startsWith('▶'));
+    }
+
+    test('R1: staged validate-phase.md routing block uses /gsd-<cmd> hyphen form', () => {
+      const stagedFile = path.join(
+        tmpDir, '.claude', 'get-shit-done', 'workflows', 'validate-phase.md',
+      );
+      assert.ok(
+        fs.existsSync(stagedFile),
+        `validate-phase.md must exist in staged get-shit-done/workflows/`,
+      );
+      const routingLines = collectRoutingLines(stagedFile);
+      // At least the two known routing lines (▶ Next / ▶ Retry) must survive.
+      const gsdRoutingLines = routingLines.filter(({ text }) => /\/gsd[-:]/.test(text));
+      assert.ok(
+        gsdRoutingLines.length >= 2,
+        `validate-phase.md must have at least 2 ▶-routing lines referencing a /gsd- command — ` +
+        `found ${gsdRoutingLines.length}: ${JSON.stringify(gsdRoutingLines)}`,
+      );
+      // Positive: every routing line that references gsd must use the hyphen form.
+      for (const { lineNo, text } of gsdRoutingLines) {
+        assert.ok(
+          /\/gsd-[a-z]/.test(text),
+          `validate-phase.md line ${lineNo}: ▶-routing line must use /gsd-<cmd> hyphen form, got: ${JSON.stringify(text)}`,
+        );
+        // Negative: must not contain the colon form.
+        assert.ok(
+          !/\/gsd:[a-z]/.test(text),
+          `validate-phase.md line ${lineNo}: ▶-routing line must not contain /gsd:<cmd> colon form, got: ${JSON.stringify(text)}`,
+        );
+      }
+    });
+
+    test('R2: staged secure-phase.md routing block uses /gsd-<cmd> hyphen form', () => {
+      const stagedFile = path.join(
+        tmpDir, '.claude', 'get-shit-done', 'workflows', 'secure-phase.md',
+      );
+      assert.ok(
+        fs.existsSync(stagedFile),
+        `secure-phase.md must exist in staged get-shit-done/workflows/`,
+      );
+      const routingLines = collectRoutingLines(stagedFile);
+      // At least the three known routing lines (fix-mitigations, validate-phase, verify-work).
+      const gsdRoutingLines = routingLines.filter(({ text }) => /\/gsd[-:]/.test(text));
+      assert.ok(
+        gsdRoutingLines.length >= 3,
+        `secure-phase.md must have at least 3 ▶-routing lines referencing a /gsd- command — ` +
+        `found ${gsdRoutingLines.length}: ${JSON.stringify(gsdRoutingLines)}`,
+      );
+      for (const { lineNo, text } of gsdRoutingLines) {
+        assert.ok(
+          /\/gsd-[a-z]/.test(text),
+          `secure-phase.md line ${lineNo}: ▶-routing line must use /gsd-<cmd> hyphen form, got: ${JSON.stringify(text)}`,
+        );
+        assert.ok(
+          !/\/gsd:[a-z]/.test(text),
+          `secure-phase.md line ${lineNo}: ▶-routing line must not contain /gsd:<cmd> colon form, got: ${JSON.stringify(text)}`,
+        );
+      }
+    });
+
+    test('R3: all staged workflow routing blocks use hyphen form (cross-file sweep)', () => {
+      // Sweeps all installed workflow files looking for ▶-prefixed lines that
+      // reference a /gsd:<cmd> colon-form — the bug symptom from #3646.
+      const workflowsDir = path.join(tmpDir, '.claude', 'get-shit-done', 'workflows');
+      assert.ok(fs.existsSync(workflowsDir), 'workflows/ must exist for R3 to be meaningful');
+
+      const offenders = [];
+      const walk = (d) => {
+        for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+          const fullPath = path.join(d, entry.name);
+          if (entry.isDirectory()) { walk(fullPath); continue; }
+          if (!entry.name.endsWith('.md')) continue;
+          const lines = fs.readFileSync(fullPath, 'utf-8').split('\n');
+          lines.forEach((text, i) => {
+            if (text.startsWith('▶') && /\/gsd:[a-z]/.test(text)) {
+              offenders.push(`${path.relative(tmpDir, fullPath)}:${i + 1}: ${text.trim()}`);
+            }
+          });
+        }
+      };
+      walk(workflowsDir);
+
+      assert.deepEqual(
+        offenders,
+        [],
+        `Staged workflows contain ▶-routing lines with /gsd:<cmd> colon form — ` +
+        `these must resolve to /gsd-<cmd> for Claude Code skills-based install. ` +
+        `Offenders:\n  ${offenders.join('\n  ')}`,
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // G — negative: gemini install must PRESERVE colon form (no-op normalizer)
   // -------------------------------------------------------------------------
   describe('G — negative: staged gemini workflows preserve colon-namespace refs', () => {
