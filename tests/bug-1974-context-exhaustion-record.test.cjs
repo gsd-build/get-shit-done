@@ -11,15 +11,20 @@
  * 4. Path resolution uses __dirname, not hardcoded ~/.claude/.
  * 5. A WARNING-only fire does NOT set criticalRecorded (selectivity counter-test).
  *
- * Design note (#3726): the original test polled STATE.md on a wall-clock deadline
- * against a fire-and-forget spawn().unref() subprocess — racy under Docker
- * contention.  The fix uses two deterministic assertions:
+ * Design note (#3726, #3775): the original test polled STATE.md on a
+ * wall-clock deadline against a fire-and-forget spawn().unref() subprocess —
+ * racy under Docker contention.  On loaded Docker hosts (cartographer,
+ * holodeck) the subprocess intrinsic cost (Node startup + state lock acquire
+ * + atomic write) reached 900–1700ms, consuming the entire budget and causing
+ * intermittent CI failures (#3775).  The fix uses two deterministic
+ * assertions that do not depend on subprocess completion timing:
  *   (a) The hook writes criticalRecorded:true to the warnPath file BEFORE it
  *       exits (synchronously, before .unref() returns).  Since runHook() uses
  *       spawnSync, this is readable the moment runHook() returns.
  *   (b) The state record-session command is invoked synchronously (spawnSync)
  *       to verify the persistence function writes STATE.md correctly.  This
- *       decouples the hook's fire-and-forget semantics from the test assertion.
+ *       decouples the hook's fire-and-forget semantics from the test
+ *       assertion entirely — no wall-clock budget needed.
  */
 
 'use strict';
@@ -205,8 +210,10 @@ describe('#1974 context exhaustion auto-record', () => {
     assert.strictEqual(recordResult.exitCode, 0, 'record-session should succeed');
 
     // Second CRITICAL fire — same session, criticalRecorded already true in
-    // warnPath.  Advance callsSinceWarn past DEBOUNCE_CALLS (5) so the hook
-    // processes the warning message path and exercises the sentinel guard.
+    // warnPath.  Advance callsSinceWarn past DEBOUNCE_CALLS (5, see hook
+    // line 29) so the hook processes the warning message path and exercises
+    // the sentinel guard.  Using 10 (2× DEBOUNCE_CALLS) ensures we clear the
+    // debounce threshold regardless of any future DEBOUNCE_CALLS adjustment.
     const warnPath = path.join(os.tmpdir(), `claude-ctx-${sessionId}-warned.json`);
     const warnDataPatched = { ...warnData1, callsSinceWarn: 10 };
     fs.writeFileSync(warnPath, JSON.stringify(warnDataPatched));
