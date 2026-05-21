@@ -177,6 +177,8 @@ API key fields accept a string value (the key itself). They can also be set to t
 | `exa_search` | string \| boolean \| null | `null` | Exa Search API key for semantic search. Masked in display |
 | `perplexity` | string \| boolean \| null | `null` | Perplexity API key. Powers `perplexity-search` (Search API) and `perplexity-agent` (Agent API) `gsd-sdk query` handlers. Displayed as `****<last-4>` in all UI / `config-set` output; never echoed plaintext. See https://docs.perplexity.ai |
 
+For `perplexity`, the string API-key form is the only config value used as a credential by the query handlers, after `PERPLEXITY_API_KEY` and `~/.gsd/perplexity_api_key` are checked. The boolean form is only an availability override for orchestration prompts: `false` disables Perplexity even if auto-detection would find a key, while `true` says the integration should be treated as configured. Boolean `true` is not a credential; API calls still require an env var, key file, or string `perplexity` value.
+
 **Masking convention (`get-shit-done/bin/lib/secrets.cjs`):** keys 8+ characters render as `****<last-4>`; shorter keys render as `****`; `null`/empty renders as `(unset)`. Plaintext is written as-is to `.planning/config.json` — that file is the security boundary — but the CLI, confirmation tables, logs, and `AskUserQuestion` descriptions never display the plaintext. This applies to the `config-set` command output itself: `config-set brave_search <key>` returns a JSON payload with the value masked.
 
 ### Code-review CLI routing

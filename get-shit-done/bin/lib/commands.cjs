@@ -497,6 +497,9 @@ async function cmdPerplexitySearch(cwd, query, options, raw) {
     searchRecencyFilter: options && options.recency ? options.recency : undefined,
   }, { cwd });
   if (!result.available) {
+    if (result.failure && result.failure.kind !== 'NO_KEY') {
+      error(result.failure.message);
+    }
     output(result, raw, '');
     return;
   }
@@ -513,6 +516,9 @@ async function cmdPerplexityAgent(cwd, input, options, raw) {
     model: options && options.model ? options.model : undefined,
   }, { cwd });
   if (!result.available) {
+    if (result.failure && result.failure.kind !== 'NO_KEY') {
+      error(result.failure.message);
+    }
     output(result, raw, '');
     return;
   }

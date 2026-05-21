@@ -13,7 +13,7 @@
  * Docs: https://docs.perplexity.ai
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, parse, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,92 @@ import type { QueryHandler } from './utils.js';
 export const SEARCH_URL = 'https://api.perplexity.ai/search';
 export const AGENT_URL = 'https://api.perplexity.ai/v1/agent';
 const PACKAGE_NAME = 'get-shit-done-cc';
+const REDACTED = '[redacted]';
+
+export type PerplexityFailureKind = 'NO_KEY' | 'API_ERROR' | 'NETWORK' | 'PARSE' | 'BAD_ARGS';
+
+export interface PerplexityFailure {
+  kind: PerplexityFailureKind;
+  status: number | null;
+  message: string;
+}
+
+interface PerplexityUnavailable {
+  available: false;
+  failure: PerplexityFailure;
+  reason?: string;
+  error?: string;
+}
+
+interface PerplexitySearchAvailable {
+  available: true;
+  query: string;
+  count: number;
+  results: SearchResultItem[];
+}
+
+interface PerplexityAgentAvailable {
+  available: true;
+  id: string | null;
+  output: unknown;
+  raw: unknown;
+}
+
+export type PerplexitySearchResult = PerplexitySearchAvailable | PerplexityUnavailable;
+export type PerplexityAgentResult = PerplexityAgentAvailable | PerplexityUnavailable;
+
+interface PerplexityError extends Error {
+  code?: 'NO_KEY' | 'API_ERROR' | 'INVALID_JSON';
+  status?: number;
+}
+
+function warn(message: string): void {
+  writeSync(2, `[perplexity] ${message}\n`);
+}
+
+function formatError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function sanitizeMessage(message: unknown, apiKey?: string | null): string {
+  let sanitized = String(message);
+  if (apiKey) {
+    sanitized = sanitized.split(apiKey).join(REDACTED);
+  }
+  return sanitized
+    .replace(/Bearer\s+[^ \t\r\n]+/g, `Bearer ${REDACTED}`)
+    .replace(/\bpplx-[A-Za-z0-9._-]+/g, REDACTED);
+}
+
+function sanitizeValue(value: unknown, apiKey?: string | null): unknown {
+  if (typeof value === 'string') return sanitizeMessage(value, apiKey);
+  if (Array.isArray(value)) return value.map(item => sanitizeValue(item, apiKey));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, sanitizeValue(item, apiKey)]),
+  );
+}
+
+function unavailable(kind: PerplexityFailureKind, message: string, status: number | null = null): PerplexityUnavailable {
+  const failure = { kind, status, message };
+  if (kind === 'NO_KEY') return { available: false, failure, reason: message };
+  return { available: false, failure, error: message };
+}
+
+function classifyFailure(err: unknown, apiKey?: string | null): PerplexityFailure {
+  const e = err as PerplexityError;
+  const message = sanitizeMessage(formatError(err), apiKey);
+  if (e.code === 'NO_KEY') return { kind: 'NO_KEY', status: null, message };
+  if (e.code === 'API_ERROR') return { kind: 'API_ERROR', status: e.status ?? null, message };
+  if (e.code === 'INVALID_JSON') return { kind: 'PARSE', status: null, message };
+  return { kind: 'NETWORK', status: null, message };
+}
+
+function unavailableFromError(err: unknown, apiKey?: string | null): PerplexityUnavailable {
+  const failure = classifyFailure(err, apiKey);
+  if (failure.kind === 'NO_KEY') return { available: false, failure, reason: failure.message };
+  return { available: false, failure, error: failure.message };
+}
 
 function readPackageVersion(startDir: string): string | null {
   let dir = pathResolve(startDir);
@@ -30,7 +116,13 @@ function readPackageVersion(startDir: string): string | null {
   while (true) {
     const candidate = join(dir, 'package.json');
     if (existsSync(candidate)) {
-      const pkg = JSON.parse(readFileSync(candidate, 'utf-8')) as { name?: unknown; version?: unknown };
+      const text = readFileSync(candidate, 'utf-8');
+      let pkg: { name?: unknown; version?: unknown };
+      try {
+        pkg = JSON.parse(text) as { name?: unknown; version?: unknown };
+      } catch (err: unknown) {
+        throw new Error(`Failed to parse ${candidate}: ${formatError(err)}`);
+      }
       if (typeof pkg.version === 'string' && pkg.version) {
         if (pkg.name === PACKAGE_NAME) return pkg.version;
         fallbackVersion = fallbackVersion || pkg.version;
@@ -51,8 +143,12 @@ export function integrationHeader(): string {
   let version = 'unknown';
   try {
     const here = dirname(fileURLToPath(import.meta.url));
-    version = readPackageVersion(here) || version;
-  } catch { /* unknown is fine — header still goes out */ }
+    const found = readPackageVersion(here);
+    if (found) version = found;
+    else warn('falling back to unknown integration version: package.json version not found');
+  } catch (err: unknown) {
+    warn(`falling back to unknown integration version: ${formatError(err)}`);
+  }
   return `get-shit-done/${version}`;
 }
 
@@ -63,7 +159,11 @@ function readKeyFile(filePath: string): string | null {
       return buf.toString('utf16le').replace(/^\uFEFF/, '').trim();
     }
     return buf.toString('utf-8').replace(/^\uFEFF/, '').trim();
-  } catch {
+  } catch (err: unknown) {
+    const code = err && typeof err === 'object' && 'code' in err ? (err as { code?: unknown }).code : null;
+    if (code !== 'ENOENT') {
+      warn(`could not read key file ${filePath}: ${formatError(err)}`);
+    }
     return null;
   }
 }
@@ -74,24 +174,35 @@ export function resolveApiKey(cwd?: string): string | null {
   const fromHome = readKeyFile(homeKey);
   if (fromHome) return fromHome;
   if (cwd) {
-    try {
-      const cfgPath = join(cwd, '.planning', 'config.json');
-      if (existsSync(cfgPath)) {
-        const cfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { perplexity?: unknown };
-        if (typeof cfg.perplexity === 'string' && cfg.perplexity.length > 0) {
-          return cfg.perplexity;
-        }
+    const cfgPath = join(cwd, '.planning', 'config.json');
+    if (existsSync(cfgPath)) {
+      const text = readFileSync(cfgPath, 'utf-8');
+      let cfg: { perplexity?: unknown };
+      try {
+        cfg = JSON.parse(text) as { perplexity?: unknown };
+      } catch (err: unknown) {
+        warn(`could not parse ${cfgPath}: ${formatError(err)}`);
+        return null;
       }
-    } catch { /* malformed config treated as no-key */ }
+      if (typeof cfg.perplexity === 'string' && cfg.perplexity.length > 0) {
+        return cfg.perplexity;
+      }
+    }
   }
   return null;
 }
 
 interface PerplexityFetchOpts {
-  apiKey: string;
+  apiKey: string | null;
   fetchImpl?: typeof fetch;
 }
 
+/**
+ * Central Perplexity transport. Adds Authorization and X-Pplx-Integration,
+ * returns parsed JSON, and throws on missing key, transport/non-2xx, or
+ * invalid JSON. Thrown errors carry `.code` for NO_KEY, API_ERROR, and
+ * INVALID_JSON; API_ERROR also attaches `.status`.
+ */
 export async function perplexityFetch<T = unknown>(
   url: string,
   body: Record<string, unknown>,
@@ -99,7 +210,9 @@ export async function perplexityFetch<T = unknown>(
 ): Promise<T> {
   const { apiKey, fetchImpl } = opts;
   if (!apiKey) {
-    throw new Error('PERPLEXITY_API_KEY not set');
+    const err = new Error('PERPLEXITY_API_KEY not set') as PerplexityError;
+    err.code = 'NO_KEY';
+    throw err;
   }
   const doFetch = fetchImpl || globalThis.fetch;
   const response = await doFetch(url, {
@@ -113,12 +226,17 @@ export async function perplexityFetch<T = unknown>(
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+    const err = new Error(`API error: ${response.status}`) as PerplexityError;
+    err.code = 'API_ERROR';
+    err.status = response.status;
+    throw err;
   }
   try {
     return await response.json() as T;
   } catch {
-    throw new Error('Invalid JSON response');
+    const err = new Error('Invalid JSON response') as PerplexityError;
+    err.code = 'INVALID_JSON';
+    throw err;
   }
 }
 
@@ -139,21 +257,21 @@ interface SearchResponse {
  * Perplexity Search API handler.
  * Args: <query> [--limit N] [--recency hour|day|week|month|year]
  */
-export const perplexitySearch: QueryHandler = async (args, cwd) => {
+export const perplexitySearch: QueryHandler<PerplexitySearchResult> = async (args, cwd) => {
   const apiKey = resolveApiKey(cwd);
   if (!apiKey) {
-    return { data: { available: false, reason: 'PERPLEXITY_API_KEY not set' } };
+    return { data: unavailable('NO_KEY', 'PERPLEXITY_API_KEY not set') };
   }
   const query = args[0];
   if (typeof query !== 'string' || query.trim() === '') {
-    return { data: { available: false, error: 'Query required' } };
+    return { data: unavailable('BAD_ARGS', 'Query required') };
   }
   const limitIdx = args.indexOf('--limit');
   const recencyIdx = args.indexOf('--recency');
   const limitValue = limitIdx !== -1 ? args[limitIdx + 1] : null;
   const limit = limitIdx !== -1 ? Number(limitValue) : 10;
   if (limitIdx !== -1 && (!limitValue || limitValue.startsWith('--') || !Number.isInteger(limit) || limit < 1)) {
-    return { data: { available: false, error: '--limit requires a positive integer' } };
+    return { data: unavailable('BAD_ARGS', '--limit requires a positive integer') };
   }
   const recency = recencyIdx !== -1 ? args[recencyIdx + 1] : null;
 
@@ -164,16 +282,15 @@ export const perplexitySearch: QueryHandler = async (args, cwd) => {
     const data = await perplexityFetch<SearchResponse>(SEARCH_URL, body, { apiKey });
     const rawResults = Array.isArray(data.results) ? data.results : [];
     const results: SearchResultItem[] = rawResults.map(r => ({
-      title: r.title || '',
-      url: r.url || '',
-      snippet: r.snippet || '',
-      date: r.date || null,
-      last_updated: r.last_updated || null,
+      title: sanitizeValue(r.title || '', apiKey) as string,
+      url: sanitizeValue(r.url || '', apiKey) as string,
+      snippet: sanitizeValue(r.snippet || '', apiKey) as string,
+      date: sanitizeValue(r.date || null, apiKey) as string | null,
+      last_updated: sanitizeValue(r.last_updated || null, apiKey) as string | null,
     }));
     return { data: { available: true, query, count: results.length, results } };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { data: { available: false, error: msg } };
+    return { data: unavailableFromError(err, apiKey) };
   }
 };
 
@@ -188,17 +305,17 @@ interface AgentResponse {
  * Perplexity Agent API handler.
  * Args: <input> [--preset pro-search] [--model <id>]
  *
- * Defaults `preset` to `pro-search` when neither `--preset` nor `--model`
- * is provided — that's the documented first-class research-agent surface.
+ * `model` and `preset` are mutually exclusive on the wire. `model` wins when
+ * both are provided; otherwise `preset` defaults to `pro-search`.
  */
-export const perplexityAgent: QueryHandler = async (args, cwd) => {
+export const perplexityAgent: QueryHandler<PerplexityAgentResult> = async (args, cwd) => {
   const apiKey = resolveApiKey(cwd);
   if (!apiKey) {
-    return { data: { available: false, reason: 'PERPLEXITY_API_KEY not set' } };
+    return { data: unavailable('NO_KEY', 'PERPLEXITY_API_KEY not set') };
   }
   const input = args[0];
   if (typeof input !== 'string' || input.trim() === '') {
-    return { data: { available: false, error: 'Input required' } };
+    return { data: unavailable('BAD_ARGS', 'Input required') };
   }
   const presetIdx = args.indexOf('--preset');
   const modelIdx = args.indexOf('--model');
@@ -211,16 +328,22 @@ export const perplexityAgent: QueryHandler = async (args, cwd) => {
 
   try {
     const data = await perplexityFetch<AgentResponse>(AGENT_URL, body, { apiKey });
+    const output = data.output !== undefined
+      ? data.output
+      : data.output_text !== undefined
+        ? data.output_text
+        : data.response !== undefined
+          ? data.response
+          : null;
     return {
       data: {
         available: true,
         id: data.id || null,
-        output: data.output || data.output_text || data.response || null,
-        raw: data,
+        output: sanitizeValue(output, apiKey),
+        raw: sanitizeValue(data, apiKey),
       },
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { data: { available: false, error: msg } };
+    return { data: unavailableFromError(err, apiKey) };
   }
 };

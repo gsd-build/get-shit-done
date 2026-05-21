@@ -25,6 +25,61 @@ const path = require('path');
 const SEARCH_URL = 'https://api.perplexity.ai/search';
 const AGENT_URL = 'https://api.perplexity.ai/v1/agent';
 const PACKAGE_NAME = 'get-shit-done-cc';
+const REDACTED = '[redacted]';
+
+function warn(message) {
+  fs.writeSync(2, `[perplexity] ${message}\n`);
+}
+
+function formatError(err) {
+  return err && err.message ? err.message : String(err);
+}
+
+function sanitizeMessage(message, apiKey) {
+  let sanitized = String(message);
+  if (apiKey) {
+    sanitized = sanitized.split(apiKey).join(REDACTED);
+  }
+  return sanitized
+    .replace(/Bearer\s+[^ \t\r\n]+/g, `Bearer ${REDACTED}`)
+    .replace(/\bpplx-[A-Za-z0-9._-]+/g, REDACTED);
+}
+
+function sanitizeValue(value, apiKey) {
+  if (typeof value === 'string') return sanitizeMessage(value, apiKey);
+  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, apiKey));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, sanitizeValue(item, apiKey)]),
+  );
+}
+
+function failure(kind, message, status) {
+  return { kind, status: status == null ? null : status, message };
+}
+
+function unavailable(kind, message, status) {
+  const result = { available: false, failure: failure(kind, message, status) };
+  if (kind === 'NO_KEY') result.reason = message;
+  else result.error = message;
+  return result;
+}
+
+function classifyFailure(err, apiKey) {
+  const message = sanitizeMessage(formatError(err), apiKey);
+  if (err && err.code === 'NO_KEY') return failure('NO_KEY', message, null);
+  if (err && err.code === 'API_ERROR') return failure('API_ERROR', message, err.status);
+  if (err && err.code === 'INVALID_JSON') return failure('PARSE', message, null);
+  return failure('NETWORK', message, null);
+}
+
+function unavailableFromError(err, apiKey) {
+  const f = classifyFailure(err, apiKey);
+  const result = { available: false, failure: f };
+  if (f.kind === 'NO_KEY') result.reason = f.message;
+  else result.error = f.message;
+  return result;
+}
 
 function readPackageVersion(startDir) {
   let dir = path.resolve(startDir);
@@ -33,7 +88,13 @@ function readPackageVersion(startDir) {
   while (true) {
     const candidate = path.join(dir, 'package.json');
     if (fs.existsSync(candidate)) {
-      const pkg = JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+      const text = fs.readFileSync(candidate, 'utf-8');
+      let pkg;
+      try {
+        pkg = JSON.parse(text);
+      } catch (err) {
+        throw new Error(`Failed to parse ${candidate}: ${formatError(err)}`);
+      }
       if (pkg && typeof pkg.version === 'string' && pkg.version) {
         if (pkg.name === PACKAGE_NAME) return pkg.version;
         fallbackVersion = fallbackVersion || pkg.version;
@@ -53,8 +114,12 @@ function readPackageVersion(startDir) {
 function integrationHeader() {
   let version = 'unknown';
   try {
-    version = readPackageVersion(__dirname) || version;
-  } catch { /* unknown is fine — header still goes out */ }
+    const found = readPackageVersion(__dirname);
+    if (found) version = found;
+    else warn('falling back to unknown integration version: package.json version not found');
+  } catch (err) {
+    warn(`falling back to unknown integration version: ${formatError(err)}`);
+  }
   return `get-shit-done/${version}`;
 }
 
@@ -66,7 +131,10 @@ function readKeyFile(filePath) {
       return buf.toString('utf16le').replace(/^\uFEFF/, '').trim();
     }
     return buf.toString('utf-8').replace(/^\uFEFF/, '').trim();
-  } catch {
+  } catch (err) {
+    if (!err || err.code !== 'ENOENT') {
+      warn(`could not read key file ${filePath}: ${formatError(err)}`);
+    }
     return null;
   }
 }
@@ -82,14 +150,19 @@ function resolveApiKey(cwd) {
   const fromHome = readKeyFile(homeKey);
   if (fromHome) return fromHome;
   if (cwd) {
-    try {
-      const cfgPath = path.join(cwd, '.planning', 'config.json');
-      if (fs.existsSync(cfgPath)) {
-        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-        const v = cfg && cfg.perplexity;
-        if (typeof v === 'string' && v.length > 0) return v;
+    const cfgPath = path.join(cwd, '.planning', 'config.json');
+    if (fs.existsSync(cfgPath)) {
+      const text = fs.readFileSync(cfgPath, 'utf-8');
+      let cfg;
+      try {
+        cfg = JSON.parse(text);
+      } catch (err) {
+        warn(`could not parse ${cfgPath}: ${formatError(err)}`);
+        return null;
       }
-    } catch { /* malformed config is treated as no-key */ }
+      const v = cfg && cfg.perplexity;
+      if (typeof v === 'string' && v.length > 0) return v;
+    }
   }
   return null;
 }
@@ -138,20 +211,20 @@ async function perplexityFetch(url, body, opts) {
 /**
  * Search API — POST https://api.perplexity.ai/search.
  * Returns `{ available: true, query, count, results: [{title,url,snippet,date,last_updated}] }`
- * or `{ available: false, reason | error }` for graceful fallback.
+ * or `{ available: false, failure: { kind, status, message }, reason | error }`.
  */
 async function search(query, options, ctx) {
   const apiKey = resolveApiKey(ctx && ctx.cwd);
   if (!apiKey) {
-    return { available: false, reason: 'PERPLEXITY_API_KEY not set' };
+    return unavailable('NO_KEY', 'PERPLEXITY_API_KEY not set', null);
   }
   if (typeof query !== 'string' || query.trim() === '') {
-    return { available: false, error: 'Query required' };
+    return unavailable('BAD_ARGS', 'Query required', null);
   }
   const body = { query };
   if (options && options.maxResults != null) {
     if (!Number.isInteger(options.maxResults) || options.maxResults < 1) {
-      return { available: false, error: 'maxResults requires a positive integer' };
+      return unavailable('BAD_ARGS', 'maxResults requires a positive integer', null);
     }
     body.max_results = options.maxResults;
   }
@@ -167,11 +240,11 @@ async function search(query, options, ctx) {
       fetchImpl: ctx && ctx.fetchImpl,
     });
     const results = Array.isArray(data && data.results) ? data.results.map((r) => ({
-      title: r.title || '',
-      url: r.url || '',
-      snippet: r.snippet || '',
-      date: r.date || null,
-      last_updated: r.last_updated || null,
+      title: sanitizeValue(r.title || '', apiKey),
+      url: sanitizeValue(r.url || '', apiKey),
+      snippet: sanitizeValue(r.snippet || '', apiKey),
+      date: sanitizeValue(r.date || null, apiKey),
+      last_updated: sanitizeValue(r.last_updated || null, apiKey),
     })) : [];
     return {
       available: true,
@@ -180,30 +253,29 @@ async function search(query, options, ctx) {
       results,
     };
   } catch (err) {
-    return { available: false, error: err && err.message ? err.message : String(err) };
+    return unavailableFromError(err, apiKey);
   }
 }
 
 /**
  * Agent API — POST https://api.perplexity.ai/v1/agent.
  * Returns `{ available: true, id, output, raw }` on success, or
- * `{ available: false, reason | error }` for graceful fallback.
+ * `{ available: false, failure: { kind, status, message }, reason | error }`.
  *
- * `preset` defaults to `pro-search` per the provider docs; callers can pass
- * an explicit model via `options.model`.
+ * `model` and `preset` are mutually exclusive on the wire. `model` wins when
+ * both are provided; otherwise `preset` defaults to `pro-search`.
  */
 async function agent(input, options, ctx) {
   const apiKey = resolveApiKey(ctx && ctx.cwd);
   if (!apiKey) {
-    return { available: false, reason: 'PERPLEXITY_API_KEY not set' };
+    return unavailable('NO_KEY', 'PERPLEXITY_API_KEY not set', null);
   }
   if (typeof input !== 'string' || input.trim() === '') {
-    return { available: false, error: 'Input required' };
+    return unavailable('BAD_ARGS', 'Input required', null);
   }
   const body = { input };
-  if (options && options.preset) body.preset = options.preset;
-  else if (!options || !options.model) body.preset = 'pro-search';
   if (options && options.model) body.model = options.model;
+  else body.preset = (options && options.preset) || 'pro-search';
   if (options && options.tools) body.tools = options.tools;
 
   try {
@@ -211,14 +283,21 @@ async function agent(input, options, ctx) {
       apiKey,
       fetchImpl: ctx && ctx.fetchImpl,
     });
+    const output = data && data.output !== undefined
+      ? data.output
+      : data && data.output_text !== undefined
+        ? data.output_text
+        : data && data.response !== undefined
+          ? data.response
+          : null;
     return {
       available: true,
       id: (data && data.id) || null,
-      output: (data && (data.output || data.output_text || data.response)) || null,
-      raw: data,
+      output: sanitizeValue(output, apiKey),
+      raw: sanitizeValue(data, apiKey),
     };
   } catch (err) {
-    return { available: false, error: err && err.message ? err.message : String(err) };
+    return unavailableFromError(err, apiKey);
   }
 }
 
