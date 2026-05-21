@@ -52,6 +52,7 @@ const {
   buildCodexHookWindowsShimIR,
   ensureCodexHooksJsonSessionStart,
   resolveNodeRunner,
+  uninstall,
 } = INSTALL;
 
 const { projectManagedHookCommand } = PROJECTION;
@@ -357,7 +358,53 @@ describe('#3426 integration: ensureCodexHooksJsonSessionStart on win32 writes .c
   });
 });
 
-// ─── Step 5: Upgrade path — existing win32 hooks.json with node-runner command ─
+// ─── Step 5: Uninstall cleanup — .cmd shim removed from disk ─────────────────
+
+describe('#3426 uninstall: gsd-check-update.cmd is removed from hooks dir on uninstall', () => {
+  let tmpDir;
+
+  function withCodexHome(dir, fn) {
+    const prev = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = dir;
+    try { return fn(); }
+    finally {
+      if (prev == null) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = prev;
+    }
+  }
+
+  beforeEach(() => {
+    tmpDir = createTempDir('gsd-3426-uninstall-');
+    fs.mkdirSync(path.join(tmpDir, 'hooks'), { recursive: true });
+    // Write the .js hook (required by install) and a pre-existing .cmd shim
+    fs.writeFileSync(
+      path.join(tmpDir, 'hooks', 'gsd-check-update.js'),
+      '#!/usr/bin/env node\nconsole.log("ok");\n',
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, 'hooks', 'gsd-check-update.cmd'),
+      '@ECHO OFF\r\n@SETLOCAL\r\n@"C:/node.exe" "C:/path/gsd-check-update.js" %*\r\n',
+    );
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('uninstall removes gsd-check-update.cmd from hooks directory', () => {
+    const cmdShimPath = path.join(tmpDir, 'hooks', 'gsd-check-update.cmd');
+    assert.ok(fs.existsSync(cmdShimPath), 'pre-condition: .cmd shim exists before uninstall');
+
+    withCodexHome(tmpDir, () => uninstall(true, 'codex'));
+
+    assert.ok(
+      !fs.existsSync(cmdShimPath),
+      `gsd-check-update.cmd must be removed from disk on uninstall — orphaned .cmd shim would cause stale hook references. Path: ${cmdShimPath}`,
+    );
+  });
+});
+
+// ─── Step 6: Upgrade path — existing win32 hooks.json with node-runner command ─
 
 describe('#3426 upgrade: reinstall on win32 migrates existing "node script.js" to .cmd shim', () => {
   let tmpDir;

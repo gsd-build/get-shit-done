@@ -1454,7 +1454,7 @@ describe('Codex install hook configuration (e2e)', () => {
     const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
     assert.ok(
       fs.existsSync(hookFile),
-      `gsd-check-update.js must exist at ${hookFile} — config.toml references it but file was not installed`
+      `gsd-check-update.js must exist at ${hookFile} — hooks.json references it (directly on POSIX, via .cmd shim on Windows) but file was not installed`
     );
   });
 
