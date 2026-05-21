@@ -167,6 +167,22 @@ describe('bug #3739 — gap-analysis padded-prefix CONTEXT.md', () => {
       'findContextMdIn must return null when no CONTEXT.md exists');
   });
 
+  // ── Test 5b: findContextMdIn accepts pre-read files array (avoids double readdirSync) ──
+
+  test('findContextMdIn accepts an already-read files array (avoids double readdirSync)', () => {
+    const { findContextMdIn } = require('../get-shit-done/bin/lib/planning-workspace.cjs');
+    // Passing an array directly should behave identically to passing a directory path.
+    assert.strictEqual(findContextMdIn(['CONTEXT.md', 'other.md']), 'CONTEXT.md',
+      'bare form found in array');
+    assert.strictEqual(findContextMdIn(['01-CONTEXT.md', 'other.md']), '01-CONTEXT.md',
+      'padded form found in array');
+    assert.strictEqual(findContextMdIn(['unrelated.md']), null,
+      'returns null when no CONTEXT.md in array');
+    // Bare wins over padded when both are present
+    assert.strictEqual(findContextMdIn(['01-CONTEXT.md', 'CONTEXT.md']), 'CONTEXT.md',
+      'bare form preferred over padded form when both in array');
+  });
+
   // ── Test 6: dual-file precedence — bare CONTEXT.md wins over padded form ──
 
   test('findContextMdIn prefers bare CONTEXT.md over padded form (helper level)', () => {

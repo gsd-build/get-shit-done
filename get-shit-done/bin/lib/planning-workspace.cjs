@@ -383,12 +383,16 @@ function setActiveWorkstream(cwd, name) {
  * duplication that previously existed across init.cjs, roadmap.cjs,
  * core.cjs, gap-checker.cjs (#3739).
  *
- * @param {string} absDir - Absolute path to the phase directory.
+ * @param {string|string[]} absDirOrFiles - Absolute path to the phase directory,
+ *   OR an already-read files array (avoids a redundant readdirSync at call sites
+ *   that already hold a directory listing).
  * @returns {string|null}
  */
-function findContextMdIn(absDir) {
+function findContextMdIn(absDirOrFiles) {
   try {
-    const files = fs.readdirSync(absDir);
+    const files = Array.isArray(absDirOrFiles)
+      ? absDirOrFiles
+      : fs.readdirSync(absDirOrFiles);
     if (files.includes('CONTEXT.md')) return 'CONTEXT.md';
     return files.find(f => f.endsWith('-CONTEXT.md')) ?? null;
   } catch {

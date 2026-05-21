@@ -41,13 +41,13 @@ function coerceTruthToString(t) {
 function countPhasePlansAndSummaries(phaseDir) {
   const { planCount, summaryCount } = scanPhasePlans(phaseDir);
   // hasContext and hasResearch are not plan-scan concerns — read the directory
-  // once for the non-plan metadata that cmdRoadmapAnalyze needs.
+  // once and share the listing for all non-plan metadata that cmdRoadmapAnalyze needs.
   let phaseFiles = [];
   try { phaseFiles = fs.readdirSync(phaseDir); } catch { /* empty */ }
   return {
     planCount,
     summaryCount,
-    hasContext: findContextMdIn(phaseDir) !== null,
+    hasContext: findContextMdIn(phaseFiles) !== null,
     hasResearch: phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
   };
 }

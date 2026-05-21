@@ -1811,7 +1811,7 @@ function getPhaseFileStats(phaseDir) {
     plans: filterPlanFiles(files),
     summaries: filterSummaryFiles(files),
     hasResearch: files.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
-    hasContext: findContextMdIn(phaseDir) !== null,
+    hasContext: findContextMdIn(files) !== null,
     hasVerification: files.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md'),
     hasReviews: files.some(f => f.endsWith('-REVIEWS.md') || f === 'REVIEWS.md'),
   };
