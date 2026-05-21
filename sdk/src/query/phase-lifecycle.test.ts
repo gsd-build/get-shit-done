@@ -325,7 +325,7 @@ describe('phaseAdd', () => {
     expect(roadmap).toContain('**Goal:** [To be planned]');
   });
 
-  it('skips phases >= 999 when calculating next number (backlog exclusion)', async () => {
+  it('skips exactly phase 999 (backlog sentinel) when calculating next number', async () => {
     const { phaseAdd } = await import('./phase-lifecycle.js');
     const roadmapWith999 = MINIMAL_ROADMAP.replace(
       '---\n*Last updated',
@@ -337,6 +337,59 @@ describe('phaseAdd', () => {
     const data = result.data as Record<string, unknown>;
     // Should be 11, not 1000
     expect(data.phase_number).toBe(11);
+  });
+
+  it('returns correct next phase id for projects using 1000+ canonical phase numbers (regression #3774)', async () => {
+    // Bug: scanSequentialMaxPhaseFromMilestone and scanSequentialMaxPhaseFromDirs
+    // used `num >= 999` instead of `num === 999`, causing every phase ≥ 1000 to be
+    // excluded from the max-scan. computeNextSequentialPhaseId returned 1 (0+1)
+    // instead of 1501 for a project whose highest phase is 1500.
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    const roadmapWith1000Plus = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v10.0 Large Project',
+      '',
+      '### Phase 1000: Foundation',
+      '',
+      '**Goal:** Foundation',
+      '**Requirements**: TBD',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 1000-01 (Foundation setup)',
+      '',
+      '### Phase 1500: Latest',
+      '',
+      '**Goal:** Latest',
+      '**Requirements**: TBD',
+      '**Depends on:** Phase 1499',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 1500-01 (Latest step)',
+      '',
+      '---',
+      '*Last updated: 2026-05-20*',
+      '',
+    ].join('\n');
+
+    const phases = [
+      '1000-foundation',
+      '1100-alpha',
+      '1200-beta',
+      '1300-gamma',
+      '1400-delta',
+      '1500-latest',
+    ];
+
+    await setupTestProject(tmpDir, { roadmap: roadmapWith1000Plus, phases });
+
+    const result = await phaseAdd(['Next After 1500'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    // Must be 1501, not 1 (the pre-fix bug value)
+    expect(data.phase_number).toBe(1501);
   });
 
   it('throws GSDError with Validation for empty description', async () => {
