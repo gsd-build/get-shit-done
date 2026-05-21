@@ -178,6 +178,26 @@ describe('#1925 TOCTOU: state commands use readModifyWriteStateMd', () => {
   });
 
   test('state update: both concurrent updates to different fields survive', async () => {
+    // Deterministic concurrency via file-barrier synchronization.
+    //
+    // Problem with the prior design: Promise.all([execAsync(A), execAsync(B)])
+    // offers no guarantee that both subprocesses are alive simultaneously.  On a
+    // loaded CI runner one subprocess can fully complete (acquire lock → transform
+    // → release lock → exit) before the other's Node runtime has even started.
+    // When that happens the second subprocess never contends on the lock — the
+    // test trivially passes — but the test also fails to exercise what it claims
+    // to test.  On Docker overlay-fs under load the opposite pathology occurs:
+    // both subprocesses race O_EXCL creation, and depending on scheduler timing
+    // one can observe stale fs state, causing a lost update that fails the
+    // assertion.  Either way, the outcome is non-deterministic.
+    //
+    // Redesign: a barrier file forces both subprocesses to reach their "ready"
+    // gate before either is allowed to proceed.  The barrier is removed only
+    // after BOTH have signalled readiness, guaranteeing true overlap in the
+    // critical section.  No sleep-based synchronization; the barrier loop uses
+    // Atomics.wait (same primitive as acquireStateLock) so it yields the CPU
+    // instead of spinning.
+
     writeStateMd(tmpDir, [
       '# Project State',
       '',
@@ -187,14 +207,97 @@ describe('#1925 TOCTOU: state commands use readModifyWriteStateMd', () => {
       '**Last Activity:** 2024-01-01',
     ].join('\n') + '\n');
 
-    const nodeBin = process.execPath;
-    const cmdA = `"${nodeBin}" "${TOOLS_PATH}" state update Status Executing --cwd "${tmpDir}"`;
-    const cmdB = `"${nodeBin}" "${TOOLS_PATH}" state update "Current Phase" 02 --cwd "${tmpDir}"`;
+    // ── Barrier infrastructure ────────────────────────────────────────────────
+    // barrierPath: exists while subprocesses must hold.  Removed by the test
+    //              orchestrator once both subprocesses have signalled readiness.
+    // ready-{id}:  each subprocess creates this file to signal it is at the gate.
+    const barrierPath = path.join(tmpDir, '.barrier');
+    const readyA     = path.join(tmpDir, '.ready-a');
+    const readyB     = path.join(tmpDir, '.ready-b');
+    fs.writeFileSync(barrierPath, '1');       // erect the barrier
+    if (fs.existsSync(readyA)) fs.unlinkSync(readyA);
+    if (fs.existsSync(readyB)) fs.unlinkSync(readyB);
 
-    await Promise.all([
-      execAsync(cmdA, { encoding: 'utf-8' }).catch(() => {}),
-      execAsync(cmdB, { encoding: 'utf-8' }).catch(() => {}),
-    ]);
+    // ── Wrapper script written to tmpDir ─────────────────────────────────────
+    // Each subprocess runs this wrapper, which:
+    //   1. Writes its ready-signal so the orchestrator knows it is alive.
+    //   2. Spins (Atomics.wait, 10 ms steps) until the barrier is removed.
+    //   3. Immediately calls gsd-tools to exercise the real lock contention.
+    //
+    // TOOLS_PATH and the caller-supplied args are injected via env vars to avoid
+    // shell-quoting complexity when the tmpDir path contains spaces.
+    const wrapperPath = path.join(tmpDir, '.barrier-wrapper-update.cjs');
+    fs.writeFileSync(wrapperPath, [
+      "'use strict';",
+      'const fs   = require("fs");',
+      'const path = require("path");',
+      'const { execFileSync } = require("child_process");',
+      'const { TOOLS_PATH, BARRIER_FILE, READY_FILE, FIELD_NAME, FIELD_VALUE, CWD_PATH } = process.env;',
+      '',
+      '// Signal readiness to the orchestrator.',
+      'fs.writeFileSync(READY_FILE, String(process.pid));',
+      '',
+      '// Wait at the barrier (yield via Atomics.wait so we do not spin the CPU).',
+      '// Budget: 10 s — if the orchestrator never releases us, something is broken.',
+      'const sab = new SharedArrayBuffer(4);',
+      'const sai = new Int32Array(sab);',
+      'const deadline = Date.now() + 10000;',
+      'while (fs.existsSync(BARRIER_FILE)) {',
+      '  if (Date.now() > deadline) { process.stderr.write("barrier timeout\\n"); process.exit(1); }',
+      '  Atomics.wait(sai, 0, 0, 10); // sleep 10 ms, then re-check',
+      '}',
+      '',
+      '// Barrier is down — execute the actual gsd-tools command.',
+      'execFileSync(process.execPath, [TOOLS_PATH, "state", "update", FIELD_NAME, FIELD_VALUE, "--cwd", CWD_PATH], {',
+      '  stdio: "pipe",',
+      '});',
+    ].join('\n'));
+
+    const nodeBin = process.execPath;
+
+    // ── Spawn both subprocesses ───────────────────────────────────────────────
+    // Both start immediately; both block at the barrier until the orchestrator
+    // confirms both are ready, then both proceed to contend on the STATE.md lock.
+    function spawnWrapper(fieldName, fieldValue, readyFile) {
+      return new Promise((resolve, reject) => {
+        const child = spawn(nodeBin, [wrapperPath], {
+          env: {
+            ...process.env,
+            TOOLS_PATH,
+            BARRIER_FILE: barrierPath,
+            READY_FILE:   readyFile,
+            FIELD_NAME:   fieldName,
+            FIELD_VALUE:  fieldValue,
+            CWD_PATH:     tmpDir,
+          },
+          stdio: 'pipe',
+        });
+        let stderr = '';
+        child.stderr.on('data', (d) => { stderr += d.toString(); });
+        child.on('close', (code) => {
+          if (code !== 0) reject(new Error(`wrapper exited ${code}: ${stderr}`));
+          else resolve();
+        });
+      });
+    }
+
+    const promiseA = spawnWrapper('Status', 'Executing', readyA);
+    const promiseB = spawnWrapper('Current Phase', '02', readyB);
+
+    // ── Orchestrate: wait for both ready-signals, then drop the barrier ───────
+    // Poll with Atomics.wait (10 ms steps).  Budget: 10 s.
+    const sab2 = new SharedArrayBuffer(4);
+    const sai2 = new Int32Array(sab2);
+    const deadline2 = Date.now() + 10000;
+    while (!fs.existsSync(readyA) || !fs.existsSync(readyB)) {
+      if (Date.now() > deadline2) throw new Error('Timed out waiting for both subprocesses to reach barrier');
+      Atomics.wait(sai2, 0, 0, 10);
+    }
+    // Both subprocesses are at the gate — drop the barrier simultaneously.
+    fs.unlinkSync(barrierPath);
+
+    // ── Collect results ───────────────────────────────────────────────────────
+    await Promise.all([promiseA, promiseB]);
 
     const content = readStateMd(tmpDir);
     assert.ok(
