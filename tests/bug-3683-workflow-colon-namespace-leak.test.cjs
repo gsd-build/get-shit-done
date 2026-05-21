@@ -126,6 +126,9 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
   const cmdNames = readCmdNames();
   const rosterRegex = buildRosterRegex(cmdNames);
 
+  // Shared claude local install — used by W (workflow/reference clean-slate) and
+  // R (routing-block positive assertion) sub-suites. G suite runs its own separate
+  // gemini install and does not depend on claudeTmpDir.
   before(() => {
     claudeTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3683-claude-'));
     runClaudeLocalInstall(claudeTmpDir);
@@ -258,11 +261,12 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
         `validate-phase.md must exist in staged get-shit-done/workflows/`,
       );
       const routingLines = collectRoutingLines(stagedFile);
-      // At least the two known routing lines (▶ Next / ▶ Retry) must survive.
+      // Exactly two known routing lines (▶ Next / ▶ Retry).
       const gsdRoutingLines = routingLines.filter(({ text }) => /\/gsd[-:]/.test(text));
-      assert.ok(
-        gsdRoutingLines.length >= 2,
-        `validate-phase.md must have at least 2 ▶-routing lines referencing a /gsd- command — ` +
+      assert.strictEqual(
+        gsdRoutingLines.length,
+        2,
+        `validate-phase.md must have exactly 2 ▶-routing lines referencing a /gsd- command — ` +
         `found ${gsdRoutingLines.length}: ${JSON.stringify(gsdRoutingLines)}`,
       );
       // Positive: every routing line that references gsd must use the hyphen form.
@@ -298,11 +302,12 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
         `secure-phase.md must exist in staged get-shit-done/workflows/`,
       );
       const routingLines = collectRoutingLines(stagedFile);
-      // At least the three known routing lines (fix-mitigations, validate-phase, verify-work).
+      // Exactly three known routing lines (fix-mitigations, validate-phase, verify-work).
       const gsdRoutingLines = routingLines.filter(({ text }) => /\/gsd[-:]/.test(text));
-      assert.ok(
-        gsdRoutingLines.length >= 3,
-        `secure-phase.md must have at least 3 ▶-routing lines referencing a /gsd- command — ` +
+      assert.strictEqual(
+        gsdRoutingLines.length,
+        3,
+        `secure-phase.md must have exactly 3 ▶-routing lines referencing a /gsd- command — ` +
         `found ${gsdRoutingLines.length}: ${JSON.stringify(gsdRoutingLines)}`,
       );
       for (const { lineNo, text } of gsdRoutingLines) {
@@ -328,9 +333,16 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
     });
 
     test('R3: all staged workflow routing blocks use hyphen form (cross-file sweep)', () => {
-      // Sweeps all installed workflow files looking for ▶-prefixed lines that
-      // reference a /gsd:<cmd> colon-form — the bug symptom from #3646.
-      const workflowsDir = path.join(claudeTmpDir, '.claude', 'get-shit-done', 'workflows');
+      // R3 unique value vs W3:
+      //   W3 catches overt /gsd:<cmd> at file level (any line).
+      //   R3 adds:
+      //     (a) ▶-line-scoped assertion (catches drift specifically in routing-block context)
+      //     (b) embedded-colon token check (e.g. /gsd-validate:phase partial-conversion artifacts)
+      //         not detectable by W3's file-level regex
+      // Sweeps both workflows/ and references/ so routing blocks in reference files
+      // are covered alongside workflow files.
+      const gsdDir = path.join(claudeTmpDir, '.claude', 'get-shit-done');
+      const workflowsDir = path.join(gsdDir, 'workflows');
       assert.ok(fs.existsSync(workflowsDir), 'workflows/ must exist for R3 to be meaningful');
 
       const colonOffenders = [];
@@ -361,7 +373,10 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
           });
         }
       };
+      // Walk both workflows/ and references/ — routing blocks can appear in either.
       walk(workflowsDir);
+      const refsDir = path.join(gsdDir, 'references');
+      if (fs.existsSync(refsDir)) walk(refsDir);
 
       assert.deepEqual(
         colonOffenders,

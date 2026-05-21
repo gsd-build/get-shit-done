@@ -1,5 +1,5 @@
 ---
-type: Fixed
+type: patch
 pr: 3800
 ---
-Workflow routing-block strings now emit /gsd-<cmd> hyphen form — regression tests for #3646 confirm that routing lines in installed workflow files use the routable hyphen form, catching any future regression in the install-time normalizer.
+Adds R1/R2/R3 regression coverage that confirms the existing hyphen-form emission from #3685 works on `validate-phase.md`, `secure-phase.md`, and across all workflow routing surfaces. No user-visible behavior change.
