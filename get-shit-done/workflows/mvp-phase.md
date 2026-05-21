@@ -34,14 +34,25 @@ Normalize per `@~/.claude/get-shit-done/references/phase-argument-parsing.md` (z
 ## 2. Validate phase exists and check status
 
 ```bash
-PHASE_INFO=$(gsd-sdk query roadmap.get-phase "${PHASE}")
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+PHASE_INFO=$($GSD_SDK query roadmap.get-phase "${PHASE}")
 PHASE_FOUND=$(echo "$PHASE_INFO" | jq -r '.found')
 PHASE_NAME=$(echo "$PHASE_INFO" | jq -r '.phase_name')
 PHASE_GOAL=$(echo "$PHASE_INFO" | jq -r '.goal')
 PHASE_MODE=$(echo "$PHASE_INFO" | jq -r '.mode // ""')
 PHASE_COMPLETE=$(echo "$PHASE_INFO" | jq -r '.roadmap_complete // false')
 
-ANALYZE=$(gsd-sdk query roadmap.analyze)
+ANALYZE=$($GSD_SDK query roadmap.analyze)
 if [[ "$ANALYZE" == @file:* ]]; then ANALYZE=$(cat "${ANALYZE#@file:}"); fi
 DISK_STATUS=$(echo "$ANALYZE" | jq -r --arg p "$PHASE" '.phases[] | select((.phase_number|tostring)==$p) | .disk_status' | head -1)
 if [[ "$DISK_STATUS" == "complete" || "$PHASE_COMPLETE" == "true" ]]; then
@@ -98,7 +109,7 @@ If any of the three answers is empty or whitespace-only, error and re-prompt tha
 **Validate via the centralized User Story validator.** The verb owns the canonical regex `/^As a .+, I want to .+, so that .+\.$/` and surfaces per-error guidance:
 
 ```bash
-USER_STORY_RESULT=$(gsd-sdk query user-story.validate --story "$USER_STORY")
+USER_STORY_RESULT=$($GSD_SDK query user-story.validate --story "$USER_STORY")
 if [ "$(echo "$USER_STORY_RESULT" | jq -r '.valid')" != "true" ]; then
   echo "$USER_STORY_RESULT" | jq -r '.errors[]' >&2
   # Re-prompt the offending field(s) per surfaced errors, then re-run validation.
@@ -183,8 +194,8 @@ On Apply, write the updated `ROADMAP.md` atomically (read-edit-write).
 ## 6. Verify the write
 
 ```bash
-NEW_MODE=$(gsd-sdk query roadmap.get-phase "${PHASE}" --pick mode)
-NEW_GOAL=$(gsd-sdk query roadmap.get-phase "${PHASE}" --pick goal)
+NEW_MODE=$($GSD_SDK query roadmap.get-phase "${PHASE}" --pick mode)
+NEW_GOAL=$($GSD_SDK query roadmap.get-phase "${PHASE}" --pick goal)
 ```
 
 Assert:

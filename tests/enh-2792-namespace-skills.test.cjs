@@ -197,9 +197,10 @@ describe('gsd-health --context flag is wired into command + workflow', () => {
     const stepMatch = raw.match(/<step name="context_check">([\s\S]*?)<\/step>/);
     assert.ok(stepMatch, 'context_check step must be a closed <step>...</step> block');
     const stepBody = stepMatch[1];
+    // After #3797 architectural fix, callsites use $GSD_SDK — accept either form
     assert.match(
       stepBody,
-      /gsd-sdk\s+query\s+validate\.context/,
+      /(?:\$GSD_SDK|gsd-sdk)\s+query\s+validate\.context/,
       'context_check must call `gsd-sdk query validate.context`',
     );
     assert.match(stepBody, /--tokens-used/, 'context_check must pass --tokens-used');

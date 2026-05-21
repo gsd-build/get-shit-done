@@ -12,8 +12,19 @@ Read all files referenced by the invoking prompt's execution_context before star
 Ensure config exists and load current state:
 
 ```bash
-gsd-sdk query config-ensure-section
-INIT=$(gsd-sdk query state.load)
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+$GSD_SDK query config-ensure-section
+INIT=$($GSD_SDK query state.load)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # `state.load` returns STATE frontmatter JSON from the SDK — it does not include `config_path`. Orchestrators may set `GSD_CONFIG_PATH` from init phase-op JSON; otherwise resolve the same path gsd-tools uses for flat vs active workstream (#2282).
 if [[ -z "${GSD_CONFIG_PATH:-}" ]]; then

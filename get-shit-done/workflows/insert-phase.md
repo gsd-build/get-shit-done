@@ -34,7 +34,18 @@ Validate first argument is an integer.
 Load phase operation context:
 
 ```bash
-INIT=$(gsd-sdk query init.phase-op "${after_phase}")
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.phase-op "${after_phase}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -49,7 +60,7 @@ Exit.
 **Delegate the phase insertion to `gsd-sdk query phase.insert`:**
 
 ```bash
-RESULT=$(gsd-sdk query phase.insert "${after_phase}" "${description}")
+RESULT=$($GSD_SDK query phase.insert "${after_phase}" "${description}")
 ```
 
 The CLI handles:
@@ -71,7 +82,7 @@ blocks direct STATE.md writes):
    `{decimal_phase}`:
 
    ```bash
-   gsd-sdk query state.patch '{"Current Phase":"{decimal_phase}","Next recommended run":"/gsd:plan-phase {decimal_phase}"}'
+   $GSD_SDK query state.patch '{"Current Phase":"{decimal_phase}","Next recommended run":"/gsd:plan-phase {decimal_phase}"}'
    ```
 
    (Adjust field names to whatever pointers STATE.md exposes — the handler
@@ -82,7 +93,7 @@ blocks direct STATE.md writes):
    and dedupes identical entries:
 
    ```bash
-   gsd-sdk query state.add-roadmap-evolution \
+   $GSD_SDK query state.add-roadmap-evolution \
      --phase {decimal_phase} \
      --action inserted \
      --after {after_phase} \

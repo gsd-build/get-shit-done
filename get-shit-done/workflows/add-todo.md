@@ -12,7 +12,18 @@ Read all files referenced by the invoking prompt's execution_context before star
 Load todo context:
 
 ```bash
-INIT=$(gsd-sdk query init.todos)
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.todos)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -86,7 +97,7 @@ Use values from init context: `timestamp` and `date` are already available.
 
 Generate slug for the title:
 ```bash
-slug=$(gsd-sdk query generate-slug "$title" --raw)
+slug=$($GSD_SDK query generate-slug "$title" --raw)
 ```
 
 Write to `.planning/todos/pending/${date}-${slug}.md`:
@@ -121,7 +132,7 @@ If `.planning/STATE.md` exists:
 Commit the todo and any updated state:
 
 ```bash
-gsd-sdk query commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
+$GSD_SDK query commit "docs: capture todo - [title]" --files .planning/todos/pending/[filename] .planning/STATE.md
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.

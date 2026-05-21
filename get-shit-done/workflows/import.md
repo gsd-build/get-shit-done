@@ -176,7 +176,18 @@ Apply GSD naming convention for the output filename:
 Determine the target directory by querying `init.phase-op` for the phase number extracted in `plan_read_input`. This ensures the `project_code` prefix from `.planning/config.json` is applied:
 
 ```bash
-INIT=$(gsd-sdk query init.phase-op "{NN}")
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.phase-op "{NN}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 expected_phase_dir=$(echo "$INIT" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).expected_phase_dir)")
 ```
@@ -225,7 +236,7 @@ Update `.planning/STATE.md` if appropriate (e.g., increment total plan count).
 
 Commit the imported plan and updated files:
 ```bash
-gsd-sdk query commit "docs({phase}): import plan from {basename FILEPATH}" --files .planning/phases/{phase}/{plan}-PLAN.md .planning/ROADMAP.md
+$GSD_SDK query commit "docs({phase}): import plan from {basename FILEPATH}" --files .planning/phases/{phase}/{plan}-PLAN.md .planning/ROADMAP.md
 ```
 
 Display completion:

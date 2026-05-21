@@ -29,7 +29,18 @@ Exit.
 Load phase operation context:
 
 ```bash
-INIT=$(gsd-sdk query init.phase-op "0")
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.phase-op "0")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -45,7 +56,7 @@ Exit.
 **Delegate the phase addition to `gsd-sdk query phase.add`:**
 
 ```bash
-RESULT=$(gsd-sdk query phase.add "${description}")
+RESULT=$($GSD_SDK query phase.add "${description}")
 ```
 
 The CLI handles:

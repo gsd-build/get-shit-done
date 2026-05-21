@@ -26,7 +26,19 @@ Wait for response before continuing.
 **Check if project exists.**
 
 ```bash
-INIT=$(gsd-sdk query state.load 2>/dev/null)
+# SDK resolution: prefer global gsd-sdk, fall back to local node shim (#3668)
+_GSD_SHIM_NAME="gsd-tools.cjs"
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/${_GSD_SHIM_NAME}"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node $GSD_TOOLS"
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query state.load 2>/dev/null)
 ```
 
 Track whether `.planning/` exists — some routes require it, others don't.

@@ -163,7 +163,18 @@ If found, delete them — phase is complete, handoffs are stale.
 **Delegate ROADMAP.md and STATE.md updates to `gsd-sdk query phase.complete`:**
 
 ```bash
-TRANSITION=$(gsd-sdk query phase.complete "${current_phase}")
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+TRANSITION=$($GSD_SDK query phase.complete "${current_phase}")
 ```
 
 The CLI handles:
@@ -300,7 +311,7 @@ This step is fully delegated to `graduation.md`. It handles guard checks (featur
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(gsd-sdk query progress.bar --raw)
+PROGRESS=$($GSD_SDK query progress.bar --raw)
 ```
 
 Update the progress bar line in STATE.md with the result.
@@ -409,7 +420,7 @@ The `next_phase` and `next_phase_name` fields give you the next phase details.
 
 If you need additional context, use:
 ```bash
-ROADMAP=$(gsd-sdk query roadmap.analyze)
+ROADMAP=$($GSD_SDK query roadmap.analyze)
 ```
 
 This returns all phases with goals, disk status, and completion info.
@@ -428,7 +439,7 @@ In flat mode, go directly to **Route B**.
 ```bash
 # Only check if we're in workstream mode
 if [ -n "$GSD_WORKSTREAM" ]; then
-  WS_LIST=$(gsd-sdk query workstream.list --raw)
+  WS_LIST=$($GSD_SDK query workstream.list --raw)
 fi
 ```
 
@@ -548,7 +559,7 @@ to the next milestone — other workstreams are still working.
 **Clear auto-advance chain flag** — workstream boundary is the natural stopping point:
 
 ```bash
-gsd-sdk query config-set workflow._auto_chain_active false
+$GSD_SDK query config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">
@@ -602,7 +613,7 @@ Do NOT auto-invoke any further slash commands.
 **Clear auto-advance chain flag** — milestone boundary is the natural stopping point:
 
 ```bash
-gsd-sdk query config-set workflow._auto_chain_active false
+$GSD_SDK query config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">

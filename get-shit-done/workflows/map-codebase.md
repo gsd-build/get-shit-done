@@ -69,9 +69,20 @@ documents refreshed.
 Load codebase mapping context:
 
 ```bash
-INIT=$(gsd-sdk query init.map-codebase)
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.map-codebase)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper)
+AGENT_SKILLS_MAPPER=$($GSD_SDK query agent-skills gsd-codebase-mapper)
 ```
 
 Extract from init JSON: `mapper_model`, `commit_docs`, `codebase_dir`, `existing_maps`, `has_maps`, `codebase_dir_exists`, `subagent_timeout`, `date`.
@@ -378,7 +389,7 @@ Continue to commit_codebase_map.
 Commit the codebase map:
 
 ```bash
-gsd-sdk query commit "docs: map existing codebase" --files .planning/codebase/*.md
+$GSD_SDK query commit "docs: map existing codebase" --files .planning/codebase/*.md
 ```
 
 Continue to offer_next.

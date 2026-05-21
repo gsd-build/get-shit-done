@@ -16,7 +16,18 @@ Analyze completed phase artifacts (PLAN.md, SUMMARY.md, VERIFICATION.md, UAT.md,
 Parse arguments and load project state:
 
 ```bash
-INIT=$(gsd-sdk query init.phase-op "${PHASE_ARG}")
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -189,7 +200,7 @@ The body follows this structure:
 Update STATE.md to reflect the learning extraction:
 
 ```bash
-gsd-sdk query state.update "Last Activity" "$(date +%Y-%m-%d)"
+$GSD_SDK query state.update "Last Activity" "$(date +%Y-%m-%d)"
 ```
 </step>
 

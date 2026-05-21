@@ -34,10 +34,21 @@ GSD_WS=""
 echo "$ARGUMENTS" | grep -qE -- '--ws[[:space:]]+[^[:space:]]+' && GSD_WS=$(echo "$ARGUMENTS" | grep -oE -- '--ws[[:space:]]+[^[:space:]]+')
 PHASE_ARG=$(echo "$ARGUMENTS" | sed -E 's/--ws[[:space:]]+[^[:space:]]+//g' | xargs)
 
-INIT=$(gsd-sdk query init.verify-work "${PHASE_ARG}" ${GSD_WS})
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+INIT=$($GSD_SDK query init.verify-work "${PHASE_ARG}" ${GSD_WS})
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
-AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
+AGENT_SKILLS_PLANNER=$($GSD_SDK query agent-skills gsd-planner)
+AGENT_SKILLS_CHECKER=$($GSD_SDK query agent-skills gsd-plan-checker)
 ```
 
 Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `has_verification`, `uat_path`.
@@ -46,7 +57,7 @@ Parse JSON for: `planner_model`, `checker_model`, `commit_docs`, `phase_found`, 
 # MVP mode detection via the centralized phase.mvp-mode resolver.
 # verify-work has no --mvp CLI flag (mode is inherited from the planned phase),
 # so we omit --cli-flag — the verb falls through roadmap → config → false.
-MVP_MODE=$(gsd-sdk query phase.mvp-mode "${phase_number}" ${GSD_WS} --pick active)
+MVP_MODE=$($GSD_SDK query phase.mvp-mode "${phase_number}" ${GSD_WS} --pick active)
 ```
 </step>
 
@@ -158,8 +169,8 @@ When `MVP_MODE=false` (mode is null, absent, or the phase has no `**Mode:**` lin
 **User-story format guard.** When `MVP_MODE=true`, also verify the phase's goal is in User Story format via the centralized validator:
 
 ```bash
-PHASE_GOAL=$(gsd-sdk query roadmap.get-phase "${phase_number}" ${GSD_WS} --pick goal)
-USER_STORY_VALID=$(gsd-sdk query user-story.validate --story "$PHASE_GOAL" --pick valid)
+PHASE_GOAL=$($GSD_SDK query roadmap.get-phase "${phase_number}" ${GSD_WS} --pick goal)
+USER_STORY_VALID=$($GSD_SDK query user-story.validate --story "$PHASE_GOAL" --pick valid)
 if [ "$USER_STORY_VALID" != "true" ]; then
   echo "Phase ${phase_number} has '**Mode:** mvp' in ROADMAP.md but the **Goal:** is not in user-story format."
   echo "Run /gsd mvp-phase ${phase_number} to set a user-story goal before verifying."
@@ -267,7 +278,7 @@ Proceed to `present_test`.
 Render the checkpoint from the structured UAT file instead of composing it freehand:
 
 ```bash
-CHECKPOINT=$(gsd-sdk query uat.render-checkpoint --file "$uat_path" --raw)
+CHECKPOINT=$($GSD_SDK query uat.render-checkpoint --file "$uat_path" --raw)
 if [[ "$CHECKPOINT" == @file:* ]]; then CHECKPOINT=$(cat "${CHECKPOINT#@file:}"); fi
 ```
 
@@ -425,7 +436,7 @@ Clear Current Test section:
 
 Commit the UAT file:
 ```bash
-gsd-sdk query commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
+$GSD_SDK query commit "test({phase_num}): complete UAT - {passed} passed, {issues} issues" --files ".planning/phases/XX-name/{phase_num}-UAT.md"
 ```
 
 Present summary:
@@ -449,7 +460,7 @@ Present summary:
 **If issues == 0:**
 
 ```bash
-SECURITY_CFG=$(gsd-sdk query config-get workflow.security_enforcement --raw 2>/dev/null || echo "true")
+SECURITY_CFG=$($GSD_SDK query config-get workflow.security_enforcement --raw 2>/dev/null || echo "true")
 SECURITY_FILE=$(ls "${PHASE_DIR}"/*-SECURITY.md 2>/dev/null | head -1)
 ```
 
@@ -498,7 +509,7 @@ Run phase artifact scan to surface any open items before marking phase verified:
 `audit-open` is CJS-only until registered on `gsd-sdk query`:
 
 ```bash
-gsd-sdk query audit-open --json
+$GSD_SDK query audit-open --json
 ```
 
 Parse the JSON output. For the CURRENT PHASE ONLY, surface:

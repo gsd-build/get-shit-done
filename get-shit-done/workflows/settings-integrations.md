@@ -42,7 +42,18 @@ Read all files referenced by the invoking prompt's execution_context before star
 Ensure config exists and resolve the active config path (flat vs workstream, #2282):
 
 ```bash
-gsd-sdk query config-ensure-section
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+$GSD_SDK query config-ensure-section
 if [[ -z "${GSD_CONFIG_PATH:-}" ]]; then
   if [[ -f .planning/active-workstream ]]; then
     WS=$(tr -d '\n\r' < .planning/active-workstream)
@@ -65,10 +76,10 @@ integration field, compute one of:
 - `<value>` — non-secret routing/skill string, shown as-is
 
 ```bash
-BRAVE=$(gsd-sdk query config-get brave_search --default null)
-FIRECRAWL=$(gsd-sdk query config-get firecrawl --default null)
-EXA=$(gsd-sdk query config-get exa_search --default null)
-SEARCH_GITIGNORED=$(gsd-sdk query config-get search_gitignored --default false)
+BRAVE=$($GSD_SDK query config-get brave_search --default null)
+FIRECRAWL=$($GSD_SDK query config-get firecrawl --default null)
+EXA=$($GSD_SDK query config-get exa_search --default null)
+SEARCH_GITIGNORED=$($GSD_SDK query config-get search_gitignored --default false)
 ```
 
 For each secret key (`brave_search`, `firecrawl`, `exa_search`) the displayed
@@ -131,16 +142,16 @@ key value. **The answer must not be echoed back** in subsequent question
 descriptions or confirmation text. Write the value via:
 
 ```bash
-gsd-sdk query config-set brave_search "<value>"     # masked in output
-gsd-sdk query config-set firecrawl "<value>"        # masked in output
-gsd-sdk query config-set exa_search "<value>"       # masked in output
-gsd-sdk query config-set search_gitignored true|false
+$GSD_SDK query config-set brave_search "<value>"     # masked in output
+$GSD_SDK query config-set firecrawl "<value>"        # masked in output
+$GSD_SDK query config-set exa_search "<value>"       # masked in output
+$GSD_SDK query config-set search_gitignored true|false
 ```
 
 For "Clear", write `null`:
 
 ```bash
-gsd-sdk query config-set brave_search null
+$GSD_SDK query config-set brave_search null
 ```
 </step>
 
@@ -172,7 +183,7 @@ Leave / Replace / Clear, followed by a text-input prompt for the new command
 string. Write via:
 
 ```bash
-gsd-sdk query config-set review.models.<cli> "<command string>"
+$GSD_SDK query config-set review.models.<cli> "<command string>"
 ```
 
 Loop until the user selects "Done".
@@ -220,7 +231,7 @@ For a selected slug, prompt for the comma-separated skill list (text input).
 Show the current value if any, offer Leave / Replace / Clear. Write via:
 
 ```bash
-gsd-sdk query config-set agent_skills.<slug> "<skill-a,skill-b,skill-c>"
+$GSD_SDK query config-set agent_skills.<slug> "<skill-a,skill-b,skill-c>"
 ```
 
 Loop until "Done".

@@ -44,7 +44,8 @@ test('new-milestone.md: todo linking is best-effort and leaves unmatched todos u
 });
 
 test('new-milestone.md: step 10.5 commits tagged todos', () => {
-  assert.ok(NEW_MILESTONE.includes('gsd-sdk query commit'), 'should commit tagged todos');
+  // After #3797 architectural fix, callsites use $GSD_SDK — accept either form
+  assert.ok(NEW_MILESTONE.includes('$GSD_SDK query commit') || NEW_MILESTONE.includes('gsd-sdk query commit'), 'should commit tagged todos');
   assert.ok(NEW_MILESTONE.includes('resolves_phase after milestone'), 'commit message should mention resolves_phase');
 });
 

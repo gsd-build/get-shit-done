@@ -49,7 +49,18 @@ available — replace the prompt with a plain-text two-question sequence
 plain text from the user's response.
 
 ```bash
-gsd-sdk query validate.context \
+# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
+if command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
+elif [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node "$GSD_TOOLS""
+else
+  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
+  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
+  exit 1
+fi
+$GSD_SDK query validate.context \
   --tokens-used "$TOKENS_USED" \
   --context-window "$CONTEXT_WINDOW"
 ```
@@ -64,7 +75,7 @@ health output, the two modes are independent diagnostics.
 **Run health validation:**
 
 ```bash
-gsd-sdk query validate.health $REPAIR_FLAG $BACKFILL_FLAG
+$GSD_SDK query validate.health $REPAIR_FLAG $BACKFILL_FLAG
 ```
 
 Parse JSON output:
@@ -151,7 +162,7 @@ If yes, re-run with --repair flag and display results.
 Re-run health check without --repair to confirm issues are resolved:
 
 ```bash
-gsd-sdk query validate.health
+$GSD_SDK query validate.health
 ```
 
 Report final status.

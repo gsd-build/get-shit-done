@@ -712,7 +712,8 @@ test('#3425: helper cleanup path pins orchestrator CWD to primary worktree and c
   assert.match(content, /cd "\$PRIMARY_WT" \|\| \{ echo "FATAL: cannot cd to primary worktree \$PRIMARY_WT" >&2; exit 1; \}/);
   assert.match(content, /ORCH_BRANCH=\$\(git rev-parse --abbrev-ref HEAD\)/);
   assert.match(content, /FATAL: orchestrator on '\$ORCH_BRANCH' but expected '\$EXPECTED_BRANCH' before worktree cleanup — refusing to merge \(#3174-class drift\)/);
-  assert.match(content, /gsd-sdk query worktree\.cleanup-wave --manifest "\$WAVE_WORKTREE_MANIFEST" \|\| exit 1/);
+  // After #3797 architectural fix, callsites use $GSD_SDK — accept either form
+  assert.match(content, /(?:\$GSD_SDK|gsd-sdk) query worktree\.cleanup-wave --manifest "\$WAVE_WORKTREE_MANIFEST"/);
 });
 
 test('#3425: cleanup-tail snippet carries the same primary-worktree pin before removal', () => {

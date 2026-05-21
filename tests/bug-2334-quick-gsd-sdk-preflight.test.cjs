@@ -32,11 +32,17 @@ describe('bug #2334: quick workflow gsd-sdk pre-flight check', () => {
 
   test('Step 2 checks for gsd-sdk before invoking it', () => {
     content = content || fs.readFileSync(WORKFLOW_PATH, 'utf-8');
-    // The check must appear before the first gsd-sdk invocation in Step 2
+    // The check must appear before the first gsd-sdk invocation in Step 2.
+    // After the #3797 architectural fix, callsites use $GSD_SDK (not bare gsd-sdk),
+    // so we search for the $GSD_SDK form of the init.quick call.
     const step2Start = content.indexOf('**Step 2:');
     assert.ok(step2Start !== -1, 'Step 2 must exist in quick workflow');
 
-    const firstSdkCall = content.indexOf('gsd-sdk query init.quick', step2Start);
+    // Accept either the bare form (legacy) or the $GSD_SDK form (post-#3797)
+    let firstSdkCall = content.indexOf('$GSD_SDK query init.quick', step2Start);
+    if (firstSdkCall === -1) {
+      firstSdkCall = content.indexOf('gsd-sdk query init.quick', step2Start);
+    }
     assert.ok(firstSdkCall !== -1, 'gsd-sdk query init.quick must be present in Step 2');
 
     // Find any gsd-sdk availability check between the Step 2 heading and the first call
@@ -53,7 +59,11 @@ describe('bug #2334: quick workflow gsd-sdk pre-flight check', () => {
   test('pre-flight error message references the install command', () => {
     content = content || fs.readFileSync(WORKFLOW_PATH, 'utf-8');
     const step2Start = content.indexOf('**Step 2:');
-    const firstSdkCall = content.indexOf('gsd-sdk query init.quick', step2Start);
+    // Accept either form of the SDK call (bare or $GSD_SDK)
+    let firstSdkCall = content.indexOf('$GSD_SDK query init.quick', step2Start);
+    if (firstSdkCall === -1) {
+      firstSdkCall = content.indexOf('gsd-sdk query init.quick', step2Start);
+    }
     const step2Section = content.slice(step2Start, firstSdkCall);
 
     const hasInstallHint = step2Section.includes('get-shit-done-cc') || step2Section.includes('gsd-update') || step2Section.includes('/gsd-update');
