@@ -1,11 +1,13 @@
 'use strict';
 
 const { PHASE_SUBCOMMANDS } = require('./command-aliases.generated.cjs');
-const { routeCjsCommandFamily } = require('./cjs-command-router-adapter.cjs');
 const { output } = require('./core.cjs');
 
 // ─── SDK bridge (Phase 6) — shared loader via cjs-sdk-bridge.cjs ──────────────
 const { tryLoadSdk, getExecuteForCjs } = require('./cjs-sdk-bridge.cjs');
+
+// ─── CommandRoutingHub (issue #3788) ──────────────────────────────────────────
+const { createHub } = require('./command-routing-hub.cjs');
 
 /**
  * Manifest-backed phase subcommand router.
@@ -22,164 +24,183 @@ const { tryLoadSdk, getExecuteForCjs } = require('./cjs-sdk-bridge.cjs');
  * - scaffold: routed through top-level scaffold command.
  *
  * CJS-only subcommands: none.
+ *
+ * #3788: dispatch is now mediated by CommandRoutingHub. The public entry point
+ * and observable CLI behaviour are unchanged.
  */
 function routePhaseCommand({ phase, args, cwd, raw, error }) {
   const activeWorkstream = process.env.GSD_WORKSTREAM;
   const sdkAvailable = !activeWorkstream && tryLoadSdk();
 
-  function sdkHandler(registryCommand, registryArgs, legacyArgs, cjsFallback) {
-    if (!sdkAvailable) return cjsFallback;
-    return () => {
-      // #3631: under --raw, request mode:'raw' so the bridge runs the SDK's
-      // raw projection (formatQueryRawOutput) and returns the scalar string
-      // CJS callers used to print. We then bypass output()'s JSON-stringify
-      // path by passing rawValue (the third positional). With mode:'json',
-      // output() emits the JSON IR as before.
-      const result = getExecuteForCjs()({
-        registryCommand,
-        registryArgs,
-        legacyCommand: 'phase',
-        legacyArgs,
-        mode: raw ? 'raw' : 'json',
-        projectDir: cwd,
-      });
-      if (!result.ok) {
-        error(result.errorDetails && result.errorDetails.message
-          ? result.errorDetails.message
-          : `phase ${registryCommand} failed (${result.errorKind})`);
-        return;
-      }
-      if (raw) {
-        output(null, true, typeof result.data === 'string' ? result.data : String(result.data ?? ''));
-      } else {
-        output(result.data);
-      }
-    };
+  // ── Unsupported / SDK-only subcommands ─────────────────────────────────────
+  // Resolved before dispatch so the error message matches the pre-#3788 text.
+  const UNSUPPORTED = {
+    'list-plans': 'phase list-plans is SDK-only. Use: gsd-sdk query phase.list-plans ...',
+    'list-artifacts': 'phase list-artifacts is SDK-only. Use: gsd-sdk query phase.list-artifacts ...',
+    scaffold: 'phase scaffold is routed through the top-level scaffold command.',
+  };
+
+  const subcommand = args[1];
+
+  if (subcommand && UNSUPPORTED[subcommand]) {
+    error(UNSUPPORTED[subcommand]);
+    return;
   }
 
-  routeCjsCommandFamily({
-    args,
-    subcommands: PHASE_SUBCOMMANDS,
-    unsupported: {
-      'list-plans': 'phase list-plans is SDK-only. Use: gsd-sdk query phase.list-plans ...',
-      'list-artifacts': 'phase list-artifacts is SDK-only. Use: gsd-sdk query phase.list-artifacts ...',
-      scaffold: 'phase scaffold is routed through the top-level scaffold command.',
-    },
-    error,
-    unknownMessage: (_subcommand, available) => `Unknown phase subcommand. Available: ${available.join(', ')}`,
-    handlers: {
-      'mvp-mode': () => phase.cmdPhaseMvpMode(cwd, args.slice(2), raw),
-      'next-decimal': sdkHandler(
-        'phase.next-decimal',
-        args.slice(2),
-        args.slice(1),
-        () => phase.cmdPhaseNextDecimal(cwd, args[2], raw),
-      ),
-      add: sdkHandler(
-        'phase.add',
-        args.slice(2),
-        args.slice(1),
-        () => {
-          let customId = null;
-          const descArgs = [];
-          for (let i = 2; i < args.length; i++) {
-            const token = args[i];
-            if (token === '--raw') {
-              continue;
-            }
-            if (token === '--id') {
-              const id = args[i + 1];
-              if (!id || id.startsWith('--')) {
-                error('--id requires a value');
-                return;
-              }
-              customId = id;
-              i++;
-            } else if (token.startsWith('--')) {
-              error(`phase add does not support ${token}`);
-              return;
-            } else {
-              descArgs.push(token);
-            }
+  // ── Build the CJS registry ──────────────────────────────────────────────────
+  // Each handler receives a ctx object from the hub and must return a HubResult.
+  const cjsRegistry = {
+    phase: {
+      'mvp-mode': (_ctx) => {
+        phase.cmdPhaseMvpMode(cwd, args.slice(2), raw);
+        return { ok: true, data: null };
+      },
+      'next-decimal': (_ctx) => {
+        phase.cmdPhaseNextDecimal(cwd, args[2], raw);
+        return { ok: true, data: null };
+      },
+      add: (_ctx) => {
+        let customId = null;
+        const descArgs = [];
+        for (let i = 2; i < args.length; i++) {
+          const token = args[i];
+          if (token === '--raw') {
+            continue;
           }
-          phase.cmdPhaseAdd(cwd, descArgs.join(' '), raw, customId);
-        },
-      ),
-      'add-batch': sdkHandler(
-        'phase.add-batch',
-        args.slice(2),
-        args.slice(1),
-        () => {
-          const descFlagIdx = args.indexOf('--descriptions');
-          let descriptions;
-          if (descFlagIdx !== -1) {
-            const rawDescriptions = args[descFlagIdx + 1];
-            if (!rawDescriptions || rawDescriptions.startsWith('--')) {
-              error('--descriptions must be a JSON array');
-              return;
+          if (token === '--id') {
+            const id = args[i + 1];
+            if (!id || id.startsWith('--')) {
+              return { ok: false, errorKind: 'InvalidArgs', message: '--id requires a value' };
             }
-            try {
-              descriptions = JSON.parse(rawDescriptions);
-            } catch {
-              error('--descriptions must be a JSON array');
-              return;
-            }
-            if (!Array.isArray(descriptions)) {
-              error('--descriptions must be a JSON array');
-              return;
-            }
+            customId = id;
+            i++;
+          } else if (token.startsWith('--')) {
+            return { ok: false, errorKind: 'InvalidArgs', message: `phase add does not support ${token}` };
           } else {
-            descriptions = args.slice(2).filter(a => a !== '--raw');
+            descArgs.push(token);
           }
-          phase.cmdPhaseAddBatch(cwd, descriptions, raw);
-        },
-      ),
-      insert: sdkHandler(
-        'phase.insert',
-        args.slice(2),
-        args.slice(1),
-        () => {
-          if (args.includes('--dry-run')) {
-            error('phase insert does not support --dry-run');
-            return;
+        }
+        phase.cmdPhaseAdd(cwd, descArgs.join(' '), raw, customId);
+        return { ok: true, data: null };
+      },
+      'add-batch': (_ctx) => {
+        const descFlagIdx = args.indexOf('--descriptions');
+        let descriptions;
+        if (descFlagIdx !== -1) {
+          const rawDescriptions = args[descFlagIdx + 1];
+          if (!rawDescriptions || rawDescriptions.startsWith('--')) {
+            return { ok: false, errorKind: 'InvalidArgs', message: '--descriptions must be a JSON array' };
           }
-          phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
-        },
-      ),
-      remove: sdkHandler(
-        'phase.remove',
-        args.slice(2),
-        args.slice(1),
-        () => {
-          const removeArgs = args.slice(2).filter(token => token !== '--raw');
-          let forceFlag = false;
-          const positional = [];
-          for (const token of removeArgs) {
-            if (token === '--force') {
-              forceFlag = true;
-              continue;
-            }
-            if (token.startsWith('--')) {
-              error(`phase remove does not support ${token}`);
-              return;
-            }
-            positional.push(token);
+          try {
+            descriptions = JSON.parse(rawDescriptions);
+          } catch {
+            return { ok: false, errorKind: 'InvalidArgs', message: '--descriptions must be a JSON array' };
           }
-          if (positional.length !== 1) {
-            error('phase remove accepts exactly one phase number');
-            return;
+          if (!Array.isArray(descriptions)) {
+            return { ok: false, errorKind: 'InvalidArgs', message: '--descriptions must be a JSON array' };
           }
-          phase.cmdPhaseRemove(cwd, positional[0], { force: forceFlag }, raw);
-        },
-      ),
-      complete: sdkHandler(
-        'phase.complete',
-        args.slice(2),
-        args.slice(1),
-        () => phase.cmdPhaseComplete(cwd, args[2], raw),
-      ),
+        } else {
+          descriptions = args.slice(2).filter(a => a !== '--raw');
+        }
+        phase.cmdPhaseAddBatch(cwd, descriptions, raw);
+        return { ok: true, data: null };
+      },
+      insert: (_ctx) => {
+        if (args.includes('--dry-run')) {
+          return { ok: false, errorKind: 'InvalidArgs', message: 'phase insert does not support --dry-run' };
+        }
+        phase.cmdPhaseInsert(cwd, args[2], args.slice(3).join(' '), raw);
+        return { ok: true, data: null };
+      },
+      remove: (_ctx) => {
+        const removeArgs = args.slice(2).filter(token => token !== '--raw');
+        let forceFlag = false;
+        const positional = [];
+        for (const token of removeArgs) {
+          if (token === '--force') {
+            forceFlag = true;
+            continue;
+          }
+          if (token.startsWith('--')) {
+            return { ok: false, errorKind: 'InvalidArgs', message: `phase remove does not support ${token}` };
+          }
+          positional.push(token);
+        }
+        if (positional.length !== 1) {
+          return { ok: false, errorKind: 'InvalidArgs', message: 'phase remove accepts exactly one phase number' };
+        }
+        phase.cmdPhaseRemove(cwd, positional[0], { force: forceFlag }, raw);
+        return { ok: true, data: null };
+      },
+      complete: (_ctx) => {
+        phase.cmdPhaseComplete(cwd, args[2], raw);
+        return { ok: true, data: null };
+      },
     },
+  };
+
+  // ── Build the SDK loader ────────────────────────────────────────────────────
+  function sdkLoader() {
+    const execute = getExecuteForCjs();
+    if (!execute) return null;
+    // Wrap executeForCjs to match the hub's sdkLoader contract:
+    // hub calls sdkLoader() -> returns the execute function itself.
+    return execute;
+  }
+
+  // ── Build manifest (available subcommands for UnknownCommand detection) ─────
+  // `availableSubcommands` is what the error message shows. It excludes
+  // SDK-only unsupported commands (already handled above) but does NOT include
+  // 'mvp-mode' because it was absent from PHASE_SUBCOMMANDS in the original
+  // and was not shown in the "Available:" list there either.
+  //
+  // `manifestSubcommands` is the full routing set for the hub — it includes
+  // 'mvp-mode' (which the original code routed via a handler even without a
+  // manifest entry) so the hub's UnknownCommand check passes for it.
+  const availableSubcommands = PHASE_SUBCOMMANDS.filter(s => !UNSUPPORTED[s]);
+  const manifestSubcommands = ['mvp-mode', ...availableSubcommands];
+  const manifest = { phase: manifestSubcommands };
+
+  // ── Construct hub (mode fixed at call time based on env + SDK availability) ─
+  const mode = sdkAvailable ? 'sdk' : 'cjs';
+  const hub = createHub({
+    mode,
+    sdkLoader: mode === 'sdk' ? sdkLoader : undefined,
+    cjsRegistry: mode === 'cjs' ? cjsRegistry : undefined,
+    manifest,
   });
+
+  // ── Dispatch ────────────────────────────────────────────────────────────────
+  const result = hub.dispatch({
+    family: 'phase',
+    subcommand,
+    args: args.slice(2),
+    cwd,
+    raw,
+  });
+
+  // ── Translate result → CLI output / error (adapter responsibility) ──────────
+  if (!result.ok) {
+    if (result.errorKind === 'UnknownCommand') {
+      const available = availableSubcommands.join(', ');
+      error(`Unknown phase subcommand. Available: ${available}`);
+      return;
+    }
+    // InvalidArgs, HandlerRefusal, HandlerFailure, SdkLoadFailed, SdkDispatchFailed
+    error(result.message);
+    return;
+  }
+
+  // SDK path: the hub wraps executeForCjs; data projection is the adapter's job.
+  // CJS handlers call output() themselves (inside phase.cmdPhase*()), so no
+  // further output call is needed for cjs mode.
+  if (mode === 'sdk') {
+    if (raw) {
+      output(null, true, typeof result.data === 'string' ? result.data : String(result.data ?? ''));
+    } else {
+      output(result.data);
+    }
+  }
 }
 
 module.exports = {
