@@ -89,6 +89,8 @@ if [ "$RUNTIME" = "codex" ] && [ "$USE_WORKTREES" != "false" ]; then
   echo "FATAL: Codex execute-phase worktree isolation is unsupported. Set workflow.use_worktrees=false or use a runtime with Agent isolation=\"worktree\" support." >&2
   exit 1
 fi
+# Sweep orphaned locked worktrees from prior crashed sessions before spawning executors (#3707).
+[ "$USE_WORKTREES" != "false" ] && gsd-sdk query worktree.reap-orphans 2>/dev/null || true
 ```
 Codex maps subagents to `spawn_agent`, which has no direct Codex mapping for Claude Code's `isolation="worktree"` parameter. Failing closed prevents main-checkout edits while the workflow believes agents are isolated.
 

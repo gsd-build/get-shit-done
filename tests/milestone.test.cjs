@@ -4,45 +4,64 @@
 
 /**
  * GSD Tools Tests - Milestone
+ *
+ * Covers: milestone complete command, phases clear command,
+ * requirements mark-complete command (regex-global fix), new-milestone
+ * workflow verification gate, milestone complete version scoping (#3043).
  */
 
-const { test, describe, beforeEach, afterEach } = require('node:test');
+'use strict';
+
+const { test, describe, before, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function writeState(tmpDir, extra = '') {
+  fs.writeFileSync(
+    path.join(tmpDir, '.planning', 'STATE.md'),
+    `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n${extra}`,
+  );
+}
+
+function writeRoadmap(tmpDir, content) {
+  fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), content);
+}
+
+function mkPhaseDir(tmpDir, name, opts = {}) {
+  const p = path.join(tmpDir, '.planning', 'phases', name);
+  fs.mkdirSync(p, { recursive: true });
+  if (opts.plan) fs.writeFileSync(path.join(p, `${name.split('-')[0]}-01-PLAN.md`), '# Plan\n');
+  if (opts.oneLiner) {
+    fs.writeFileSync(
+      path.join(p, `${name.split('-')[0]}-01-SUMMARY.md`),
+      `---\none-liner: ${opts.oneLiner}\n---\n# Summary\n`,
+    );
+  }
+  return p;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// milestone complete command
+// ─────────────────────────────────────────────────────────────────────────────
+
 describe('milestone complete command', () => {
   let tmpDir;
 
-  beforeEach(() => {
-    tmpDir = createTempProject();
-  });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
 
   test('archives roadmap, requirements, creates MILESTONES.md', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0 MVP\n\n### Phase 1: Foundation\n**Goal:** Setup\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0 MVP\n\n### Phase 1: Foundation\n**Goal:** Setup\n`);
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
-      `# Requirements\n\n- [ ] User auth\n- [ ] Dashboard\n`
+      `# Requirements\n\n- [ ] User auth\n- [ ] Dashboard\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
-    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
-    fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(
-      path.join(p1, '01-01-SUMMARY.md'),
-      `---\none-liner: Set up project infrastructure\n---\n# Summary\n`
-    );
+    writeState(tmpDir);
+    mkPhaseDir(tmpDir, '01-foundation', { oneLiner: 'Set up project infrastructure' });
 
     const result = runGsdTools('milestone complete v1.0 --name MVP Foundation', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -52,189 +71,110 @@ describe('milestone complete command', () => {
     assert.strictEqual(output.phases, 1);
     assert.ok(output.archived.roadmap, 'roadmap should be archived');
     assert.ok(output.archived.requirements, 'requirements should be archived');
-
-    // Verify archive files exist
     assert.ok(
       fs.existsSync(path.join(tmpDir, '.planning', 'milestones', 'v1.0-ROADMAP.md')),
-      'archived roadmap should exist'
+      'archived roadmap should exist',
     );
     assert.ok(
       fs.existsSync(path.join(tmpDir, '.planning', 'milestones', 'v1.0-REQUIREMENTS.md')),
-      'archived requirements should exist'
+      'archived requirements should exist',
     );
-
-    // Verify MILESTONES.md created
-    assert.ok(
-      fs.existsSync(path.join(tmpDir, '.planning', 'MILESTONES.md')),
-      'MILESTONES.md should be created'
-    );
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'MILESTONES.md')));
     const milestones = fs.readFileSync(path.join(tmpDir, '.planning', 'MILESTONES.md'), 'utf-8');
-    assert.ok(milestones.includes('v1.0 MVP Foundation'), 'milestone entry should contain name');
-    assert.ok(milestones.includes('Set up project infrastructure'), 'accomplishments should be listed');
+    assert.ok(milestones.includes('v1.0 MVP Foundation'));
+    assert.ok(milestones.includes('Set up project infrastructure'));
   });
 
   test('prepends to existing MILESTONES.md (reverse chronological)', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'MILESTONES.md'),
-      `# Milestones\n\n## v0.9 Alpha (Shipped: 2025-01-01)\n\n---\n\n`
+      `# Milestones\n\n## v0.9 Alpha (Shipped: 2025-01-01)\n\n---\n\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
+    writeState(tmpDir);
 
     const result = runGsdTools('milestone complete v1.0 --name Beta', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const milestones = fs.readFileSync(path.join(tmpDir, '.planning', 'MILESTONES.md'), 'utf-8');
-    assert.ok(milestones.includes('v0.9 Alpha'), 'existing entry should be preserved');
-    assert.ok(milestones.includes('v1.0 Beta'), 'new entry should be present');
-    // New entry should appear BEFORE old entry (reverse chronological)
-    const newIdx = milestones.indexOf('v1.0 Beta');
-    const oldIdx = milestones.indexOf('v0.9 Alpha');
-    assert.ok(newIdx < oldIdx, 'new entry should appear before old entry (reverse chronological)');
+    assert.ok(milestones.includes('v0.9 Alpha'));
+    assert.ok(milestones.includes('v1.0 Beta'));
+    assert.ok(milestones.indexOf('v1.0 Beta') < milestones.indexOf('v0.9 Alpha'), 'new entry before old');
   });
 
   test('three sequential completions maintain reverse-chronological order', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'MILESTONES.md'),
-      `# Milestones\n\n## v1.0 First (Shipped: 2025-01-01)\n\n---\n\n`
+      `# Milestones\n\n## v1.0 First (Shipped: 2025-01-01)\n\n---\n\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.1\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.1\n`);
+    writeState(tmpDir);
 
-    let result = runGsdTools('milestone complete v1.1 --name Second', tmpDir);
-    assert.ok(result.success, `v1.1 failed: ${result.error}`);
+    assert.ok(runGsdTools('milestone complete v1.1 --name Second', tmpDir).success);
+    writeRoadmap(tmpDir, `# Roadmap v1.2\n`);
+    assert.ok(runGsdTools('milestone complete v1.2 --name Third', tmpDir).success);
 
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.2\n`
-    );
-
-    result = runGsdTools('milestone complete v1.2 --name Third', tmpDir);
-    assert.ok(result.success, `v1.2 failed: ${result.error}`);
-
-    const milestones = fs.readFileSync(
-      path.join(tmpDir, '.planning', 'MILESTONES.md'), 'utf-8'
-    );
-
-    const idx10 = milestones.indexOf('v1.0 First');
-    const idx11 = milestones.indexOf('v1.1 Second');
-    const idx12 = milestones.indexOf('v1.2 Third');
-
-    assert.ok(idx10 !== -1, 'v1.0 should be present');
-    assert.ok(idx11 !== -1, 'v1.1 should be present');
-    assert.ok(idx12 !== -1, 'v1.2 should be present');
-    assert.ok(idx12 < idx11, 'v1.2 should appear before v1.1');
-    assert.ok(idx11 < idx10, 'v1.1 should appear before v1.0');
+    const m = fs.readFileSync(path.join(tmpDir, '.planning', 'MILESTONES.md'), 'utf-8');
+    const [i10, i11, i12] = ['v1.0 First', 'v1.1 Second', 'v1.2 Third'].map(s => m.indexOf(s));
+    assert.ok(i10 !== -1 && i11 !== -1 && i12 !== -1);
+    assert.ok(i12 < i11, 'v1.2 before v1.1');
+    assert.ok(i11 < i10, 'v1.1 before v1.0');
   });
 
   test('archives phase directories with --archive-phases flag', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
-    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
-    fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(
-      path.join(p1, '01-01-SUMMARY.md'),
-      `---\none-liner: Set up project infrastructure\n---\n# Summary\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
+    writeState(tmpDir);
+    mkPhaseDir(tmpDir, '01-foundation', { oneLiner: 'Set up project infrastructure' });
 
     const result = runGsdTools('milestone complete v1.0 --name MVP --archive-phases', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.archived.phases, true, 'phases should be archived');
-
-    // Phase directory moved to milestones/v1.0-phases/
-    assert.ok(
-      fs.existsSync(path.join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '01-foundation')),
-      'archived phase directory should exist in milestones/v1.0-phases/'
-    );
-
-    // Original phase directory no longer exists
-    assert.ok(
-      !fs.existsSync(p1),
-      'original phase directory should no longer exist'
-    );
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'milestones', 'v1.0-phases', '01-foundation')));
+    assert.ok(!fs.existsSync(path.join(tmpDir, '.planning', 'phases', '01-foundation')));
   });
 
   test('archived REQUIREMENTS.md contains archive header', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'REQUIREMENTS.md'),
-      `# Requirements\n\n- [ ] **TEST-01**: core.cjs has tests\n- [ ] **TEST-02**: more tests\n`
+      `# Requirements\n\n- [ ] **TEST-01**: core.cjs has tests\n- [ ] **TEST-02**: more tests\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
+    writeState(tmpDir);
 
-    const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(runGsdTools('milestone complete v1.0 --name MVP', tmpDir).success);
 
     const archivedReq = fs.readFileSync(
-      path.join(tmpDir, '.planning', 'milestones', 'v1.0-REQUIREMENTS.md'), 'utf-8'
+      path.join(tmpDir, '.planning', 'milestones', 'v1.0-REQUIREMENTS.md'), 'utf-8',
     );
-    assert.ok(archivedReq.includes('Requirements Archive: v1.0'), 'should contain archive version');
-    assert.ok(archivedReq.includes('SHIPPED'), 'should contain SHIPPED status');
-    assert.ok(archivedReq.includes('Archived:'), 'should contain Archived: date line');
-    // Original content preserved after header
-    assert.ok(archivedReq.includes('# Requirements'), 'original content should be preserved');
-    assert.ok(archivedReq.includes('**TEST-01**'), 'original requirement items should be preserved');
+    assert.ok(archivedReq.includes('Requirements Archive: v1.0'));
+    assert.ok(archivedReq.includes('SHIPPED'));
+    assert.ok(archivedReq.includes('Archived:'));
+    assert.ok(archivedReq.includes('# Requirements'));
+    assert.ok(archivedReq.includes('**TEST-01**'));
   });
 
   test('STATE.md gets updated during milestone complete', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
+    writeState(tmpDir);
 
     const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.state_updated, true, 'state_updated should be true');
+    assert.strictEqual(output.state_updated, true);
 
     const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    assert.ok(state.includes('v1.0 milestone complete'), 'status should be updated to milestone complete');
-    assert.ok(
-      state.includes('v1.0 milestone completed and archived'),
-      'last activity description should reference milestone completion'
-    );
+    assert.ok(state.includes('v1.0 milestone complete'));
+    assert.ok(state.includes('v1.0 milestone completed and archived'));
   });
 
   test('normalizes stale STATE.md narrative tails after milestone complete (#3088)', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n\n## Current Position\n\nPhase: 03 — EXECUTING\nPlan: 03-02\nStatus: Executing\nLast activity: 2025-01-01 — Running phase\n\n## Operator Next Steps\n\n- Re-run /gsd:complete-milestone v1.0\n`
+      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n\n## Current Position\n\nPhase: 03 — EXECUTING\nPlan: 03-02\nStatus: Executing\nLast activity: 2025-01-01 — Running phase\n\n## Operator Next Steps\n\n- Re-run /gsd:complete-milestone v1.0\n`,
     );
 
     const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
@@ -244,17 +184,12 @@ describe('milestone complete command', () => {
     assert.ok(state.includes('Phase: Milestone v1.0 complete'));
     assert.ok(state.includes('Status: Awaiting next milestone'));
     assert.ok(!state.includes('Re-run /gsd:complete-milestone'));
-    // #3584: persisted ROADMAP/STATE strings now use the runtime-routable
-    // hyphen-form slash command (formatter resolves codex → $gsd-, others → /gsd-).
     assert.ok(state.includes('/gsd-new-milestone'));
   });
 
   test('appends canonical narrative sections when STATE.md headings are missing (#3088)', () => {
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), `# Roadmap v1.0\n`);
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
+    writeState(tmpDir);
 
     const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
@@ -263,57 +198,33 @@ describe('milestone complete command', () => {
     assert.ok(state.includes('## Current Position'));
     assert.ok(state.includes('Phase: Milestone v1.0 complete'));
     assert.ok(state.includes('## Operator Next Steps'));
-    // #3584: hyphen form is the runtime-routable shape for skills-based installs.
     assert.ok(state.includes('/gsd-new-milestone'));
   });
 
   test('handles missing ROADMAP.md gracefully', () => {
-    // Only STATE.md — no ROADMAP.md, no REQUIREMENTS.md
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeState(tmpDir);
 
     const result = runGsdTools('milestone complete v1.0 --name NoRoadmap', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.archived.roadmap, false, 'roadmap should not be archived');
-    assert.strictEqual(output.archived.requirements, false, 'requirements should not be archived');
-    assert.strictEqual(output.milestones_updated, true, 'MILESTONES.md should still be created');
-
-    assert.ok(
-      fs.existsSync(path.join(tmpDir, '.planning', 'MILESTONES.md')),
-      'MILESTONES.md should be created even without ROADMAP.md'
-    );
+    assert.strictEqual(output.archived.roadmap, false);
+    assert.strictEqual(output.archived.requirements, false);
+    assert.strictEqual(output.milestones_updated, true);
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'MILESTONES.md')));
   });
 
   test('scopes stats to current milestone phases only', () => {
-    // Set up ROADMAP.md that only references Phase 3 and Phase 4
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.1\n\n### Phase 3: New Feature\n**Goal:** Build it\n\n### Phase 4: Polish\n**Goal:** Ship it\n`
+    writeRoadmap(tmpDir,
+      `# Roadmap v1.1\n\n### Phase 3: New Feature\n**Goal:** Build it\n\n### Phase 4: Polish\n**Goal:** Ship it\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeState(tmpDir);
 
-    // Create phases from PREVIOUS milestone (should be excluded)
-    const p1 = path.join(tmpDir, '.planning', 'phases', '01-old-setup');
-    fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan\n');
-    fs.writeFileSync(path.join(p1, '01-01-SUMMARY.md'), '---\none-liner: Old setup work\n---\n# Summary\n');
-    const p2 = path.join(tmpDir, '.planning', 'phases', '02-old-core');
-    fs.mkdirSync(p2, { recursive: true });
-    fs.writeFileSync(path.join(p2, '02-01-PLAN.md'), '# Plan\n');
-    fs.writeFileSync(path.join(p2, '02-01-SUMMARY.md'), '---\none-liner: Old core work\n---\n# Summary\n');
-
-    // Create phases for CURRENT milestone (should be included)
-    const p3 = path.join(tmpDir, '.planning', 'phases', '03-new-feature');
-    fs.mkdirSync(p3, { recursive: true });
-    fs.writeFileSync(path.join(p3, '03-01-PLAN.md'), '# Plan\n');
-    fs.writeFileSync(path.join(p3, '03-01-SUMMARY.md'), '---\none-liner: Built new feature\n---\n# Summary\n');
+    // Previous milestone phases — must be excluded
+    mkPhaseDir(tmpDir, '01-old-setup', { plan: true, oneLiner: 'Old setup work' });
+    mkPhaseDir(tmpDir, '02-old-core', { plan: true, oneLiner: 'Old core work' });
+    // Current milestone phases
+    mkPhaseDir(tmpDir, '03-new-feature', { plan: true, oneLiner: 'Built new feature' });
     const p4 = path.join(tmpDir, '.planning', 'phases', '04-polish');
     fs.mkdirSync(p4, { recursive: true });
     fs.writeFileSync(path.join(p4, '04-01-PLAN.md'), '# Plan\n');
@@ -324,237 +235,129 @@ describe('milestone complete command', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
-    // Should only count phases 3 and 4, not 1 and 2
-    assert.strictEqual(output.phases, 2, 'should count only milestone phases (3, 4)');
+    assert.strictEqual(output.phases, 2, 'should count only phases 3 and 4');
     assert.strictEqual(output.plans, 3, 'should count only plans from phases 3 and 4');
-    // Accomplishments should only be from phases 3 and 4
-    assert.ok(output.accomplishments.includes('Built new feature'), 'should include current milestone accomplishment');
-    assert.ok(output.accomplishments.includes('Polished UI'), 'should include current milestone accomplishment');
-    assert.ok(!output.accomplishments.includes('Old setup work'), 'should NOT include previous milestone accomplishment');
-    assert.ok(!output.accomplishments.includes('Old core work'), 'should NOT include previous milestone accomplishment');
+    assert.ok(output.accomplishments.includes('Built new feature'));
+    assert.ok(output.accomplishments.includes('Polished UI'));
+    assert.ok(!output.accomplishments.includes('Old setup work'));
+    assert.ok(!output.accomplishments.includes('Old core work'));
   });
 
   test('archive-phases only archives current milestone phases', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.1\n\n### Phase 2: Current Work\n**Goal:** Do it\n`
+    writeRoadmap(tmpDir,
+      `# Roadmap v1.1\n\n### Phase 2: Current Work\n**Goal:** Do it\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
+    writeState(tmpDir);
+    mkPhaseDir(tmpDir, '01-old', { plan: true });
+    mkPhaseDir(tmpDir, '02-current', { plan: true });
 
-    // Phase from previous milestone
-    const p1 = path.join(tmpDir, '.planning', 'phases', '01-old');
-    fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan\n');
+    assert.ok(runGsdTools('milestone complete v1.1 --name Test --archive-phases', tmpDir).success);
 
-    // Phase from current milestone
-    const p2 = path.join(tmpDir, '.planning', 'phases', '02-current');
-    fs.mkdirSync(p2, { recursive: true });
-    fs.writeFileSync(path.join(p2, '02-01-PLAN.md'), '# Plan\n');
-
-    const result = runGsdTools('milestone complete v1.1 --name Test --archive-phases', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    // Phase 2 should be archived
-    assert.ok(
-      fs.existsSync(path.join(tmpDir, '.planning', 'milestones', 'v1.1-phases', '02-current')),
-      'current milestone phase should be archived'
-    );
-    // Phase 1 should still be in place (not archived)
-    assert.ok(
-      fs.existsSync(path.join(tmpDir, '.planning', 'phases', '01-old')),
-      'previous milestone phase should NOT be archived'
-    );
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'milestones', 'v1.1-phases', '02-current')));
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'phases', '01-old')));
   });
 
   test('phase 1 in roadmap does NOT match directory 10-something (no prefix collision)', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n`
+    writeRoadmap(tmpDir,
+      `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
-    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
-    fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan\n');
-    fs.writeFileSync(
-      path.join(p1, '01-01-SUMMARY.md'),
-      '---\none-liner: Foundation work\n---\n'
-    );
-
-    const p10 = path.join(tmpDir, '.planning', 'phases', '10-scaling');
-    fs.mkdirSync(p10, { recursive: true });
-    fs.writeFileSync(path.join(p10, '10-01-PLAN.md'), '# Plan\n');
-    fs.writeFileSync(
-      path.join(p10, '10-01-SUMMARY.md'),
-      '---\none-liner: Scaling work\n---\n'
-    );
+    writeState(tmpDir);
+    mkPhaseDir(tmpDir, '01-foundation', { plan: true, oneLiner: 'Foundation work' });
+    mkPhaseDir(tmpDir, '10-scaling', { plan: true, oneLiner: 'Scaling work' });
 
     const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
     assert.ok(result.success, `Command failed: ${result.error}`);
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.phases, 1, 'should count only phase 1, not phase 10');
-    assert.strictEqual(output.plans, 1, 'should count only plans from phase 1');
-    assert.ok(
-      output.accomplishments.includes('Foundation work'),
-      'should include phase 1 accomplishment'
-    );
-    assert.ok(
-      !output.accomplishments.includes('Scaling work'),
-      'should NOT include phase 10 accomplishment'
-    );
+    assert.strictEqual(output.plans, 1);
+    assert.ok(output.accomplishments.includes('Foundation work'));
+    assert.ok(!output.accomplishments.includes('Scaling work'));
   });
 
   test('non-numeric directory is excluded when milestone scoping is active', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n\n### Phase 1: Core\n**Goal:** Build core\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
-    const p1 = path.join(tmpDir, '.planning', 'phases', '01-core');
-    fs.mkdirSync(p1, { recursive: true });
-    fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan\n');
-
-    // Non-phase directory — should be excluded
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n\n### Phase 1: Core\n**Goal:** Build core\n`);
+    writeState(tmpDir);
+    mkPhaseDir(tmpDir, '01-core', { plan: true });
     const misc = path.join(tmpDir, '.planning', 'phases', 'notes');
     fs.mkdirSync(misc, { recursive: true });
     fs.writeFileSync(path.join(misc, 'PLAN.md'), '# Not a phase\n');
 
     const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.success);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.phases, 1, 'non-numeric dir should not be counted as a phase');
-    assert.strictEqual(output.plans, 1, 'plans from non-numeric dir should not be counted');
+    assert.strictEqual(output.phases, 1);
+    assert.strictEqual(output.plans, 1);
   });
 
   test('large phase numbers (456, 457) scope correctly', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.49\n\n### Phase 456: DACP\n**Goal:** Ship DACP\n\n### Phase 457: Integration\n**Goal:** Integrate\n`
+    writeRoadmap(tmpDir,
+      `# Roadmap v1.49\n\n### Phase 456: DACP\n**Goal:** Ship DACP\n\n### Phase 457: Integration\n**Goal:** Integrate\n`,
     );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
-    const p456 = path.join(tmpDir, '.planning', 'phases', '456-dacp');
-    fs.mkdirSync(p456, { recursive: true });
-    fs.writeFileSync(path.join(p456, '456-01-PLAN.md'), '# Plan\n');
-
-    const p457 = path.join(tmpDir, '.planning', 'phases', '457-integration');
-    fs.mkdirSync(p457, { recursive: true });
-    fs.writeFileSync(path.join(p457, '457-01-PLAN.md'), '# Plan\n');
-
-    // Phase 45 from prior milestone — should not match
-    const p45 = path.join(tmpDir, '.planning', 'phases', '45-old');
-    fs.mkdirSync(p45, { recursive: true });
-    fs.writeFileSync(path.join(p45, 'PLAN.md'), '# Plan\n');
+    writeState(tmpDir);
+    mkPhaseDir(tmpDir, '456-dacp', { plan: true });
+    mkPhaseDir(tmpDir, '457-integration', { plan: true });
+    mkPhaseDir(tmpDir, '45-old', { plan: true });
 
     const result = runGsdTools('milestone complete v1.49 --name DACP', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.phases, 2, 'should count only phases 456 and 457');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).phases, 2);
   });
 
   test('counts tasks from **Tasks:** N in summary body', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n`);
+    writeState(tmpDir);
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(p1, { recursive: true });
     fs.writeFileSync(
       path.join(p1, '01-01-SUMMARY.md'),
-      `---\none-liner: Built the foundation\n---\n\n# Phase 1: Foundation Summary\n\n**Built the foundation**\n\n## Performance\n\n- **Duration:** 28 min\n- **Tasks:** 7\n- **Files modified:** 12\n`
+      `---\none-liner: Built the foundation\n---\n\n# Phase 1: Foundation Summary\n\n**Built the foundation**\n\n## Performance\n\n- **Duration:** 28 min\n- **Tasks:** 7\n- **Files modified:** 12\n`,
     );
 
     const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.tasks, 7, 'should count tasks from **Tasks:** N field');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).tasks, 7);
   });
 
   test('extracts one-liner from body when not in frontmatter', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n`);
+    writeState(tmpDir);
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
     fs.mkdirSync(p1, { recursive: true });
-    // No one-liner in frontmatter, but present in body as bold line
     fs.writeFileSync(
       path.join(p1, '01-01-SUMMARY.md'),
-      `---\nphase: "01"\n---\n\n# Phase 1: Foundation Summary\n\n**JWT auth with refresh rotation using jose library**\n\n## Performance\n`
+      `---\nphase: "01"\n---\n\n# Phase 1: Foundation Summary\n\n**JWT auth with refresh rotation using jose library**\n\n## Performance\n`,
     );
 
     const result = runGsdTools('milestone complete v1.0 --name MVP', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok(
-      output.accomplishments.includes('JWT auth with refresh rotation using jose library'),
-      'should extract one-liner from body bold line'
-    );
+    assert.ok(result.success);
+    assert.ok(JSON.parse(result.output).accomplishments.includes('JWT auth with refresh rotation using jose library'));
   });
 
   test('updates STATE.md with plain format fields', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\nStatus: In progress\nLast Activity: 2025-01-01\nLast Activity Description: Working\n`
+      `# State\n\nStatus: In progress\nLast Activity: 2025-01-01\nLast Activity Description: Working\n`,
     );
 
     const result = runGsdTools('milestone complete v1.0 --name Test', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const state = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    assert.ok(state.includes('v1.0 milestone complete'), 'plain Status field should be updated');
+    assert.ok(result.success);
+    assert.ok(fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8').includes('v1.0 milestone complete'));
   });
 
   test('handles empty phases directory', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      `# Roadmap v1.0\n`
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      `# State\n\n**Status:** In progress\n**Last Activity:** 2025-01-01\n**Last Activity Description:** Working\n`
-    );
-    // phases directory exists but is empty (from createTempProject)
+    writeRoadmap(tmpDir, `# Roadmap v1.0\n`);
+    writeState(tmpDir);
 
     const result = runGsdTools('milestone complete v1.0 --name EmptyPhases', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.success);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.phases, 0, 'phase count should be 0');
-    assert.strictEqual(output.plans, 0, 'plan count should be 0');
-    assert.strictEqual(output.tasks, 0, 'task count should be 0');
+    assert.strictEqual(output.phases, 0);
+    assert.strictEqual(output.plans, 0);
+    assert.strictEqual(output.tasks, 0);
   });
 });
 
@@ -565,13 +368,8 @@ describe('milestone complete command', () => {
 describe('phases clear command', () => {
   let tmpDir;
 
-  beforeEach(() => {
-    tmpDir = createTempProject();
-  });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
 
   test('deletes normal phase directories when --confirm is passed', () => {
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-setup');
@@ -579,42 +377,34 @@ describe('phases clear command', () => {
     fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan\n');
 
     const result = runGsdTools('phases clear --confirm', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.cleared, 1, 'should have cleared 1 directory');
-    assert.ok(!fs.existsSync(p1), '01-setup should be deleted');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).cleared, 1);
+    assert.ok(!fs.existsSync(p1));
   });
 
   test('requires --confirm when phase directories exist', () => {
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-setup');
     fs.mkdirSync(p1, { recursive: true });
-
-    const result = runGsdTools('phases clear', tmpDir);
-    assert.ok(!result.success, 'should fail without --confirm');
+    assert.ok(!runGsdTools('phases clear', tmpDir).success);
   });
 
   test('preserves 999.x backlog phase directories during clear (#1853)', () => {
     const p1 = path.join(tmpDir, '.planning', 'phases', '01-setup');
     const p999a = path.join(tmpDir, '.planning', 'phases', '999.1-some-idea');
     const p999b = path.join(tmpDir, '.planning', 'phases', '999.2-another-idea');
-
     fs.mkdirSync(p1, { recursive: true });
     fs.mkdirSync(p999a, { recursive: true });
     fs.mkdirSync(p999b, { recursive: true });
-
     fs.writeFileSync(path.join(p1, '01-01-PLAN.md'), '# Plan\n');
-    fs.writeFileSync(path.join(p999a, 'PLAN.md'), '# Backlog idea\n');
-    fs.writeFileSync(path.join(p999b, 'PLAN.md'), '# Another backlog idea\n');
+    fs.writeFileSync(path.join(p999a, 'PLAN.md'), '# Backlog\n');
+    fs.writeFileSync(path.join(p999b, 'PLAN.md'), '# Backlog 2\n');
 
     const result = runGsdTools('phases clear --confirm', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.cleared, 1, 'should have cleared only 1 directory (not backlog)');
-    assert.ok(!fs.existsSync(p1), '01-setup should be deleted');
-    assert.ok(fs.existsSync(p999a), '999.1-some-idea should be preserved');
-    assert.ok(fs.existsSync(p999b), '999.2-another-idea should be preserved');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).cleared, 1);
+    assert.ok(!fs.existsSync(p1));
+    assert.ok(fs.existsSync(p999a));
+    assert.ok(fs.existsSync(p999b));
   });
 
   test('reports 0 cleared when only backlog phases exist', () => {
@@ -622,30 +412,21 @@ describe('phases clear command', () => {
     fs.mkdirSync(p999a, { recursive: true });
 
     const result = runGsdTools('phases clear --confirm', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.cleared, 0, 'cleared should be 0 when only backlog phases exist');
-    assert.ok(fs.existsSync(p999a), '999.1-idea should be preserved');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).cleared, 0);
+    assert.ok(fs.existsSync(p999a));
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// requirements mark-complete command
+// requirements mark-complete command — regex global-state fix (#milestone-regex-global)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('requirements mark-complete command', () => {
   let tmpDir;
 
-  beforeEach(() => {
-    tmpDir = createTempProject();
-  });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
-
-  // ─── helpers ──────────────────────────────────────────────────────────────
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
 
   function writeRequirements(tmpDir, content) {
     fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), content, 'utf-8');
@@ -679,22 +460,19 @@ describe('requirements mark-complete command', () => {
 | INFRA-01 | Phase 6 | Pending |
 `;
 
-  // ─── tests ────────────────────────────────────────────────────────────────
-
   test('marks single requirement complete (checkbox + table)', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
     const result = runGsdTools('requirements mark-complete TEST-01', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.success);
 
     const output = JSON.parse(result.output);
     assert.strictEqual(output.updated, true);
-    assert.ok(output.marked_complete.includes('TEST-01'), 'TEST-01 should be marked complete');
+    assert.ok(output.marked_complete.includes('TEST-01'));
 
     const content = readRequirements(tmpDir);
     assert.ok(content.includes('- [x] **TEST-01**'), 'checkbox should be checked');
     assert.ok(content.includes('| TEST-01 | Phase 1 | Complete |'), 'table row should be Complete');
-    // Other checkboxes unchanged
     assert.ok(content.includes('- [ ] **TEST-02**'), 'TEST-02 should remain unchecked');
   });
 
@@ -702,120 +480,161 @@ describe('requirements mark-complete command', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
     const result = runGsdTools('requirements mark-complete TEST-01,REG-01,INFRA-01', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.success);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.marked_complete.length, 3, 'should mark 3 requirements complete');
+    assert.strictEqual(output.marked_complete.length, 3);
     assert.ok(output.marked_complete.includes('TEST-01'));
     assert.ok(output.marked_complete.includes('REG-01'));
     assert.ok(output.marked_complete.includes('INFRA-01'));
 
     const content = readRequirements(tmpDir);
-    assert.ok(content.includes('- [x] **TEST-01**'), 'TEST-01 checkbox should be checked');
-    assert.ok(content.includes('- [x] **REG-01**'), 'REG-01 checkbox should be checked');
-    assert.ok(content.includes('- [x] **INFRA-01**'), 'INFRA-01 checkbox should be checked');
-    assert.ok(content.includes('| TEST-01 | Phase 1 | Complete |'), 'TEST-01 table should be Complete');
-    assert.ok(content.includes('| REG-01 | Phase 1 | Complete |'), 'REG-01 table should be Complete');
-    assert.ok(content.includes('| INFRA-01 | Phase 6 | Complete |'), 'INFRA-01 table should be Complete');
+    assert.ok(content.includes('- [x] **TEST-01**'));
+    assert.ok(content.includes('- [x] **REG-01**'));
+    assert.ok(content.includes('- [x] **INFRA-01**'));
+    assert.ok(content.includes('| TEST-01 | Phase 1 | Complete |'));
+    assert.ok(content.includes('| REG-01 | Phase 1 | Complete |'));
+    assert.ok(content.includes('| INFRA-01 | Phase 6 | Complete |'));
   });
 
   test('accepts space-separated IDs', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
     const result = runGsdTools('requirements mark-complete TEST-01 TEST-02', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.marked_complete.length, 2, 'should mark 2 requirements complete');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).marked_complete.length, 2);
 
     const content = readRequirements(tmpDir);
-    assert.ok(content.includes('- [x] **TEST-01**'), 'TEST-01 should be checked');
-    assert.ok(content.includes('- [x] **TEST-02**'), 'TEST-02 should be checked');
+    assert.ok(content.includes('- [x] **TEST-01**'));
+    assert.ok(content.includes('- [x] **TEST-02**'));
   });
 
   test('accepts bracket-wrapped IDs [REQ-01, REQ-02]', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
     const result = runGsdTools('requirements mark-complete [TEST-01,TEST-02]', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.marked_complete.length, 2, 'should mark 2 requirements complete');
+    assert.ok(result.success);
+    assert.strictEqual(JSON.parse(result.output).marked_complete.length, 2);
 
     const content = readRequirements(tmpDir);
-    assert.ok(content.includes('- [x] **TEST-01**'), 'TEST-01 should be checked');
-    assert.ok(content.includes('- [x] **TEST-02**'), 'TEST-02 should be checked');
+    assert.ok(content.includes('- [x] **TEST-01**'));
+    assert.ok(content.includes('- [x] **TEST-02**'));
   });
 
   test('returns not_found for invalid IDs while updating valid ones', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
     const result = runGsdTools('requirements mark-complete TEST-01,FAKE-99', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.success);
 
     const output = JSON.parse(result.output);
-    assert.strictEqual(output.updated, true, 'should still update valid IDs');
-    assert.ok(output.marked_complete.includes('TEST-01'), 'TEST-01 should be marked complete');
-    assert.ok(output.not_found.includes('FAKE-99'), 'FAKE-99 should be in not_found');
-    assert.strictEqual(output.total, 2, 'total should reflect all IDs attempted');
+    assert.strictEqual(output.updated, true);
+    assert.ok(output.marked_complete.includes('TEST-01'));
+    assert.ok(output.not_found.includes('FAKE-99'));
+    assert.strictEqual(output.total, 2);
   });
 
   test('idempotent — re-marking already-complete requirement does not corrupt', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
-    // TEST-03 already has [x] and Complete in the fixture
     const result = runGsdTools('requirements mark-complete TEST-03', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.ok(result.success);
 
     const output = JSON.parse(result.output);
-    assert.ok(output.already_complete.includes('TEST-03'), 'already-complete ID should be in already_complete');
-    assert.deepStrictEqual(output.not_found, [], 'should not appear in not_found');
+    assert.ok(output.already_complete.includes('TEST-03'));
+    assert.deepStrictEqual(output.not_found, []);
 
     const content = readRequirements(tmpDir);
-    // File should not be corrupted — no [xx] or doubled markers
-    assert.ok(content.includes('- [x] **TEST-03**'), 'existing [x] should remain intact');
-    assert.ok(!content.includes('[xx]'), 'should not have doubled x markers');
-    assert.ok(!content.includes('- [x] [x]'), 'should not have duplicate checkbox');
+    assert.ok(content.includes('- [x] **TEST-03**'));
+    assert.ok(!content.includes('[xx]'));
+    assert.ok(!content.includes('- [x] [x]'));
   });
 
   test('returns already_complete for idempotent calls on completed requirements', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
-    // TEST-03 is already [x] in the fixture
-    const result = runGsdTools('requirements mark-complete TEST-03', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.deepStrictEqual(output.already_complete, ['TEST-03'],
-      'should report TEST-03 as already_complete');
-    assert.deepStrictEqual(output.not_found, [],
-      'should not report already-complete IDs as not_found');
+    const output = JSON.parse(runGsdTools('requirements mark-complete TEST-03', tmpDir).output);
+    assert.deepStrictEqual(output.already_complete, ['TEST-03']);
+    assert.deepStrictEqual(output.not_found, []);
   });
 
   test('mixed: updates pending, reports already-complete, and flags missing', () => {
     writeRequirements(tmpDir, STANDARD_REQUIREMENTS);
 
-    const result = runGsdTools('requirements mark-complete TEST-01,TEST-03,FAKE-99', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.deepStrictEqual(output.marked_complete, ['TEST-01'],
-      'should mark TEST-01 complete');
-    assert.deepStrictEqual(output.already_complete, ['TEST-03'],
-      'should report TEST-03 as already_complete');
-    assert.deepStrictEqual(output.not_found, ['FAKE-99'],
-      'should report FAKE-99 as not_found');
+    const output = JSON.parse(
+      runGsdTools('requirements mark-complete TEST-01,TEST-03,FAKE-99', tmpDir).output,
+    );
+    assert.deepStrictEqual(output.marked_complete, ['TEST-01']);
+    assert.deepStrictEqual(output.already_complete, ['TEST-03']);
+    assert.deepStrictEqual(output.not_found, ['FAKE-99']);
   });
 
   test('missing REQUIREMENTS.md returns expected error structure', () => {
-    // createTempProject does not create REQUIREMENTS.md — so it's already missing
+    const output = JSON.parse(runGsdTools('requirements mark-complete TEST-01', tmpDir).output);
+    assert.strictEqual(output.updated, false);
+    assert.strictEqual(output.reason, 'REQUIREMENTS.md not found');
+  });
+});
 
-    const result = runGsdTools('requirements mark-complete TEST-01', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
+// ─────────────────────────────────────────────────────────────────────────────
+// milestone.cjs regex global-state fix (structural regression guard)
+// ─────────────────────────────────────────────────────────────────────────────
 
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.updated, false, 'updated should be false');
-    assert.strictEqual(output.reason, 'REQUIREMENTS.md not found', 'should report file not found');
+describe('milestone.cjs regex global state fix', () => {
+  // allow-test-rule: structural-regression-guard
+  // milestone.cjs must use replace()+compare, not test()+replace(), to avoid
+  // regex lastIndex corruption with global flags.
+  const MILESTONE_SRC = path.join(__dirname, '..', 'get-shit-done', 'bin', 'lib', 'milestone.cjs');
+  let src;
+
+  before(() => { src = fs.readFileSync(MILESTONE_SRC, 'utf-8'); });
+
+  test('checkbox update uses replace() + compare, not test() + replace()', () => {
+    const funcBody = src.slice(
+      src.indexOf('function cmdRequirementsMarkComplete'),
+      src.indexOf('function cmdMilestoneComplete'),
+    );
+    assert.ok(!funcBody.includes('checkboxPattern.test(reqContent)'));
+    assert.ok(
+      funcBody.includes('afterCheckbox !== reqContent') ||
+      funcBody.includes('afterCheckbox!==reqContent'),
+    );
+  });
+
+  test('table update uses replace() + compare, not test() + replace()', () => {
+    const funcBody = src.slice(
+      src.indexOf('function cmdRequirementsMarkComplete'),
+      src.indexOf('function cmdMilestoneComplete'),
+    );
+    assert.ok(!funcBody.includes('tablePattern.test(reqContent)'));
+    assert.ok(
+      funcBody.includes('afterTable !== reqContent') ||
+      funcBody.includes('afterTable!==reqContent'),
+    );
+  });
+
+  test('done-check regexes use non-global flag (only need existence check)', () => {
+    const funcBody = src.slice(
+      src.indexOf('function cmdRequirementsMarkComplete'),
+      src.indexOf('function cmdMilestoneComplete'),
+    );
+    const doneCheckboxMatch = funcBody.match(/doneCheckbox\s*=\s*new RegExp\([^)]+,\s*'([^']+)'\)/);
+    const doneTableMatch = funcBody.match(/doneTable\s*=\s*new RegExp\([^)]+,\s*'([^']+)'\)/);
+    assert.ok(doneCheckboxMatch, 'doneCheckbox regex should exist');
+    assert.ok(doneTableMatch, 'doneTable regex should exist');
+    assert.ok(!doneCheckboxMatch[1].includes('g'));
+    assert.ok(!doneTableMatch[1].includes('g'));
+  });
+
+  test('no duplicate regex construction for the same pattern', () => {
+    const funcBody = src.slice(
+      src.indexOf('function cmdRequirementsMarkComplete'),
+      src.indexOf('function cmdMilestoneComplete'),
+    );
+    const tableConstructions = funcBody.split('\n').filter(
+      line => line.includes('tablePattern') && line.includes('new RegExp'),
+    );
+    assert.ok(tableConstructions.length <= 1, `Expected ≤1 tablePattern construction, got ${tableConstructions.length}`);
   });
 });
 
@@ -828,42 +647,72 @@ describe('new-milestone workflow verification gate', () => {
     const workflowPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'new-milestone.md');
     const content = fs.readFileSync(workflowPath, 'utf8');
 
-    // Must have a verification step between goal gathering and PROJECT.md writing
-    assert.ok(
-      content.includes('Verify Milestone Understanding'),
-      'workflow must have a "Verify Milestone Understanding" step'
-    );
-
-    // Verification must come before Step 4 (Update PROJECT.md)
+    assert.ok(content.includes('Verify Milestone Understanding'));
     const verifyIdx = content.indexOf('Verify Milestone Understanding');
     const updateIdx = content.indexOf('## 4. Update PROJECT.md');
-    assert.ok(verifyIdx > 0, 'verification step must exist');
-    assert.ok(updateIdx > 0, 'Update PROJECT.md step must exist');
-    assert.ok(
-      verifyIdx < updateIdx,
-      'verification step must appear before Update PROJECT.md step'
-    );
+    assert.ok(verifyIdx > 0);
+    assert.ok(updateIdx > 0);
+    assert.ok(verifyIdx < updateIdx);
   });
 
   test('verification step uses AskUserQuestion with adjust loop', () => {
     const workflowPath = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'new-milestone.md');
     const content = fs.readFileSync(workflowPath, 'utf8');
 
-    // Extract the section between 3.5 and 4
-    const sectionStart = content.indexOf('## 3.5');
-    const sectionEnd = content.indexOf('## 4.');
-    const section = content.slice(sectionStart, sectionEnd);
-
-    assert.ok(section.includes('AskUserQuestion'), 'verification must use AskUserQuestion');
-    assert.ok(section.includes('Adjust'), 'verification must offer Adjust option');
-    assert.ok(section.includes('Looks good'), 'verification must offer Looks good option');
+    const section = content.slice(content.indexOf('## 3.5'), content.indexOf('## 4.'));
+    assert.ok(section.includes('AskUserQuestion'));
+    assert.ok(section.includes('Adjust'));
+    assert.ok(section.includes('Looks good'));
     assert.ok(
       section.includes('Loop until') || section.includes('loop until') || section.includes('re-present'),
-      'verification must loop until user approves'
     );
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// validate consistency command
+// milestone complete respects explicit version scope (#3043)
 // ─────────────────────────────────────────────────────────────────────────────
+
+describe('milestone complete explicit version scope (#3043)', () => {
+  test('milestone.complete v3.6 uses v3.6 phases even when STATE milestone is v3.5', () => {
+    const tmpDir = createTempProject('gsd-bug-3043-');
+    try {
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '---\nmilestone: v3.5\n---\n');
+      writeRoadmap(
+        tmpDir,
+        '# Roadmap\n\n## 🚧 v3.5 Paused\n### Phase 103: old\n### Phase 104: old2\n\n## 🚧 v3.6 Current\n### Phase 108: new\n',
+      );
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), '# Requirements\n');
+
+      for (const [dir, liner] of [['103.old', 'old milestone A'], ['104.old', 'old milestone B'], ['108.new', 'new milestone']]) {
+        const p = path.join(tmpDir, '.planning', 'phases', dir);
+        fs.mkdirSync(p, { recursive: true });
+        fs.writeFileSync(path.join(p, 'SUMMARY.md'), `one-liner: ${liner}\n\n## Summary\n${liner.split(' ')[0]}\n`);
+      }
+
+      const result = runGsdTools(['milestone', 'complete', 'v3.6', '--raw'], tmpDir);
+      assert.equal(result.success, true, result.error || result.output);
+      const payload = JSON.parse(result.output);
+      assert.equal(payload.version, 'v3.6');
+      assert.equal(payload.phases, 1, `expected 1 phase for v3.6, got ${payload.phases}`);
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('milestone.complete fails when explicit milestone version resolves no phases', () => {
+    const tmpDir = createTempProject('gsd-bug-3043-empty-');
+    try {
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '---\nmilestone: v1.0\n---\n');
+      writeRoadmap(tmpDir, '# Roadmap\n\n## 🚧 v1.0\n### Phase 1: foundation\n');
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'REQUIREMENTS.md'), '# Requirements\n');
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+
+      const result = runGsdTools(['milestone', 'complete', 'v9.9', '--raw'], tmpDir);
+      assert.equal(result.success, false, 'expected command to fail when no phases match explicit version');
+      assert.match(result.error || '', /no phases|phase/i);
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+});

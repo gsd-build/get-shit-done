@@ -1,3 +1,14 @@
+/**
+ * Phase Runner tests — consolidated from phase-runner.test.ts,
+ * phase-runner-types.test.ts, and phase-prompt.test.ts (issue #3740).
+ *
+ * Covers:
+ *   • PhaseRunner state machine (mocked deps)
+ *   • Phase lifecycle type contracts (PhaseStepType, GSDEventType, PhaseOpInfo, etc.)
+ *   • GSDTools typed methods
+ *   • PromptFactory / extractBlock / extractSteps / PHASE_WORKFLOW_MAP
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,10 +24,22 @@ import type {
   GSDEvent,
   PhasePlanIndex,
   PlanInfo,
+  PhaseStepResult,
+  PhaseRunnerResult,
+  PhaseRunnerOptions,
+  GSDPhaseStartEvent,
+  GSDPhaseStepStartEvent,
+  GSDPhaseStepCompleteEvent,
+  GSDPhaseCompleteEvent,
+  ContextFiles,
+  ParsedPlan,
+  PlanFrontmatter,
 } from './types.js';
 import { PhaseStepType, PhaseType, GSDEventType } from './types.js';
 import type { GSDConfig } from './config.js';
 import { CONFIG_DEFAULTS } from './config.js';
+import { GSDTools, GSDToolsError } from './gsd-tools.js';
+import { PromptFactory, extractBlock, extractSteps, PHASE_WORKFLOW_MAP } from './phase-prompt.js';
 
 // ─── Mock modules ────────────────────────────────────────────────────────────
 
@@ -2716,5 +2739,922 @@ Use TypeScript.`, 'utf-8');
       expect(planStep!.error).toContain('persistent failure');
       expect(result.success).toBe(false);
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase lifecycle type contracts
+// (consolidated from sdk/src/phase-runner-types.test.ts — issue #3740)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Phase lifecycle types', () => {
+  // ─── PhaseStepType enum ────────────────────────────────────────────────
+
+  describe('PhaseStepType', () => {
+    it('has all expected step values', () => {
+      expect(PhaseStepType.Discuss).toBe('discuss');
+      expect(PhaseStepType.Research).toBe('research');
+      expect(PhaseStepType.Plan).toBe('plan');
+      expect(PhaseStepType.Execute).toBe('execute');
+      expect(PhaseStepType.Verify).toBe('verify');
+      expect(PhaseStepType.Advance).toBe('advance');
+    });
+
+    it('has exactly 7 members', () => {
+      const values = Object.values(PhaseStepType);
+      expect(values).toHaveLength(7);
+    });
+  });
+
+  // ─── GSDEventType phase lifecycle values ───────────────────────────────
+
+  describe('GSDEventType phase lifecycle events', () => {
+    it('includes PhaseStart', () => {
+      expect(GSDEventType.PhaseStart).toBe('phase_start');
+    });
+
+    it('includes PhaseStepStart', () => {
+      expect(GSDEventType.PhaseStepStart).toBe('phase_step_start');
+    });
+
+    it('includes PhaseStepComplete', () => {
+      expect(GSDEventType.PhaseStepComplete).toBe('phase_step_complete');
+    });
+
+    it('includes PhaseComplete', () => {
+      expect(GSDEventType.PhaseComplete).toBe('phase_complete');
+    });
+  });
+
+  // ─── PhaseOpInfo shape validation ──────────────────────────────────────
+
+  describe('PhaseOpInfo interface', () => {
+    it('accepts a valid phase-op output object', () => {
+      const info: PhaseOpInfo = {
+        phase_found: true,
+        phase_dir: '.planning/phases/05-Skill-Scaffolding',
+        phase_number: '5',
+        phase_name: 'Skill Scaffolding',
+        phase_slug: 'skill-scaffolding',
+        padded_phase: '05',
+        has_research: false,
+        has_context: false,
+        has_plans: false,
+        has_verification: false,
+        plan_count: 0,
+        roadmap_exists: true,
+        planning_exists: true,
+        commit_docs: true,
+        context_path: '.planning/phases/05-Skill-Scaffolding/CONTEXT.md',
+        research_path: '.planning/phases/05-Skill-Scaffolding/RESEARCH.md',
+      };
+
+      expect(info.phase_found).toBe(true);
+      expect(info.phase_number).toBe('5');
+      expect(info.plan_count).toBe(0);
+      expect(info.has_context).toBe(false);
+    });
+
+    it('matches the documented init phase-op JSON shape', () => {
+      const raw = JSON.parse(JSON.stringify({
+        phase_found: true,
+        phase_dir: '.planning/phases/03-Auth',
+        phase_number: '3',
+        phase_name: 'Auth',
+        phase_slug: 'auth',
+        padded_phase: '03',
+        has_research: true,
+        has_context: true,
+        has_plans: true,
+        has_verification: false,
+        plan_count: 2,
+        roadmap_exists: true,
+        planning_exists: true,
+        commit_docs: true,
+        context_path: '.planning/phases/03-Auth/CONTEXT.md',
+        research_path: '.planning/phases/03-Auth/RESEARCH.md',
+      }));
+
+      const info = raw as PhaseOpInfo;
+      expect(info.phase_found).toBe(true);
+      expect(info.has_plans).toBe(true);
+      expect(info.plan_count).toBe(2);
+      expect(typeof info.phase_dir).toBe('string');
+      expect(typeof info.padded_phase).toBe('string');
+    });
+  });
+
+  // ─── Phase result types ────────────────────────────────────────────────
+
+  describe('PhaseStepResult', () => {
+    it('can represent a successful step', () => {
+      const result: PhaseStepResult = {
+        step: PhaseStepType.Research,
+        success: true,
+        durationMs: 5000,
+      };
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('can represent a failed step with error', () => {
+      const result: PhaseStepResult = {
+        step: PhaseStepType.Execute,
+        success: false,
+        durationMs: 12000,
+        error: 'Session timed out',
+        planResults: [],
+      };
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Session timed out');
+    });
+  });
+
+  describe('PhaseRunnerResult', () => {
+    it('can represent a complete phase run', () => {
+      const result: PhaseRunnerResult = {
+        phaseNumber: '3',
+        phaseName: 'Auth',
+        steps: [
+          { step: PhaseStepType.Research, success: true, durationMs: 5000 },
+          { step: PhaseStepType.Plan, success: true, durationMs: 3000 },
+          { step: PhaseStepType.Execute, success: true, durationMs: 60000 },
+        ],
+        success: true,
+        totalCostUsd: 1.5,
+        totalDurationMs: 68000,
+      };
+      expect(result.steps).toHaveLength(3);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('HumanGateCallbacks', () => {
+    it('accepts an object with all optional callbacks', () => {
+      const callbacks: HumanGateCallbacks = {
+        onDiscussApproval: async () => 'approve',
+        onVerificationReview: async () => 'accept',
+        onBlockerDecision: async () => 'retry',
+      };
+      expect(callbacks.onDiscussApproval).toBeDefined();
+    });
+
+    it('accepts an empty object (all callbacks optional)', () => {
+      const callbacks: HumanGateCallbacks = {};
+      expect(callbacks.onDiscussApproval).toBeUndefined();
+    });
+  });
+
+  describe('PhaseRunnerOptions', () => {
+    it('accepts full options', () => {
+      const options: PhaseRunnerOptions = {
+        callbacks: {},
+        maxBudgetPerStep: 3.0,
+        maxTurnsPerStep: 30,
+        model: 'claude-sonnet-4-6',
+      };
+      expect(options.maxBudgetPerStep).toBe(3.0);
+    });
+
+    it('accepts empty options (all fields optional)', () => {
+      const options: PhaseRunnerOptions = {};
+      expect(options.callbacks).toBeUndefined();
+    });
+  });
+
+  // ─── Phase lifecycle event interfaces ──────────────────────────────────
+
+  describe('Phase lifecycle event interfaces', () => {
+    it('GSDPhaseStartEvent has correct shape', () => {
+      const event: GSDPhaseStartEvent = {
+        type: GSDEventType.PhaseStart,
+        timestamp: new Date().toISOString(),
+        sessionId: 'test-session',
+        phaseNumber: '3',
+        phaseName: 'Auth',
+      };
+      expect(event.type).toBe('phase_start');
+      expect(event.phaseNumber).toBe('3');
+    });
+
+    it('GSDPhaseStepStartEvent has correct shape', () => {
+      const event: GSDPhaseStepStartEvent = {
+        type: GSDEventType.PhaseStepStart,
+        timestamp: new Date().toISOString(),
+        sessionId: 'test-session',
+        phaseNumber: '3',
+        step: PhaseStepType.Research,
+      };
+      expect(event.type).toBe('phase_step_start');
+      expect(event.step).toBe('research');
+    });
+
+    it('GSDPhaseStepCompleteEvent has correct shape', () => {
+      const event: GSDPhaseStepCompleteEvent = {
+        type: GSDEventType.PhaseStepComplete,
+        timestamp: new Date().toISOString(),
+        sessionId: 'test-session',
+        phaseNumber: '3',
+        step: PhaseStepType.Execute,
+        success: true,
+        durationMs: 45000,
+      };
+      expect(event.type).toBe('phase_step_complete');
+      expect(event.success).toBe(true);
+    });
+
+    it('GSDPhaseStepCompleteEvent can include error', () => {
+      const event: GSDPhaseStepCompleteEvent = {
+        type: GSDEventType.PhaseStepComplete,
+        timestamp: new Date().toISOString(),
+        sessionId: 'test-session',
+        phaseNumber: '3',
+        step: PhaseStepType.Verify,
+        success: false,
+        durationMs: 2000,
+        error: 'Verification failed',
+      };
+      expect(event.error).toBe('Verification failed');
+    });
+
+    it('GSDPhaseCompleteEvent has correct shape', () => {
+      const event: GSDPhaseCompleteEvent = {
+        type: GSDEventType.PhaseComplete,
+        timestamp: new Date().toISOString(),
+        sessionId: 'test-session',
+        phaseNumber: '3',
+        phaseName: 'Auth',
+        success: true,
+        totalCostUsd: 2.5,
+        totalDurationMs: 120000,
+        stepsCompleted: 5,
+      };
+      expect(event.type).toBe('phase_complete');
+      expect(event.stepsCompleted).toBe(5);
+    });
+  });
+});
+
+// ─── GSDTools typed methods ──────────────────────────────────────────────────
+
+describe('GSDTools typed methods', () => {
+  let tmpDir: string;
+  let fixtureDir: string;
+
+  beforeEach(async () => {
+    tmpDir = join(tmpdir(), `gsd-tools-phase-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    fixtureDir = join(tmpDir, 'fixtures');
+    await mkdir(fixtureDir, { recursive: true });
+    await mkdir(join(tmpDir, '.planning'), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  async function createScript(name: string, code: string): Promise<string> {
+    const scriptPath = join(fixtureDir, name);
+    await writeFile(scriptPath, code, { mode: 0o755 });
+    return scriptPath;
+  }
+
+  describe('initPhaseOp()', () => {
+    it('returns typed PhaseOpInfo from gsd-tools output', async () => {
+      const mockOutput: PhaseOpInfo = {
+        phase_found: true,
+        phase_dir: '.planning/phases/05-Skill-Scaffolding',
+        phase_number: '5',
+        phase_name: 'Skill Scaffolding',
+        phase_slug: 'skill-scaffolding',
+        padded_phase: '05',
+        has_research: false,
+        has_context: true,
+        has_plans: true,
+        has_verification: false,
+        plan_count: 3,
+        roadmap_exists: true,
+        planning_exists: true,
+        commit_docs: true,
+        context_path: '.planning/phases/05-Skill-Scaffolding/CONTEXT.md',
+        research_path: '.planning/phases/05-Skill-Scaffolding/RESEARCH.md',
+      };
+
+      const scriptPath = await createScript(
+        'init-phase-op.cjs',
+        `
+        const args = process.argv.slice(2);
+        // Script receives: init phase-op 5 --raw
+        if (args[0] === 'init' && args[1] === 'phase-op' && args[2] === '5') {
+          process.stdout.write(JSON.stringify(${JSON.stringify(mockOutput)}));
+        } else {
+          process.stderr.write('unexpected args: ' + args.join(' '));
+          process.exit(1);
+        }
+        `,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
+      const result = await tools.initPhaseOp('5');
+
+      expect(result.phase_found).toBe(true);
+      expect(result.phase_number).toBe('5');
+      expect(result.phase_name).toBe('Skill Scaffolding');
+      expect(result.plan_count).toBe(3);
+      expect(result.has_context).toBe(true);
+      expect(result.has_plans).toBe(true);
+      expect(result.context_path).toContain('CONTEXT.md');
+    });
+
+    it('calls exec with correct args (init phase-op <N>)', async () => {
+      const scriptPath = await createScript(
+        'init-phase-op-args.cjs',
+        `
+        const args = process.argv.slice(2);
+        process.stdout.write(JSON.stringify({ received_args: args }));
+        `,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
+      const result = await tools.initPhaseOp('7') as { received_args: string[] };
+
+      expect(result.received_args).toContain('init');
+      expect(result.received_args).toContain('phase-op');
+      expect(result.received_args).toContain('7');
+      expect(result.received_args).not.toContain('--raw');
+    });
+  });
+
+  describe('configGet()', () => {
+    it('returns string value from gsd-tools config', async () => {
+      const scriptPath = await createScript(
+        'config-get.cjs',
+        `
+        const args = process.argv.slice(2);
+        if (args[0] === 'config-get' && args[1] === 'model_profile') {
+          process.stdout.write(JSON.stringify('balanced'));
+        } else {
+          process.exit(1);
+        }
+        `,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
+      const result = await tools.configGet('model_profile');
+
+      expect(result).toBe('balanced');
+    });
+
+    it('returns null when key not found', async () => {
+      const scriptPath = await createScript(
+        'config-get-null.cjs',
+        `
+        const args = process.argv.slice(2);
+        if (args[0] === 'config-get' && args[1] === 'nonexistent_key') {
+          process.stdout.write('null');
+        } else {
+          process.exit(1);
+        }
+        `,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
+      const result = await tools.configGet('nonexistent_key');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('stateBeginPhase()', () => {
+    it('calls state begin-phase with correct args', async () => {
+      const scriptPath = await createScript(
+        'state-begin-phase.cjs',
+        `
+        const args = process.argv.slice(2);
+        if (args[0] === 'state' && args[1] === 'begin-phase' && args[2] === '--phase' && args[3] === '3') {
+          process.stdout.write('ok');
+        } else {
+          process.stderr.write('unexpected args: ' + args.join(' '));
+          process.exit(1);
+        }
+        `,
+      );
+
+      const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath, preferNativeQuery: false });
+      const result = await tools.stateBeginPhase('3');
+
+      expect(result).toBe('ok');
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PromptFactory / extractBlock / extractSteps / PHASE_WORKFLOW_MAP
+// (consolidated from sdk/src/phase-prompt.test.ts — issue #3740)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Prompt helpers ───────────────────────────────────────────────────────────
+
+async function createPromptTempDir(): Promise<string> {
+  return mkdtemp(join(tmpdir(), 'gsd-prompt-'));
+}
+
+function makeWorkflowContent(purpose: string, steps: string[]): string {
+  const stepBlocks = steps
+    .map((s, i) => `<step name="step_${i + 1}">\n${s}\n</step>`)
+    .join('\n\n');
+  return `<purpose>\n${purpose}\n</purpose>\n\n<process>\n${stepBlocks}\n</process>`;
+}
+
+function makeAgentDef(name: string, tools: string, role: string): string {
+  return `---\nname: ${name}\ntools: ${tools}\n---\n\n<role>\n${role}\n</role>`;
+}
+
+function makePromptParsedPlan(overrides?: Partial<ParsedPlan>): ParsedPlan {
+  return {
+    frontmatter: {
+      phase: 'execute',
+      plan: 'test-plan',
+      type: 'feature',
+      wave: 1,
+      depends_on: [],
+      files_modified: [],
+      autonomous: true,
+      requirements: [],
+      must_haves: { truths: [], artifacts: [], key_links: [] },
+    } as PlanFrontmatter,
+    objective: 'Test objective',
+    execution_context: [],
+    context_refs: [],
+    tasks: [],
+    raw: '',
+    ...overrides,
+  };
+}
+
+// ─── extractBlock tests ──────────────────────────────────────────────────────
+
+describe('extractBlock', () => {
+  it('extracts content from a simple block', () => {
+    const content = '<purpose>\nDo the thing.\n</purpose>';
+    expect(extractBlock(content, 'purpose')).toBe('Do the thing.');
+  });
+
+  it('extracts content from block with attributes', () => {
+    const content = '<step name="init" priority="first">\nLoad context.\n</step>';
+    expect(extractBlock(content, 'step')).toBe('Load context.');
+  });
+
+  it('returns empty string for missing block', () => {
+    const content = '<purpose>Something</purpose>';
+    expect(extractBlock(content, 'role')).toBe('');
+  });
+
+  it('extracts multiline content', () => {
+    const content = '<role>\nLine 1\nLine 2\nLine 3\n</role>';
+    expect(extractBlock(content, 'role')).toBe('Line 1\nLine 2\nLine 3');
+  });
+});
+
+describe('extractSteps', () => {
+  it('extracts multiple steps from process content', () => {
+    const process = `
+<step name="init">Initialize</step>
+<step name="execute">Run tasks</step>
+<step name="verify">Check results</step>`;
+
+    const steps = extractSteps(process);
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toEqual({ name: 'init', content: 'Initialize' });
+    expect(steps[1]).toEqual({ name: 'execute', content: 'Run tasks' });
+    expect(steps[2]).toEqual({ name: 'verify', content: 'Check results' });
+  });
+
+  it('returns empty array for no steps', () => {
+    expect(extractSteps('no steps here')).toEqual([]);
+  });
+
+  it('handles steps with priority attributes', () => {
+    const process = '<step name="init" priority="first">\nDo first.\n</step>';
+    const steps = extractSteps(process);
+    expect(steps).toHaveLength(1);
+    expect(steps[0].name).toBe('init');
+    expect(steps[0].content).toBe('Do first.');
+  });
+});
+
+// ─── PromptFactory tests ─────────────────────────────────────────────────────
+
+describe('PromptFactory', () => {
+  let tempDir: string;
+  let workflowsDir: string;
+  let agentsDir: string;
+
+  beforeEach(async () => {
+    tempDir = await createPromptTempDir();
+    workflowsDir = join(tempDir, 'workflows');
+    agentsDir = join(tempDir, 'agents');
+    await mkdir(workflowsDir, { recursive: true });
+    await mkdir(agentsDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  function makeFactory(): PromptFactory {
+    return new PromptFactory({
+      gsdInstallDir: tempDir,
+      agentsDir,
+      sdkPromptsDir: join(tempDir, 'sdk-prompts-does-not-exist'),
+    });
+  }
+
+  describe('buildPrompt', () => {
+    it('assembles research prompt with role + purpose + process + context', async () => {
+      await writeFile(
+        join(workflowsDir, 'research-phase.md'),
+        makeWorkflowContent('Research the phase.', ['Gather info', 'Analyze findings']),
+      );
+      await writeFile(
+        join(agentsDir, 'gsd-phase-researcher.md'),
+        makeAgentDef('gsd-phase-researcher', 'Read, Grep, Bash', 'You are a researcher.'),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = {
+        state: '# State\nproject: test',
+        roadmap: '# Roadmap\nphases listed',
+      };
+
+      const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
+
+      expect(prompt).toContain('## Agent Instructions');
+      expect(prompt).toContain('You are a researcher.');
+      expect(prompt).toContain('## Purpose');
+      expect(prompt).toContain('Research the phase.');
+      expect(prompt).toContain('## Process');
+      expect(prompt).toContain('Gather info');
+      expect(prompt).toContain('## Context');
+      expect(prompt).toContain('# State');
+      expect(prompt).toContain('# Roadmap');
+
+      const agentIdx = prompt.indexOf('## Agent Instructions');
+      const contextIdx = prompt.indexOf('## Context');
+      expect(agentIdx).toBeLessThan(contextIdx);
+    });
+
+    it('assembles plan prompt with all context files', async () => {
+      await writeFile(
+        join(workflowsDir, 'plan-phase.md'),
+        makeWorkflowContent('Plan the implementation.', ['Break down tasks']),
+      );
+      await writeFile(
+        join(agentsDir, 'gsd-planner.md'),
+        makeAgentDef('gsd-planner', 'Read, Write, Bash', 'You are a planner.'),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = {
+        state: '# State',
+        roadmap: '# Roadmap',
+        context: '# Context',
+        research: '# Research',
+        requirements: '# Requirements',
+      };
+
+      const prompt = await factory.buildPrompt(PhaseType.Plan, null, contextFiles);
+
+      expect(prompt).toContain('You are a planner.');
+      expect(prompt).toContain('Plan the implementation.');
+      expect(prompt).toContain('# State');
+      expect(prompt).toContain('# Research');
+      expect(prompt).toContain('# Requirements');
+    });
+
+    it('delegates execute phase with plan to buildExecutorPrompt', async () => {
+      await writeFile(
+        join(agentsDir, 'gsd-executor.md'),
+        makeAgentDef('gsd-executor', 'Read, Write, Edit, Bash', 'You are an executor.'),
+      );
+
+      const factory = makeFactory();
+      const plan = makePromptParsedPlan({ objective: 'Build the auth system' });
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Execute, plan, contextFiles);
+
+      expect(prompt).toContain('## Objective');
+      expect(prompt).toContain('Build the auth system');
+      expect(prompt).toContain('## Role');
+      expect(prompt).toContain('You are an executor.');
+    });
+
+    it('handles execute phase without plan (non-delegation path)', async () => {
+      await writeFile(
+        join(workflowsDir, 'execute-plan.md'),
+        makeWorkflowContent('Execute the plan.', ['Run tasks']),
+      );
+      await writeFile(
+        join(agentsDir, 'gsd-executor.md'),
+        makeAgentDef('gsd-executor', 'Read, Write, Edit, Bash', 'You are an executor.'),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Execute, null, contextFiles);
+
+      expect(prompt).toContain('## Agent Instructions');
+      expect(prompt).toContain('You are an executor.');
+      expect(prompt).toContain('## Purpose');
+      expect(prompt).toContain('Execute the plan.');
+    });
+
+    it('assembles verify prompt with phase instructions', async () => {
+      await writeFile(
+        join(workflowsDir, 'verify-phase.md'),
+        makeWorkflowContent('Verify phase goals.', ['Check artifacts', 'Run tests']),
+      );
+      await writeFile(
+        join(agentsDir, 'gsd-verifier.md'),
+        makeAgentDef('gsd-verifier', 'Read, Bash, Grep', 'You are a verifier.'),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = {
+        state: '# State',
+        roadmap: '# Roadmap',
+        requirements: '# Requirements',
+      };
+
+      const prompt = await factory.buildPrompt(PhaseType.Verify, null, contextFiles);
+
+      expect(prompt).toContain('You are a verifier.');
+      expect(prompt).toContain('Verify phase goals.');
+    });
+
+    it('assembles discuss prompt without agent role (no dedicated agent)', async () => {
+      await writeFile(
+        join(workflowsDir, 'discuss-phase.md'),
+        makeWorkflowContent('Discuss implementation decisions.', ['Identify areas']),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Discuss, null, contextFiles);
+
+      expect(prompt).not.toContain('## Agent Instructions');
+      expect(prompt).toContain('## Purpose');
+      expect(prompt).toContain('Discuss implementation decisions.');
+    });
+
+    it('handles missing workflow file gracefully', async () => {
+      await writeFile(
+        join(agentsDir, 'gsd-phase-researcher.md'),
+        makeAgentDef('gsd-phase-researcher', 'Read, Bash', 'You are a researcher.'),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
+
+      expect(prompt).toContain('## Agent Instructions');
+      expect(prompt).toContain('## Context');
+      expect(prompt).not.toContain('## Purpose');
+    });
+
+    it('handles missing agent def gracefully', async () => {
+      await writeFile(
+        join(workflowsDir, 'research-phase.md'),
+        makeWorkflowContent('Research the phase.', ['Gather info']),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
+
+      expect(prompt).not.toContain('## Agent Instructions');
+      expect(prompt).toContain('## Purpose');
+      expect(prompt).toContain('Research the phase.');
+    });
+
+    it('omits empty context section when no files provided', async () => {
+      await writeFile(
+        join(workflowsDir, 'discuss-phase.md'),
+        makeWorkflowContent('Discuss things.', ['Talk']),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = {};
+
+      const prompt = await factory.buildPrompt(PhaseType.Discuss, null, contextFiles);
+
+      expect(prompt).not.toContain('## Context');
+    });
+  });
+
+  describe('loadWorkflowFile', () => {
+    it('loads existing workflow file', async () => {
+      await writeFile(
+        join(workflowsDir, 'research-phase.md'),
+        'workflow content',
+      );
+
+      const factory = makeFactory();
+      const content = await factory.loadWorkflowFile(PhaseType.Research);
+      expect(content).toBe('workflow content');
+    });
+
+    it('returns undefined for missing workflow file', async () => {
+      const factory = makeFactory();
+      const content = await factory.loadWorkflowFile(PhaseType.Research);
+      expect(content).toBeUndefined();
+    });
+  });
+
+  describe('loadAgentDef', () => {
+    it('loads agent def from agents dir', async () => {
+      await writeFile(
+        join(agentsDir, 'gsd-executor.md'),
+        'agent content',
+      );
+
+      const factory = makeFactory();
+      const content = await factory.loadAgentDef(PhaseType.Execute);
+      expect(content).toBe('agent content');
+    });
+
+    it('returns undefined for phases with no agent (discuss)', async () => {
+      const factory = makeFactory();
+      const content = await factory.loadAgentDef(PhaseType.Discuss);
+      expect(content).toBeUndefined();
+    });
+
+    it('falls back to project agents dir', async () => {
+      const projectAgentsDir = join(tempDir, 'project-agents');
+      await mkdir(projectAgentsDir, { recursive: true });
+      await writeFile(
+        join(projectAgentsDir, 'gsd-executor.md'),
+        'project agent content',
+      );
+
+      const factory = new PromptFactory({
+        gsdInstallDir: tempDir,
+        agentsDir,
+        projectAgentsDir,
+        sdkPromptsDir: join(tempDir, 'sdk-prompts-does-not-exist'),
+      });
+
+      const content = await factory.loadAgentDef(PhaseType.Execute);
+      expect(content).toBe('project agent content');
+    });
+
+    it('prefers user agents dir over project agents dir', async () => {
+      const projectAgentsDir = join(tempDir, 'project-agents');
+      await mkdir(projectAgentsDir, { recursive: true });
+      await writeFile(join(agentsDir, 'gsd-executor.md'), 'user agent');
+      await writeFile(join(projectAgentsDir, 'gsd-executor.md'), 'project agent');
+
+      const factory = new PromptFactory({
+        gsdInstallDir: tempDir,
+        agentsDir,
+        projectAgentsDir,
+        sdkPromptsDir: join(tempDir, 'sdk-prompts-does-not-exist'),
+      });
+
+      const content = await factory.loadAgentDef(PhaseType.Execute);
+      expect(content).toBe('user agent');
+    });
+  });
+
+  // ─── Headless prompt loading ─────────────────────────────────────────────
+
+  describe('headless prompt loading', () => {
+    it('loadWorkflowFile prefers installed GSD over sdkPromptsDir', async () => {
+      const sdkDir = join(tempDir, 'sdk-prompts');
+      await mkdir(join(sdkDir, 'workflows'), { recursive: true });
+
+      await writeFile(join(workflowsDir, 'research-phase.md'), 'GSD-1 original');
+      await writeFile(join(sdkDir, 'workflows', 'research-phase.md'), 'SDK bundled version');
+
+      const factory = new PromptFactory({
+        gsdInstallDir: tempDir,
+        agentsDir,
+        sdkPromptsDir: sdkDir,
+      });
+
+      const content = await factory.loadWorkflowFile(PhaseType.Research);
+      expect(content).toBe('GSD-1 original');
+    });
+
+    it('loadWorkflowFile falls back to GSD-1 when sdkPromptsDir file missing', async () => {
+      const sdkDir = join(tempDir, 'sdk-prompts');
+      await mkdir(join(sdkDir, 'workflows'), { recursive: true });
+
+      await writeFile(join(workflowsDir, 'research-phase.md'), 'GSD-1 original');
+
+      const factory = new PromptFactory({
+        gsdInstallDir: tempDir,
+        agentsDir,
+        sdkPromptsDir: sdkDir,
+      });
+
+      const content = await factory.loadWorkflowFile(PhaseType.Research);
+      expect(content).toBe('GSD-1 original');
+    });
+
+    it('loadAgentDef prefers installed agents over sdkPromptsDir', async () => {
+      const sdkDir = join(tempDir, 'sdk-prompts');
+      await mkdir(join(sdkDir, 'agents'), { recursive: true });
+
+      await writeFile(join(agentsDir, 'gsd-executor.md'), 'user agent');
+      await writeFile(join(sdkDir, 'agents', 'gsd-executor.md'), 'SDK bundled agent');
+
+      const factory = new PromptFactory({
+        gsdInstallDir: tempDir,
+        agentsDir,
+        sdkPromptsDir: sdkDir,
+      });
+
+      const content = await factory.loadAgentDef(PhaseType.Execute);
+      expect(content).toBe('user agent');
+    });
+
+    it('loadAgentDef falls back to user agents when sdkPromptsDir file missing', async () => {
+      const sdkDir = join(tempDir, 'sdk-prompts');
+      await mkdir(join(sdkDir, 'agents'), { recursive: true });
+
+      await writeFile(join(agentsDir, 'gsd-executor.md'), 'user agent');
+
+      const factory = new PromptFactory({
+        gsdInstallDir: tempDir,
+        agentsDir,
+        sdkPromptsDir: sdkDir,
+      });
+
+      const content = await factory.loadAgentDef(PhaseType.Execute);
+      expect(content).toBe('user agent');
+    });
+
+    it('buildPrompt sanitizes interactive patterns from output', async () => {
+      await writeFile(
+        join(workflowsDir, 'research-phase.md'),
+        makeWorkflowContent('Research the codebase thoroughly.', [
+          'Gather data from the project.\nAskUserQuestion("what?")\nAnalyze findings.',
+          'Run the analysis.\n/gsd:analyze --deep\nDocument results.',
+        ]),
+      );
+      await writeFile(
+        join(agentsDir, 'gsd-phase-researcher.md'),
+        makeAgentDef('gsd-phase-researcher', 'Read, Bash', 'You are a researcher.\nSTOP and wait for user input.\nBe thorough.'),
+      );
+
+      const factory = makeFactory();
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Research, null, contextFiles);
+
+      expect(prompt).not.toContain('AskUserQuestion');
+      expect(prompt).not.toContain('/gsd:');
+      expect(prompt).not.toMatch(/\bSTOP\s+and\s+wait/);
+
+      expect(prompt).toContain('You are a researcher.');
+      expect(prompt).toContain('Be thorough.');
+      expect(prompt).toContain('Gather data from the project.');
+      expect(prompt).toContain('Analyze findings.');
+    });
+
+    it('buildPrompt with execute+plan sanitizes output from buildExecutorPrompt', async () => {
+      await writeFile(
+        join(agentsDir, 'gsd-executor.md'),
+        makeAgentDef('gsd-executor', 'Read, Write, Edit, Bash', 'You are an executor.\nSTOP and wait for user.\nExecute thoroughly.'),
+      );
+
+      const factory = makeFactory();
+      const plan = makePromptParsedPlan({ objective: 'Build the auth system' });
+      const contextFiles: ContextFiles = { state: '# State' };
+
+      const prompt = await factory.buildPrompt(PhaseType.Execute, plan, contextFiles);
+
+      expect(prompt).toContain('Build the auth system');
+      expect(prompt).not.toMatch(/\bSTOP\s+and\s+wait/);
+      expect(prompt).toContain('You are an executor.');
+    });
+  });
+});
+
+describe('PHASE_WORKFLOW_MAP', () => {
+  it('maps all phase types to workflow filenames', () => {
+    for (const phase of Object.values(PhaseType)) {
+      expect(PHASE_WORKFLOW_MAP[phase]).toBeDefined();
+      expect(PHASE_WORKFLOW_MAP[phase]).toMatch(/\.md$/);
+    }
+  });
+
+  it('execute phase maps to execute-plan.md (not execute-phase.md)', () => {
+    expect(PHASE_WORKFLOW_MAP[PhaseType.Execute]).toBe('execute-plan.md');
   });
 });

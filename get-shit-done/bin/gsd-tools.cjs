@@ -1207,8 +1207,10 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
       const worktreeSafety = require('./lib/worktree-safety.cjs');
       if (subcommand === 'cleanup-wave') {
         worktreeSafety.cmdWorktreeCleanupWave(cwd, args.slice(2));
+      } else if (subcommand === 'reap-orphans') {
+        worktreeSafety.cmdWorktreeReapOrphans(cwd);
       } else {
-        error('Unknown worktree subcommand. Available: cleanup-wave', ERROR_REASON.SDK_UNKNOWN_COMMAND);
+        error('Unknown worktree subcommand. Available: cleanup-wave, reap-orphans', ERROR_REASON.SDK_UNKNOWN_COMMAND);
       }
       break;
     }

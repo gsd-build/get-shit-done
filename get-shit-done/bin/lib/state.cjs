@@ -951,10 +951,9 @@ function acquireStateLock(statePath) {
       _heldStateLocks.add(lockPath);
       return lockPath;
     } catch (err) {
-      // EPERM / EBUSY and other transient codes occur on Windows / Docker / NFS
-      // when the lock file is briefly held open by the deleting process.
-      // Retry instead of propagating or — worse — silently returning a
-      // false-success lockPath (old behaviour: `return lockPath` on non-EEXIST).
+      // Transient filesystem errors (Docker overlay-fs, NFS, OS signals, AV scanners)
+      // are recoverable — retry the acquisition loop rather than propagating.
+      // See ACQUIRE_LOCK_RETRY_ERRNOS for the full list and rationale.
       if (ACQUIRE_LOCK_RETRY_ERRNOS.has(err.code)) { continue; }
       if (err.code !== 'EEXIST') throw err; // propagate — silent bypass causes lost updates
       // Only unlink a lock we did not place when it has crossed the staleness
