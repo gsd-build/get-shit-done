@@ -195,7 +195,7 @@ function parseUatItems(content: string): Record<string, unknown>[] {
  * rather than the body, parseVerificationItems was returning [] because it
  * only searched the body for a "## Human Verification" heading.
  */
-function parseVerificationFrontmatterItems(fm: Record<string, unknown>): Record<string, unknown>[] {
+export function parseVerificationFrontmatterItems(fm: Record<string, unknown>): Record<string, unknown>[] {
   const items: Record<string, unknown>[] = [];
   const hvArray = fm.human_verification;
   if (!Array.isArray(hvArray)) return items;

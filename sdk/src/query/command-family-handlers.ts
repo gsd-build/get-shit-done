@@ -24,6 +24,7 @@ import { verifyKeyLinks, validateConsistency, validateHealth, validateAgents, va
 import {
   phaseListPlans, phaseListArtifacts,
 } from './phase-list-queries.js';
+import { phaseUatPassed } from './phase-uat-passed.js';
 import {
   phaseAdd, phaseAddBatch, phaseInsert, phaseRemove, phaseComplete,
   phaseScaffold, phaseNextDecimal, phasesList, phasesClear, phasesArchive,
@@ -86,6 +87,7 @@ export const FAMILY_HANDLERS: Record<string, Readonly<Record<string, QueryHandle
   phase: {
     'phase.list-plans': phaseListPlans,
     'phase.list-artifacts': phaseListArtifacts,
+    'phase.uat-passed': phaseUatPassed,
     'phase.add': phaseAdd,
     'phase.add-batch': phaseAddBatch,
     'phase.insert': phaseInsert,

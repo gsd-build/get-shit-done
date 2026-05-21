@@ -6,6 +6,7 @@ import type { CommandManifestEntry } from './command-manifest.types.js';
 export const PHASE_COMMAND_MANIFEST: readonly CommandManifestEntry[] = [
   { family: 'phase', canonical: 'phase.list-plans', aliases: ['phase list-plans'], mutation: false, outputMode: 'json' },
   { family: 'phase', canonical: 'phase.list-artifacts', aliases: ['phase list-artifacts'], mutation: false, outputMode: 'json' },
+  { family: 'phase', canonical: 'phase.uat-passed', aliases: ['phase uat-passed'], mutation: false, outputMode: 'json' },
   { family: 'phase', canonical: 'phase.next-decimal', aliases: ['phase next-decimal'], mutation: false, outputMode: 'json' },
   { family: 'phase', canonical: 'phase.add', aliases: ['phase add'], mutation: true, outputMode: 'json' },
   { family: 'phase', canonical: 'phase.add-batch', aliases: ['phase add-batch'], mutation: true, outputMode: 'json' },

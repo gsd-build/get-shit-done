@@ -390,6 +390,14 @@ const PHASE_COMMAND_ALIASES = [
     "mutation": false
   },
   {
+    "canonical": "phase.uat-passed",
+    "aliases": [
+      "phase uat-passed"
+    ],
+    "subcommand": "uat-passed",
+    "mutation": false
+  },
+  {
     "canonical": "phase.next-decimal",
     "aliases": [
       "phase next-decimal"

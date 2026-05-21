@@ -67,6 +67,7 @@ export const INIT_COMMAND_ALIASES: readonly FamilyCommandAlias[] = [
 export const PHASE_COMMAND_ALIASES: readonly FamilyCommandAlias[] = [
   { canonical: 'phase.list-plans', aliases: ['phase list-plans'], subcommand: 'list-plans', mutation: false },
   { canonical: 'phase.list-artifacts', aliases: ['phase list-artifacts'], subcommand: 'list-artifacts', mutation: false },
+  { canonical: 'phase.uat-passed', aliases: ['phase uat-passed'], subcommand: 'uat-passed', mutation: false },
   { canonical: 'phase.next-decimal', aliases: ['phase next-decimal'], subcommand: 'next-decimal', mutation: false },
   { canonical: 'phase.add', aliases: ['phase add'], subcommand: 'add', mutation: true },
   { canonical: 'phase.add-batch', aliases: ['phase add-batch'], subcommand: 'add-batch', mutation: true },

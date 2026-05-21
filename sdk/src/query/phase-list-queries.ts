@@ -17,7 +17,7 @@ import {
 import type { QueryHandler } from './utils.js';
 
 /** Resolve `.planning/phases/<dir>` for a phase token, or null. */
-async function resolvePhaseDir(phase: string, projectDir: string, workstream?: string): Promise<string | null> {
+export async function resolvePhaseDir(phase: string, projectDir: string, workstream?: string): Promise<string | null> {
   const phasesDir = planningPaths(projectDir, workstream).phases;
   const normalized = normalizePhaseName(phase);
   try {

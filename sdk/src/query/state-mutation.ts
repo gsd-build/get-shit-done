@@ -127,7 +127,11 @@ async function isLockProcessDead(lockPath: string): Promise<boolean | null> {
   try {
     const raw = await readFile(lockPath, 'utf-8');
     const pid = parseInt(raw.trim(), 10);
-    if (!Number.isFinite(pid) || pid <= 0) return true;
+    // An empty or unparseable lock file means the writer opened the file with
+    // O_EXCL but hasn't finished writing the PID yet (async window between
+    // `open` and `writeFile`). Treat this as "unknown / still alive" — do NOT
+    // steal the lock, let the normal retry + timeout path handle it.
+    if (!Number.isFinite(pid) || pid <= 0) return null;
     try {
       process.kill(pid, 0);
       return false;
