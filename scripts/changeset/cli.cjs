@@ -19,7 +19,7 @@ const path = require('node:path');
 
 const { parseFragment, FRAGMENT_ERROR } = require('./parse.cjs');
 const { renderChangelog } = require('./render.cjs');
-const { serializeChangelog } = require('./serialize.cjs');
+const { serializeChangelog, parseChangelog } = require('./serialize.cjs');
 const { renderGithubReleaseNotes } = require('./github-release-notes.cjs');
 
 function parseArgs(argv) {
@@ -30,6 +30,7 @@ function parseArgs(argv) {
     date: null,
     fromRef: null,
     toRef: null,
+    changelog: null,
     output: null,
     repoSlug: 'gsd-build/get-shit-done',
     installCommand: 'npx get-shit-done-cc@latest',
@@ -59,6 +60,7 @@ function parseArgs(argv) {
       a === '--date' ||
       a === '--from' ||
       a === '--to' ||
+      a === '--changelog' ||
       a === '--output' ||
       a === '--repo-slug' ||
       a === '--install-command'
@@ -70,6 +72,7 @@ function parseArgs(argv) {
       else if (a === '--date') opts.date = r.value;
       else if (a === '--from') opts.fromRef = r.value;
       else if (a === '--to') opts.toRef = r.value;
+      else if (a === '--changelog') opts.changelog = r.value;
       else if (a === '--output') opts.output = r.value;
       else if (a === '--repo-slug') opts.repoSlug = r.value;
       else if (a === '--install-command') opts.installCommand = r.value;
@@ -180,6 +183,113 @@ function cmdRender(opts) {
   };
 }
 
+/**
+ * extract subcommand: extracts all changelog release blocks strictly after
+ * `--from` (exclusive) up to and including `--to` (inclusive).  Both
+ * arguments accept `v`-prefixed semver (e.g. `v1.5.13`).
+ *
+ * Exit codes:
+ *   0  — one or more releases matched, output written.
+ *   2  — no releases fall in the specified range (matches nothing).
+ *   1  — I/O error or missing required flags.
+ *
+ * Fix for #3496: provides a deterministic range-aware helper so the
+ * `/gsd:update` show_changes_and_confirm step no longer relies on
+ * vague/manual extraction that can silently skip intermediate versions.
+ */
+function cmdExtract(opts) {
+  const stripV = (v) => (typeof v === 'string' ? v.replace(/^v/, '') : v);
+  const from = stripV(opts.fromRef);
+  const to = stripV(opts.toRef);
+
+  // Validate that both bounds are strict semver (N.N.N, digits only).
+  // Coercing a malformed bound like "1.41.x" to "1.41.0" makes range
+  // selection silently wrong; reject early with a structured error.
+  const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+  if (!SEMVER_RE.test(from)) {
+    return {
+      exitCode: 1,
+      report: { error: `invalid semver for --from: "${from}" (expected N.N.N)`, releases: [] },
+      textOutput: null,
+    };
+  }
+  if (!SEMVER_RE.test(to)) {
+    return {
+      exitCode: 1,
+      report: { error: `invalid semver for --to: "${to}" (expected N.N.N)`, releases: [] },
+      textOutput: null,
+    };
+  }
+
+  const changelogPath = opts.changelog
+    ? path.resolve(opts.changelog)
+    : path.join(path.resolve(opts.repo), 'CHANGELOG.md');
+
+  if (!fs.existsSync(changelogPath)) {
+    return {
+      exitCode: 1,
+      report: { error: `CHANGELOG not found: ${changelogPath}`, releases: [] },
+      textOutput: null,
+    };
+  }
+
+  const text = fs.readFileSync(changelogPath, 'utf8');
+  const { releases } = parseChangelog(text);
+
+  // Walk the releases in document order (newest-first in a standard
+  // Keep-a-Changelog file).  Collect every release whose version is
+  // strictly after `from` and up to and including `to`.
+  //
+  // The comparison is semver-aware via the standard numeric-tuple approach
+  // so that "1.5.9" < "1.5.10" (string comparison would fail here).
+  function parseSemver(v) {
+    const parts = String(v).split('.').map(Number);
+    return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+  }
+
+  function semverCmp(a, b) {
+    const [a0, a1, a2] = parseSemver(a);
+    const [b0, b1, b2] = parseSemver(b);
+    return a0 !== b0 ? a0 - b0 : a1 !== b1 ? a1 - b1 : a2 - b2;
+  }
+
+  const matched = releases.filter((rel) => {
+    if (rel.version === 'Unreleased') return false;
+    // from is exclusive: cmp > 0 means rel.version > from
+    const afterFrom = semverCmp(rel.version, from) > 0;
+    // to is inclusive: cmp <= 0 means rel.version <= to
+    const upToTo = semverCmp(rel.version, to) <= 0;
+    return afterFrom && upToTo;
+  });
+
+  if (matched.length === 0) {
+    return {
+      exitCode: 2,
+      report: { releases: [], from, to },
+      textOutput: null,
+    };
+  }
+
+  return {
+    exitCode: 0,
+    report: { releases: matched, from, to },
+    textOutput: matched
+      .map((rel) => {
+        const header = `## [${rel.version}]${rel.date ? ` - ${rel.date}` : ''}`;
+        const sections = (rel.sections || [])
+          .map((s) => {
+            const bullets = s.bullets
+              .map((b) => (b.pr !== null ? `- ${b.body} (#${b.pr})` : `- ${b.body}`))
+              .join('\n');
+            return `### ${s.type}\n\n${bullets}`;
+          })
+          .join('\n\n');
+        return sections ? `${header}\n\n${sections}` : header;
+      })
+      .join('\n\n'),
+  };
+}
+
 function cmdGithubReleaseNotes(opts) {
   const repo = path.resolve(opts.repo);
   const report = renderGithubReleaseNotes({
@@ -222,6 +332,10 @@ function usage() {
     'usage:',
     '  changeset/cli.cjs render --repo <dir> --version V --date D [--json]',
     '  changeset/cli.cjs github-release-notes --repo <dir> --from REF --to REF [--output FILE] [--repo-slug OWNER/REPO] [--install-command CMD] [--json]',
+    '  changeset/cli.cjs extract --from VERSION --to VERSION [--changelog FILE] [--repo <dir>] [--json]',
+    '    Extracts changelog entries strictly after --from (exclusive) and up to',
+    '    and including --to (inclusive).  Accepts v-prefixed versions.',
+    '    Exit 2 when no releases fall in range.',
     '',
   ].join('\n');
 }
@@ -234,7 +348,7 @@ function main() {
     process.exit(2);
   }
   const { opts } = parsed;
-  if (opts.cmd !== 'render' && opts.cmd !== 'github-release-notes') {
+  if (opts.cmd !== 'render' && opts.cmd !== 'github-release-notes' && opts.cmd !== 'extract') {
     process.stderr.write(usage());
     process.exit(2);
   }
@@ -245,6 +359,21 @@ function main() {
   if (opts.cmd === 'github-release-notes' && (!opts.fromRef || !opts.toRef)) {
     process.stderr.write('--from and --to are required for github-release-notes\n');
     process.exit(2);
+  }
+  if (opts.cmd === 'extract' && (!opts.fromRef || !opts.toRef)) {
+    process.stderr.write('--from and --to are required for extract\n');
+    process.stderr.write(usage());
+    process.exit(1);
+  }
+
+  if (opts.cmd === 'extract') {
+    const { exitCode, report, textOutput } = cmdExtract(opts);
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+    } else if (textOutput) {
+      process.stdout.write(textOutput + '\n');
+    }
+    process.exit(exitCode);
   }
 
   const { exitCode, report } = opts.cmd === 'render' ? cmdRender(opts) : cmdGithubReleaseNotes(opts);
@@ -266,4 +395,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { cmdRender, cmdGithubReleaseNotes, parseArgs, splitChangelog, listFragmentFiles, usage };
+module.exports = { cmdRender, cmdExtract, cmdGithubReleaseNotes, parseArgs, splitChangelog, listFragmentFiles, usage };
