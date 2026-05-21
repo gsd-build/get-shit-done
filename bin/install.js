@@ -10494,7 +10494,7 @@ function installSdkIfNeeded(opts) {
   // the persistent-PATH check — that is the best available invariant.
 
   if (onPath) {
-    const versionReport = buildGsdSdkVersionMismatchReport(resolvedSdkPath, pkg.version);
+    const versionReport = buildGsdSdkVersionMismatchReport(resolvedSdkPath, pkg.version, { isLocal: !!opts.isLocal });
     if (versionReport) {
       renderGsdSdkVersionMismatchReport(versionReport);
     } else {
@@ -10758,17 +10758,26 @@ function readGsdSdkVersion(sdkPath) {
   }
 }
 
-function buildGsdSdkVersionMismatchReport(sdkPath, expectedVersion) {
+function buildGsdSdkVersionMismatchReport(sdkPath, expectedVersion, opts) {
   const actualVersion = readGsdSdkVersion(sdkPath);
   if (!actualVersion || !expectedVersion) return null;
   if (actualVersion === expectedVersion) return null;
+  // #3668: local installs should NOT be told to run `npm install -g` —
+  // that contradicts the intent of --local (self-contained, no global dep).
+  // For local installs the correct remediation is to re-run the local
+  // installer (e.g. `npx get-shit-done-cc@latest --claude --local`).
+  const isLocal = opts && opts.isLocal;
+  const fix_command = isLocal
+    ? 'npx get-shit-done-cc@latest --claude --local'
+    : 'npm install -g get-shit-done-cc@latest';
   return {
     ok: false,
     reason: 'gsd_sdk_version_mismatch',
     sdk_path: sdkPath,
     actual_version: actualVersion,
     expected_version: expectedVersion,
-    fix_command: 'npm install -g get-shit-done-cc@latest',
+    fix_command,
+    is_local: !!isLocal,
   };
 }
 
@@ -11237,6 +11246,8 @@ module.exports = {
     formatStaleStandaloneSdkWarning,
     buildSdkFailFastReport,
     renderSdkFailFastReport,
+    buildGsdSdkVersionMismatchReport,
+    renderGsdSdkVersionMismatchReport,
     classifySdkInstall,
     readGsdSdkVersion,
     convertClaudeCommandToCodexSkill,
