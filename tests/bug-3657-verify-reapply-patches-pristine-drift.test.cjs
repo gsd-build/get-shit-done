@@ -1,3 +1,6 @@
+// allow-test-rule: source-text-is-the-product — Finding 2 reads reapply-patches.md to
+// assert structural presence of the Step 5a drift-check block; the .md file is the
+// product (workflow instructions consumed by AI agents), not a source .cjs file.
 'use strict';
 
 process.env.GSD_TEST_MODE = '1';

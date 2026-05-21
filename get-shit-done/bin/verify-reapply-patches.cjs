@@ -210,7 +210,11 @@ function verifyFile({ relPath, patchesDir, configDir, pristineDir, pristineHashe
         // Over-broad mode never false-fails for a different reason because all
         // backup lines that are genuinely user-added will still be present in a
         // correctly merged install.
-        const recordedHash = pristineHashes && pristineHashes[relPath];
+        // Normalize to forward slashes so the key lookup matches on Windows
+        // where path.join produces backslash-separated relPath values but
+        // backup-meta.json stores keys written with forward slashes.
+        const hashKey = relPath.replace(/\\/g, '/');
+        const recordedHash = pristineHashes && pristineHashes[hashKey];
         if (recordedHash) {
           if (sha256(candidate) === recordedHash) {
             // Hash matches: the on-disk pristine is the correct baseline.
