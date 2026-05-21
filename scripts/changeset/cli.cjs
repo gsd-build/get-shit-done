@@ -202,6 +202,25 @@ function cmdExtract(opts) {
   const from = stripV(opts.fromRef);
   const to = stripV(opts.toRef);
 
+  // Validate that both bounds are strict semver (N.N.N, digits only).
+  // Coercing a malformed bound like "1.41.x" to "1.41.0" makes range
+  // selection silently wrong; reject early with a structured error.
+  const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+  if (!SEMVER_RE.test(from)) {
+    return {
+      exitCode: 1,
+      report: { error: `invalid semver for --from: "${from}" (expected N.N.N)`, releases: [] },
+      textOutput: null,
+    };
+  }
+  if (!SEMVER_RE.test(to)) {
+    return {
+      exitCode: 1,
+      report: { error: `invalid semver for --to: "${to}" (expected N.N.N)`, releases: [] },
+      textOutput: null,
+    };
+  }
+
   const changelogPath = opts.changelog
     ? path.resolve(opts.changelog)
     : path.join(path.resolve(opts.repo), 'CHANGELOG.md');
@@ -259,7 +278,9 @@ function cmdExtract(opts) {
         const header = `## [${rel.version}]${rel.date ? ` - ${rel.date}` : ''}`;
         const sections = (rel.sections || [])
           .map((s) => {
-            const bullets = s.bullets.map((b) => `- ${b.body} (#${b.pr})`).join('\n');
+            const bullets = s.bullets
+              .map((b) => (b.pr !== null ? `- ${b.body} (#${b.pr})` : `- ${b.body}`))
+              .join('\n');
             return `### ${s.type}\n\n${bullets}`;
           })
           .join('\n\n');
