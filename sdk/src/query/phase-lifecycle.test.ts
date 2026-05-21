@@ -325,7 +325,7 @@ describe('phaseAdd', () => {
     expect(roadmap).toContain('**Goal:** [To be planned]');
   });
 
-  it('skips phases >= 999 when calculating next number (backlog exclusion)', async () => {
+  it('skips exactly phase 999 (backlog sentinel) when calculating next number', async () => {
     const { phaseAdd } = await import('./phase-lifecycle.js');
     const roadmapWith999 = MINIMAL_ROADMAP.replace(
       '---\n*Last updated',
@@ -337,6 +337,105 @@ describe('phaseAdd', () => {
     const data = result.data as Record<string, unknown>;
     // Should be 11, not 1000
     expect(data.phase_number).toBe(11);
+  });
+
+  it('returns correct next phase id for projects using 1000+ canonical phase numbers (regression #3774)', async () => {
+    // Bug: scanSequentialMaxPhaseFromMilestone and scanSequentialMaxPhaseFromDirs
+    // used `num >= 999` instead of `num === 999`, causing every phase ≥ 1000 to be
+    // excluded from the max-scan. computeNextSequentialPhaseId returned 1 (0+1)
+    // instead of 1501 for a project whose highest phase is 1500.
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    const roadmapWith1000Plus = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v10.0 Large Project',
+      '',
+      '### Phase 1000: Foundation',
+      '',
+      '**Goal:** Foundation',
+      '**Requirements**: TBD',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 1000-01 (Foundation setup)',
+      '',
+      '### Phase 1500: Latest',
+      '',
+      '**Goal:** Latest',
+      '**Requirements**: TBD',
+      '**Depends on:** Phase 1499',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 1500-01 (Latest step)',
+      '',
+      '---',
+      '*Last updated: 2026-05-20*',
+      '',
+    ].join('\n');
+
+    const phases = [
+      '1000-foundation',
+      '1100-alpha',
+      '1200-beta',
+      '1300-gamma',
+      '1400-delta',
+      '1500-latest',
+    ];
+
+    await setupTestProject(tmpDir, { roadmap: roadmapWith1000Plus, phases });
+
+    const result = await phaseAdd(['Next After 1500'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    // Must be 1501, not 1 (the pre-fix bug value)
+    expect(data.phase_number).toBe(1501);
+  });
+
+  it('distinguishes === 999 guard from === 1000 off-by-one: [999, 1000] fixture must yield 1001 (regression #3774)', async () => {
+    // Distinguishing fixture: phases [999, 1000] on disk + in ROADMAP.
+    // With correct guard (=== 999): skips 999, keeps 1000 as max → next = 1001 ✓
+    // With off-by-one guard (=== 1000): skips 1000, keeps 999 → max = 999 but
+    //   999 is itself skipped by the equality guard (999 === 999 is true when
+    //   the guard fires), so actually keeps nothing → max = 0 → next = 1 ✗.
+    //   Either way, the result diverges from 1001, catching the regression.
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    const roadmapWith999and1000 = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v1.0',
+      '',
+      '### Phase 999: Backlog',
+      '',
+      '**Goal:** Backlog sentinel',
+      '**Plans:** 0 plans',
+      '',
+      '### Phase 1000: First Four-Digit Phase',
+      '',
+      '**Goal:** First canonical phase above backlog sentinel',
+      '**Requirements**: TBD',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 1000-01 (initial work)',
+      '',
+      '---',
+      '*Last updated: 2026-05-21*',
+      '',
+    ].join('\n');
+
+    const phases = [
+      '999-backlog',
+      '1000-first-four-digit',
+    ];
+
+    await setupTestProject(tmpDir, { roadmap: roadmapWith999and1000, phases });
+
+    const result = await phaseAdd(['After One Thousand'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    // Must be 1001: skips 999 (backlog sentinel), keeps 1000 as max, adds 1
+    expect(data.phase_number).toBe(1001);
   });
 
   it('throws GSDError with Validation for empty description', async () => {

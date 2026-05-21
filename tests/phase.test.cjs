@@ -932,6 +932,62 @@ describe('phase add command', () => {
       'directory should be 04-dashboard, not 1000-dashboard'
     );
   });
+
+  test('CJS scanner [999, 1000] fixture: skips exactly 999 and returns 1001 (regression #3774)', () => {
+    // Locks the BLOCKER fix in phase.cjs: guards at :610, :624, :688, :698 must
+    // use === 999 (not >= 999). With >= 999, phase 1000 is excluded from the
+    // max-scan and the result collapses back toward 1 instead of 1001.
+    //
+    // GSD_WORKSTREAM=ws1 forces the CJS fallback in phase-command-router.cjs.
+    // When GSD_WORKSTREAM is set, planningDir resolves to
+    //   .planning/workstreams/<ws>/ — so ROADMAP.md and phases/ live there.
+    const ws = 'ws1';
+    const planningBase = path.join(tmpDir, '.planning', 'workstreams', ws);
+    fs.mkdirSync(path.join(planningBase, 'phases'), { recursive: true });
+
+    fs.writeFileSync(
+      path.join(planningBase, 'ROADMAP.md'),
+      [
+        '# Roadmap',
+        '',
+        '## Current Milestone: v1.0',
+        '',
+        '### Phase 999: Backlog',
+        '',
+        '**Goal:** Backlog sentinel',
+        '**Plans:** 0 plans',
+        '',
+        '### Phase 1000: First Four-Digit Phase',
+        '',
+        '**Goal:** First canonical phase above backlog sentinel',
+        '**Requirements**: TBD',
+        '**Plans:** 1 plans',
+        '',
+        'Plans:',
+        '- [x] 1000-01 (initial work)',
+        '',
+        '---',
+        '*Last updated: 2026-05-21*',
+        '',
+      ].join('\n')
+    );
+
+    // Create matching phase directories on disk (inside the workstream planning dir)
+    fs.mkdirSync(path.join(planningBase, 'phases', '999-backlog'), { recursive: true });
+    fs.mkdirSync(path.join(planningBase, 'phases', '1000-first-four-digit'), { recursive: true });
+
+    const result = runGsdTools('phase add After One Thousand', tmpDir, { GSD_WORKSTREAM: ws });
+    assert.ok(result.success, `CJS phase add failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Must be 1001: skips 999 (backlog sentinel), keeps 1000, adds 1.
+    // With the old >= 999 guard: phase 1000 is excluded → max stays 0 → result = 1.
+    assert.strictEqual(output.phase_number, 1001, 'CJS scanner must return 1001, not 1 (regression #3774)');
+    assert.ok(
+      fs.existsSync(path.join(planningBase, 'phases', '1001-after-one-thousand')),
+      'directory should be 1001-after-one-thousand'
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
