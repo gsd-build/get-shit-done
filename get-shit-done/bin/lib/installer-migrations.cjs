@@ -264,6 +264,7 @@ function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEO
 
   while (true) {
     let fd = null;
+    let lockCreatedByUs = false;
     try {
       fd = fs.openSync(lockPath, 'wx');
       // Close the open descriptor before writing so the file handle is
@@ -272,10 +273,12 @@ function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEO
       // don't hold an open fd across the lifetime of the lock.
       fs.closeSync(fd);
       fd = null;
+      lockCreatedByUs = true; // we own the file; clean it up on any subsequent error
       fs.writeFileSync(lockPath, JSON.stringify({
         pid: process.pid,
         acquiredAt: new Date().toISOString(),
       }) + '\n');
+      lockCreatedByUs = false; // release closure owns cleanup from here
       return () => {
         const failures = [];
         // Use unlinkSync (not rmSync with { force: true }) so EPERM errors
@@ -294,6 +297,11 @@ function acquireInstallMigrationLock(configDir, { timeoutMs = DEFAULT_LOCK_TIMEO
         try { fs.closeSync(fd); } catch { /* best-effort */ }
         try { fs.unlinkSync(lockPath); } catch { /* best-effort */ }
         fd = null;
+      } else if (lockCreatedByUs) {
+        // fd was closed but writeFileSync threw before we returned the release
+        // closure — the empty lock file is still on disk and must be removed
+        // so it does not orphan as an unreadable (empty/invalid JSON) stale lock.
+        try { fs.unlinkSync(lockPath); } catch { /* best-effort */ }
       }
       if (error && error.code === 'EEXIST') {
         // Stale-lock reclamation: read the on-disk PID and check liveness.
