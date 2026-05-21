@@ -691,6 +691,9 @@ describe('phasePlanIndex', () => {
     expect(planA).toBeDefined();
     expect(planB).toBeDefined();
 
+    // Lock canonical casing: plan ID must be preserved as-is from the filename, not lowercased.
+    expect(planA!.id).toBe('20-01-Auth');
+
     // The DAG edge must resolve: B must be in a later wave than A.
     expect(planA!.wave).toBeLessThan(planB!.wave as number);
     // Structurally: A in wave 1, B in wave 2.
@@ -698,6 +701,8 @@ describe('phasePlanIndex', () => {
     expect(waves['2']).toBeDefined();
     expect((waves['1'] as string[]).some(id => (id as string).startsWith('20-01'))).toBe(true);
     expect(waves['2']).toContain('20-02');
+    // depends_on output must use canonical plan ID, not the user-typed casing.
+    expect(planB!.depends_on).toEqual(['20-01-Auth']);
     // No unresolved-dep warning should be emitted.
     expect(warnings.some(w => /unresolved/i.test(w))).toBe(false);
   });

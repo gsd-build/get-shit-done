@@ -598,6 +598,12 @@ objective: Manual review needed
       Number(wave01) < Number(wave02),
       `20-02 must be in a later wave than 20-01 (got wave01=${wave01}, wave02=${wave02}) — DAG edge dropped (case mismatch)`,
     );
+    // Lock canonical casing: plan ID must be preserved as-is from the filename, not lowercased.
+    const planA = output.plans.find(p => p.id.startsWith('20-01'));
+    assert.strictEqual(planA.id, '20-01-Auth', 'canonical casing must be preserved in plan ID');
+    // depends_on output must use canonical plan ID, not the user-typed casing.
+    const planB = output.plans.find(p => p.id === '20-02');
+    assert.deepStrictEqual(planB.depends_on, ['20-01-Auth'], 'depends_on output must resolve to canonical ID casing');
     // No unresolved-dep warning
     const warnings = output.warnings ?? [];
     assert.ok(

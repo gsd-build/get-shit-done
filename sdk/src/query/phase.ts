@@ -503,8 +503,17 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
   // other in planMap, routing depends_on edges to whichever plan survived last.
   // This is a configuration error — fail fast with the conflicting IDs so the
   // author can rename one file. (#3785 follow-up from adversarial review)
+  //
+  // This guard catches case-fold collisions on full plan IDs.
+  // Shared-numeric-prefix collisions (e.g. '20-01-Auth' and '20-01' both
+  // producing canonical '20-01') are resolved by first-write-wins ordering
+  // from sorted planFiles — not explicitly guarded here.
+  // seenLower is intentionally separate from planMap — it exists only to detect
+  // collisions before planMap is built, so the error fires before any Map
+  // entry silently overwrites another.
   const seenLower = new Map<string, string>(); // lowercase key → original id
   for (const p of rawPlans) {
+    // ASCII plan IDs only — toLowerCase() is correct and locale-safe here.
     const lower = p.id.toLowerCase();
     const existing = seenLower.get(lower);
     if (existing !== undefined) {
@@ -663,7 +672,13 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
     const plan: Record<string, unknown> = {
       id: raw.id,
       wave: effectiveWave,
-      depends_on: raw.dependsOn,
+      // Resolve each user-typed dep to its canonical plan ID (preserving on-disk casing)
+      // so the output never reflects the user's case typo. Unresolved deps (external
+      // phase refs) are kept as-is since planMap only contains plans in this phase.
+      depends_on: raw.dependsOn.map(dep => {
+        const lower = String(dep).toLowerCase();
+        return planMap.get(lower)?.id ?? dep;
+      }),
       autonomous: raw.autonomous,
       objective: raw.objective,
       files_modified: raw.filesModified,
