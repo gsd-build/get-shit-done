@@ -117,27 +117,36 @@ function collectOffenders(dir, regex) {
 // ---------------------------------------------------------------------------
 describe('bug #3683 — workflow/reference colon-namespace leak (Claude local install)', () => {
 
+  // Shared Claude local install used by W and R suites.
+  // Consolidating to a single install halves disk I/O for this file and
+  // reduces concurrent load on CI runners — preventing timing interference
+  // with concurrently-running tests (e.g. the TOCTOU barrier tests in
+  // locking-bugs-1909-1916-1925-1927.test.cjs).
+  let claudeTmpDir;
+  const cmdNames = readCmdNames();
+  const rosterRegex = buildRosterRegex(cmdNames);
+
+  // Shared claude local install — used by W (workflow/reference clean-slate) and
+  // R (routing-block positive assertion) sub-suites. G suite runs its own separate
+  // gemini install and does not depend on claudeTmpDir.
+  before(() => {
+    claudeTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3683-claude-'));
+    runClaudeLocalInstall(claudeTmpDir);
+  });
+
+  after(() => {
+    if (claudeTmpDir) {
+      fs.rmSync(claudeTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  });
+
   // -------------------------------------------------------------------------
   // W — real local claude install: workflow + reference bodies are clean
   // -------------------------------------------------------------------------
   describe('W — integration: staged workflows and references contain no colon-namespace refs', () => {
-    let tmpDir;
-    const cmdNames = readCmdNames();
-    const rosterRegex = buildRosterRegex(cmdNames);
-
-    before(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3683-wf-'));
-      runClaudeLocalInstall(tmpDir);
-    });
-
-    after(() => {
-      if (tmpDir) {
-        fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-      }
-    });
 
     test('W0: staged get-shit-done/workflows/ directory exists after install', () => {
-      const workflowsDir = path.join(tmpDir, '.claude', 'get-shit-done', 'workflows');
+      const workflowsDir = path.join(claudeTmpDir, '.claude', 'get-shit-done', 'workflows');
       assert.ok(
         fs.existsSync(workflowsDir),
         `get-shit-done/workflows/ must be created by local claude install at ${workflowsDir}`,
@@ -145,7 +154,7 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
     });
 
     test('W1: staged get-shit-done/references/ directory exists after install', () => {
-      const refsDir = path.join(tmpDir, '.claude', 'get-shit-done', 'references');
+      const refsDir = path.join(claudeTmpDir, '.claude', 'get-shit-done', 'references');
       assert.ok(
         fs.existsSync(refsDir),
         `get-shit-done/references/ must be created by local claude install at ${refsDir}`,
@@ -156,7 +165,7 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
       // User-reported repro: /gsd-discuss-phase output ends with /gsd:nextcommand
       // because discuss-phase.md ships 7 colon refs that were not normalized.
       const stagedFile = path.join(
-        tmpDir, '.claude', 'get-shit-done', 'workflows', 'discuss-phase.md',
+        claudeTmpDir, '.claude', 'get-shit-done', 'workflows', 'discuss-phase.md',
       );
       assert.ok(
         fs.existsSync(stagedFile),
@@ -177,11 +186,11 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
     });
 
     test('W3: no staged workflow body contains /gsd:<known-cmd> colon refs', () => {
-      const workflowsDir = path.join(tmpDir, '.claude', 'get-shit-done', 'workflows');
+      const workflowsDir = path.join(claudeTmpDir, '.claude', 'get-shit-done', 'workflows');
       assert.ok(fs.existsSync(workflowsDir), 'workflows/ must exist for this check to be meaningful');
 
       const offenders = collectOffenders(workflowsDir, rosterRegex);
-      const relOffenders = offenders.map(f => path.relative(tmpDir, f));
+      const relOffenders = offenders.map(f => path.relative(claudeTmpDir, f));
 
       assert.deepEqual(
         relOffenders,
@@ -192,17 +201,196 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
     });
 
     test('W4: no staged reference body contains /gsd:<known-cmd> colon refs', () => {
-      const refsDir = path.join(tmpDir, '.claude', 'get-shit-done', 'references');
+      const refsDir = path.join(claudeTmpDir, '.claude', 'get-shit-done', 'references');
       assert.ok(fs.existsSync(refsDir), 'references/ must exist for this check to be meaningful');
 
       const offenders = collectOffenders(refsDir, rosterRegex);
-      const relOffenders = offenders.map(f => path.relative(tmpDir, f));
+      const relOffenders = offenders.map(f => path.relative(claudeTmpDir, f));
 
       assert.deepEqual(
         relOffenders,
         [],
         `Staged reference bodies still contain roster colon refs. ` +
         `Install must normalize these to /gsd-<cmd> for claude runtime. Offenders: ${relOffenders.join(', ')}`,
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // R — #3646 routing-block positive assertion: ▶-prefixed lines use hyphen
+  //
+  // User repro: workflow output ends with "▶ /gsd:validate-phase {N}" (colon
+  // form) which does not resolve in Claude Code — the installed skill is
+  // /gsd-validate-phase (hyphen). Workflows emit routing blocks verbatim, so
+  // the colon form reaches the model and is echoed to the user unchanged.
+  //
+  // This suite checks the POSITIVE invariant: lines starting with ▶ that
+  // reference a GSD slash command must use /gsd-<cmd> (hyphen) in the staged
+  // output. This is a stricter assertion than W3 (which only checks absence
+  // of colon globally) because it confirms the routing-position strings were
+  // NOT omitted — they must be present AND use the correct form.
+  //
+  // Source files with known ▶-prefixed routing-block colon refs (#3646):
+  //   - get-shit-done/workflows/validate-phase.md:151 ▶ Next: /gsd:audit-milestone
+  //   - get-shit-done/workflows/validate-phase.md:158 ▶ Retry: /gsd:validate-phase
+  //   - get-shit-done/workflows/secure-phase.md:140   ▶ Fix mitigations: /gsd:secure-phase
+  //   - get-shit-done/workflows/secure-phase.md:158   ▶ /gsd:validate-phase
+  //   - get-shit-done/workflows/secure-phase.md:159   ▶ /gsd:verify-work
+  // -------------------------------------------------------------------------
+  describe('R — #3646 routing-block: ▶-prefixed lines use hyphen form in staged claude install', () => {
+    // Uses the shared claudeTmpDir from the parent describe block — no separate install needed.
+
+    /**
+     * Collect all lines starting with the ▶ routing marker from a file.
+     * Returns an array of { lineNo, text } objects.
+     */
+    function collectRoutingLines(filePath) {
+      if (!fs.existsSync(filePath)) return [];
+      return fs.readFileSync(filePath, 'utf-8')
+        .split(/\r?\n/)
+        .map((text, i) => ({ lineNo: i + 1, text }))
+        .filter(({ text }) => text.startsWith('▶'));
+    }
+
+    test('R1: staged validate-phase.md routing block uses /gsd-<cmd> hyphen form', () => {
+      const stagedFile = path.join(
+        claudeTmpDir, '.claude', 'get-shit-done', 'workflows', 'validate-phase.md',
+      );
+      assert.ok(
+        fs.existsSync(stagedFile),
+        `validate-phase.md must exist in staged get-shit-done/workflows/`,
+      );
+      const routingLines = collectRoutingLines(stagedFile);
+      // Exactly two known routing lines (▶ Next / ▶ Retry).
+      const gsdRoutingLines = routingLines.filter(({ text }) => /\/gsd[-:]/.test(text));
+      assert.strictEqual(
+        gsdRoutingLines.length,
+        2,
+        `validate-phase.md must have exactly 2 ▶-routing lines referencing a /gsd- command — ` +
+        `found ${gsdRoutingLines.length}: ${JSON.stringify(gsdRoutingLines)}`,
+      );
+      // Positive: every routing line that references gsd must use the hyphen form.
+      for (const { lineNo, text } of gsdRoutingLines) {
+        assert.ok(
+          /\/gsd-[a-z]/.test(text),
+          `validate-phase.md line ${lineNo}: ▶-routing line must use /gsd-<cmd> hyphen form, got: ${JSON.stringify(text)}`,
+        );
+        // Negative: must not contain the colon form.
+        assert.ok(
+          !/\/gsd:[a-z]/.test(text),
+          `validate-phase.md line ${lineNo}: ▶-routing line must not contain /gsd:<cmd> colon form, got: ${JSON.stringify(text)}`,
+        );
+        // Token-level: extract real command tokens (/gsd-<cmd> starting with a
+        // lowercase letter) and assert none contain an embedded colon.
+        // Skips documentation placeholder tokens like /gsd-[command].
+        const rawTokens = text.match(/\/gsd[^\s]*/g) || [];
+        for (const token of rawTokens) {
+          assert.ok(
+            !token.includes(':'),
+            `validate-phase.md line ${lineNo}: /gsd token "${token}" must not contain a colon — embedded colon detected (e.g. /gsd-validate:phase), got: ${JSON.stringify(text)}`,
+          );
+        }
+      }
+    });
+
+    test('R2: staged secure-phase.md routing block uses /gsd-<cmd> hyphen form', () => {
+      const stagedFile = path.join(
+        claudeTmpDir, '.claude', 'get-shit-done', 'workflows', 'secure-phase.md',
+      );
+      assert.ok(
+        fs.existsSync(stagedFile),
+        `secure-phase.md must exist in staged get-shit-done/workflows/`,
+      );
+      const routingLines = collectRoutingLines(stagedFile);
+      // Exactly three known routing lines (fix-mitigations, validate-phase, verify-work).
+      const gsdRoutingLines = routingLines.filter(({ text }) => /\/gsd[-:]/.test(text));
+      assert.strictEqual(
+        gsdRoutingLines.length,
+        3,
+        `secure-phase.md must have exactly 3 ▶-routing lines referencing a /gsd- command — ` +
+        `found ${gsdRoutingLines.length}: ${JSON.stringify(gsdRoutingLines)}`,
+      );
+      for (const { lineNo, text } of gsdRoutingLines) {
+        assert.ok(
+          /\/gsd-[a-z]/.test(text),
+          `secure-phase.md line ${lineNo}: ▶-routing line must use /gsd-<cmd> hyphen form, got: ${JSON.stringify(text)}`,
+        );
+        assert.ok(
+          !/\/gsd:[a-z]/.test(text),
+          `secure-phase.md line ${lineNo}: ▶-routing line must not contain /gsd:<cmd> colon form, got: ${JSON.stringify(text)}`,
+        );
+        // Token-level: extract all /gsd... tokens and assert none contain an
+        // embedded colon (catches /gsd-validate:phase etc).
+        // Skips documentation placeholder tokens like /gsd-[command].
+        const rawTokens = text.match(/\/gsd[^\s]*/g) || [];
+        for (const token of rawTokens) {
+          assert.ok(
+            !token.includes(':'),
+            `secure-phase.md line ${lineNo}: /gsd token "${token}" must not contain a colon — embedded colon detected (e.g. /gsd-validate:phase), got: ${JSON.stringify(text)}`,
+          );
+        }
+      }
+    });
+
+    test('R3: all staged workflow routing blocks use hyphen form (cross-file sweep)', () => {
+      // R3 unique value vs W3:
+      //   W3 catches overt /gsd:<cmd> at file level (any line).
+      //   R3 adds:
+      //     (a) ▶-line-scoped assertion (catches drift specifically in routing-block context)
+      //     (b) embedded-colon token check (e.g. /gsd-validate:phase partial-conversion artifacts)
+      //         not detectable by W3's file-level regex
+      // Sweeps both workflows/ and references/ so routing blocks in reference files
+      // are covered alongside workflow files.
+      const gsdDir = path.join(claudeTmpDir, '.claude', 'get-shit-done');
+      const workflowsDir = path.join(gsdDir, 'workflows');
+      assert.ok(fs.existsSync(workflowsDir), 'workflows/ must exist for R3 to be meaningful');
+
+      const colonOffenders = [];
+      const embeddedColonOffenders = [];
+      const walk = (d) => {
+        for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+          const fullPath = path.join(d, entry.name);
+          if (entry.isDirectory()) { walk(fullPath); continue; }
+          if (!entry.name.endsWith('.md')) continue;
+          const lines = fs.readFileSync(fullPath, 'utf-8').split(/\r?\n/);
+          const rel = path.relative(claudeTmpDir, fullPath);
+          lines.forEach((text, i) => {
+            if (!text.startsWith('▶')) return;
+            // Negative: must not contain overt /gsd:<cmd> colon form.
+            if (/\/gsd:[a-z]/.test(text)) {
+              colonOffenders.push(`${rel}:${i + 1}: ${text.trim()}`);
+            }
+            // Token-level: check each /gsd... token for an embedded colon.
+            // Catches cases like /gsd-validate:phase where normalizer half-converted.
+            // Documentation placeholder tokens like /gsd-[command] are skipped
+            // because their tokens will not contain a colon.
+            const tokens = text.match(/\/gsd[^\s]*/g) || [];
+            for (const token of tokens) {
+              if (token.includes(':')) {
+                embeddedColonOffenders.push(`${rel}:${i + 1}: token "${token}" in "${text.trim()}"`);
+              }
+            }
+          });
+        }
+      };
+      // Walk both workflows/ and references/ — routing blocks can appear in either.
+      walk(workflowsDir);
+      const refsDir = path.join(gsdDir, 'references');
+      if (fs.existsSync(refsDir)) walk(refsDir);
+
+      assert.deepEqual(
+        colonOffenders,
+        [],
+        `Staged workflows contain ▶-routing lines with /gsd:<cmd> colon form — ` +
+        `these must resolve to /gsd-<cmd> for Claude Code skills-based install. ` +
+        `Offenders:\n  ${colonOffenders.join('\n  ')}`,
+      );
+      assert.deepEqual(
+        embeddedColonOffenders,
+        [],
+        `Staged workflows contain ▶-routing lines with /gsd tokens that have an embedded ` +
+        `colon (e.g. /gsd-validate:phase) — normalizer may have partially converted a token. ` +
+        `Offenders:\n  ${embeddedColonOffenders.join('\n  ')}`,
       );
     });
   });
