@@ -1,3 +1,7 @@
+// allow-test-rule: structural-source-contract — tests verify TypeScript source contracts
+// (signature shape, fallback ordering, call-site wiring) for the resolveAgentsDir fix.
+// These are signed SDK-seam contracts, not source-grep theater: the TypeScript source IS
+// the product artifact being validated (analogous to .md workflow contracts in this repo).
 'use strict';
 
 /**
