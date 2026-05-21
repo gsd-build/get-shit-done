@@ -7740,34 +7740,115 @@ function saveLocalPatches(configDir, pristineCtx) {
       console.log('     ' + dim + f + reset);
     }
 
-    // #2998: populate gsd-pristine/ via the install transform pipeline so the
-    // reapply-patches verifier (#2972) gets a real diff baseline instead of
-    // falling back to its over-broad "every significant backup line" heuristic.
+    // #2998 / #3407: maintain gsd-pristine/ as the diff baseline for the
+    // reapply-patches verifier (#2972).
+    //
+    // #3407 root-cause fix: the prior approach (#3004 CR) wiped gsd-pristine/
+    // and re-populated it from pristineCtx.packageSrc (the NEW release source).
+    // For files that changed between the old and new release this wrote NEW-
+    // release bytes as the pristine baseline while backup-meta.json recorded
+    // OLD-release hashes — a hash mismatch that caused the #3657 verifier guard
+    // (OK_PRISTINE_DRIFT_DETECTED) to skip the baseline and fall back to over-
+    // broad mode on every upgrade.
+    //
+    // Correct approach: `gsd-pristine/` is populated lazily by saveLocalPatches'
+    // regenerate branch (not by a separate install-time step); the fix works by
+    // induction across upgrades — each clean upgrade persists hash-validated
+    // entries for the next run.  During this call we must PRESERVE entries whose
+    // hash matches originalHash, not overwrite them with new-release bytes.
+    //
+    // Per-file decision:
+    //   - sha256(gsd-pristine/X) === originalHash  →  correct; keep it
+    //   - gsd-pristine/X exists but hash mismatch  →  stale from a previous
+    //     buggy run (#3407); remove so verifier falls back cleanly
+    //   - gsd-pristine/X absent                    →  attempt hash-validated
+    //     regeneration: generate candidate from new-release source; if
+    //     sha256(candidate) === originalHash the file is identical between
+    //     old and new releases so candidate bytes ARE the old-release pristine
+    //     and can be used; discard otherwise (over-broad fallback)
     if (pristineCtx) {
-      // #3004 CR: wipe any pre-existing pristine content BEFORE populating
-      // (and again in the catch path). Without this, a previous run's stale
-      // pristine could be picked up by the verifier as if it were the
-      // baseline for THIS modified set, causing a misleading three-way diff.
-      try { fs.rmSync(pristineDir, { recursive: true, force: true }); } catch { /* not present */ }
-      try {
-        const written = populatePristineDir({
-          packageSrc: pristineCtx.packageSrc,
-          pristineDir,
-          modified,
-          runtime: pristineCtx.runtime,
-          pathPrefix: pristineCtx.pathPrefix,
-          isGlobal: pristineCtx.isGlobal,
-        });
-        if (written > 0) {
-          console.log('  ' + green + '✓' + reset + '  Populated ' + cyan + 'gsd-pristine/' + reset + ' (' + written + ' file(s)) for three-way merge');
+      let preserved = 0;
+      // Track which relPaths had stale pristine entries (hash mismatch) that we
+      // removed. After the regeneration pass we compute `removed` = stale entries
+      // that could NOT be recovered (over-broad fallback applies to those only).
+      const stalePaths = new Set();
+      // Track which relPaths were successfully regenerated (from either missing or stale).
+      const regeneratedPaths = new Set();
+      const missingPaths = [];
+      for (const relPath of modified) {
+        const outRef = resolveInstallRelativePath(pristineDir, relPath);
+        if (!outRef) continue;
+        const { fullPath: pristinePath } = outRef;
+        if (fs.existsSync(pristinePath)) {
+          try {
+            const onDiskHash = fileHash(pristinePath);
+            if (onDiskHash === pristineHashes[relPath]) {
+              preserved++;
+              continue; // correct old-release bytes already in place — keep them
+            }
+          } catch { /* read error — treat as mismatch */ }
+          // Hash mismatch or read error: stale pristine from a previous buggy
+          // run (#3407). Remove so verifier falls back to over-broad mode.
+          try { fs.rmSync(pristinePath, { force: true, recursive: true }); } catch { /* best-effort */ }
+          // Only count as removed if the file is actually gone post-removal.
+          if (!fs.existsSync(pristinePath)) {
+            stalePaths.add(relPath);
+          }
         }
-      } catch (err) {
-        // Soft failure: keep the install moving even if the transform pipeline
-        // throws on an unusual configuration. Wipe the partial pristine so the
-        // verifier falls back cleanly to its pre-#2998 heuristic instead of
-        // reading half-populated data (#3004 CR).
-        try { fs.rmSync(pristineDir, { recursive: true, force: true }); } catch { /* best-effort */ }
-        console.log('  ' + yellow + 'i' + reset + '  Could not populate gsd-pristine/ (' + (err && err.message ? err.message : 'unknown') + '). Falls back to over-broad verify heuristic.');
+        // File absent from gsd-pristine/ (or just removed above as stale):
+        // attempt hash-validated regeneration from new-release source.
+        missingPaths.push(relPath);
+      }
+      // Regenerate missing entries into a temp dir, then validate each hash
+      // before promoting. Only files whose new-release generated bytes hash to
+      // originalHash are safe to use — they were unchanged between releases.
+      if (missingPaths.length > 0) {
+        let tempPristineDir = null;
+        try {
+          tempPristineDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-pristine-regen-'));
+          populatePristineDir({
+            packageSrc: pristineCtx.packageSrc,
+            pristineDir: tempPristineDir,
+            modified: missingPaths,
+            runtime: pristineCtx.runtime,
+            pathPrefix: pristineCtx.pathPrefix,
+            isGlobal: pristineCtx.isGlobal,
+          });
+          for (const relPath of missingPaths) {
+            const tempRef = resolveInstallRelativePath(tempPristineDir, relPath);
+            const outRef = resolveInstallRelativePath(pristineDir, relPath);
+            if (!tempRef || !outRef || !fs.existsSync(tempRef.fullPath)) continue;
+            try {
+              const candidateHash = fileHash(tempRef.fullPath);
+              if (candidateHash !== pristineHashes[relPath]) continue; // new-release differs — discard
+              fs.mkdirSync(path.dirname(outRef.fullPath), { recursive: true });
+              fs.copyFileSync(tempRef.fullPath, outRef.fullPath);
+              regeneratedPaths.add(relPath);
+            } catch { /* hash or copy error — skip; over-broad fallback applies */ }
+          }
+        } catch (err) {
+          // Match the pre-fix behavior: log a warning and continue (verifier falls back to over-broad mode for missing files).
+          console.warn(`gsd-pristine regen skipped: ${err.message}`);
+        } finally {
+          if (tempPristineDir) {
+            try { fs.rmSync(tempPristineDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+          }
+        }
+      }
+      // `regenerated` = total files successfully regenerated (from missing OR stale).
+      const regenerated = regeneratedPaths.size;
+      // `removed` = stale entries that were deleted and NOT subsequently regenerated.
+      // Entries that were stale-deleted but then successfully regenerated are counted
+      // only in `regenerated` — the counts are non-overlapping.
+      const removed = [...stalePaths].filter(p => !regeneratedPaths.has(p)).length;
+      if (preserved > 0) {
+        console.log('  ' + green + '✓' + reset + '  Preserved ' + cyan + 'gsd-pristine/' + reset + ' (' + preserved + ' file(s)) for three-way merge');
+      }
+      if (regenerated > 0) {
+        console.log('  ' + green + '✓' + reset + '  Regenerated ' + cyan + 'gsd-pristine/' + reset + ' (' + regenerated + ' file(s)) via hash-validated new-release source');
+      }
+      if (removed > 0) {
+        console.log('  ' + yellow + 'i' + reset + '  Removed ' + removed + ' stale gsd-pristine/ snapshot(s); regenerated ' + regenerated + ' of those — falls back to over-broad verify heuristic for the rest');
       }
     }
   }
