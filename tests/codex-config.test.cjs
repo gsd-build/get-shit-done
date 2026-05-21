@@ -1446,9 +1446,9 @@ describe('Codex install hook configuration (e2e)', () => {
     );
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
     assert.equal(
-      hooksJsonCommands.some((cmd) => cmd.includes('gsd-check-update.js')),
+      hooksJsonCommands.some((cmd) => cmd.includes('gsd-check-update')),
       true,
-      'hooks.json references gsd-check-update.js'
+      'hooks.json references gsd-check-update (.js on POSIX, .cmd on Windows)'
     );
     // The hook file must physically exist at the referenced path
     const hookFile = path.join(codexHome, 'hooks', 'gsd-check-update.js');
@@ -1465,19 +1465,24 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('[features]\nhooks = true\n'), 'writes codex_hooks feature');
     const parsed = parseTomlToObject(content);
     assert.ok(!parsed.hooks || !Array.isArray(parsed.hooks.SessionStart), 'config.toml does not carry managed SessionStart hooks');
-    // #3017: handler command now uses the absolute Node binary path so
-    // GUI/minimal-PATH runtimes can resolve it. The shape is
-    //   "<absolute-node-path>" "<hook-path>"
-    // where <absolute-node-path> is the normalized runner selected by
-    // resolveNodeRunner() and the hook path is also quoted. Homebrew Cellar
-    // execPath values intentionally normalize to stable Homebrew symlinks.
-    const expectedRunner = JSON.parse(resolveNodeRunner());
-    const expectedHookPath = path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
-    const expectedCommand = `"${expectedRunner}" "${expectedHookPath}"`;
+    // #3017 / #3426: on POSIX the handler command uses the absolute Node binary path
+    //   "<absolute-node-path>" "<hook-path.js>"
+    // On Windows (#3426) a .cmd shim is written instead; the command in hooks.json
+    // is the quoted .cmd path (no node runner prefix — cmd.exe executes .cmd natively).
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdCommands = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdCommands = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdCommands.length, 1, 'writes one GSD update hook in hooks.json');
-    assert.strictEqual(gsdCommands[0], expectedCommand, 'handler command must use absolute node runner pointing at gsd-check-update.js (#3017)');
+    if (process.platform === 'win32') {
+      // On Windows, the command is the .cmd shim path (quoted).
+      const expectedCmdPath = path.join(codexHome, 'hooks', 'gsd-check-update.cmd').replace(/\\/g, '/');
+      assert.strictEqual(gsdCommands[0], JSON.stringify(expectedCmdPath), 'win32: handler command must be the .cmd shim path (#3426)');
+    } else {
+      // On POSIX, the command is the node runner + .js hook path.
+      const expectedRunner = JSON.parse(resolveNodeRunner());
+      const expectedHookPath = path.join(codexHome, 'hooks', 'gsd-check-update.js').replace(/\\/g, '/');
+      const expectedCommand = `"${expectedRunner}" "${expectedHookPath}"`;
+      assert.strictEqual(gsdCommands[0], expectedCommand, 'handler command must use absolute node runner pointing at gsd-check-update.js (#3017)');
+    }
     assert.strictEqual(countMatches(content, /^hooks = true$/gm), 1, 'writes one codex_hooks key');
     assertNoDraftRootKeys(content);
     assertUsesOnlyEol(content, '\n');
@@ -1561,7 +1566,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('[model]\nname = "o3"'), 'preserves model section');
     assert.ok(content.includes('command = "echo custom"'), 'preserves custom hook');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'adds one GSD update hook in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -1700,7 +1705,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('other_feature = true'), 'preserves other feature keys');
     assert.ok(content.includes('command = "echo custom"'), 'preserves custom hook');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'does not duplicate GSD update hook in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -1744,7 +1749,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 0, 'does not prepend a second bare features table');
     assert.ok(content.includes('other_feature = true'), 'preserves existing feature keys');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'keeps one GSD update hook in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -1767,7 +1772,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^\[features\]\s*$/gm), 1, 'adds one real top-level features table');
     assert.strictEqual(countMatches(content, /^hooks = true$/gm), 1, 'adds one codex_hooks key');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'remains idempotent for the GSD hook block in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -1789,7 +1794,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^features\.hooks = true$/gm), 1, 'adds one dotted codex_hooks key');
     assert.ok(content.includes('features.other_feature = true'), 'preserves existing dotted features key');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'adds one GSD update hook for dotted codex_hooks and remains idempotent');
     assertNoDraftRootKeys(content);
   });
@@ -1855,7 +1860,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^features\.codex_hooks = true$/gm), 0, 'does not append a bare dotted duplicate');
     assert.ok(content.includes('features.other_feature = true'), 'preserves other dotted features keys');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'adds one GSD update hook for quoted dotted codex_hooks and remains idempotent');
     assertNoDraftRootKeys(content);
   });
@@ -1972,7 +1977,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(!content.includes('multiline-basic-sentinel'), 'removes multiline basic-string continuation lines');
     assert.ok(content.includes('other_feature = true'), 'preserves following feature keys');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'remains idempotent for the GSD hook block in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -1999,7 +2004,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(!content.includes('multiline-literal-sentinel'), 'removes multiline literal-string continuation lines');
     assert.ok(content.includes('other_feature = true'), 'preserves following feature keys');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'remains idempotent for the GSD hook block in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -2027,7 +2032,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(!content.includes('array-sentinel-2'), 'removes multiline array continuation lines');
     assert.ok(content.includes('other_feature = true'), 'preserves following feature keys');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'remains idempotent for the GSD hook block in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -2074,7 +2079,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.ok(content.includes('other_feature = true'), 'preserves other feature keys');
     assert.strictEqual(countMatches(content, /echo custom-after-command/g), 1, 'preserves non-GSD hook exactly once');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'keeps one GSD update hook in hooks.json');
     assertUsesOnlyEol(content, '\r\n');
     assertNoDraftRootKeys(content);
@@ -2099,7 +2104,7 @@ describe('Codex install hook configuration (e2e)', () => {
     assert.strictEqual(countMatches(content, /^codex_hooks = true # keep me$/gm), 1, 'preserves the commented true value');
     assert.ok(content.includes('other_feature = true'), 'preserves other feature keys');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'adds the GSD update hook once in hooks.json');
     assertNoDraftRootKeys(content);
   });
@@ -2118,7 +2123,7 @@ describe('Codex install hook configuration (e2e)', () => {
     const parsedMixed = parseTomlToObject(content);
     assert.ok(!parsedMixed.hooks || !Array.isArray(parsedMixed.hooks.SessionStart), 'does not write managed SessionStart hooks to config.toml');
     const hooksJsonCommands = readHooksSessionStartCommands(codexHome);
-    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdEntries = hooksJsonCommands.filter((cmd) => cmd.includes('gsd-check-update'));
     assert.strictEqual(gsdEntries.length, 1, 'writes one managed SessionStart hook to hooks.json');
     assert.ok(content.includes('[model]\r\nname = "o3"'), 'preserves the existing CRLF model lines');
     assert.strictEqual(countMatches(content, /^hooks = true$/gm), 1, 'remains idempotent on repeated installs');

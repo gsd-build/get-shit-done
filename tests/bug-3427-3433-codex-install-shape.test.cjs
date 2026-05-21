@@ -126,7 +126,7 @@ describe('#3427 + #3433 — Codex installer avoids duplicate skills and mixed ho
 
     const hooksJson = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
     const sessionStartCommands = extractSessionStartCommandsFromHooksJson(hooksJson);
-    const gsdCommands = sessionStartCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    const gsdCommands = sessionStartCommands.filter((cmd) => cmd.includes('gsd-check-update'));
 
     assert.equal(gsdCommands.length, 1);
     assert.equal(sessionStartCommands.includes('node "/Users/example/bin/user-hook.js"'), true);
@@ -153,7 +153,9 @@ describe('#3427 + #3433 — Codex installer avoids duplicate skills and mixed ho
 
     const hooksJson = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
     const sessionStartCommands = extractSessionStartCommandsFromHooksJson(hooksJson);
-    const gsdCommands = sessionStartCommands.filter((cmd) => cmd.includes('gsd-check-update.js'));
+    // On Windows the managed hook is the .cmd shim path; on POSIX it is the .js node-runner command.
+    // Either way the managed hook is gone after uninstall — only the user hook remains.
+    const gsdCommands = sessionStartCommands.filter((cmd) => cmd.includes('gsd-check-update'));
 
     assert.equal(gsdCommands.length, 0);
     assert.equal(sessionStartCommands.includes('node "/Users/example/bin/user-hook.js"'), true);
