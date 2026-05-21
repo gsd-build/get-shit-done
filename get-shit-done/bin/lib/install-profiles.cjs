@@ -9,7 +9,7 @@
  * dropped skills when users stack multiple plugins (#3408).
  *
  * Profile model: three named profiles replace the old minimal/full binary:
- *  - core     — six skills covering the main project loop
+ *  - core     — eight skills covering the main project loop (includes surface for ADR-0011 expand contract)
  *  - standard — core + phase management and workspace skills
  *  - full     — all skills (previous default, '*' sentinel)
  * Profiles compose: --profile=core,audit resolves to union(closure(core), closure(audit)).
