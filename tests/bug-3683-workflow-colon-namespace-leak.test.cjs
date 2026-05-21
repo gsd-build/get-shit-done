@@ -281,6 +281,16 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
           !/\/gsd:[a-z]/.test(text),
           `validate-phase.md line ${lineNo}: ▶-routing line must not contain /gsd:<cmd> colon form, got: ${JSON.stringify(text)}`,
         );
+        // Token-level: extract real command tokens (/gsd-<cmd> starting with a
+        // lowercase letter) and assert none contain an embedded colon.
+        // Skips documentation placeholder tokens like /gsd-[command].
+        const rawTokens = text.match(/\/gsd[^\s]*/g) || [];
+        for (const token of rawTokens) {
+          assert.ok(
+            !token.includes(':'),
+            `validate-phase.md line ${lineNo}: /gsd token "${token}" must not contain a colon — embedded colon detected (e.g. /gsd-validate:phase), got: ${JSON.stringify(text)}`,
+          );
+        }
       }
     });
 
@@ -309,6 +319,16 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
           !/\/gsd:[a-z]/.test(text),
           `secure-phase.md line ${lineNo}: ▶-routing line must not contain /gsd:<cmd> colon form, got: ${JSON.stringify(text)}`,
         );
+        // Token-level: extract all /gsd... tokens and assert none contain an
+        // embedded colon (catches /gsd-validate:phase etc).
+        // Skips documentation placeholder tokens like /gsd-[command].
+        const rawTokens = text.match(/\/gsd[^\s]*/g) || [];
+        for (const token of rawTokens) {
+          assert.ok(
+            !token.includes(':'),
+            `secure-phase.md line ${lineNo}: /gsd token "${token}" must not contain a colon — embedded colon detected (e.g. /gsd-validate:phase), got: ${JSON.stringify(text)}`,
+          );
+        }
       }
     });
 
@@ -318,16 +338,30 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
       const workflowsDir = path.join(tmpDir, '.claude', 'get-shit-done', 'workflows');
       assert.ok(fs.existsSync(workflowsDir), 'workflows/ must exist for R3 to be meaningful');
 
-      const offenders = [];
+      const colonOffenders = [];
+      const embeddedColonOffenders = [];
       const walk = (d) => {
         for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
           const fullPath = path.join(d, entry.name);
           if (entry.isDirectory()) { walk(fullPath); continue; }
           if (!entry.name.endsWith('.md')) continue;
           const lines = fs.readFileSync(fullPath, 'utf-8').split(/\r?\n/);
+          const rel = path.relative(tmpDir, fullPath);
           lines.forEach((text, i) => {
-            if (text.startsWith('▶') && /\/gsd:[a-z]/.test(text)) {
-              offenders.push(`${path.relative(tmpDir, fullPath)}:${i + 1}: ${text.trim()}`);
+            if (!text.startsWith('▶')) return;
+            // Negative: must not contain overt /gsd:<cmd> colon form.
+            if (/\/gsd:[a-z]/.test(text)) {
+              colonOffenders.push(`${rel}:${i + 1}: ${text.trim()}`);
+            }
+            // Token-level: check each /gsd... token for an embedded colon.
+            // Catches cases like /gsd-validate:phase where normalizer half-converted.
+            // Documentation placeholder tokens like /gsd-[command] are skipped
+            // because their tokens will not contain a colon.
+            const tokens = text.match(/\/gsd[^\s]*/g) || [];
+            for (const token of tokens) {
+              if (token.includes(':')) {
+                embeddedColonOffenders.push(`${rel}:${i + 1}: token "${token}" in "${text.trim()}"`);
+              }
             }
           });
         }
@@ -335,11 +369,18 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
       walk(workflowsDir);
 
       assert.deepEqual(
-        offenders,
+        colonOffenders,
         [],
         `Staged workflows contain ▶-routing lines with /gsd:<cmd> colon form — ` +
         `these must resolve to /gsd-<cmd> for Claude Code skills-based install. ` +
-        `Offenders:\n  ${offenders.join('\n  ')}`,
+        `Offenders:\n  ${colonOffenders.join('\n  ')}`,
+      );
+      assert.deepEqual(
+        embeddedColonOffenders,
+        [],
+        `Staged workflows contain ▶-routing lines with /gsd tokens that have an embedded ` +
+        `colon (e.g. /gsd-validate:phase) — normalizer may have partially converted a token. ` +
+        `Offenders:\n  ${embeddedColonOffenders.join('\n  ')}`,
       );
     });
   });
