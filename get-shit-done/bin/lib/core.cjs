@@ -23,6 +23,7 @@ const {
   withPlanningLock,
   getActiveWorkstream,
   setActiveWorkstream,
+  findContextMdIn,
 } = require('./planning-workspace.cjs');
 const { findProjectRoot } = require('./project-root.generated.cjs');
 
@@ -1810,7 +1811,7 @@ function getPhaseFileStats(phaseDir) {
     plans: filterPlanFiles(files),
     summaries: filterSummaryFiles(files),
     hasResearch: files.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
-    hasContext: files.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md'),
+    hasContext: findContextMdIn(files) !== null,
     hasVerification: files.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md'),
     hasReviews: files.some(f => f.endsWith('-REVIEWS.md') || f === 'REVIEWS.md'),
   };

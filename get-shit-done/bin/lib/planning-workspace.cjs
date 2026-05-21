@@ -40,6 +40,23 @@ process.on('exit', () => {
   }
 });
 
+// Transient errno codes that indicate a temporary filesystem condition under
+// concurrent O_EXCL races — Docker overlay-fs (ENOENT/EINVAL/EIO), NFS
+// (ESTALE), and OS-level interrupt/retry signals (EAGAIN/EINTR).  These are
+// recoverable; withPlanningLock retries instead of propagating them.
+// Truly fatal codes (EMFILE, ENOSPC, EROFS, EACCES) are NOT in this set and
+// will still throw immediately.
+const PLANNING_LOCK_RETRY_ERRNOS = new Set([
+  'EPERM',   // Windows / macOS AV scanner holds the file open during delete
+  'EBUSY',   // Windows: file in use by another process
+  'EAGAIN',  // POSIX: resource temporarily unavailable
+  'EINTR',   // POSIX: syscall interrupted by signal
+  'EINVAL',  // Docker overlay-fs: transient during concurrent O_EXCL creation
+  'EIO',     // Docker overlay-fs / NFS: transient I/O error
+  'ENOENT',  // Docker overlay-fs: parent dir transiently missing during race
+  'ESTALE',  // NFS: stale file handle (self-resolves on retry)
+]);
+
 function planningDir(cwd, ws, project) {
   if (project === undefined) project = process.env.GSD_PROJECT || null;
   if (ws === undefined) ws = process.env.GSD_WORKSTREAM || null;
@@ -259,6 +276,13 @@ function withPlanningLock(cwd, fn) {
     try {
       return runWithHeldLock();
     } catch (err) {
+      // Transient filesystem errors (Docker overlay-fs, NFS, OS signals, AV scanners)
+      // are recoverable — wait and retry rather than propagating.
+      // See PLANNING_LOCK_RETRY_ERRNOS for the full list and rationale.
+      if (PLANNING_LOCK_RETRY_ERRNOS.has(err.code)) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+        continue;
+      }
       if (err.code === 'EEXIST') {
         // Lock exists — check if stale (>30s old)
         try {
@@ -347,6 +371,35 @@ function setActiveWorkstream(cwd, name) {
   createPlanningWorkspace(cwd).activeWorkstream.set(name);
 }
 
+/**
+ * Locate the CONTEXT.md file in a phase directory, handling both the bare
+ * form (`CONTEXT.md`) and the padded-prefix convention (`NN-CONTEXT.md`,
+ * `NN.N-CONTEXT.md`, etc.) used by gsd-discuss-phase output.
+ *
+ * Returns the filename (not the full path) of the first match, or null if
+ * no CONTEXT.md exists in the directory.
+ *
+ * Canonical dual-form predicate extracted here to eliminate the 5-site
+ * duplication that previously existed across init.cjs, roadmap.cjs,
+ * core.cjs, gap-checker.cjs (#3739).
+ *
+ * @param {string|string[]} absDirOrFiles - Absolute path to the phase directory,
+ *   OR an already-read files array (avoids a redundant readdirSync at call sites
+ *   that already hold a directory listing).
+ * @returns {string|null}
+ */
+function findContextMdIn(absDirOrFiles) {
+  try {
+    const files = Array.isArray(absDirOrFiles)
+      ? absDirOrFiles
+      : fs.readdirSync(absDirOrFiles);
+    if (files.includes('CONTEXT.md')) return 'CONTEXT.md';
+    return files.find(f => f.endsWith('-CONTEXT.md')) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   createPlanningWorkspace,
   createSharedPointerAdapter,
@@ -358,4 +411,5 @@ module.exports = {
   withPlanningLock,
   getActiveWorkstream,
   setActiveWorkstream,
+  findContextMdIn,
 };

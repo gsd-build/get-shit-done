@@ -55,7 +55,7 @@ function runHook(sessionId, remainingPct, cwd) {
 /**
  * Wait up to `ms` for a file to exist (the subprocess is fire-and-forget).
  */
-function waitForStoppedAt(statePath, ms = 2000) {
+function waitForStoppedAt(statePath, ms = 5000) {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
     try {

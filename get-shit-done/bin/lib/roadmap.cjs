@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { escapeRegex, normalizePhaseName, phaseMarkdownRegexSource, phaseMarkdownRegexSourceExact, output, error, findPhaseInternal, stripShippedMilestones, extractCurrentMilestone, replaceInCurrentMilestone, phaseTokenMatches } = require('./core.cjs');
 const { platformWriteSync } = require('./shell-command-projection.cjs');
-const { planningPaths, withPlanningLock } = require('./planning-workspace.cjs');
+const { planningPaths, withPlanningLock, findContextMdIn } = require('./planning-workspace.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
 
 /**
@@ -41,13 +41,13 @@ function coerceTruthToString(t) {
 function countPhasePlansAndSummaries(phaseDir) {
   const { planCount, summaryCount } = scanPhasePlans(phaseDir);
   // hasContext and hasResearch are not plan-scan concerns — read the directory
-  // once for the non-plan metadata that cmdRoadmapAnalyze needs.
+  // once and share the listing for all non-plan metadata that cmdRoadmapAnalyze needs.
   let phaseFiles = [];
   try { phaseFiles = fs.readdirSync(phaseDir); } catch { /* empty */ }
   return {
     planCount,
     summaryCount,
-    hasContext: phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md'),
+    hasContext: findContextMdIn(phaseFiles) !== null,
     hasResearch: phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md'),
   };
 }

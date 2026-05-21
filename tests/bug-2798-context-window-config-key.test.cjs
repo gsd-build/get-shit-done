@@ -55,7 +55,11 @@ describe('bug-2798: context_window is a valid config key', () => {
     cleanup(tmpDir);
   });
 
-  test('config-set context_window succeeds (not rejected as unknown key)', () => {
+  test('config-set context_window succeeds (not rejected as unknown key)', (t) => {
+    if (!fs.existsSync(SDK_CLI)) {
+      t.skip('sdk/dist/cli.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     const result = runConfigSet('context_window', 1000000, tmpDir);
 
     assert.strictEqual(result.exitCode, 0, 'should exit 0 (key is valid)');
@@ -64,7 +68,11 @@ describe('bug-2798: context_window is a valid config key', () => {
     assert.strictEqual(result.json?.key, 'context_window');
   });
 
-  test('context_window value is written to config.json', () => {
+  test('context_window value is written to config.json', (t) => {
+    if (!fs.existsSync(SDK_CLI)) {
+      t.skip('sdk/dist/cli.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     runConfigSet('context_window', 500000, tmpDir);
 
     const config = JSON.parse(
@@ -73,7 +81,11 @@ describe('bug-2798: context_window is a valid config key', () => {
     assert.strictEqual(config.context_window, 500000, 'context_window should be persisted');
   });
 
-  test('config-schema CJS and SDK allowlists both include context_window', () => {
+  test('config-schema CJS and SDK allowlists both include context_window', (t) => {
+    if (!fs.existsSync(path.join(REPO_ROOT, 'sdk', 'dist', 'query', 'config-schema.js'))) {
+      t.skip('sdk/dist/query/config-schema.js not built — run `cd sdk && npm run build` to enable this integration test');
+      return;
+    }
     const cjsSchema = require(path.join(REPO_ROOT, 'get-shit-done', 'bin', 'lib', 'config-schema.cjs'));
     const sdkSchema = require(path.join(REPO_ROOT, 'sdk', 'dist', 'query', 'config-schema.js'));
 

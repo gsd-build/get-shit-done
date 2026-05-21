@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { escapeRegex, output, error } = require('./core.cjs');
-const { planningPaths, planningDir } = require('./planning-workspace.cjs');
+const { planningPaths, planningDir, findContextMdIn } = require('./planning-workspace.cjs');
 const { parseDecisions } = require('./decisions.cjs');
 
 /**
@@ -133,16 +133,24 @@ function runGapAnalysis(cwd, phaseDir) {
   const reqMd = fs.existsSync(reqPath) ? fs.readFileSync(reqPath, 'utf-8') : '';
   const reqItems = parseRequirements(reqMd).map(r => ({ ...r, source: 'REQUIREMENTS.md' }));
 
-  const ctxPath = path.join(absPhaseDir, 'CONTEXT.md');
-  const ctxMd = fs.existsSync(ctxPath) ? fs.readFileSync(ctxPath, 'utf-8') : '';
+  // Read the phase directory once; reuse the listing for both context detection
+  // and plan-file enumeration (avoids redundant readdirSync calls).
+  let phaseDirFiles = [];
+  try {
+    if (fs.existsSync(absPhaseDir)) phaseDirFiles = fs.readdirSync(absPhaseDir);
+  } catch { /* unreadable */ }
+
+  const ctxFile = findContextMdIn(phaseDirFiles);
+  const ctxPath = ctxFile ? path.join(absPhaseDir, ctxFile) : null;
+  const ctxMd = ctxPath ? fs.readFileSync(ctxPath, 'utf-8') : '';
   const dItems = parseDecisions(ctxMd).map(d => ({ ...d, source: 'CONTEXT.md' }));
 
   const items = [...reqItems, ...dItems];
 
   let planText = '';
   try {
-    if (fs.existsSync(absPhaseDir)) {
-      const files = fs.readdirSync(absPhaseDir).filter(f => /-PLAN\.md$/.test(f));
+    if (phaseDirFiles.length > 0) {
+      const files = phaseDirFiles.filter(f => /-PLAN\.md$/.test(f));
       planText = files.map(f => {
         try { return fs.readFileSync(path.join(absPhaseDir, f), 'utf-8'); }
         catch { return ''; }
