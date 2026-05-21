@@ -446,10 +446,13 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
 
   // Build a map from plan ID → raw plan for fast lookup.
   // Deps that reference plans outside this phase are treated as external and ignored.
-  const planMap = new Map(rawPlans.map(p => [p.id, p]));
+  // Plan-id lookups are case-insensitive: map keys are lowercased and dep
+  // lookups are lowercased at query time so that depends_on: ['05c-01'] resolves
+  // to a plan with on-disk ID '05C-01-foo'.
+  const planMap = new Map(rawPlans.map(p => [p.id.toLowerCase(), p]));
   // Secondary index: canonical prefix → full plan ID, so depends_on: ['03-01'] resolves
   // to '03-01-auth-hardening-PLAN.md'-derived ID '03-01-auth-hardening' (k015).
-  const canonicalToId = new Map(rawPlans.map(p => [extractCanonicalPlanId(p.id), p.id]));
+  const canonicalToId = new Map(rawPlans.map(p => [extractCanonicalPlanId(p.id).toLowerCase(), p.id]));
 
   // Kahn's algorithm — compute in-degree and adjacency for in-phase deps only.
   const level = new Map();
@@ -461,7 +464,9 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     if (!adj.has(p.id)) adj.set(p.id, []);
     for (const dep of p.dependsOn) {
       // Accept both full-stem ('03-01-auth-hardening') and canonical-prefix ('03-01') forms.
-      const resolvedDep = planMap.has(dep) ? dep : canonicalToId.get(dep);
+      // Lookups are case-insensitive.
+      const depKey = dep.toLowerCase();
+      const resolvedDep = planMap.has(depKey) ? planMap.get(depKey).id : canonicalToId.get(depKey);
       if (!resolvedDep) continue; // external dep — ignore
       if (!adj.has(resolvedDep)) adj.set(resolvedDep, []);
       adj.get(resolvedDep).push(p.id);

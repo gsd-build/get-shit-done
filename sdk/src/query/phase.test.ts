@@ -648,4 +648,38 @@ describe('phasePlanIndex', () => {
     // A clear, dedicated warning naming the unresolved reference must surface.
     expect(warnings.some(w => /unresolved/i.test(w) && w.includes('does-not-exist'))).toBe(true);
   });
+
+  it('case-insensitive depends_on: lowercase dep resolves to uppercase-suffix plan ID', async () => {
+    const phase05c = join(tmpDir, '.planning', 'phases', '05C-letter-suffix');
+    await mkdir(phase05c, { recursive: true });
+    await writeFile(join(phase05c, '05C-01-PLAN.md'), [
+      '---',
+      'phase: 05C',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A with uppercase suffix.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase05c, '05C-02-PLAN.md'), [
+      '---',
+      'phase: 05C',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on: [05c-01]',
+      '---',
+      '<objective>Plan B references plan A via lowercase canonical-prefix form.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['05C'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const waves = data.waves as Record<string, string[]>;
+    const warnings = (data.warnings as string[] | undefined) ?? [];
+
+    expect(waves['1']).toEqual(['05C-01']);
+    expect(waves['2']).toEqual(['05C-02']);
+    expect(warnings).toEqual([]);
+  });
 });
