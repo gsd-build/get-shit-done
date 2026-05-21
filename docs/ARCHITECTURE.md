@@ -277,6 +277,10 @@ Programmatic SDK callers (`GSDTools`) route through one seam that owns query dis
 
 This keeps callers thin adapters and centralizes transport decisions for SDK publishability.
 
+### Command Routing Hub (`get-shit-done/bin/lib/command-routing-hub.cjs`)
+
+All CJS command family routers (`phase-command-router.cjs`, `phases-command-router.cjs`, `roadmap-command-router.cjs`, etc.) dispatch through the `CommandRoutingHub`. The hub owns three cross-cutting concerns that each router previously duplicated: (1) mode selection (`sdk` when `tryLoadSdk()` succeeds and no `GSD_WORKSTREAM` is active, `cjs` otherwise), set once at construction; (2) a no-throw pure-result contract (`hub.dispatch()` catches all exceptions and returns `{ ok: false, errorKind, message, details }` instead of propagating); and (3) a closed six-value `errorKind` enum exported as the frozen `ERROR_KINDS` object. Router adapters remain thin CLI translators — they build the hub, call `dispatch`, then map the Result to `output()`/`error()` calls. No transparent SDK→CJS fallback: an SDK-mode hub that encounters a load or dispatch failure returns `SdkLoadFailed` or `SdkDispatchFailed` without retrying via CJS. See `docs/adr/3788-command-routing-hub.md`.
+
 ### CLI Tools (`get-shit-done/bin/`)
 
 Node.js CLI utility (`gsd-tools.cjs`) with domain modules split across `get-shit-done/bin/lib/` (see [`docs/INVENTORY.md`](INVENTORY.md#cli-modules-33-shipped) for the authoritative roster):
