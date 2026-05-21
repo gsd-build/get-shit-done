@@ -196,10 +196,22 @@ describe('applySurface', () => {
     fs.writeFileSync(path.join(foreignDir, 'SKILL.md'), '# custom\n', 'utf8');
 
     const skillsKind = { kind: 'skills', destSubpath: 'skills', prefix: 'gsd-', stage: () => stagedDir };
-    _syncGsdDir(stagedDir, destDir, skillsKind);
+
+    // Build a minimal manifest that includes the GSD-owned stems so that the
+    // manifest-membership gate (Finding 1 fix) correctly identifies gsd-old-skill
+    // as GSD-owned and prunes it. Without a manifest the new code conservatively
+    // preserves all gsd-* dirs it cannot confirm are GSD-owned.
+    const manifest = new Map([
+      ['help', []],
+      ['update', []],
+      ['old-skill', []],  // GSD-owned stale stem — must be pruned when not in staged set
+    ]);
+
+    _syncGsdDir(stagedDir, destDir, skillsKind, manifest);
 
     assert.ok(fs.existsSync(path.join(destDir, stem1, 'SKILL.md')), 'gsd-help/SKILL.md should be copied');
     assert.ok(fs.existsSync(path.join(destDir, stem2, 'SKILL.md')), 'gsd-update/SKILL.md should be copied');
+    // stale gsd- dir removed (it's in the manifest so it is GSD-owned, but not in staged set)
     assert.ok(!fs.existsSync(staleDir), 'stale gsd-old-skill dir should be removed');
     assert.ok(fs.existsSync(foreignDir), 'my-custom-skill dir should be preserved');
   });
