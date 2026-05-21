@@ -122,7 +122,7 @@ AskUserQuestion([
 ])
 
 // Q2: only presented when the user chose "Standard tier…" in Q1 above.
-// Skip this question and preserve existing config when user chose Adaptive or Inherit.
+// Skip this question when user chose Adaptive or Inherit (Q1 still writes model_profile on those branches — only Q2 is skipped).
 AskUserQuestion([
   {
     question: "Which standard profile? (Quality / Balanced / Budget)",
@@ -144,7 +144,6 @@ AskUserQuestion([
 //   Q1 "Standard tier…" + Q2 "Budget"    → model_profile = "budget"
 
 AskUserQuestion([
-  {
   {
     question: "Spawn Plan Researcher? (researches domain before planning)",
     header: "Research",
