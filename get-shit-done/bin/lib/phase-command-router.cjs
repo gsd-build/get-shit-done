@@ -47,6 +47,17 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
     return;
   }
 
+  // ── CJS-only subcommands (always bypass SDK path) ──────────────────────────
+  // `mvp-mode` was never registered in the SDK; the pre-#3788 code always
+  // dispatched it via the CJS handler even when `sdkAvailable` was true.
+  // Dispatch it early so the SDK hub path is never reached for this subcommand,
+  // preserving the pre-migration observable behaviour (correct exit code,
+  // correct JSON error reason code, correct ROADMAP scan).
+  if (subcommand === 'mvp-mode') {
+    phase.cmdPhaseMvpMode(cwd, args.slice(2), raw);
+    return;
+  }
+
   // ── Build the CJS registry ──────────────────────────────────────────────────
   // Each handler receives a ctx object from the hub and must return a HubResult.
   const cjsRegistry = {
