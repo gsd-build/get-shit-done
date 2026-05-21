@@ -249,7 +249,7 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
     function collectRoutingLines(filePath) {
       if (!fs.existsSync(filePath)) return [];
       return fs.readFileSync(filePath, 'utf-8')
-        .split('\n')
+        .split(/\r?\n/)
         .map((text, i) => ({ lineNo: i + 1, text }))
         .filter(({ text }) => text.startsWith('▶'));
     }
@@ -324,7 +324,7 @@ describe('bug #3683 — workflow/reference colon-namespace leak (Claude local in
           const fullPath = path.join(d, entry.name);
           if (entry.isDirectory()) { walk(fullPath); continue; }
           if (!entry.name.endsWith('.md')) continue;
-          const lines = fs.readFileSync(fullPath, 'utf-8').split('\n');
+          const lines = fs.readFileSync(fullPath, 'utf-8').split(/\r?\n/);
           lines.forEach((text, i) => {
             if (text.startsWith('▶') && /\/gsd:[a-z]/.test(text)) {
               offenders.push(`${path.relative(tmpDir, fullPath)}:${i + 1}: ${text.trim()}`);
