@@ -23,7 +23,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-INIT=$(gsd-sdk query init.todos)
+INIT=$($GSD_SDK query init.todos)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -168,7 +168,7 @@ If todo was moved to done/, commit the change:
 
 ```bash
 git rm --cached .planning/todos/pending/[filename] 2>/dev/null || true
-gsd-sdk query commit "docs: start work on todo - [title]" --files .planning/todos/completed/[filename] .planning/STATE.md
+$GSD_SDK query commit "docs: start work on todo - [title]" --files .planning/todos/completed/[filename] .planning/STATE.md
 ```
 
 Tool respects `commit_docs` config and gitignore automatically.

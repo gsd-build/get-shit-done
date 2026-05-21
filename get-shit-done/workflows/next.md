@@ -25,7 +25,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-gsd-sdk query state.json 2>/dev/null || echo "{}"
+$GSD_SDK query state.json 2>/dev/null || echo "{}"
 ```
 
 Also read:
@@ -138,7 +138,7 @@ Choice [S]:
 ```
 2. Commit the deferral record:
 ```bash
-gsd-sdk query commit "docs: defer incomplete Phase {src} items to backlog"
+$GSD_SDK query commit "docs: defer incomplete Phase {src} items to backlog"
 ```
 3. Continue routing to `determine_next_action` immediately — no second prompt.
 

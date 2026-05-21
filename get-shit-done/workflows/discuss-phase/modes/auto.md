@@ -40,7 +40,7 @@ that the next pass treats as gaps, consuming unbounded time and resources.
 
 Check the pass cap from config:
 ```bash
-MAX_PASSES=$(gsd-sdk query config-get workflow.max_discuss_passes 2>/dev/null || echo "3")
+MAX_PASSES=$($GSD_SDK query config-get workflow.max_discuss_passes 2>/dev/null || echo "3")
 ```
 
 If you have already written and committed CONTEXT.md, the discuss step is

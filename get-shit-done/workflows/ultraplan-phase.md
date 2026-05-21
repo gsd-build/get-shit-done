@@ -77,7 +77,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-INIT=$(gsd-sdk query init.plan-phase "$PHASE")
+INIT=$($GSD_SDK query init.plan-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 

@@ -40,7 +40,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-INIT=$(gsd-sdk query init.phase-op "${PHASE_ARG}")
+INIT=$($GSD_SDK query init.phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -48,14 +48,14 @@ Extract from init JSON: `phase_dir`, `phase_number`, `phase_name`, `has_plans`, 
 
 Then load phase details and list plans/summaries:
 ```bash
-gsd-sdk query roadmap.get-phase "${phase_number}"
+$GSD_SDK query roadmap.get-phase "${phase_number}"
 grep -E "^| ${phase_number}" .planning/REQUIREMENTS.md 2>/dev/null || true
 ls "$phase_dir"/*-SUMMARY.md "$phase_dir"/*-PLAN.md 2>/dev/null || true
 ```
 
 Load full milestone phases for deferred-item filtering (Step 9b):
 ```bash
-gsd-sdk query roadmap.analyze
+$GSD_SDK query roadmap.analyze
 ```
 
 Extract **phase goal** from ROADMAP.md (the outcome to verify, not tasks), **requirements** from REQUIREMENTS.md if it exists, and **all milestone phases** from roadmap analyze (for cross-referencing gaps against later phases).
@@ -68,7 +68,7 @@ Use `gsd-sdk query` verify handlers (or legacy gsd-tools) to extract must_haves 
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  MUST_HAVES=$(gsd-sdk query frontmatter.get "$plan" --field must_haves)
+  MUST_HAVES=$($GSD_SDK query frontmatter.get "$plan" --field must_haves)
   echo "=== $plan ===" && echo "$MUST_HAVES"
 done
 ```
@@ -82,7 +82,7 @@ Aggregate all must_haves across plans for phase-level verification.
 If no must_haves in frontmatter (MUST_HAVES returns error or empty), check for Success Criteria:
 
 ```bash
-PHASE_DATA=$(gsd-sdk query roadmap.get-phase "${phase_number}" --raw)
+PHASE_DATA=$($GSD_SDK query roadmap.get-phase "${phase_number}" --raw)
 ```
 
 Parse the `success_criteria` array from the JSON output. If non-empty:
@@ -118,7 +118,7 @@ Use `gsd-sdk query verify.artifacts` (or legacy gsd-tools) for artifact verifica
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  ARTIFACT_RESULT=$(gsd-sdk query verify.artifacts "$plan")
+  ARTIFACT_RESULT=$($GSD_SDK query verify.artifacts "$plan")
   echo "=== $plan ===" && echo "$ARTIFACT_RESULT"
 done
 ```
@@ -161,7 +161,7 @@ Use `gsd-sdk query verify.key-links` (or legacy gsd-tools) for key link verifica
 
 ```bash
 for plan in "$PHASE_DIR"/*-PLAN.md; do
-  LINKS_RESULT=$(gsd-sdk query verify.key-links "$plan")
+  LINKS_RESULT=$($GSD_SDK query verify.key-links "$plan")
   echo "=== $plan ===" && echo "$LINKS_RESULT"
 done
 ```
@@ -216,7 +216,7 @@ phase.
 no `<decisions>` block.
 
 ```bash
-GATE_CFG=$(gsd-sdk query config-get workflow.context_coverage_gate 2>/dev/null || echo "true")
+GATE_CFG=$($GSD_SDK query config-get workflow.context_coverage_gate 2>/dev/null || echo "true")
 if [ "$GATE_CFG" != "false" ]; then
   # Discover the phase CONTEXT.md via glob expansion rather than `ls | head`
   # (review F17 / ShellCheck SC2012). Globs preserve filenames containing
@@ -225,7 +225,7 @@ if [ "$GATE_CFG" != "false" ]; then
   for f in "${PHASE_DIR}"/*-CONTEXT.md; do
     [ -e "$f" ] && CONTEXT_PATH="$f" && break
   done
-  DECISION_RESULT=$(gsd-sdk query check.decision-coverage-verify "${PHASE_DIR}" "${CONTEXT_PATH}")
+  DECISION_RESULT=$($GSD_SDK query check.decision-coverage-verify "${PHASE_DIR}" "${CONTEXT_PATH}")
 fi
 ```
 
@@ -260,7 +260,7 @@ inspecting static artifacts.
 
 ```bash
 # Resolve test command: project config > Makefile > language sniff
-TEST_CMD=$(gsd-sdk query config-get workflow.test_command --default "" 2>/dev/null || true)
+TEST_CMD=$($GSD_SDK query config-get workflow.test_command --default "" 2>/dev/null || true)
 if [ -z "$TEST_CMD" ]; then
   if [ -f "Makefile" ] && grep -q "^test:" Makefile; then
     TEST_CMD="make test"

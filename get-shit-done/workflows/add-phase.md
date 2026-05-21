@@ -40,7 +40,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-INIT=$(gsd-sdk query init.phase-op "0")
+INIT=$($GSD_SDK query init.phase-op "0")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -56,7 +56,7 @@ Exit.
 **Delegate the phase addition to `gsd-sdk query phase.add`:**
 
 ```bash
-RESULT=$(gsd-sdk query phase.add "${description}")
+RESULT=$($GSD_SDK query phase.add "${description}")
 ```
 
 The CLI handles:

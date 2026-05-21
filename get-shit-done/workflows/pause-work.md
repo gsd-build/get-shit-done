@@ -77,7 +77,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-timestamp=$(gsd-sdk query current-timestamp full --raw)
+timestamp=$($GSD_SDK query current-timestamp full --raw)
 ```
 
 ```json
@@ -212,13 +212,13 @@ Be specific enough for a fresh Claude to understand immediately.
 
 Use `current-timestamp` for last_updated field. You can use init todos (which provides timestamps) or call directly:
 ```bash
-timestamp=$(gsd-sdk query current-timestamp full --raw)
+timestamp=$($GSD_SDK query current-timestamp full --raw)
 ```
 </step>
 
 <step name="commit">
 ```bash
-gsd-sdk query commit "wip: [context-name] paused at [X]/[Y]" --files [handoff-path] .planning/HANDOFF.json
+$GSD_SDK query commit "wip: [context-name] paused at [X]/[Y]" --files [handoff-path] .planning/HANDOFF.json
 ```
 </step>
 

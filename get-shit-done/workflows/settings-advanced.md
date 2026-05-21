@@ -31,7 +31,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-gsd-sdk query config-ensure-section
+$GSD_SDK query config-ensure-section
 if [[ -z "${GSD_CONFIG_PATH:-}" ]]; then
   if [[ -f .planning/active-workstream ]]; then
     WS=$(tr -d '\n\r' < .planning/active-workstream)
@@ -445,12 +445,12 @@ AskUserQuestion([
 
 For each tier where the user chose "Enter model ID":
 ```bash
-gsd-sdk query config-set model_profile_overrides.<runtime>.<tier> "<model-id>"
+$GSD_SDK query config-set model_profile_overrides.<runtime>.<tier> "<model-id>"
 ```
 
 For each tier where the user chose "Clear override", remove the key by setting it to null:
 ```bash
-gsd-sdk query config-set model_profile_overrides.<runtime>.<tier> null
+$GSD_SDK query config-set model_profile_overrides.<runtime>.<tier> null
 ```
 
 "Keep current" selections are skipped entirely. Never write a key the user did not explicitly
@@ -468,14 +468,14 @@ keys and sibling sub-objects.
 
 ```bash
 # Example — only write keys the user changed. "Keep current" selections are skipped.
-gsd-sdk query config-set workflow.plan_bounce_passes 5
-gsd-sdk query config-set workflow.subagent_timeout 900
-gsd-sdk query config-set git.base_branch main
-gsd-sdk query config-set context_window 1000000
+$GSD_SDK query config-set workflow.plan_bounce_passes 5
+$GSD_SDK query config-set workflow.subagent_timeout 900
+$GSD_SDK query config-set git.base_branch main
+$GSD_SDK query config-set context_window 1000000
 # Runtime model tier examples:
-gsd-sdk query config-set runtime gemini
-gsd-sdk query config-set model_profile_overrides.gemini.opus gemini-3-ultra
-gsd-sdk query config-set model_profile_overrides.gemini.haiku null
+$GSD_SDK query config-set runtime gemini
+$GSD_SDK query config-set model_profile_overrides.gemini.opus gemini-3-ultra
+$GSD_SDK query config-set model_profile_overrides.gemini.haiku null
 ```
 
 Conceptual shape after merge (unchanged top-level keys like `model_profile`,

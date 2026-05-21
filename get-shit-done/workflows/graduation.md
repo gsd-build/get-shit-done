@@ -32,9 +32,9 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-GRADUATION_ENABLED=$(gsd-sdk query config-get features.graduation 2>/dev/null || echo "true")
-GRADUATION_WINDOW=$(gsd-sdk query config-get features.graduation_window 2>/dev/null || echo "5")
-GRADUATION_THRESHOLD=$(gsd-sdk query config-get features.graduation_threshold 2>/dev/null || echo "3")
+GRADUATION_ENABLED=$($GSD_SDK query config-get features.graduation 2>/dev/null || echo "true")
+GRADUATION_WINDOW=$($GSD_SDK query config-get features.graduation_window 2>/dev/null || echo "5")
+GRADUATION_THRESHOLD=$($GSD_SDK query config-get features.graduation_threshold 2>/dev/null || echo "3")
 ```
 
 **Skip silently (print nothing) if:**

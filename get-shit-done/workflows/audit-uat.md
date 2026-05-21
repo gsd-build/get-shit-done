@@ -19,7 +19,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-AUDIT=$(gsd-sdk query audit-uat --raw)
+AUDIT=$($GSD_SDK query audit-uat --raw)
 ```
 
 Parse JSON for `results` array and `summary` object.

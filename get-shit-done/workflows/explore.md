@@ -126,7 +126,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-gsd-sdk query commit "docs: capture exploration — {topic_slug}" --files {file_list}
+$GSD_SDK query commit "docs: capture exploration — {topic_slug}" --files {file_list}
 ```
 
 ## Step 6: Close

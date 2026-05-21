@@ -30,7 +30,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-NEXT=$(gsd-sdk query phase.next-decimal 999 --raw)
+NEXT=$($GSD_SDK query phase.next-decimal 999 --raw)
 ```
 
 If no 999.x phases exist yet, `phase.next-decimal` returns `999.1`. Sparse numbering
@@ -63,8 +63,8 @@ Plans:
 Apply the `project_code` prefix (if set in `.planning/config.json`) so the backlog directory name is consistent with all other phase-creation paths:
 
 ```bash
-SLUG=$(gsd-sdk query generate-slug "$ARGUMENTS" --raw)
-PROJECT_CODE=$(gsd-sdk query config-get project_code --raw 2>/dev/null || echo "")
+SLUG=$($GSD_SDK query generate-slug "$ARGUMENTS" --raw)
+PROJECT_CODE=$($GSD_SDK query config-get project_code --raw 2>/dev/null || echo "")
 PREFIX=$([ -n "$PROJECT_CODE" ] && echo "${PROJECT_CODE}-" || echo "")
 PHASE_DIR=".planning/phases/${PREFIX}${NEXT}-${SLUG}"
 mkdir -p "${PHASE_DIR}"
@@ -74,7 +74,7 @@ touch "${PHASE_DIR}/.gitkeep"
 ## Step 5: Commit
 
 ```bash
-gsd-sdk query commit "docs: add backlog item ${NEXT} — ${ARGUMENTS}" --files .planning/ROADMAP.md "${PHASE_DIR}/.gitkeep"
+$GSD_SDK query commit "docs: add backlog item ${NEXT} — ${ARGUMENTS}" --files .planning/ROADMAP.md "${PHASE_DIR}/.gitkeep"
 ```
 
 ## Step 6: Report

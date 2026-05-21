@@ -283,7 +283,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-gsd-sdk query state.record-session "" \
+$GSD_SDK query state.record-session "" \
   "Forensic investigation complete" \
   ".planning/forensics/report-{timestamp}.md"
 ```

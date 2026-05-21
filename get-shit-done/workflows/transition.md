@@ -174,7 +174,7 @@ else
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
   exit 1
 fi
-TRANSITION=$(gsd-sdk query phase.complete "${current_phase}")
+TRANSITION=$($GSD_SDK query phase.complete "${current_phase}")
 ```
 
 The CLI handles:
@@ -311,7 +311,7 @@ This step is fully delegated to `graduation.md`. It handles guard checks (featur
 Verify the updates are correct by reading STATE.md. If the progress bar needs updating, use:
 
 ```bash
-PROGRESS=$(gsd-sdk query progress.bar --raw)
+PROGRESS=$($GSD_SDK query progress.bar --raw)
 ```
 
 Update the progress bar line in STATE.md with the result.
@@ -420,7 +420,7 @@ The `next_phase` and `next_phase_name` fields give you the next phase details.
 
 If you need additional context, use:
 ```bash
-ROADMAP=$(gsd-sdk query roadmap.analyze)
+ROADMAP=$($GSD_SDK query roadmap.analyze)
 ```
 
 This returns all phases with goals, disk status, and completion info.
@@ -439,7 +439,7 @@ In flat mode, go directly to **Route B**.
 ```bash
 # Only check if we're in workstream mode
 if [ -n "$GSD_WORKSTREAM" ]; then
-  WS_LIST=$(gsd-sdk query workstream.list --raw)
+  WS_LIST=$($GSD_SDK query workstream.list --raw)
 fi
 ```
 
@@ -559,7 +559,7 @@ to the next milestone — other workstreams are still working.
 **Clear auto-advance chain flag** — workstream boundary is the natural stopping point:
 
 ```bash
-gsd-sdk query config-set workflow._auto_chain_active false
+$GSD_SDK query config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">
@@ -613,7 +613,7 @@ Do NOT auto-invoke any further slash commands.
 **Clear auto-advance chain flag** — milestone boundary is the natural stopping point:
 
 ```bash
-gsd-sdk query config-set workflow._auto_chain_active false
+$GSD_SDK query config-set workflow._auto_chain_active false
 ```
 
 <if mode="yolo">
