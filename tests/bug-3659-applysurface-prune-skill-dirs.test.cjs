@@ -33,10 +33,8 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
-
 const { writeSurface, applySurface } = require('../get-shit-done/bin/lib/surface.cjs');
-const { loadSkillsManifest, writeActiveProfile } = require('../get-shit-done/bin/lib/install-profiles.cjs');
+const { loadSkillsManifest } = require('../get-shit-done/bin/lib/install-profiles.cjs');
 const { CLUSTERS } = require('../get-shit-done/bin/lib/clusters.cjs');
 const { resolveRuntimeArtifactLayout } = require('../get-shit-done/bin/lib/runtime-artifact-layout.cjs');
 const { createTempDir, cleanup } = require('./helpers.cjs');

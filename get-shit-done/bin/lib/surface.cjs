@@ -3,7 +3,7 @@
  * Runtime surface module — ADR-0011 Phase 2 (Option B).
  *
  * Manages the runtime enable/disable surface state (the `.gsd-surface.json` marker in
- * each runtime's skills dir) independently of the install-time profile marker
+ * each runtime's config dir root (e.g., ~/.claude)) independently of the install-time profile marker
  * (`.gsd-profile`). Runtime config locations are resolved by callers.
  *
  * Effective skill set = base profile ∪ explicitAdds − disabledClusters − explicitRemoves,
@@ -15,6 +15,7 @@
  *   resolveSurface(runtimeConfigDir, manifest, clusterMap)
  *   applySurface(runtimeConfigDir, layout, manifest, clusterMap)
  *   listSurface(runtimeConfigDir, layout, manifest, clusterMap)
+ *   pruneSkillDirs(skillsDir, retainedNames, prefix, manifest)
  */
 
 const fs = require('fs');
@@ -251,20 +252,11 @@ function pruneSkillDirs(skillsDir, retainedNames, prefix, manifest) {
   // A non-Map manifest would throw on .keys(); treat it as absent and be conservative.
   const safeManifest = (manifest instanceof Map) ? manifest : null;
 
-  let canonicalStems;
-  if (prefix === '') {
-    // Hermes (empty-prefix) branch: GSD-owned iff the stem appears in manifest.
-    canonicalStems = safeManifest
-      ? new Set([...safeManifest.keys()].filter(k => !k.startsWith('_calls_agents_')))
-      : null;
-  } else {
-    // Prefixed branch (e.g. 'gsd-'): build the manifest-owned stem set.
-    // Finding 1: deletion requires BOTH prefix match AND manifest membership.
-    // Without a valid manifest we cannot determine ownership — be conservative.
-    canonicalStems = safeManifest
-      ? new Set([...safeManifest.keys()].filter(k => !k.startsWith('_calls_agents_')))
-      : null;
-  }
+  // Build the canonical stem set from the manifest (used for both prefixed and Hermes paths).
+  // Deletion requires manifest membership — without a valid manifest, be conservative.
+  const canonicalStems = safeManifest
+    ? new Set([...safeManifest.keys()].filter(k => !k.startsWith('_calls_agents_')))
+    : null;
 
   for (const entry of fs.readdirSync(skillsDir)) {
     const entryPath = path.join(skillsDir, entry);
@@ -298,9 +290,13 @@ function pruneSkillDirs(skillsDir, retainedNames, prefix, manifest) {
       continue;
     }
 
-    if (!isGsdOwned) continue;         // preserve user-owned dirs
+    if (!isGsdOwned) continue;         // Hermes path only: preserve user-owned dirs not in manifest
     if (retainedNames.has(entry)) continue; // GSD-owned and in retain set
-    try { fs.rmSync(entryPath, { recursive: true, force: true }); } catch {}
+    try {
+      fs.rmSync(entryPath, { recursive: true, force: true });
+    } catch (err) {
+      process.stderr.write(`surface: failed to prune ${entryPath}: ${err.message}\n`);
+    }
   }
 }
 
@@ -339,15 +335,10 @@ function _syncGsdDir(stagedDir, destDir, kind, manifest) {
       })
     );
 
-    // Copy missing dirs from staged to dest
+    // Copy missing dirs from staged to dest (always overwrite to ensure content is current)
     for (const dirName of stagedDirs) {
       const destSubDir = path.join(destDir, dirName);
-      if (!fs.existsSync(destSubDir)) {
-        fs.cpSync(path.join(stagedDir, dirName), destSubDir, { recursive: true });
-      } else {
-        // Overwrite to ensure content is current
-        fs.cpSync(path.join(stagedDir, dirName), destSubDir, { recursive: true });
-      }
+      fs.cpSync(path.join(stagedDir, dirName), destSubDir, { recursive: true });
     }
 
     // Prune GSD-owned dirs that are no longer in the staged set.
