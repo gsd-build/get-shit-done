@@ -80,14 +80,14 @@ export const phaseMvpMode: QueryHandler<MvpModeResult> = async (args, projectDir
   const cliNoFlagPresent = args.includes('--cli-no-flag');
   const cliFlagPresent = args.includes('--cli-flag');
 
-  // Precedence #2: ROADMAP.md
+  // Precedence #3: ROADMAP.md
   const phaseResult = await roadmapGetPhase([phaseNum], projectDir, workstream);
   const phaseData = phaseResult.data as { found?: boolean; mode?: string | null };
   const roadmapMode = phaseData.found && typeof phaseData.mode === 'string'
     ? phaseData.mode.trim().toLowerCase()
     : null;
 
-  // Precedence #3: config
+  // Precedence #4: config
   const config = await loadConfig(projectDir, workstream);
   const wf = (config.workflow ?? {}) as unknown as Record<string, unknown>;
   const configMvpMode = Boolean(wf.mvp_mode ?? false);
@@ -169,14 +169,14 @@ export const phaseTddMode: QueryHandler<TddModeResult> = async (args, projectDir
   const cliNoFlagPresent = args.includes('--cli-no-flag');
   const cliFlagPresent = args.includes('--cli-flag');
 
-  // Precedence #2: ROADMAP.md
+  // Precedence #3: ROADMAP.md
   const phaseResult = await roadmapGetPhase([phaseNum], projectDir, workstream);
   const phaseData = phaseResult.data as { found?: boolean; tdd?: string | null };
   const roadmapTdd = phaseData.found && typeof phaseData.tdd === 'string'
     ? phaseData.tdd.trim().toLowerCase()
     : null;
 
-  // Precedence #3: config
+  // Precedence #4: config
   const config = await loadConfig(projectDir, workstream);
   const wf = (config.workflow ?? {}) as unknown as Record<string, unknown>;
   const configTddMode = Boolean(wf.tdd_mode ?? false);

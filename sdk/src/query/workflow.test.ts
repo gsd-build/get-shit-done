@@ -143,6 +143,17 @@ describe('workflow.parse: code_blocks', () => {
     // Closing fence is line 5
     expect(result.code_blocks[0]!.line_end).toBe(5);
   });
+
+  it('captures unclosed fenced block at EOF without throwing', () => {
+    // A markdown file with an unclosed ``` fence (malformed but present in the wild)
+    const file = makeTmpFile('# Doc\n\n```bash\necho hello\n');
+    const result = parseWorkflowFile(file, []);
+    expect(result.code_blocks).toHaveLength(1);
+    expect(result.code_blocks[0]!.language).toBe('bash');
+    expect(result.code_blocks[0]!.line_start).toBe(3);
+    // line_end should equal total_lines (no closing fence — entire remainder is the block)
+    expect(result.code_blocks[0]!.line_end).toBe(result.total_lines);
+  });
 });
 
 // ─── Cycle 3: asks ───────────────────────────────────────────────────────────

@@ -224,6 +224,15 @@ export function parseWorkflowFile(filePath: string, termList: readonly string[])
       }
     }
   }
+  // Unclosed fenced block at EOF — push what we have (language=null signals MD040 violation)
+  if (inBlock) {
+    code_blocks.push({
+      language: blockLang,
+      line_start: blockStart,
+      line_end: lines.length,
+      content_length: blockContentLen,
+    });
+  }
 
   // ── asks ────────────────────────────────────────────────────────────────────
   const asks: AskEntry[] = [];

@@ -46,6 +46,7 @@ const ir = parseWorkflow(WORKFLOW, [
   'MVP_MODE',
   'TDD_MODE',
   'phase.mvp-mode',
+  'phase.tdd-mode',
   'execute-mvp-tdd.md',
   'blocking',
   'MVP+TDD',
@@ -61,6 +62,10 @@ describe('execute-phase — MVP+TDD gate', () => {
     // hasRoadmapModeResolution → sdk_calls must contain phase.mvp-mode
     const mvpSdkCall = ir.sdk_calls.find(c => c.verb === 'phase.mvp-mode');
     assert.ok(mvpSdkCall, 'workflow must call gsd-sdk query phase.mvp-mode (consults roadmap phase mode)');
+
+    // hasTddModeResolution → sdk_calls must contain phase.tdd-mode (E4 symmetry, not config-get)
+    const tddModeSdkCall = ir.sdk_calls.find(c => c.verb === 'phase.tdd-mode');
+    assert.ok(tddModeSdkCall, 'workflow must call gsd-sdk query phase.tdd-mode (symmetric with phase.mvp-mode — closes E4)');
   });
 
   test('gate fires when both MVP_MODE and TDD_MODE are true', () => {
@@ -109,6 +114,15 @@ describe('execute-phase — MVP+TDD gate', () => {
     // hasReferenceDoc → terms 'execute-mvp-tdd.md' present
     const refTerm = ir.terms.find(t => t.term === 'execute-mvp-tdd.md');
     assert.ok(refTerm && refTerm.count > 0, 'must reference the gate semantics file execute-mvp-tdd.md');
+  });
+
+  test('--no-mvp and --no-tdd opt-out flags are parsed (E7 symmetry)', () => {
+    // MVP_FLAG_ARG and TDD_FLAG_ARG bash assignments signal that opt-out flag parsing is present
+    const mvpFlagAssign = ir.bash_assignments.find(a => a.var === 'MVP_FLAG_ARG');
+    assert.ok(mvpFlagAssign, 'workflow must declare MVP_FLAG_ARG bash assignment (signals --no-mvp is parsed)');
+
+    const tddFlagAssign = ir.bash_assignments.find(a => a.var === 'TDD_FLAG_ARG');
+    assert.ok(tddFlagAssign, 'workflow must declare TDD_FLAG_ARG bash assignment (signals --no-tdd is parsed)');
   });
 
   // ── Counter-tests (Contract 6 — negative-space coverage) ─────────────────
