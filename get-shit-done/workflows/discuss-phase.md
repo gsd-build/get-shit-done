@@ -109,20 +109,9 @@ Phase: "API documentation"       → Structure/navigation, Code examples depth, 
 Phase number from argument (required).
 
 ```bash
-# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
-GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
-if command -v gsd-sdk >/dev/null 2>&1; then
-  GSD_SDK="gsd-sdk"
-elif [ -f "$GSD_TOOLS" ]; then
-  GSD_SDK="node "$GSD_TOOLS""
-else
-  echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
-  echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
-  exit 1
-fi
-INIT=$(gsd-sdk query init.phase-op "${PHASE}")
-if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_ADVISOR=$(gsd-sdk query agent-skills gsd-advisor-researcher)
+GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"; command -v gsd-sdk >/dev/null 2>&1 && GSD_SDK=gsd-sdk || { [ -f "$GSD_TOOLS" ] && GSD_SDK="node $GSD_TOOLS" || { echo "ERROR: gsd-sdk not found. Run: npx get-shit-done-cc@latest --claude --local" >&2; exit 1; }; }
+INIT=$($GSD_SDK query init.phase-op "${PHASE}"); [[ "$INIT" == @file:* ]] && INIT=$(cat "${INIT#@file:}")
+AGENT_SKILLS_ADVISOR=$($GSD_SDK query agent-skills gsd-advisor-researcher)
 ```
 
 Parse JSON for: `commit_docs`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_research`, `has_context`, `has_plans`, `has_verification`, `plan_count`, `roadmap_exists`, `planning_exists`, `response_language`.
