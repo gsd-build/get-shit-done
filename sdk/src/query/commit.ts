@@ -107,6 +107,13 @@ export function parsePhasesFromFiles(filePaths: string[]): Set<string> {
   // Match the FIRST path segment that looks like `<phase>-` where phase is a
   // positive integer or dotted number.  We anchor to path separators so that
   // a file named `output-results.md` at the root does NOT match.
+  //
+  // NOTE: The `^` anchor accepts a leading digit-prefix even when the file
+  // is at the repository root (e.g. `2-results.md` → phase 2). This
+  // deviates from CJS behavior, which reads phase numbers strictly from
+  // `.planning/phases/<N>-*` directories. The test at bug-3749:148 documents
+  // this as an accepted current limitation; integration tests cover the
+  // directory-rooted happy path.
   const segmentRe = /(?:^|[/\\])(\d+(?:\.\d+)*)-/;
   for (const p of filePaths) {
     const m = p.match(segmentRe);
@@ -139,28 +146,36 @@ export function validateBranchTemplate(
 }
 
 /**
- * Resolve the final branch name from a config template and a phase's data.
+ * Resolve the final branch name from a config template and two positional tokens.
+ *
+ * The naming is intentionally generic: `firstToken` and `secondToken` cover
+ * both the phase strategy (`phase number` + `phase slug`) and the milestone
+ * strategy (`milestone version` + `milestone slug`). The template placeholders
+ * `{phase}` / `{milestone}` map to `firstToken`; `{slug}` maps to `secondToken`.
+ * This avoids duplicating the substitution + unresolved-placeholder check in the
+ * milestone strategy block (issue #1278, PR #1279).
  *
  * Returns `{ ok: false }` if the resolved name still contains unsubstituted
  * `{placeholder}` tokens (which would indicate a broken template).
  *
- * @param template - Raw template string (pre-validated)
- * @param phaseNumber - Phase number string (e.g. `"1"`)
- * @param phaseSlug   - Phase slug (e.g. `"setup"`) — falls back to `"phase"`
+ * @param template    - Raw template string (pre-validated)
+ * @param firstToken  - Primary substitution token (phase number or milestone version)
+ * @param secondToken - Secondary substitution token (slug) — falls back to `"phase"` or `"milestone"`
  * @returns `{ ok: true; branch: string }` or `{ ok: false; reason: string; branch: string }`
  */
 export function resolveStrategyBranchName(
   template: string,
-  phaseNumber: string,
-  phaseSlug: string,
+  firstToken: string,
+  secondToken: string,
 ): { ok: true; branch: string } | { ok: false; reason: string; branch: string } {
   const branch = template
-    .replace('{phase}', phaseNumber)
-    .replace('{slug}', phaseSlug);
+    .replace('{phase}', firstToken)
+    .replace('{milestone}', firstToken)
+    .replace('{slug}', secondToken);
   if (/\{[^}]+\}/.test(branch)) {
     return {
       ok: false,
-      reason: `phase_branch_template produced unresolved placeholders: "${branch}"`,
+      reason: `branch template produced unresolved placeholders: "${branch}"`,
       branch,
     };
   }
@@ -183,8 +198,8 @@ export type StrategyBranchResult =
  * Create or switch to the configured strategy branch before a commit.
  *
  * Port of the branching-strategy block in cmdCommit() at
- * get-shit-done/bin/lib/commands.cjs:285-320 (added in PR #1279 for CJS;
- * ported here to close the SDK gap — bug #3749).
+ * get-shit-done/bin/lib/commands.cjs:285-320 (ported from CJS (issue #1278,
+ * PR #1279); ported here to close the SDK gap — bug #3749).
  *
  * This version (post codex adversarial review) surfaces every skip
  * distinctly — no silent swallows.  Callers receive a typed result and
@@ -303,17 +318,23 @@ export async function ensureStrategyBranch(
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '')
           .substring(0, 60) || 'milestone';
-        const resolved = config.git.milestone_branch_template
-          .replace('{milestone}', milestone.version)
-          .replace('{slug}', slug);
-        if (/\{[^}]+\}/.test(resolved)) {
+        // Reuse resolveStrategyBranchName — firstToken = milestone version,
+        // secondToken = slug. The function replaces both {phase} and {milestone}
+        // with firstToken so a milestone template of `ms/{milestone}-{slug}`
+        // resolves correctly without duplicating the unresolved-placeholder check.
+        const resolved = resolveStrategyBranchName(
+          config.git.milestone_branch_template,
+          milestone.version,
+          slug,
+        );
+        if (!resolved.ok) {
           return {
             ok: false,
-            reason: `milestone_branch_template produced unresolved placeholders: "${resolved}"`,
-            branch: resolved,
+            reason: resolved.reason,
+            branch: resolved.branch,
           };
         }
-        branchName = resolved;
+        branchName = resolved.branch;
       } else {
         return {
           ok: true,
@@ -435,10 +456,10 @@ export const commit: QueryHandler = async (args, projectDir, workstream) => {
     }
   }
 
-  // Ensure the strategy branch exists before the first commit (#3749 / CJS #1278).
+  // Ensure the strategy branch exists before the first commit (#3749 / issue #1278).
   // Pre-execution workflows (discuss-phase, plan-phase) commit artifacts but the
-  // branch was only created during execute-phase in the CJS path — PR #1279 fixed
-  // the CJS side; this block ports that fix to the SDK handler.
+  // branch was only created during execute-phase in the CJS path — issue #1278,
+  // PR #1279 fixed the CJS side; this block ports that fix to the SDK handler.
   //
   // Finding 2 fix: ensureStrategyBranch now returns a structured result.  A hard
   // failure (ok: false) means the branch switch could not complete — proceeding

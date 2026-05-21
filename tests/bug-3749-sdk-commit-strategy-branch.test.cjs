@@ -1,3 +1,10 @@
+// allow-test-rule: structural-regression-guard
+// Rationale: This file verifies SDK-seam structural contracts (export names,
+// guard patterns, checkout idioms) that cannot be exercised behaviorally
+// without a live git repo + multi-process harness. The behavioral tests
+// (runHelper + parsePhasesFromFiles/validateBranchTemplate/resolveStrategyBranchName)
+// cover the majority of code paths; this residual structural block guards
+// the wiring points that span TS/CJS parity (#1278, PR #1279).
 'use strict';
 
 /**
@@ -25,7 +32,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const os = require('node:os');
 
 const COMMIT_TS = path.join(__dirname, '..', 'sdk', 'src', 'query', 'commit.ts');
 const source = fs.readFileSync(COMMIT_TS, 'utf-8');
@@ -42,8 +48,6 @@ let resolveStrategyBranchName;
 let helpersAvailable = false;
 
 try {
-  // Use the project's own tsconfig to avoid mismatches.
-  const tsConfigPath = path.join(__dirname, '..', 'sdk', 'tsconfig.json');
   const helperScript = `
     const { parsePhasesFromFiles, validateBranchTemplate, resolveStrategyBranchName } =
       require(${JSON.stringify(COMMIT_TS.replace(/\\/g, '/'))});
@@ -59,22 +63,8 @@ try {
     env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
   });
 
-  // ts-node is available — require the helpers via a register shim
-  const registerScript = `
-    require('ts-node').register({
-      transpileOnly: true,
-      skipProject: true,
-      compilerOptions: { module: 'commonjs', esModuleInterop: true, resolveJsonModule: true },
-    });
-    const mod = require(${JSON.stringify(COMMIT_TS)});
-    global.__gsd_commit_helpers__ = {
-      parsePhasesFromFiles: mod.parsePhasesFromFiles,
-      validateBranchTemplate: mod.validateBranchTemplate,
-      resolveStrategyBranchName: mod.resolveStrategyBranchName,
-    };
-  `;
-  // We need to load helpers into THIS process — use a child process that writes
-  // JSON results back so we can test them hermetically.
+  // ts-node is available — helpers are loaded per-test via runHelper() child processes
+  // that write JSON results back so we can test them hermetically.
   helpersAvailable = true;
 } catch {
   // ts-node not available — typed-IR tests will be skipped
@@ -194,11 +184,14 @@ describe('typed-IR: resolveStrategyBranchName(template, phaseNum, slug) — Find
   });
 
   test('template with unresolved placeholder → ok: false', () => {
-    // Template that still contains a {milestone} token after phase substitution
-    const result = runHelper('resolveStrategyBranchName', '["phase/{phase}-{milestone}", "1", "setup"]');
+    // Template that still contains an unknown {token} after substitution.
+    // Note: {phase} and {milestone} are both replaced by firstToken (the function
+    // covers both phase and milestone strategies). An unknown placeholder like
+    // {unknown} is the reliable way to exercise the unresolved-placeholder guard.
+    const result = runHelper('resolveStrategyBranchName', '["phase/{phase}-{unknown}", "1", "setup"]');
     assert.equal(result.ok, false);
     assert.ok(result.reason.includes('unresolved placeholders'), `expected unresolved-placeholder message, got: ${result.reason}`);
-    assert.ok(result.branch.includes('{milestone}'));
+    assert.ok(result.branch.includes('{unknown}'));
   });
 
   test('slug fallback: empty slug uses "phase" literal', () => {
