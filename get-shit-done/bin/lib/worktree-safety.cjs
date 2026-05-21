@@ -385,6 +385,121 @@ function gitResultOk(result) {
   return result && result.exitCode === 0 && !result.timedOut;
 }
 
+// Errors during *.planning traversal that should be treated as "no SUMMARY to
+// rescue" rather than a hard rescue failure — matches the shell rescue's
+// `2>/dev/null` suppression (workflows/quick.md:870-883).
+const BENIGN_FS_TRAVERSAL_ERRORS = new Set(['ENOENT', 'EACCES', 'ENOTDIR']);
+
+/**
+ * Rescue uncommitted *SUMMARY.md files out of an executor worktree before the
+ * cleanup loop's dirty-state check (#3804).
+ *
+ * Worktree-isolated executors leave SUMMARY.md uncommitted in their .planning
+ * tree by contract (workflows/quick.md:757-758); the orchestrator commits the
+ * docs bundle in Step 8 from the main tree. Without this rescue, the porcelain
+ * dirty-check at the next step sees the uncommitted SUMMARY and refuses to
+ * merge — the same scenario the shell-fallback rescue at workflows/quick.md:870-883
+ * handles. This is the SDK-side equivalent.
+ *
+ * Discovery uses filesystem traversal, not `git ls-files --exclude-standard`,
+ * because projects often gitignore .planning/ and the git form silently returns
+ * empty in that case (the original 2024 footgun referenced in workflows/quick.md:872).
+ * Symlinks are skipped defensively to avoid traversal loops.
+ *
+ * Returns `{ ok: true, rescued: [...relPaths] }` listing every SUMMARY found in
+ * the worktree's .planning tree (whether copied or already-identical in main).
+ * Returns `{ ok: false, reason: 'summary_rescue_failed', file, error }` on the
+ * first copy or read failure — never silently swallows.
+ */
+function rescueWorktreeSummaries(worktreePath, repoRoot, deps = {}) {
+  const fsApi = deps.fs || fs;
+  const planningRoot = path.join(worktreePath, '.planning');
+  const summaries = [];
+  walkForSummaries(planningRoot, fsApi, summaries);
+
+  const rescued = [];
+  for (const absSrc of summaries) {
+    const relPath = path.relative(worktreePath, absSrc);
+    // Normalise to POSIX separators for the rescued/report set: git porcelain
+    // output uses '/' on every platform, and downstream callers (the dirty-state
+    // filter, the CLI JSON output) must compare against that shape. path.relative
+    // emits '\\' on Windows — without this normalisation, the filter would miss.
+    const relPathPosix = toPosixPath(relPath);
+    const destAbs = path.join(repoRoot, relPath);
+    try {
+      if (fsApi.existsSync(destAbs)) {
+        const srcBytes = Buffer.from(fsApi.readFileSync(absSrc));
+        const destBytes = Buffer.from(fsApi.readFileSync(destAbs));
+        if (srcBytes.equals(destBytes)) {
+          rescued.push(relPathPosix);
+          continue;
+        }
+      }
+      fsApi.mkdirSync(path.dirname(destAbs), { recursive: true });
+      fsApi.copyFileSync(absSrc, destAbs);
+      rescued.push(relPathPosix);
+    } catch (err) {
+      return {
+        ok: false,
+        reason: 'summary_rescue_failed',
+        file: relPathPosix,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+  }
+  return { ok: true, rescued };
+}
+
+function toPosixPath(p) {
+  return path.sep === '\\' ? p.split('\\').join('/') : p;
+}
+
+function walkForSummaries(dirPath, fsApi, out) {
+  let entries;
+  try {
+    entries = fsApi.readdirSync(dirPath, { withFileTypes: true });
+  } catch (err) {
+    if (err && BENIGN_FS_TRAVERSAL_ERRORS.has(err.code)) return;
+    throw err;
+  }
+  for (const ent of entries) {
+    if (ent.isSymbolicLink()) continue;
+    const child = path.join(dirPath, ent.name);
+    if (ent.isDirectory()) {
+      walkForSummaries(child, fsApi, out);
+    } else if (ent.isFile() && /SUMMARY\.md$/.test(ent.name)) {
+      out.push(child);
+    }
+  }
+}
+
+/**
+ * Drop porcelain lines whose path is in `rescuedRelPaths`. Returns the remaining
+ * dirty-state output (empty string when only rescued SUMMARYs were present).
+ * Porcelain format used: `XY path` (2-char status + space + path) — adequate for
+ * the SUMMARY.md case (untracked, no spaces, no rename). Quoted paths and rename
+ * lines (`R  old -> new`) fall through unchanged and still trip the dirty check.
+ */
+function filterPorcelainAgainstRescued(porcelainOutput, rescuedRelPaths) {
+  if (!porcelainOutput) return '';
+  // Defensive normalisation: rescueWorktreeSummaries already returns POSIX-shape
+  // paths, but if any caller ever passes a Windows-shape '\\'-separated rescued
+  // list, the string-equality lookup below would silently miss every match and
+  // the SUMMARY would fall through into the dirty-state output. Belt-and-braces.
+  const rescuedSet = new Set(
+    (rescuedRelPaths || []).map((p) => (p && p.indexOf('\\') >= 0 ? p.split('\\').join('/') : p))
+  );
+  const lines = porcelainOutput.split('\n');
+  const kept = [];
+  for (const line of lines) {
+    if (!line) continue;
+    const filePath = line.length > 3 ? line.slice(3) : line;
+    if (rescuedSet.has(filePath)) continue;
+    kept.push(line);
+  }
+  return kept.join('\n');
+}
+
 function executeWorktreeWaveCleanupPlan(plan, deps = {}) {
   const execGit = deps.execGit || execGitDefault;
   const entries = Array.isArray(plan?.entries) ? plan.entries : [];
@@ -453,11 +568,38 @@ function executeWorktreeWaveCleanupPlan(plan, deps = {}) {
       break;
     }
 
+    // Rescue uncommitted *SUMMARY.md before the dirty-state check (#3804).
+    // The executor contract leaves SUMMARY.md uncommitted by design; without
+    // this rescue, the SDK cleanup path treats the contractual artifact as
+    // blocking dirt — strictly weaker than the shell fallback it supersedes.
+    const rescue = rescueWorktreeSummaries(entry.worktree_path, plan.repoRoot, deps);
+    if (!rescue.ok) {
+      result.status = 'blocked';
+      result.reason = rescue.reason;
+      result.file = rescue.file;
+      result.stderr = rescue.error || '';
+      results.push(result);
+      pending.push(...entries.slice(i + 1));
+      ok = false;
+      break;
+    }
+    result.rescued = rescue.rescued;
+
     const worktreeStatus = execGit(['-C', entry.worktree_path, 'status', '--porcelain', '--untracked-files=all'], { cwd: plan.repoRoot });
-    if (!gitResultOk(worktreeStatus) || worktreeStatus.stdout) {
+    if (!gitResultOk(worktreeStatus)) {
       result.status = 'blocked';
       result.reason = 'worktree_dirty';
-      result.stderr = worktreeStatus?.stdout || worktreeStatus?.stderr || '';
+      result.stderr = worktreeStatus?.stderr || '';
+      results.push(result);
+      pending.push(...entries.slice(i + 1));
+      ok = false;
+      break;
+    }
+    const remainingDirty = filterPorcelainAgainstRescued(worktreeStatus.stdout || '', rescue.rescued);
+    if (remainingDirty) {
+      result.status = 'blocked';
+      result.reason = 'worktree_dirty';
+      result.stderr = remainingDirty;
       results.push(result);
       pending.push(...entries.slice(i + 1));
       ok = false;
@@ -867,4 +1009,8 @@ module.exports = {
   cmdWorktreeCleanupWave,
   reapOrphanWorktrees,
   cmdWorktreeReapOrphans,
+  // Exported for cross-platform regression tests (#3804 — git porcelain output
+  // always uses '/', but path.relative emits '\\' on Windows).
+  filterPorcelainAgainstRescued,
+  rescueWorktreeSummaries,
 };
