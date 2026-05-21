@@ -7740,34 +7740,57 @@ function saveLocalPatches(configDir, pristineCtx) {
       console.log('     ' + dim + f + reset);
     }
 
-    // #2998: populate gsd-pristine/ via the install transform pipeline so the
-    // reapply-patches verifier (#2972) gets a real diff baseline instead of
-    // falling back to its over-broad "every significant backup line" heuristic.
+    // #2998 / #3407: maintain gsd-pristine/ as the diff baseline for the
+    // reapply-patches verifier (#2972).
+    //
+    // #3407 root-cause fix: the prior approach (#3004 CR) wiped gsd-pristine/
+    // and re-populated it from pristineCtx.packageSrc (the NEW release source).
+    // For files that changed between the old and new release this wrote NEW-
+    // release bytes as the pristine baseline while backup-meta.json recorded
+    // OLD-release hashes — a hash mismatch that caused the #3657 verifier guard
+    // (OK_PRISTINE_DRIFT_DETECTED) to skip the baseline and fall back to over-
+    // broad mode on every upgrade.
+    //
+    // Correct approach: gsd-pristine/ is populated during the INSTALL step
+    // (after install.js writes files to configDir) — at that point the bytes
+    // on disk ARE the old-release pristine and the transform pipeline produces
+    // the correct baseline.  During the pre-wipe saveLocalPatches call (here),
+    // those per-file pristine entries already exist and are correct. We must
+    // PRESERVE them, not overwrite them with new-release bytes.
+    //
+    // Per-file decision:
+    //   - sha256(gsd-pristine/X) === originalHash  →  correct; keep it
+    //   - gsd-pristine/X absent or hash mismatch   →  old-release bytes
+    //     unavailable; remove any stale file so the verifier falls back
+    //     cleanly to over-broad mode (never false-fails)
     if (pristineCtx) {
-      // #3004 CR: wipe any pre-existing pristine content BEFORE populating
-      // (and again in the catch path). Without this, a previous run's stale
-      // pristine could be picked up by the verifier as if it were the
-      // baseline for THIS modified set, causing a misleading three-way diff.
-      try { fs.rmSync(pristineDir, { recursive: true, force: true }); } catch { /* not present */ }
-      try {
-        const written = populatePristineDir({
-          packageSrc: pristineCtx.packageSrc,
-          pristineDir,
-          modified,
-          runtime: pristineCtx.runtime,
-          pathPrefix: pristineCtx.pathPrefix,
-          isGlobal: pristineCtx.isGlobal,
-        });
-        if (written > 0) {
-          console.log('  ' + green + '✓' + reset + '  Populated ' + cyan + 'gsd-pristine/' + reset + ' (' + written + ' file(s)) for three-way merge');
+      let preserved = 0;
+      let removed = 0;
+      for (const relPath of modified) {
+        const outRef = resolveInstallRelativePath(pristineDir, relPath);
+        if (!outRef) continue;
+        const { fullPath: pristinePath } = outRef;
+        if (fs.existsSync(pristinePath)) {
+          try {
+            const onDiskHash = fileHash(pristinePath);
+            if (onDiskHash === pristineHashes[relPath]) {
+              preserved++;
+              continue; // correct old-release bytes already in place — keep them
+            }
+          } catch { /* read error — treat as mismatch */ }
+          // Hash mismatch or read error: stale pristine from a previous buggy
+          // run (#3407). Remove so verifier falls back to over-broad mode.
+          try { fs.rmSync(pristinePath); } catch { /* best-effort */ }
+          removed++;
         }
-      } catch (err) {
-        // Soft failure: keep the install moving even if the transform pipeline
-        // throws on an unusual configuration. Wipe the partial pristine so the
-        // verifier falls back cleanly to its pre-#2998 heuristic instead of
-        // reading half-populated data (#3004 CR).
-        try { fs.rmSync(pristineDir, { recursive: true, force: true }); } catch { /* best-effort */ }
-        console.log('  ' + yellow + 'i' + reset + '  Could not populate gsd-pristine/ (' + (err && err.message ? err.message : 'unknown') + '). Falls back to over-broad verify heuristic.');
+        // File absent from gsd-pristine/: old-release bytes unavailable.
+        // Leave absent — over-broad fallback is correct and safe.
+      }
+      if (preserved > 0) {
+        console.log('  ' + green + '✓' + reset + '  Preserved ' + cyan + 'gsd-pristine/' + reset + ' (' + preserved + ' file(s)) for three-way merge');
+      }
+      if (removed > 0) {
+        console.log('  ' + yellow + 'i' + reset + '  Removed ' + removed + ' stale gsd-pristine/ snapshot(s) — falls back to over-broad verify heuristic for those files');
       }
     }
   }
