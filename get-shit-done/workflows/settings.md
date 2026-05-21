@@ -110,19 +110,23 @@ Context Warnings, Research Qs
 // user chose "Standard tier" in Q1) picks among the three standard profiles. (#3784)
 AskUserQuestion([
   {
-    question: "Which model profile for agents? (step 1 of 2 for standard profiles)",
+    question: "Which model profile for agents?",
     header: "Model",
     multiSelect: false,
     options: [
-      { label: "Adaptive (Recommended)", description: "Role-based cost optimization: Opus for heavy agents (planner, debugger), Sonnet for standard agents, Haiku for light agents. Best balance of quality and cost — Claude only" },
+      { label: "Adaptive (Recommended)", description: "Role-based cost optimization: heavy roles use the highest-tier model available on the active runtime, light roles use the cheapest. Best balance of quality and cost across all supported runtimes (Claude, Codex, Gemini, OpenRouter, local)." },
       { label: "Standard tier…", description: "Choose Quality, Balanced, or Budget — flat tier applied to all agents" },
       { label: "Inherit", description: "Use current session model for all agents (required for non-Claude runtimes: Codex, Gemini CLI, OpenRouter, local models)" }
     ]
   }
 ])
 
-// Q2: only presented when the user chose "Standard tier…" in Q1 above.
-// Skip this question when user chose Adaptive or Inherit (Q1 still writes model_profile on those branches — only Q2 is skipped).
+**Conditional visibility — model_profile (Q2):**
+  Only ask this question when Q1's answer is "Standard tier…".
+  If Q1 = "Adaptive (Recommended)" → write model_profile=adaptive and SKIP Q2.
+  If Q1 = "Inherit"                → write model_profile=inherit and SKIP Q2.
+  If user cancels Q2 after picking "Standard tier…" → leave existing model_profile value unchanged (mirror code_review_depth's cancellation rule).
+
 AskUserQuestion([
   {
     question: "Which standard profile? (Quality / Balanced / Budget)",
@@ -409,7 +413,7 @@ Merge new settings into existing config.json:
 }
 ```
 
-**Safe merge:** Apply each chosen value via `gsd-sdk query config-set <key.path> <value>` so unrelated keys are never clobbered. `code_review_depth` is written only if the code_review question was answered `on`; otherwise leave the existing value in place.
+**Safe merge:** Apply each chosen value via `gsd-sdk query config-set <key.path> <value>` so unrelated keys are never clobbered. `code_review_depth` is written only if the code_review question was answered `on`; otherwise leave the existing value in place. `model_profile` is written on Q1 "Adaptive (Recommended)" (→ adaptive) or Q1 "Inherit" (→ inherit) immediately; for Q1 "Standard tier…", `model_profile` is written from Q2's answer. If Q1 = "Standard tier…" but Q2 is cancelled, leave the existing `model_profile` value unchanged — do not write any new value.
 
 Write updated config to `$GSD_CONFIG_PATH` (the workstream-aware path resolved in `ensure_and_load_config`). Never hardcode `.planning/config.json` — workstream installs route to `.planning/workstreams/<slug>/config.json`.
 </step>

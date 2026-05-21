@@ -130,11 +130,69 @@ describe('bug #3784: settings.md model profile UI exposes all 5 profiles', () =>
   // ── adaptive described with role-based routing semantics ──
 
   test('settings.md describes adaptive profile with role-based routing semantics', () => {
-    // Adaptive uses heavy=opus, standard=sonnet, light=haiku per routingTier.
-    // The UI description must convey this is role-based, not flat-tier.
+    // Adaptive uses heavy/light role tiers per routingTier.
+    // The UI description must convey role-based cost optimization and the heavy/light tier
+    // split — not just mention "Adaptive" somewhere (that word appears 6+ times in the file).
+    const lower = content.toLowerCase();
     assert.ok(
-      content.includes('role') || content.includes('routing') || content.includes('Adaptive'),
-      'settings.md must describe the adaptive profile in terms of role-based or routing-tier model selection'
+      lower.includes('role-based cost optimization') && lower.includes('heavy roles'),
+      'settings.md must describe the adaptive profile with "role-based cost optimization" and "heavy roles" wording so the description is meaningful across all supported runtimes'
+    );
+  });
+
+  // ── 4-option cap enforcement ──
+
+  test('each question object in present_settings AskUserQuestion blocks has at most 4 options (AskUserQuestion runtime cap)', () => {
+    // The AskUserQuestion runtime enforces a hard 4-option cap per individual question object
+    // (each { question:..., options:[...] } entry). This test guards against a naïve revert
+    // that puts all 5 profiles into a single question object instead of using the Q1/Q2 split.
+    const ASK_USER_QUESTION_OPTION_CAP = 4; // hard limit enforced by the AskUserQuestion runtime
+
+    // Extract each individual options array by finding 'options: [' and walking to the
+    // matching balanced ']', then count label: entries within that span.
+    const optionsKeyRe = /\boptions\s*:\s*\[/g;
+    let match;
+    let questionIndex = 0;
+    while ((match = optionsKeyRe.exec(presentBlock)) !== null) {
+      questionIndex++;
+      // Walk forward from the opening '[' to find the balanced close ']'.
+      let depth = 0;
+      const start = match.index + match[0].length - 1; // points at '['
+      let end = start;
+      for (let k = start; k < presentBlock.length; k++) {
+        if (presentBlock[k] === '[') { depth++; }
+        else if (presentBlock[k] === ']') {
+          depth--;
+          if (depth === 0) { end = k; break; }
+        }
+      }
+      const optionsBody = presentBlock.slice(start, end + 1);
+      const labelMatches = optionsBody.match(/label:\s*"[^"]+"/g) || [];
+      const optionCount = labelMatches.length;
+      assert.ok(
+        optionCount <= ASK_USER_QUESTION_OPTION_CAP,
+        `Question object ${questionIndex} in present_settings has ${optionCount} options — exceeds the runtime cap of ${ASK_USER_QUESTION_OPTION_CAP}. Split into multiple questions (as #3784 did for model_profile).`
+      );
+    }
+    // Sanity check: there must be at least one options array found.
+    assert.ok(questionIndex > 0, 'present_settings must contain at least one AskUserQuestion options array');
+  });
+
+  // ── Brace-balance regression (bd53925f fixed duplicate '{' from 35fc1d21) ──
+
+  test('present_settings step has balanced braces — regression: brace-balance after #3784 split', () => {
+    // commit bd53925f fixed a duplicate '{' introduced by 35fc1d21 when the model-profile
+    // AskUserQuestion was split into Q1+Q2. This test guards against a recurrence.
+    let depth = 0;
+    const maxDepth = 0;
+    for (const ch of presentBlock) {
+      if (ch === '{') { depth++; }
+      if (ch === '}') { depth--; }
+    }
+    assert.strictEqual(
+      depth,
+      0,
+      `present_settings step has unbalanced braces: net depth after full scan is ${depth} (positive = extra '{', negative = extra '}'). Regression guard for bd53925f / #3784.`
     );
   });
 });
