@@ -66,7 +66,6 @@ If `--wave` is absent, preserve the current behavior of executing all incomplete
 Load all context in one call:
 
 ```bash
-# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
 GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
 if command -v gsd-sdk >/dev/null 2>&1; then
   GSD_SDK="gsd-sdk"

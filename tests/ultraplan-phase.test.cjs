@@ -111,7 +111,11 @@ describe('ultraplan-phase workflow initialization', () => {
   const content = fs.readFileSync(WF_PATH, 'utf-8');
 
   test('loads GSD phase context via gsd-sdk query init.plan-phase', () => {
-    assert.ok(content.includes('gsd-sdk query init.plan-phase'), 'workflow must load phase context via gsd-sdk query init.plan-phase');
+    // After #3797 architectural fix, callsites use $GSD_SDK — accept either form
+    assert.ok(
+      content.includes('$GSD_SDK query init.plan-phase') || content.includes('gsd-sdk query init.plan-phase'),
+      'workflow must load phase context via gsd-sdk query init.plan-phase',
+    );
   });
 
   test('handles missing .planning directory', () => {
