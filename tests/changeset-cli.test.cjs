@@ -38,6 +38,111 @@ function runRender(args = []) {
 before(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-changeset-')); });
 after(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
+// Fixtures for extract tests (#3496)
+// Written as arrays to avoid template-literal indentation injecting
+// leading spaces that would break the ^## regex anchor.
+const EXTRACT_CHANGELOG = [
+  '# Changelog',
+  '',
+  '## [1.5.15] - 2026-01-20',
+  '',
+  '### Added',
+  '',
+  '- Feature X. (#200)',
+  '',
+  '## [1.5.14] - 2026-01-18',
+  '',
+  '### Fixed',
+  '',
+  '- Single-line fix. (#101)',
+  '- **Multi-line fix** — first line of a long',
+  '  description that spans two lines. (#102)',
+  '',
+  '## [1.5.13] - 2026-01-15',
+  '',
+  '### Fixed',
+  '',
+  '- Old fix. (#100)',
+  '',
+  '## [1.5.10] - 2026-01-01',
+  '',
+  '### Fixed',
+  '',
+  '- Very old fix. (#50)',
+].join('\n');
+
+function runExtract(args = [], changelogText = null) {
+  const changelogFile = path.join(tmp, 'CHANGELOG-extract-test.md');
+  if (changelogText !== null) {
+    fs.writeFileSync(changelogFile, changelogText);
+  }
+  const r = cp.spawnSync(
+    process.execPath,
+    [SCRIPT, 'extract', '--changelog', changelogFile, ...args],
+    { encoding: 'utf8' },
+  );
+  return {
+    status: r.status,
+    stdout: r.stdout || '',
+    stderr: r.stderr || '',
+    json: (() => {
+      try { return JSON.parse(r.stdout); } catch { return null; }
+    })(),
+  };
+}
+
+describe('changeset cli extract: version-range changelog extraction (#3496)', () => {
+  test('exits 2 with no output when no versions fall in range', (t) => {
+    const r = runExtract(['--from', '1.5.15', '--to', '1.5.15', '--json'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 2, `expected exit 2 for empty range, stderr=${r.stderr}`);
+  });
+
+  test('extracts versions strictly after from and up to and including to', (t) => {
+    const r = runExtract(['--from', '1.5.13', '--to', '1.5.15', '--json'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 0, `stderr=${r.stderr}`);
+    assert.ok(r.json, 'stdout must be valid JSON');
+    const versions = r.json.releases.map((rel) => rel.version);
+    assert.ok(versions.includes('1.5.15'), '1.5.15 must be in range (inclusive to)');
+    assert.ok(versions.includes('1.5.14'), '1.5.14 must be in range (between from and to)');
+    assert.ok(!versions.includes('1.5.13'), '1.5.13 must NOT be in range (exclusive from)');
+    assert.ok(!versions.includes('1.5.10'), '1.5.10 must NOT be in range (below from)');
+  });
+
+  test('accepts v-prefixed version arguments', (t) => {
+    const r = runExtract(['--from', 'v1.5.13', '--to', 'v1.5.15', '--json'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 0, `stderr=${r.stderr}`);
+    assert.ok(r.json, 'stdout must be valid JSON');
+    const versions = r.json.releases.map((rel) => rel.version);
+    assert.ok(versions.includes('1.5.15'));
+    assert.ok(versions.includes('1.5.14'));
+    assert.ok(!versions.includes('1.5.13'));
+  });
+
+  test('captures multi-line bullets in extracted range', (t) => {
+    const r = runExtract(['--from', '1.5.13', '--to', '1.5.14', '--json'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 0, `stderr=${r.stderr}`);
+    const release = r.json.releases.find((rel) => rel.version === '1.5.14');
+    assert.ok(release, '1.5.14 must be in result');
+    const prs = release.sections.flatMap((s) => s.bullets.map((b) => b.pr));
+    assert.ok(prs.includes(101), 'single-line bullet pr=101 must be captured');
+    assert.ok(prs.includes(102), 'multi-line bullet pr=102 must be captured');
+  });
+
+  test('emits markdown when --json is not passed', (t) => {
+    const r = runExtract(['--from', '1.5.13', '--to', '1.5.15'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 0, `stderr=${r.stderr}`);
+    assert.ok(r.stdout.includes('1.5.15'), 'stdout markdown must contain 1.5.15');
+    assert.ok(r.stdout.includes('1.5.14'), 'stdout markdown must contain 1.5.14');
+    assert.ok(!r.stdout.includes('1.5.13'), 'stdout must not contain excluded from-version');
+  });
+
+  test('missing --from or --to emits usage and exits non-zero', (t) => {
+    const r = runExtract(['--from', '1.0.0'], EXTRACT_CHANGELOG);
+    assert.notEqual(r.status, 0);
+    assert.ok(r.stderr.length > 0 || r.stdout.length > 0, 'must emit usage text');
+  });
+});
+
 describe('changeset cli render: file-I/O wrapper (#2975)', () => {
   test('exits 0 with consumed=N when N fragments are folded into CHANGELOG.md and deleted', () => {
     fs.rmSync(path.join(tmp, '.changeset'), { recursive: true, force: true });
