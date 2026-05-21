@@ -30,6 +30,9 @@ jobs:
       - name: Lint — no source-grep tests
         shell: bash
         run: node scripts/lint-no-source-grep.cjs
+      - name: Lint — test file count per module
+        shell: bash
+        run: node scripts/lint-test-file-count.cjs
       - name: Lint — command contract (ADR-0002)
         shell: bash
         run: node scripts/lint-command-contract.cjs

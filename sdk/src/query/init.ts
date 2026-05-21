@@ -164,16 +164,34 @@ function computeExpectedPhaseDirName(
 async function shouldDropArchivedPhaseMatch(
   phaseInfo: Record<string, unknown> | null,
   roadmapPhase: Record<string, unknown> | null,
-  _projectDir: string,
-  _workstream?: string,
+  projectDir: string,
+  workstream?: string,
 ): Promise<boolean> {
   // Matches CJS cmdInitPlanPhase / cmdInitExecutePhase / cmdInitVerifyWork:
   //   if (phaseInfo?.archived && roadmapPhase?.found) phaseInfo = null;
-  // Unconditional drop — the ROADMAP is authoritative for the current milestone,
-  // regardless of what archived milestone the on-disk match came from. Do NOT add
-  // a milestone-version equality check (#2391 regression risk).
+  // ROADMAP is authoritative for the current milestone, regardless of what
+  // archived milestone the on-disk match came from — BUT see #3469 exception.
   if (!phaseInfo?.archived) return false;
   if (!roadmapPhase || !roadmapPhase.found) return false;
+
+  // #3469: If the archived phase belongs to the CURRENT milestone (e.g. phases
+  // were cleared via `phases clear` into .planning/milestones/<version>-phases/
+  // but the workflow is still on that same milestone), preserve the archived dir
+  // as the canonical phase location. Only drop when the archived version is from
+  // a PRIOR milestone (the original anti-ghost-phase guard).
+  // Note: the milestone-version equality check here does NOT regress #2391
+  // because in the #2391 scenario archived.version != current milestone.
+  const pp = planningPaths(projectDir, workstream);
+  try {
+    const stateContent = readFileSync(pp.state, 'utf-8');
+    const milestoneMatch = stateContent.match(/^milestone:\s*(.+)$/m);
+    const currentMilestone = milestoneMatch ? milestoneMatch[1].trim() : null;
+    if (currentMilestone && phaseInfo.archived === currentMilestone) {
+      // Same milestone — archived dir is the canonical location. Keep it.
+      return false;
+    }
+  } catch { /* STATE.md unreadable — fall through to default drop */ }
+
   return true;
 }
 

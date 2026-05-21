@@ -1,16 +1,29 @@
 // allow-test-rule: source-text-is-the-product
 // Reads .md/.json/.yml product files whose deployed text IS what the
 // runtime loads — testing text content tests the deployed contract.
+// allow-test-rule: state-md-is-the-runtime-contract — regression tests for
+// bug #3517 assert the exact STATE.md fields written by phase.complete;
+// STATE.md IS the product surface being verified, not source code.
+// Migration to typed-IR parser tracked in #2974.
 
 /**
  * GSD Tools Tests - Phase
+ *
+ * Consolidated from 20 → 4 test files (issue #3740). This file covers the
+ * CJS phase CLI layer (phase.cjs + gsd-tools.cjs): add, remove, complete,
+ * list, insert, and all regression tests for bugs in that layer.
  */
 
 const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { runGsdTools, createTempProject, cleanup } = require('./helpers.cjs');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+const { runGsdTools, createTempProject, createTempDir, cleanup } = require('./helpers.cjs');
+
+const GSD_TOOLS_BIN = path.resolve(__dirname, '..', 'get-shit-done', 'bin', 'gsd-tools.cjs');
+const SDK_CLI = path.join(__dirname, '..', 'sdk', 'dist', 'cli.js');
 
 describe('phases list command', () => {
   let tmpDir;
@@ -2971,5 +2984,1583 @@ describe('phase complete excludes 999.x backlog from next-phase (#2129)', () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// milestone complete command
+// regression: bug #1962 — normalizePhaseName preserves letter suffix case
+// (consolidated from tests/bug-1962-phase-suffix-case.test.cjs)
 // ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug #1962: normalizePhaseName preserves letter suffix case', () => {
+  test('lowercase suffix preserved: 16c → 16c', () => {
+    assert.equal(normalizePhaseName('16c'), '16c');
+  });
+
+  test('uppercase suffix preserved: 16C → 16C', () => {
+    assert.equal(normalizePhaseName('16C'), '16C');
+  });
+
+  test('single digit padded with lowercase suffix: 1a → 01a', () => {
+    assert.equal(normalizePhaseName('1a'), '01a');
+  });
+
+  test('single digit padded with uppercase suffix: 1A → 01A', () => {
+    assert.equal(normalizePhaseName('1A'), '01A');
+  });
+
+  test('no suffix unchanged: 16 → 16', () => {
+    assert.equal(normalizePhaseName('16'), '16');
+  });
+
+  test('decimal suffix preserved: 16.1 → 16.1', () => {
+    assert.equal(normalizePhaseName('16.1'), '16.1');
+  });
+
+  test('letter + decimal preserved: 16c.2 → 16c.2', () => {
+    assert.equal(normalizePhaseName('16c.2'), '16c.2');
+  });
+
+  test('project code prefix stripped, suffix case preserved: CK-01a → 01a', () => {
+    assert.equal(normalizePhaseName('CK-01a'), '01a');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #1998 — phase complete updates overview checkbox
+// (consolidated from tests/bug-1998-phase-complete-checkbox.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug #1998: phase complete updates overview checkbox', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-1998-'));
+    planningDir = path.join(tmpDir, '.planning');
+    fs.mkdirSync(planningDir, { recursive: true });
+
+    // Minimal config
+    fs.writeFileSync(
+      path.join(planningDir, 'config.json'),
+      JSON.stringify({ project_code: 'TEST' })
+    );
+
+    // Minimal STATE.md
+    fs.writeFileSync(
+      path.join(planningDir, 'STATE.md'),
+      '---\ncurrent_phase: 1\nstatus: executing\n---\n# State\n'
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('checkbox updated when no archived milestones exist', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-foundation');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap',
+      '',
+      '## Phases',
+      '',
+      '- [ ] **Phase 1: Foundation** - core setup',
+      '- [ ] **Phase 2: Features** - add features',
+      '',
+      '## Progress',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 1. Foundation | 0/1 | Pending | - |',
+      '| 2. Features | 0/1 | Pending | - |',
+    ].join('\n'));
+
+    try {
+      execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], { cwd: tmpDir, timeout: 10000 });
+    } catch {
+      // Command may exit non-zero if STATE.md update fails, but ROADMAP.md update happens first
+    }
+
+    const result = fs.readFileSync(roadmapPath, 'utf-8');
+    assert.match(result, /- \[x\] \*\*Phase 1: Foundation\*\*/, 'overview checkbox should be checked');
+    assert.match(result, /- \[ \] \*\*Phase 2: Features\*\*/, 'phase 2 checkbox should remain unchecked');
+  });
+
+  test('checkbox updated when archived milestones exist in <details>', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-setup');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap v2.0',
+      '',
+      '## Phases',
+      '',
+      '- [ ] **Phase 1: Setup** - initial setup',
+      '- [ ] **Phase 2: Build** - build features',
+      '',
+      '## Progress',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 1. Setup | 0/1 | Pending | - |',
+      '| 2. Build | 0/1 | Pending | - |',
+      '',
+      '<details>',
+      '<summary>v1.0 (Archived)</summary>',
+      '',
+      '## v1.0 Phases',
+      '- [x] **Phase 1: Init** - initialization',
+      '- [x] **Phase 2: Deploy** - deployment',
+      '',
+      '</details>',
+    ].join('\n'));
+
+    try {
+      execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], { cwd: tmpDir, timeout: 10000 });
+    } catch {
+      // May exit non-zero
+    }
+
+    const result = fs.readFileSync(roadmapPath, 'utf-8');
+    assert.match(result, /- \[x\] \*\*Phase 1: Setup\*\*/, 'current milestone checkbox should be checked');
+    assert.match(result, /- \[ \] \*\*Phase 2: Build\*\*/, 'phase 2 checkbox should remain unchecked');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #2005 — phase complete inside <details> updates plan count
+// (consolidated from tests/bug-2005-phase-complete-details.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug #2005: phase complete updates plan count when milestone is inside <details>', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2005-'));
+    planningDir = path.join(tmpDir, '.planning');
+    fs.mkdirSync(planningDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(planningDir, 'config.json'),
+      JSON.stringify({ project_code: 'TEST' })
+    );
+
+    fs.writeFileSync(
+      path.join(planningDir, 'STATE.md'),
+      '---\ncurrent_phase: 1\nstatus: executing\nmilestone: v2.0\n---\n# State\n'
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('plan count is updated when current milestone is wrapped in <details>', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-setup');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.\n'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap',
+      '',
+      '<details>',
+      '<summary>v1.0 (shipped)</summary>',
+      '',
+      '## v1.0 Phases',
+      '- [x] **Phase 0: Bootstrap** - shipped',
+      '',
+      '</details>',
+      '',
+      '<details open>',
+      '<summary>v2.0 (in progress)</summary>',
+      '',
+      '## v2.0 Phases',
+      '',
+      '- [ ] **Phase 1: Setup** - initial setup',
+      '- [ ] **Phase 2: Build** - build features',
+      '',
+      '## Progress',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 1. Setup | 0/1 | Pending | - |',
+      '| 2. Build | 0/1 | Pending | - |',
+      '',
+      '### Phase 1: Setup',
+      '',
+      '**Plans:** 0/1 plans complete',
+      '',
+      '### Phase 2: Build',
+      '',
+      '**Plans:** 0/1 plans complete',
+      '',
+      '</details>',
+    ].join('\n'));
+
+    try {
+      execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], { cwd: tmpDir, timeout: 10000 });
+    } catch {
+      // May exit non-zero if STATE.md update fails, but ROADMAP.md update is the target
+    }
+
+    const result = fs.readFileSync(roadmapPath, 'utf-8');
+
+    assert.match(
+      result,
+      /\*\*Plans:\*\*\s*1\/1 plans complete/,
+      'plan count in Phase 1 section must be updated to 1/1 plans complete'
+    );
+    assert.match(
+      result,
+      /- \[x\] \*\*Phase 1: Setup\*\*/,
+      'Phase 1 checkbox must be checked after completion'
+    );
+    assert.match(
+      result,
+      /- \[ \] \*\*Phase 2: Build\*\*/,
+      'Phase 2 checkbox must remain unchecked'
+    );
+  });
+
+  test('phase complete with all milestones in <details> does not corrupt phase 2 plan count', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-setup');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.\n'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap',
+      '',
+      '<details open>',
+      '<summary>v2.0 (in progress)</summary>',
+      '',
+      '## v2.0 Phases',
+      '',
+      '- [ ] **Phase 1: Setup** - initial setup',
+      '- [ ] **Phase 2: Build** - build features',
+      '',
+      '### Phase 1: Setup',
+      '',
+      '**Plans:** 0/1 plans complete',
+      '',
+      '### Phase 2: Build',
+      '',
+      '**Plans:** 0/2 plans complete',
+      '',
+      '</details>',
+    ].join('\n'));
+
+    try {
+      execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], { cwd: tmpDir, timeout: 10000 });
+    } catch {}
+
+    const result = fs.readFileSync(roadmapPath, 'utf-8');
+
+    assert.match(
+      result,
+      /Phase 2: Build[\s\S]*?\*\*Plans:\*\*\s*0\/2 plans complete/,
+      'Phase 2 plan count must remain 0/2 (untouched)'
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #2526 — phase complete warns about unregistered REQ-IDs
+// (consolidated from tests/bug-2526-phase-complete-req-discovery.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bug #2526: phase complete warns about unregistered REQ-IDs', () => {
+  let tmpDir;
+  let planningDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-2526-'));
+    planningDir = path.join(tmpDir, '.planning');
+    fs.mkdirSync(planningDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(planningDir, 'config.json'),
+      JSON.stringify({ project_code: '' })
+    );
+
+    fs.writeFileSync(
+      path.join(planningDir, 'STATE.md'),
+      '---\ncurrent_phase: 1\nstatus: executing\n---\n# State\n'
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('emits warning for REQ-IDs in body but missing from Traceability table', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-foundation');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap',
+      '',
+      '### Phase 1: Foundation',
+      '',
+      '**Goal:** Build core',
+      '**Requirements:** REQ-001',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 01-1-PLAN.md',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 1. Foundation | 0/1 | Pending | - |',
+    ].join('\n'));
+
+    const reqPath = path.join(planningDir, 'REQUIREMENTS.md');
+    fs.writeFileSync(reqPath, [
+      '# Requirements',
+      '',
+      '## Functional Requirements',
+      '',
+      '- [x] **REQ-001**: Core data model',
+      '- [ ] **REQ-002**: User authentication',
+      '- [ ] **REQ-003**: API endpoints',
+      '',
+      '## Traceability',
+      '',
+      '| REQ-ID | Phase | Status |',
+      '|--------|-------|--------|',
+      '| REQ-001 | 1 | Pending |',
+    ].join('\n'));
+
+    let stdout = '';
+    let stderr = '';
+    try {
+      const result = execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], {
+        cwd: tmpDir,
+        timeout: 10000,
+        encoding: 'utf-8',
+      });
+      stdout = result;
+    } catch (err) {
+      stdout = err.stdout || '';
+      stderr = err.stderr || '';
+      throw err;
+    }
+
+    const combined = stdout + stderr;
+    assert.match(combined, /REQ-002/, 'output should mention REQ-002 as missing from Traceability table');
+    assert.match(combined, /REQ-003/, 'output should mention REQ-003 as missing from Traceability table');
+  });
+
+  test('no warning when all body REQ-IDs are present in Traceability table', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-foundation');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap',
+      '',
+      '### Phase 1: Foundation',
+      '',
+      '**Goal:** Build core',
+      '**Requirements:** REQ-001, REQ-002',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 01-1-PLAN.md',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 1. Foundation | 0/1 | Pending | - |',
+    ].join('\n'));
+
+    const reqPath = path.join(planningDir, 'REQUIREMENTS.md');
+    fs.writeFileSync(reqPath, [
+      '# Requirements',
+      '',
+      '## Functional Requirements',
+      '',
+      '- [x] **REQ-001**: Core data model',
+      '- [x] **REQ-002**: User authentication',
+      '',
+      '## Traceability',
+      '',
+      '| REQ-ID | Phase | Status |',
+      '|--------|-------|--------|',
+      '| REQ-001 | 1 | Pending |',
+      '| REQ-002 | 1 | Pending |',
+    ].join('\n'));
+
+    let stdout = '';
+    let stderr = '';
+    try {
+      const result = execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], {
+        cwd: tmpDir,
+        timeout: 10000,
+        encoding: 'utf-8',
+      });
+      stdout = result;
+    } catch (err) {
+      stdout = err.stdout || '';
+      stderr = err.stderr || '';
+      throw err;
+    }
+
+    const combined = stdout + stderr;
+    assert.doesNotMatch(
+      combined,
+      /unregistered|missing.*traceability|not in.*traceability/i,
+      'no warning should appear when all REQ-IDs are in the table'
+    );
+  });
+
+  test('warning includes all missing REQ-IDs, not just the first', () => {
+    const phasesDir = path.join(planningDir, 'phases', '01-foundation');
+    fs.mkdirSync(phasesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-PLAN.md'),
+      '---\nphase: 1\nplan: 1\n---\n# Plan 1\n'
+    );
+    fs.writeFileSync(
+      path.join(phasesDir, '01-1-SUMMARY.md'),
+      '---\nstatus: complete\n---\n# Summary\nDone.'
+    );
+
+    const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+    fs.writeFileSync(roadmapPath, [
+      '# Roadmap',
+      '',
+      '### Phase 1: Foundation',
+      '',
+      '**Goal:** Build core',
+      '**Requirements:** REQ-001',
+      '**Plans:** 1 plans',
+      '',
+      'Plans:',
+      '- [x] 01-1-PLAN.md',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 1. Foundation | 0/1 | Pending | - |',
+    ].join('\n'));
+
+    const reqPath = path.join(planningDir, 'REQUIREMENTS.md');
+    fs.writeFileSync(reqPath, [
+      '# Requirements',
+      '',
+      '- [x] **REQ-001**: Core data model',
+      '- [ ] **REQ-002**: User auth',
+      '- [ ] **REQ-003**: API',
+      '- [ ] **REQ-004**: Reports',
+      '',
+      '## Traceability',
+      '',
+      '| REQ-ID | Phase | Status |',
+      '|--------|-------|--------|',
+      '| REQ-001 | 1 | Pending |',
+    ].join('\n'));
+
+    let stdout = '';
+    let stderr = '';
+    try {
+      const result = execFileSync('node', [GSD_TOOLS_BIN, 'phase', 'complete', '1'], {
+        cwd: tmpDir,
+        timeout: 10000,
+        encoding: 'utf-8',
+      });
+      stdout = result;
+    } catch (err) {
+      stdout = err.stdout || '';
+      stderr = err.stderr || '';
+      throw err;
+    }
+
+    const combined = stdout + stderr;
+    assert.match(combined, /REQ-002/, 'should warn about REQ-002');
+    assert.match(combined, /REQ-003/, 'should warn about REQ-003');
+    assert.match(combined, /REQ-004/, 'should warn about REQ-004');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #3287 — phase-dir prefix parity across creation paths
+// (consolidated from tests/bug-3287-phase-dir-prefix-parity.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── shared fixture for bug-3287 ─────────────────────────────────────────────
+function makeXRProject(tmpDir) {
+  fs.writeFileSync(
+    path.join(tmpDir, '.planning', 'config.json'),
+    JSON.stringify({ project_code: 'XR' }),
+  );
+  fs.writeFileSync(
+    path.join(tmpDir, '.planning', 'ROADMAP.md'),
+    [
+      '# Roadmap v1.0',
+      '',
+      '### Phase 1: Foundation',
+      '**Goal:** Setup project',
+      '**Plans:** 0 plans',
+      '',
+      '---',
+      '',
+    ].join('\n'),
+  );
+}
+
+describe('bug-3287 — phase.add emits project_code prefix (sanity)', () => {
+  let tmpDir;
+
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('phase.add creates XR-02-<slug> when project_code is XR', () => {
+    makeXRProject(tmpDir);
+
+    const result = runGsdTools('phase add auth service', tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `phase.add failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_number, 2, 'phase number should be 2');
+
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    const dirs = fs.readdirSync(phasesDir);
+    const prefixedDirs = dirs.filter(d => d.startsWith('XR-'));
+    assert.ok(
+      prefixedDirs.length > 0,
+      `Expected at least one XR- prefixed dir, got: ${JSON.stringify(dirs)}`,
+    );
+    assert.ok(
+      dirs.some(d => d === 'XR-02-auth-service'),
+      `Expected XR-02-auth-service, got: ${JSON.stringify(dirs)}`,
+    );
+  });
+});
+
+describe('bug-3287 — init phase-op exposes expected_phase_dir with project_code prefix', () => {
+  let tmpDir;
+
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('returns expected_phase_dir with XR- prefix when phase directory does not exist', () => {
+    makeXRProject(tmpDir);
+
+    const result = runGsdTools('init phase-op 1', tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `init phase-op failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true, 'phase should be found in roadmap');
+    assert.strictEqual(output.phase_dir, null, 'phase_dir should be null (no dir yet)');
+
+    assert.ok(
+      typeof output.expected_phase_dir === 'string',
+      `expected_phase_dir should be a string, got: ${JSON.stringify(output.expected_phase_dir)}`,
+    );
+    assert.ok(
+      output.expected_phase_dir.includes('XR-'),
+      `expected_phase_dir should contain XR- prefix, got: "${output.expected_phase_dir}"`,
+    );
+    assert.ok(
+      output.expected_phase_dir.includes('foundation'),
+      `expected_phase_dir should contain the phase slug, got: "${output.expected_phase_dir}"`,
+    );
+  });
+
+  test('expected_phase_dir is null when no project_code is set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({}),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n\n---\n',
+    );
+
+    const result = runGsdTools('init phase-op 1', tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `init phase-op failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_dir, null);
+    assert.ok(
+      typeof output.expected_phase_dir === 'string',
+      `expected_phase_dir should be a string even without project_code, got: ${JSON.stringify(output.expected_phase_dir)}`,
+    );
+    assert.ok(
+      !output.expected_phase_dir.match(/^[A-Z][A-Z0-9]*-/),
+      `expected_phase_dir should have NO prefix without project_code, got: "${output.expected_phase_dir}"`,
+    );
+  });
+});
+
+describe('bug-3287 — init plan-phase exposes expected_phase_dir with project_code prefix', () => {
+  let tmpDir;
+
+  beforeEach(() => { tmpDir = createTempProject(); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  test('returns expected_phase_dir with XR- prefix when phase directory does not exist', () => {
+    makeXRProject(tmpDir);
+
+    const result = runGsdTools('init plan-phase 1', tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `init plan-phase failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true, 'phase should be found in roadmap');
+    assert.strictEqual(output.phase_dir, null, 'phase_dir should be null (no dir yet)');
+
+    assert.ok(
+      typeof output.expected_phase_dir === 'string',
+      `expected_phase_dir should be a string, got: ${JSON.stringify(output.expected_phase_dir)}`,
+    );
+    assert.ok(
+      output.expected_phase_dir.includes('XR-'),
+      `expected_phase_dir should contain XR- prefix, got: "${output.expected_phase_dir}"`,
+    );
+    assert.ok(
+      output.expected_phase_dir.includes('foundation'),
+      `expected_phase_dir should contain the phase slug, got: "${output.expected_phase_dir}"`,
+    );
+  });
+
+  test('expected_phase_dir omits prefix when project_code is not set', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({}),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap v1.0\n\n### Phase 1: Foundation\n**Goal:** Setup\n\n---\n',
+    );
+
+    const result = runGsdTools('init plan-phase 1', tmpDir, { HOME: tmpDir });
+    assert.ok(result.success, `init plan-phase failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_dir, null);
+    assert.ok(
+      typeof output.expected_phase_dir === 'string',
+      `expected_phase_dir should be a string, got: ${JSON.stringify(output.expected_phase_dir)}`,
+    );
+    assert.ok(
+      !output.expected_phase_dir.match(/^[A-Z][A-Z0-9]*-/),
+      `expected_phase_dir should have NO prefix without project_code, got: "${output.expected_phase_dir}"`,
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #3298 — phase-dir prefix drift in workflows
+// (consolidated from tests/bug-3298-phase-dir-prefix-drift-in-workflows.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+{
+  const PMG_WF = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'plan-milestone-gaps.md');
+  const IMPORT_WF = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'import.md');
+  const BACKLOG_WF = path.join(__dirname, '..', 'get-shit-done', 'workflows', 'add-backlog.md');
+
+  function readWorkflow(filePath) {
+    try {
+      return fs.readFileSync(filePath, 'utf8');
+    } catch (err) {
+      throw new Error(`Cannot read workflow file ${filePath}: ${err.message}`);
+    }
+  }
+
+  function containsBareTemplateMkdir(content) {
+    return /mkdir[^`\n]*\.planning\/phases\/\{[A-Z0-9]+\}-\{/.test(content);
+  }
+
+  function containsBareShellVarMkdir(content) {
+    return /mkdir[^`\n]*\.planning\/phases\/"\$\{(?:NEXT|NN|PHASE)[^}]*\}-/.test(content)
+      || /mkdir[^`\n]*\.planning\/phases\/\$\{(?:NEXT|NN|PHASE)[^}]*\}-/.test(content);
+  }
+
+  describe('bug-3298 — plan-milestone-gaps.md must not construct bare {NN}-{name} phase dirs', () => {
+    test('workflow file exists', () => {
+      assert.ok(fs.existsSync(PMG_WF), `plan-milestone-gaps.md must exist at ${PMG_WF}`);
+    });
+
+    test('step 8 must not use bare {NN}-{name} mkdir pattern', () => {
+      const content = readWorkflow(PMG_WF);
+      assert.ok(
+        !containsBareTemplateMkdir(content),
+        'plan-milestone-gaps.md must not contain bare mkdir .planning/phases/{NN}-{name} pattern — use phase.add or expected_phase_dir',
+      );
+    });
+
+    test('step 8 must use expected_phase_dir or phase.add for directory creation', () => {
+      const content = readWorkflow(PMG_WF);
+      const usesExpectedPhaseDir = content.includes('expected_phase_dir');
+      const usesPhaseAdd = content.includes('phase.add');
+      assert.ok(
+        usesExpectedPhaseDir || usesPhaseAdd,
+        'plan-milestone-gaps.md must use expected_phase_dir (from init.phase-op) or phase.add to create phase directories with project_code prefix',
+      );
+    });
+  });
+
+  describe('bug-3298 — import.md must not construct bare {NN}-{slug} phase dirs', () => {
+    test('workflow file exists', () => {
+      assert.ok(fs.existsSync(IMPORT_WF), `import.md must exist at ${IMPORT_WF}`);
+    });
+
+    test('plan_convert step must not use bare {NN}-{slug} mkdir pattern', () => {
+      const content = readWorkflow(IMPORT_WF);
+      assert.ok(
+        !containsBareTemplateMkdir(content),
+        'import.md must not contain bare mkdir .planning/phases/{NN}-{slug} pattern — use expected_phase_dir from init.phase-op',
+      );
+    });
+
+    test('plan_convert step must use expected_phase_dir for directory creation', () => {
+      const content = readWorkflow(IMPORT_WF);
+      assert.ok(
+        content.includes('expected_phase_dir'),
+        'import.md must use expected_phase_dir (from init.phase-op) to create phase directory with project_code prefix',
+      );
+    });
+
+    test('plan_convert step must call init.phase-op to resolve the prefixed dir', () => {
+      const content = readWorkflow(IMPORT_WF);
+      assert.ok(
+        content.includes('init.phase-op') || content.includes('init phase-op'),
+        'import.md must call gsd-sdk query init.phase-op to get expected_phase_dir with project_code prefix',
+      );
+    });
+  });
+
+  describe('bug-3298 — add-backlog.md must apply project_code prefix when creating 999.x dirs', () => {
+    test('workflow file exists', () => {
+      assert.ok(fs.existsSync(BACKLOG_WF), `add-backlog.md must exist at ${BACKLOG_WF}`);
+    });
+
+    test('step 4 must not use bare ${NEXT}-${SLUG} mkdir without project_code prefix', () => {
+      const content = readWorkflow(BACKLOG_WF);
+      assert.ok(
+        !containsBareShellVarMkdir(content),
+        'add-backlog.md must not create .planning/phases/${NEXT}-${SLUG} without a project_code prefix variable — apply ${PREFIX} (or equivalent) before ${NEXT}',
+      );
+    });
+
+    test('step 4 must reference project_code or a prefix variable before the phase number', () => {
+      const content = readWorkflow(BACKLOG_WF);
+      const hasProjectCodeRef = content.includes('project_code') || content.includes('PROJECT_CODE');
+      const hasPrefixVar = content.includes('${PREFIX}') || content.includes('${PHASE_PREFIX}') || content.includes('${CODE}');
+      assert.ok(
+        hasProjectCodeRef || hasPrefixVar,
+        'add-backlog.md must read project_code (or use a PREFIX variable) to apply the project_code prefix to the 999.x phase directory name',
+      );
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #3517 — phase.complete leaves STATE.md with stale fields
+// (consolidated from tests/bug-3517-phase-complete-state-md-staleness.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+{
+  function runSdkQuery(args, cwd) {
+    try {
+      const result = execFileSync(process.execPath, [SDK_CLI, 'query', ...args], {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const parsed = JSON.parse(result.trim());
+      return { success: true, data: parsed };
+    } catch (err) {
+      const stderr = err.stderr?.toString().trim() || '';
+      const stdout = err.stdout?.toString().trim() || '';
+      try {
+        const parsed = JSON.parse(stdout);
+        return { success: true, data: parsed };
+      } catch { /* not JSON */ }
+      return { success: false, error: stderr || err.message };
+    }
+  }
+
+  function setupPhase3517Project(tmpDir) {
+    const planningDir = path.join(tmpDir, '.planning');
+    const phasesDir = path.join(planningDir, 'phases');
+    fs.mkdirSync(planningDir, { recursive: true });
+    fs.mkdirSync(phasesDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(planningDir, 'config.json'),
+      JSON.stringify({ project_code: 'TEST' }),
+    );
+
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '## Current Milestone: v3.0',
+      '',
+      '| Phase | Plans | Status | Completed |',
+      '|-------|-------|--------|-----------|',
+      '| 4.    | 3/3   | Complete | 2026-04-01 |',
+      '| 5.    | 7/7   | In Progress |  |',
+      '| 6.    | 0/5   | Not Started |  |',
+      '',
+      '- [x] Phase 4: Foundation (completed 2026-04-01)',
+      '- [ ] Phase 5: Core API',
+      '- [ ] Phase 6: Integration',
+      '',
+      '### Phase 4: Foundation',
+      '',
+      '**Goal:** Foundation work',
+      '**Plans:** 3/3 plans complete',
+      '',
+      '### Phase 5: Core API',
+      '',
+      '**Goal:** Build core API layer',
+      '**Plans:** 7 plans',
+      '',
+      'Plans:',
+      '- [ ] 05-01 plan',
+      '- [ ] 05-02 plan',
+      '- [ ] 05-03 plan',
+      '- [ ] 05-04 plan',
+      '- [ ] 05-05 plan',
+      '- [ ] 05-06 plan',
+      '- [ ] 05-07 plan',
+      '',
+      '### Phase 6: Integration',
+      '',
+      '**Goal:** Integration work',
+      '**Plans:** 5 plans',
+      '',
+      '---',
+      '*Last updated: 2026-05-14*',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(planningDir, 'ROADMAP.md'), roadmap);
+
+    const state = [
+      '---',
+      'gsd_state_version: 1.0',
+      'milestone: v3.0',
+      'milestone_name: Core Platform',
+      'status: executing',
+      'stopped_at: Completed 05-03-PLAN.md',
+      'last_updated: 2026-05-10T08:00:00.000Z',
+      'progress:',
+      '  total_phases: 3',
+      '  completed_phases: 1',
+      '  total_plans: 15',
+      '  completed_plans: 6',
+      '  percent: 33',
+      '---',
+      '',
+      '# Project State',
+      '',
+      '## Current Position',
+      '',
+      '**Current focus:** Phase 5 — Core API',
+      'Phase: 5 of 3 (Core API) — EXECUTING',
+      'Plan: 7 of 7',
+      'Status: Executing Phase 5',
+      'Last activity: 2026-05-10',
+      '',
+      '## Progress',
+      '',
+      'Progress: [████████████░░░░] 40% (1/3 phases complete before Phase 5 closeout)',
+      '',
+      '## Performance Metrics',
+      '',
+      '**Velocity:**',
+      '',
+      '- Total plans completed: 6',
+      '- Average duration: 2h',
+      '- Total execution time: 14 hours',
+      '- Window: 2026-04-01 to 2026-05-10',
+      '',
+      '**By Phase:**',
+      '',
+      '| Phase | Plans | Total | Avg/Plan |',
+      '|-------|-------|-------|----------|',
+      '| 4 | 3 | - | - |',
+      '',
+      '## Session Continuity',
+      '',
+      'Last session: 2026-05-10T08:00:00.000Z',
+      'Stopped at: Completed 05-07-PLAN.md',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(planningDir, 'STATE.md'), state);
+
+    const phase5Dir = path.join(phasesDir, '05-core-api');
+    fs.mkdirSync(phase5Dir, { recursive: true });
+    for (let i = 1; i <= 7; i++) {
+      const padded = String(i).padStart(2, '0');
+      fs.writeFileSync(path.join(phase5Dir, `05-${padded}-PLAN.md`), `plan ${i}`, 'utf8');
+      fs.writeFileSync(path.join(phase5Dir, `05-${padded}-SUMMARY.md`), `summary ${i}`, 'utf8');
+    }
+
+    const phase4Dir = path.join(phasesDir, '04-foundation');
+    fs.mkdirSync(phase4Dir, { recursive: true });
+    for (let i = 1; i <= 3; i++) {
+      const padded = String(i).padStart(2, '0');
+      fs.writeFileSync(path.join(phase4Dir, `04-${padded}-PLAN.md`), `plan ${i}`, 'utf8');
+      fs.writeFileSync(path.join(phase4Dir, `04-${padded}-SUMMARY.md`), `summary ${i}`, 'utf8');
+    }
+
+    const phase6Dir = path.join(phasesDir, '06-integration');
+    fs.mkdirSync(phase6Dir, { recursive: true });
+
+    return { planningDir, phase5Dir };
+  }
+
+  describe('bug #3517: phase.complete leaves STATE.md with stale fields', () => {
+    let tmpDir;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-3517-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    test('completed_phases is derived from ROADMAP, not blindly incremented (idempotency)', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r1 = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r1.success, `first call failed: ${r1.error}`);
+
+      const stateAfter1 = fs.readFileSync(statePath, 'utf8');
+      const match1 = stateAfter1.match(/completed_phases:\s*(\d+)/);
+      assert.ok(match1, 'completed_phases not found in frontmatter after first call');
+      assert.equal(
+        Number(match1[1]),
+        2,
+        `After first call: completed_phases should be 2 (derived from ROADMAP: phases 4 and 5 complete), got ${match1[1]}`,
+      );
+
+      const r2 = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r2.success, `second call failed: ${r2.error}`);
+
+      const stateAfter2 = fs.readFileSync(statePath, 'utf8');
+      const match2 = stateAfter2.match(/completed_phases:\s*(\d+)/);
+      assert.ok(match2, 'completed_phases not found in frontmatter after second call');
+      assert.equal(
+        Number(match2[1]),
+        2,
+        `After second call (same phase): completed_phases must remain 2 (idempotent), got ${match2[1]}`,
+      );
+    });
+
+    test('frontmatter stopped_at is updated after phase.complete', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      const stoppedMatch = state.match(/stopped_at:\s*(.+)/);
+      assert.ok(stoppedMatch, 'stopped_at not found in frontmatter');
+      assert.ok(
+        !stoppedMatch[1].includes('05-03-PLAN.md'),
+        `stopped_at should not still say "Completed 05-03-PLAN.md" — got: ${stoppedMatch[1]}`,
+      );
+      assert.ok(
+        stoppedMatch[1].toLowerCase().includes('phase 5') ||
+        stoppedMatch[1].toLowerCase().includes('complete'),
+        `stopped_at should reference phase 5 completion, got: ${stoppedMatch[1]}`,
+      );
+    });
+
+    test('frontmatter last_updated is refreshed to today after phase.complete', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      const lastUpdatedMatch = state.match(/last_updated:\s*(.+)/);
+      assert.ok(lastUpdatedMatch, 'last_updated not found in frontmatter');
+      assert.notEqual(
+        lastUpdatedMatch[1].trim(),
+        '2026-05-10T08:00:00.000Z',
+        `last_updated must be refreshed, but it is still the stale value: ${lastUpdatedMatch[1]}`,
+      );
+      const updatedAt = new Date(lastUpdatedMatch[1].trim());
+      const now = new Date();
+      const diffMs = Math.abs(now - updatedAt);
+      assert.ok(
+        diffMs < 60_000,
+        `last_updated should be approximately now (within 60s), got: ${lastUpdatedMatch[1]} (diff: ${diffMs}ms)`,
+      );
+    });
+
+    test('frontmatter total_plans is updated from ROADMAP plan counts after phase.complete', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      const match = state.match(/total_plans:\s*(\d+)/);
+      assert.ok(match, 'total_plans not found in frontmatter');
+      const totalPlans = Number(match[1]);
+      assert.ok(Number.isFinite(totalPlans) && totalPlans > 0, `total_plans must be a positive number, got: ${match[1]}`);
+    });
+
+    test('frontmatter completed_plans is updated from SUMMARY file count after phase.complete', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      const match = state.match(/completed_plans:\s*(\d+)/);
+      assert.ok(match, 'completed_plans not found in frontmatter');
+      const completedPlans = Number(match[1]);
+      assert.equal(
+        completedPlans,
+        10,
+        `completed_plans should be 10 (3 phase-4 summaries + 7 phase-5 summaries), got: ${completedPlans}`,
+      );
+    });
+
+    test('frontmatter percent is recomputed from fresh derived counts', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      const match = state.match(/percent:\s*(\d+)/);
+      assert.ok(match, 'percent not found in frontmatter');
+      assert.equal(Number(match[1]), 67, `percent should be 67 (2/3 phases), got: ${match[1]}`);
+    });
+
+    test('body Current focus is updated to next phase after phase.complete', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      assert.ok(
+        !state.includes('Current focus:** Phase 5') && !state.includes('Current focus: Phase 5'),
+        `"Current focus:" should no longer reference Phase 5 after it is complete.\nState:\n${state}`,
+      );
+    });
+
+    test('body By Phase table row for completed phase shows correct plan count', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+
+      const state = fs.readFileSync(statePath, 'utf8');
+      assert.match(
+        state,
+        /\|\s*5\s*\|\s*7\s*\|/,
+        `By Phase table should have a row for phase 5 with 7 summaries.\nState:\n${state}`,
+      );
+    });
+
+    test('full consistency check: all STATE.md fields are coherent after phase.complete', () => {
+      setupPhase3517Project(tmpDir);
+      const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+
+      const r = runSdkQuery(['phase.complete', '5'], tmpDir);
+      assert.ok(r.success, `call failed: ${r.error}`);
+      assert.equal(r.data?.state_updated, true, 'state_updated must be true');
+
+      const state = fs.readFileSync(statePath, 'utf8');
+
+      assert.match(state, /completed_phases:\s*2/, 'completed_phases must be 2 (4 and 5 complete)');
+      assert.match(state, /percent:\s*67/, 'percent must be 67%');
+      assert.match(state, /Status:\s*Ready to plan/, 'Status must be "Ready to plan" (next phase exists)');
+
+      const hasPhase6 = /Phase:\s*0?6/.test(state) || /current_phase:\s*0?6/.test(state);
+      assert.ok(hasPhase6, `STATE.md must reference Phase 6 as current after completing Phase 5.\nState:\n${state}`);
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// regression: bug #3601 — phase remove preserves peer-depth decimal sections
+// (consolidated from tests/bug-3601-phase-remove-preserves-decimal-sections.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+{
+  process.env.GSD_TEST_MODE = '1';
+
+  function writeRoadmapForRemove(tmpDir, body) {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), body);
+  }
+  function writeStateForRemove(tmpDir, version) {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `---\nmilestone: ${version}\n---\n`,
+    );
+  }
+  function ensurePhaseDir(tmpDir, name) {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', name), { recursive: true });
+  }
+  function getPhase(tmpDir, phaseNum) {
+    const r = runGsdTools(['roadmap', 'get-phase', phaseNum, '--json'], tmpDir);
+    if (!r.success) return { found: false, error: r.error };
+    return JSON.parse(r.output);
+  }
+
+  describe('bug #3601: phase remove preserves peer-depth decimal sections', () => {
+    let tmpDir;
+    beforeEach(() => {
+      tmpDir = createTempProject('bug-3601-');
+    });
+    afterEach(() => {
+      cleanup(tmpDir);
+    });
+
+    test('removing Phase 2 preserves peer-depth Phase 2.1 and renumbers Phase 3 → 2', () => {
+      writeStateForRemove(tmpDir, 'v1.0.0');
+      writeRoadmapForRemove(
+        tmpDir,
+        [
+          '# Roadmap',
+          '',
+          '## Current Milestone: v1.0.0 - Test',
+          '',
+          '### Phase 2: Parent',
+          '**Goal:** RemoveMeGoal',
+          '',
+          '### Phase 2.1: Follow-up',
+          '**Goal:** PreserveDecimalGoal',
+          '',
+          '### Phase 3: Trailing',
+          '**Goal:** PreserveTrailingGoal',
+          '',
+        ].join('\n'),
+      );
+      ensurePhaseDir(tmpDir, '02-parent');
+      ensurePhaseDir(tmpDir, '02.1-follow-up');
+      ensurePhaseDir(tmpDir, '03-trailing');
+
+      const r = runGsdTools(['phase', 'remove', '2'], tmpDir);
+      assert.ok(r.success, `phase remove failed: ${r.error || r.output}`);
+
+      const decimal = getPhase(tmpDir, '2.1');
+      assert.strictEqual(decimal.found, true, 'Phase 2.1 deleted alongside Phase 2');
+      assert.strictEqual(decimal.phase_name, 'Follow-up');
+      assert.strictEqual(decimal.goal, 'PreserveDecimalGoal');
+
+      const renumbered = getPhase(tmpDir, '2');
+      assert.strictEqual(renumbered.found, true);
+      assert.strictEqual(renumbered.phase_name, 'Trailing');
+      assert.strictEqual(
+        renumbered.goal,
+        'PreserveTrailingGoal',
+        'Phase 3 → Phase 2 renumber did not carry the right section content',
+      );
+
+      const parentLookup = getPhase(tmpDir, '3');
+      assert.notStrictEqual(
+        parentLookup.goal,
+        'RemoveMeGoal',
+        'removed parent goal reappeared under a phase header',
+      );
+    });
+
+    test('removing Phase 5 preserves Phase 5.1 and Phase 5.2 (multiple peer decimals)', () => {
+      writeStateForRemove(tmpDir, 'v1.0.0');
+      writeRoadmapForRemove(
+        tmpDir,
+        [
+          '# Roadmap',
+          '',
+          '## Current Milestone: v1.0.0 - Test',
+          '',
+          '### Phase 5: Parent',
+          '**Goal:** RemoveParent',
+          '',
+          '### Phase 5.1: First child',
+          '**Goal:** ChildAGoal',
+          '',
+          '### Phase 5.2: Second child',
+          '**Goal:** ChildBGoal',
+          '',
+          '### Phase 6: Tail',
+          '**Goal:** TailGoal',
+          '',
+        ].join('\n'),
+      );
+      ensurePhaseDir(tmpDir, '05-parent');
+      ensurePhaseDir(tmpDir, '05.1-first-child');
+      ensurePhaseDir(tmpDir, '05.2-second-child');
+      ensurePhaseDir(tmpDir, '06-tail');
+
+      const r = runGsdTools(['phase', 'remove', '5'], tmpDir);
+      assert.ok(r.success);
+
+      const decimalA = getPhase(tmpDir, '5.1');
+      assert.strictEqual(decimalA.found, true, 'Phase 5.1 deleted');
+      assert.strictEqual(decimalA.goal, 'ChildAGoal');
+
+      const decimalB = getPhase(tmpDir, '5.2');
+      assert.strictEqual(decimalB.found, true, 'Phase 5.2 deleted');
+      assert.strictEqual(decimalB.goal, 'ChildBGoal');
+
+      const tail = getPhase(tmpDir, '5');
+      assert.strictEqual(tail.found, true);
+      assert.strictEqual(tail.goal, 'TailGoal', 'Phase 6 → Phase 5 renumber misfired');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // regression: bug #3602 — phase remove renumbers slugged plan references
+  // (consolidated from tests/bug-3602-phase-remove-renumbers-slugged-plan-refs.test.cjs)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  function ensurePlanFile(tmpDir, phaseDirName, planName) {
+    const p = path.join(tmpDir, '.planning', 'phases', phaseDirName, planName);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, '# Plan\n');
+  }
+
+  describe('bug #3602: phase remove renumbers slugged plan references in ROADMAP', () => {
+    let tmpDir;
+    beforeEach(() => {
+      tmpDir = createTempProject('bug-3602-');
+    });
+    afterEach(() => {
+      cleanup(tmpDir);
+    });
+
+    test('slugged PLAN reference (07-01-cherry-pick-foundation-PLAN.md) is renumbered to 06-01-…', () => {
+      writeStateForRemove(tmpDir, 'v1.0.0');
+      writeRoadmapForRemove(
+        tmpDir,
+        [
+          '# Roadmap',
+          '',
+          '## Current Milestone: v1.0.0',
+          '',
+          '### Phase 6: Old Work',
+          '**Goal:** RemoveThisGoal',
+          '',
+          '### Phase 7: New Work',
+          '**Goal:** Plans: 07-01-cherry-pick-foundation-PLAN.md and 07-02-finish-it-SUMMARY.md',
+          '',
+        ].join('\n'),
+      );
+      ensurePhaseDir(tmpDir, '06-old');
+      ensurePhaseDir(tmpDir, '07-new');
+      ensurePlanFile(tmpDir, '07-new', '07-01-cherry-pick-foundation-PLAN.md');
+      ensurePlanFile(tmpDir, '07-new', '07-02-finish-it-SUMMARY.md');
+
+      const r = runGsdTools(['phase', 'remove', '6'], tmpDir);
+      assert.ok(r.success, `phase remove failed: ${r.error || r.output}`);
+
+      const phase6 = getPhase(tmpDir, '6');
+      assert.strictEqual(phase6.found, true);
+      assert.strictEqual(phase6.phase_name, 'New Work');
+      assert.ok(
+        phase6.goal.includes('06-01-cherry-pick-foundation-PLAN.md'),
+        `Plans reference for slugged PLAN was not renumbered. Goal: ${phase6.goal}`,
+      );
+      assert.ok(
+        phase6.goal.includes('06-02-finish-it-SUMMARY.md'),
+        `Plans reference for slugged SUMMARY was not renumbered. Goal: ${phase6.goal}`,
+      );
+      assert.ok(
+        !phase6.goal.includes('07-01'),
+        `stale 07-01 prefix remains in ROADMAP. Goal: ${phase6.goal}`,
+      );
+      assert.ok(
+        !phase6.goal.includes('07-02'),
+        `stale 07-02 prefix remains in ROADMAP. Goal: ${phase6.goal}`,
+      );
+    });
+
+    test('compact PLAN/SUMMARY reference (07-01-PLAN.md) still renumbers (#3601 contract preserved)', () => {
+      writeStateForRemove(tmpDir, 'v1.0.0');
+      writeRoadmapForRemove(
+        tmpDir,
+        [
+          '# Roadmap',
+          '',
+          '## Current Milestone: v1.0.0',
+          '',
+          '### Phase 6: Old',
+          '**Goal:** RemoveGoal',
+          '',
+          '### Phase 7: New',
+          '**Goal:** Plans: 07-01-PLAN.md and 07-02-SUMMARY.md',
+          '',
+        ].join('\n'),
+      );
+      ensurePhaseDir(tmpDir, '06-old');
+      ensurePhaseDir(tmpDir, '07-new');
+      ensurePlanFile(tmpDir, '07-new', '07-01-PLAN.md');
+      ensurePlanFile(tmpDir, '07-new', '07-02-SUMMARY.md');
+
+      const r = runGsdTools(['phase', 'remove', '6'], tmpDir);
+      assert.ok(r.success);
+
+      const phase6 = getPhase(tmpDir, '6');
+      assert.strictEqual(phase6.found, true);
+      assert.ok(phase6.goal.includes('06-01-PLAN.md'));
+      assert.ok(phase6.goal.includes('06-02-SUMMARY.md'));
+      assert.ok(!phase6.goal.includes('07-01-PLAN.md'));
+      assert.ok(!phase6.goal.includes('07-02-SUMMARY.md'));
+    });
+
+    test('does NOT renumber values that look like phase-plan tokens but are not (e.g. 2026-01-01 dates)', () => {
+      writeStateForRemove(tmpDir, 'v1.0.0');
+      writeRoadmapForRemove(
+        tmpDir,
+        [
+          '# Roadmap',
+          '',
+          '## Current Milestone: v1.0.0',
+          '',
+          '### Phase 6: Old',
+          '**Goal:** RemoveGoal',
+          '',
+          '### Phase 7: Date safety',
+          '**Goal:** Created 2026-01-01 and tagged v1-2-3 — must not renumber',
+          '',
+        ].join('\n'),
+      );
+      ensurePhaseDir(tmpDir, '06-old');
+      ensurePhaseDir(tmpDir, '07-new');
+
+      const r = runGsdTools(['phase', 'remove', '6'], tmpDir);
+      assert.ok(r.success);
+
+      const phase6 = getPhase(tmpDir, '6');
+      assert.strictEqual(phase6.found, true);
+      assert.ok(
+        phase6.goal.includes('2026-01-01'),
+        `ISO date 2026-01-01 was wrongly modified. Goal: ${phase6.goal}`,
+      );
+      assert.ok(
+        phase6.goal.includes('v1-2-3'),
+        `version-tag v1-2-3 was wrongly modified. Goal: ${phase6.goal}`,
+      );
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// feature: phase complete auto-prune (#2087)
+// (consolidated from tests/phase-complete-auto-prune.test.cjs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+{
+  function writeConfigForAutoPrune(tmpDir, config) {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify(config, null, 2));
+  }
+
+  function writeStateMdForAutoPrune(tmpDir, content) {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), content);
+  }
+
+  function readStateMdForAutoPrune(tmpDir) {
+    return fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+  }
+
+  function writeRoadmapForAutoPrune(tmpDir, content) {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), content);
+  }
+
+  function setupPhaseForAutoPrune(tmpDir, phaseNum, planCount) {
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    const phaseDir = path.join(phasesDir, `${String(phaseNum).padStart(2, '0')}-test-phase`);
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    for (let i = 1; i <= planCount; i++) {
+      const planId = `${String(phaseNum).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      fs.writeFileSync(path.join(phaseDir, `${planId}-PLAN.md`), `# Plan ${planId}\n`);
+      fs.writeFileSync(path.join(phaseDir, `${planId}-SUMMARY.md`), `# Summary ${planId}\n`);
+    }
+  }
+
+  describe('phase complete auto-prune (#2087)', () => {
+    let tmpDir;
+
+    beforeEach(() => {
+      tmpDir = createTempProject();
+    });
+
+    afterEach(() => {
+      cleanup(tmpDir);
+    });
+
+    test('prunes STATE.md automatically when auto_prune_state is true', () => {
+      writeConfigForAutoPrune(tmpDir, {
+        workflow: { auto_prune_state: true },
+      });
+
+      writeStateMdForAutoPrune(tmpDir, [
+        '# Session State',
+        '',
+        '**Current Phase:** 6',
+        '**Status:** Executing',
+        '',
+        '## Decisions',
+        '',
+        '- [Phase 1]: Old decision from phase 1',
+        '- [Phase 2]: Old decision from phase 2',
+        '- [Phase 5]: Recent decision',
+        '- [Phase 6]: Current decision',
+        '',
+      ].join('\n'));
+
+      writeRoadmapForAutoPrune(tmpDir, [
+        '# Roadmap',
+        '',
+        '## Phase 6: Test Phase',
+        '',
+        '**Plans:** 0/2',
+        '',
+      ].join('\n'));
+
+      setupPhaseForAutoPrune(tmpDir, 6, 2);
+
+      const result = runGsdTools('phase complete 6', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const newState = readStateMdForAutoPrune(tmpDir);
+      assert.doesNotMatch(newState, /\[Phase 1\]: Old decision/);
+      assert.doesNotMatch(newState, /\[Phase 2\]: Old decision/);
+      assert.match(newState, /\[Phase 5\]: Recent decision/);
+      assert.match(newState, /\[Phase 6\]: Current decision/);
+    });
+
+    test('does NOT prune when auto_prune_state is false (default)', () => {
+      writeConfigForAutoPrune(tmpDir, {
+        workflow: { auto_prune_state: false },
+      });
+
+      writeStateMdForAutoPrune(tmpDir, [
+        '# Session State',
+        '',
+        '**Current Phase:** 6',
+        '**Status:** Executing',
+        '',
+        '## Decisions',
+        '',
+        '- [Phase 1]: Old decision from phase 1',
+        '- [Phase 5]: Recent decision',
+        '- [Phase 6]: Current decision',
+        '',
+      ].join('\n'));
+
+      writeRoadmapForAutoPrune(tmpDir, [
+        '# Roadmap',
+        '',
+        '## Phase 6: Test Phase',
+        '',
+        '**Plans:** 0/2',
+        '',
+      ].join('\n'));
+
+      setupPhaseForAutoPrune(tmpDir, 6, 2);
+
+      const result = runGsdTools('phase complete 6', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const newState = readStateMdForAutoPrune(tmpDir);
+      assert.match(newState, /\[Phase 1\]: Old decision/);
+    });
+
+    test('does NOT prune when auto_prune_state is absent from config', () => {
+      writeConfigForAutoPrune(tmpDir, {
+        workflow: {},
+      });
+
+      writeStateMdForAutoPrune(tmpDir, [
+        '# Session State',
+        '',
+        '**Current Phase:** 6',
+        '**Status:** Executing',
+        '',
+        '## Decisions',
+        '',
+        '- [Phase 1]: Old decision from phase 1',
+        '- [Phase 6]: Current decision',
+        '',
+      ].join('\n'));
+
+      writeRoadmapForAutoPrune(tmpDir, [
+        '# Roadmap',
+        '',
+        '## Phase 6: Test Phase',
+        '',
+        '**Plans:** 0/2',
+        '',
+      ].join('\n'));
+
+      setupPhaseForAutoPrune(tmpDir, 6, 2);
+
+      const result = runGsdTools('phase complete 6', tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const newState = readStateMdForAutoPrune(tmpDir);
+      assert.match(newState, /\[Phase 1\]: Old decision/);
+    });
+  });
+}

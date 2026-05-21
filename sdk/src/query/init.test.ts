@@ -757,16 +757,15 @@ describe('initListWorkspaces', () => {
 });
 
 describe('initRemoveWorkspace', () => {
-  it('returns error when name arg missing', async () => {
-    const result = await initRemoveWorkspace([], tmpDir);
-    const data = result.data as Record<string, unknown>;
-    expect(data.error).toBeDefined();
+  // initRemoveWorkspace throws GSDError for validation failures rather than
+  // returning { data: { error } } — the CLI output path treats error-returns as
+  // success, so validation must surface as a thrown exception for non-zero exit.
+  it('throws GSDError when name arg missing', async () => {
+    await expect(initRemoveWorkspace([], tmpDir)).rejects.toThrow('workspace name required');
   });
 
-  it('rejects path separator in workspace name (T-14-01)', async () => {
-    const result = await initRemoveWorkspace(['../../bad'], tmpDir);
-    const data = result.data as Record<string, unknown>;
-    expect(data.error).toBeDefined();
+  it('throws GSDError for path separator in workspace name (T-14-01)', async () => {
+    await expect(initRemoveWorkspace(['../../bad'], tmpDir)).rejects.toThrow('path separators not allowed');
   });
 });
 
