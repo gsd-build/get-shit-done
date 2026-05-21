@@ -79,6 +79,12 @@ function getGlobalConfigDir(runtime) {
         ? expandTilde(env.ANTIGRAVITY_CONFIG_DIR)
         : path.join(home, '.gemini', 'antigravity');
 
+    // ── Antigravity CLI (agy) ────────────────────────────────────────────────
+    case 'agy':
+      return env.AGY_CONFIG_DIR
+        ? expandTilde(env.AGY_CONFIG_DIR)
+        : path.join(home, '.gemini', 'antigravity-cli');
+
     // ── Windsurf ─────────────────────────────────────────────────────────────
     case 'windsurf':
       return env.WINDSURF_CONFIG_DIR
@@ -145,6 +151,7 @@ function getGlobalSkillsBase(runtime) {
   if (runtime === 'cline') return null;
   const configDir = getGlobalConfigDir(runtime);
   if (runtime === 'hermes') return path.join(configDir, 'skills', 'gsd');
+  if (runtime === 'agy') return path.join(configDir, 'plugins', 'get-shit-done', 'skills');
   return path.join(configDir, 'skills');
 }
 
