@@ -26,7 +26,8 @@ function parseWorkflowSteps(content) {
       const body = match[2];
       return {
         name: match[1],
-        readsRuntimeConfig: body.includes('RUNTIME=$(gsd-sdk query config-get runtime --default claude'),
+        // After #3797 architectural fix, callsites use $GSD_SDK — accept either form
+        readsRuntimeConfig: body.includes('RUNTIME=$($GSD_SDK query config-get runtime --default claude') || body.includes('RUNTIME=$(gsd-sdk query config-get runtime --default claude'),
         codexWorktreeGuard: body.includes('Codex execute-phase worktree isolation is unsupported'),
         worktreeDispatchGuidance: body.includes('isolation="worktree"'),
       };
