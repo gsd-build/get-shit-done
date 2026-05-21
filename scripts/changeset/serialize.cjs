@@ -69,6 +69,10 @@ function parseChangelog(text) {
     const trailMatch = joined.match(/^(.*?)\s*\(#(\d+)\)\s*$/);
     if (trailMatch) {
       curSection.bullets.push({ body: trailMatch[1].trim(), pr: Number(trailMatch[2]) });
+    } else {
+      // Bullet has no PR trailer — preserve it with pr: null so callers
+      // (e.g. cmdExtract) do not silently drop authored content.
+      curSection.bullets.push({ body: joined, pr: null });
     }
     bulletLines = null;
   }

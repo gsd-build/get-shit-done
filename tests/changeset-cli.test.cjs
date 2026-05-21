@@ -150,6 +150,46 @@ describe('changeset cli extract: version-range changelog extraction (#3496)', ()
     assert.notEqual(r.status, 0);
     assert.ok(r.stderr.length > 0 || r.stdout.length > 0, 'must emit usage text');
   });
+
+  test('rejects malformed --from semver (non-numeric component) with exit 1', (t) => {
+    const r = runExtract(['--from', '1.41.x', '--to', '1.5.15', '--json'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 1, `expected exit 1 for malformed --from, stderr=${r.stderr}`);
+    assert.ok(r.json, 'stdout must be valid JSON on error');
+    assert.ok(typeof r.json.error === 'string', 'error field must be present');
+    assert.ok(r.json.error.includes('--from'), 'error must mention --from');
+  });
+
+  test('rejects malformed --to semver (alphabetic) with exit 1', (t) => {
+    const r = runExtract(['--from', '1.5.13', '--to', 'foo', '--json'], EXTRACT_CHANGELOG);
+    assert.equal(r.status, 1, `expected exit 1 for malformed --to, stderr=${r.stderr}`);
+    assert.ok(r.json, 'stdout must be valid JSON on error');
+    assert.ok(typeof r.json.error === 'string', 'error field must be present');
+    assert.ok(r.json.error.includes('--to'), 'error must mention --to');
+  });
+
+  test('preserves bullets without PR trailer in extracted output', (t) => {
+    // Fixture with one no-PR bullet and one PR bullet.
+    const CHANGELOG_NO_PR = [
+      '# Changelog',
+      '',
+      '## [2.0.0] - 2026-01-01',
+      '',
+      '### Fixed',
+      '',
+      '- Documented fix without PR reference.',
+      '- Fix with PR reference. (#999)',
+    ].join('\n');
+    const r = runExtract(['--from', '1.9.9', '--to', '2.0.0', '--json'], CHANGELOG_NO_PR);
+    assert.equal(r.status, 0, `stderr=${r.stderr}`);
+    assert.ok(r.json, 'stdout must be valid JSON');
+    const section = r.json.releases[0].sections[0];
+    assert.equal(section.bullets.length, 2, 'both bullets (with and without PR) must be captured');
+    const noPrBullet = section.bullets.find((b) => b.pr === null);
+    assert.ok(noPrBullet, 'bullet without PR trailer must be present with pr: null');
+    assert.ok(noPrBullet.body.includes('Documented fix'), 'body text preserved');
+    const prBullet = section.bullets.find((b) => b.pr === 999);
+    assert.ok(prBullet, 'bullet with PR trailer must still be captured');
+  });
 });
 
 describe('changeset cli render: file-I/O wrapper (#2975)', () => {

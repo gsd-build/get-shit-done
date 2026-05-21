@@ -87,6 +87,30 @@ describe('changeset serialize: multi-line bullet parsing (#3496)', () => {
     assert.equal(result.releases[0].sections[0].bullets.length, 1);
     assert.equal(result.releases[0].sections[0].bullets[0].pr, 3287);
   });
+
+  test('preserves bullets without (# pr) trailer as { body, pr: null } instead of dropping them', () => {
+    // Regression guard for Codex finding: bullets that lack a trailing
+    // (# NNNN) were silently discarded.  They must be stored with pr: null
+    // so callers (e.g. cmdExtract) can render them without silent loss.
+    const text = [
+      '## [1.43.0] - 2026-05-20',
+      '',
+      '### Fixed',
+      '',
+      '- Fix with a PR reference. (#4000)',
+      '- Documented fix without a PR reference.',
+      '- **Multi-line fix without trailer** — first line of description',
+      '  that continues on a second line but has no (# NNN) at the end.',
+    ].join('\n');
+    const result = parseChangelog(text);
+    const section = result.releases[0].sections[0];
+    assert.equal(section.bullets.length, 3, 'all three bullets must be captured');
+    assert.equal(section.bullets[0].pr, 4000, 'PR bullet preserved');
+    assert.equal(section.bullets[1].pr, null, 'no-PR bullet has pr: null');
+    assert.ok(section.bullets[1].body.includes('Documented fix'), 'no-PR bullet body preserved');
+    assert.equal(section.bullets[2].pr, null, 'multi-line no-PR bullet has pr: null');
+    assert.ok(section.bullets[2].body.includes('Multi-line fix without trailer'), 'multi-line no-PR body preserved');
+  });
 });
 
 describe('changeset serialize: multi-section + prior content (#2975)', () => {
