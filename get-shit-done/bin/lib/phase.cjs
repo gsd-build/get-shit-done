@@ -818,7 +818,9 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
 
     const headerIdx = rawContent.indexOf(headerMatch[0]);
     const afterHeader = rawContent.slice(headerIdx + headerMatch[0].length);
-    const nextPhaseMatch = afterHeader.match(/\n#{2,4}\s+Phase\s+\d/i);
+    // #3691: `\d` → `\d[\d.]*` so decimal phase headings (e.g. `### Phase 02.3:`) are
+    // recognised as section boundaries.
+    const nextPhaseMatch = afterHeader.match(/\n#{2,4}\s+Phase\s+\d[\d.]*/i);
 
     let insertIdx;
     if (nextPhaseMatch) {
