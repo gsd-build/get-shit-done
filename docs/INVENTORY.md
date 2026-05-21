@@ -361,7 +361,7 @@ The `gsd-planner` agent is decomposed into a core agent plus reference modules t
 
 ---
 
-## CLI Modules (72 shipped)
+## CLI Modules (73 shipped)
 
 Full listing: `get-shit-done/bin/lib/*.cjs`.
 
@@ -374,6 +374,7 @@ Full listing: `get-shit-done/bin/lib/*.cjs`.
 | `cjs-command-router-adapter.cjs` | Shared compatibility adapter for manifest-backed CJS command-family routers |
 | `cjs-sdk-bridge.cjs` | Shared SDK runtime-bridge loader (`tryLoadSdk`/`getExecuteForCjs`); consumed by every CJS router and `gsd-tools.cjs` to delegate canonical commands to the SDK in-process |
 | `clusters.cjs` | Skill cluster definitions for the runtime surface module (ADR-0011 Phase 2) |
+| `code-review-flags.cjs` | Typed flag parser for `/gsd:code-review`; exports `parseCodeReviewFlags(argv)` (→ `{ fix, all, auto, depth, files }`) and `resolveCodeReviewWorkflow(flags)` (→ `'code-review.md' \| 'code-review-fix.md'`); canonical dispatch seam for `--fix`/`--all`/`--auto` routing |
 | `command-aliases.generated.cjs` | Generated CJS alias/subcommand metadata for manifest-backed family routers |
 | `commands.cjs` | Misc CLI commands (slug, timestamp, todos, scaffolding, stats) |
 | `config-schema.cjs` | Single source of truth for `VALID_CONFIG_KEYS` and dynamic key patterns; imported by both the validator and the config-schema-docs parity test |
