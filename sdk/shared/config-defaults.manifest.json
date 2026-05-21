@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical CONFIG_DEFAULTS for the Configuration Module. Nested shape is canonical. CJS flat projection (branching_strategy, sub_repos, etc.) is handled by consumers at the boundary. Security keys (security_enforcement, security_asvs_level, security_block_on) and post_planning_gaps live in workflow.* as their canonical location. resolve_model_ids, context_window, phase_naming are CJS-originated top-level keys included here. brave_search, firecrawl, exa_search default to false in the manifest; at runtime buildNewProjectConfig detects API keys. The plan_checker (CJS flat) → workflow.plan_check (canonical nested) divergence is resolved: canonical name is workflow.plan_check. _auto_chain_active is a runtime-state field included for completeness.",
+  "_comment": "Canonical CONFIG_DEFAULTS for the Configuration Module. Nested shape is canonical. CJS flat projection (branching_strategy, sub_repos, etc.) is handled by consumers at the boundary. Security keys (security_enforcement, security_asvs_level, security_block_on) and post_planning_gaps live in workflow.* as their canonical location. resolve_model_ids, context_window, phase_naming are CJS-originated top-level keys included here. brave_search, firecrawl, exa_search, and perplexity default to false in the manifest; at runtime buildNewProjectConfig detects API keys. The plan_checker (CJS flat) → workflow.plan_check (canonical nested) divergence is resolved: canonical name is workflow.plan_check. _auto_chain_active is a runtime-state field included for completeness.",
   "model_profile": "balanced",
   "commit_docs": true,
   "parallelization": true,
@@ -7,6 +7,7 @@
   "brave_search": false,
   "firecrawl": false,
   "exa_search": false,
+  "perplexity": false,
   "resolve_model_ids": false,
   "context_window": 200000,
   "phase_naming": "sequential",

@@ -10,6 +10,7 @@
     "brave_search",
     "firecrawl",
     "exa_search",
+    "perplexity",
     "workflow.research",
     "workflow.plan_check",
     "workflow.verifier",

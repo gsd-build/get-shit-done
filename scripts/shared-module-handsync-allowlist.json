@@ -105,6 +105,12 @@
       "justification": "Both files read from sdk/shared/model-catalog.json (ADR-0003 precedent) as independent consumers of the shared manifest. CJS exposes VALID_AGENT_TIERS, MODEL_ALIAS_MAP, RUNTIME_PROFILE_MAP, KNOWN_RUNTIMES, RUNTIMES_WITH_REASONING_EFFORT, nextTier, formatAgentToModelMapAsTable for core.cjs and model-profiles.cjs consumers. SDK exposes resolveRuntimeTierDefault, runtimesWithReasoningEffort for session-runner.ts and query handlers. The shared JSON is the single source-of-truth; both adapters derive their exports from it without duplicating any logic between themselves."
     },
     {
+      "cjs": "get-shit-done/bin/lib/perplexity.cjs",
+      "ts": "sdk/src/query/perplexity.ts",
+      "classification": "cooperating-sibling",
+      "justification": "CJS perplexity.cjs is the CLI-runtime Perplexity adapter used by gsd-tools.cjs, while SDK perplexity.ts is the native QueryHandler surface. The PR locks body-shape and failure-shape parity with cross-surface tests while preserving runtime-specific transport and filesystem behavior."
+    },
+    {
       "cjs": "get-shit-done/bin/lib/plan-scan.cjs",
       "ts": "sdk/src/query/plan-scan.ts",
       "classification": "ADAPTER-OVER-MODULE",

@@ -294,6 +294,7 @@
       "milestone.cjs",
       "model-catalog.cjs",
       "model-profiles.cjs",
+      "perplexity.cjs",
       "phase-command-router.cjs",
       "phase.cjs",
       "phases-command-router.cjs",
