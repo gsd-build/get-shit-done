@@ -1,7 +1,7 @@
 {
   "_doc": "Baseline of modules currently exceeding the 2-test-file limit. Each entry locks in TODAY's count as the ceiling. Reductions are ratcheted automatically — when a cluster drops to ≤ 2, remove its entry. New entries require justification in PR description.",
   "modules": {
-    "phase":                  { "current": 4, "issue": "3740" },
+    "phase":                  { "current": 5, "issue": "3788" },
     "worktree":               { "current": 13, "issue": "TBD" },
     "milestone":              { "current": 10, "issue": "TBD" },
     "roadmap":                { "current": 9,  "issue": "TBD" },
