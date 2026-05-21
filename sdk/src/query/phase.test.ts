@@ -701,4 +701,37 @@ describe('phasePlanIndex', () => {
     // No unresolved-dep warning should be emitted.
     expect(warnings.some(w => /unresolved/i.test(w))).toBe(false);
   });
+
+  // This test can only run on Linux where the filesystem is case-sensitive.
+  // On macOS/Windows (case-insensitive FS), writing both files silently collapses
+  // them to one file, so the collision scenario cannot be triggered via disk.
+  const itLinuxOnly = process.platform === 'linux' ? it : it.skip;
+  itLinuxOnly('#3785 adversarial: case-insensitive collision — two plan IDs that differ only by case throw a clear error', async () => {
+    // Regression guard: if two plan files produce IDs that are identical when
+    // lowercased, planMap would silently overwrite one entry and route depends_on
+    // edges to whichever plan survived. This must fail fast instead.
+    const phase21 = join(tmpDir, '.planning', 'phases', '21-collision');
+    await mkdir(phase21, { recursive: true });
+    // These two filenames produce IDs '21-01-auth' and '21-01-Auth' — same when lowercased.
+    await writeFile(join(phase21, '21-01-auth-PLAN.md'), [
+      '---',
+      'phase: 21',
+      'plan: 01',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan lowercase.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase21, '21-01-Auth-PLAN.md'), [
+      '---',
+      'phase: 21',
+      'plan: 01',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan uppercase.</objective>',
+    ].join('\n'));
+
+    await expect(phasePlanIndex(['21'], tmpDir)).rejects.toThrow(/collision/i);
+  });
 });

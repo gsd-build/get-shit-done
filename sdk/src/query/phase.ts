@@ -498,6 +498,24 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
 
   // ── Pass 2: topological level assignment via depends_on DAG ──────────────
 
+  // Guard: detect case-insensitive key collisions before building dependency
+  // maps. Two plan IDs that differ only by case would silently overwrite each
+  // other in planMap, routing depends_on edges to whichever plan survived last.
+  // This is a configuration error — fail fast with the conflicting IDs so the
+  // author can rename one file. (#3785 follow-up from adversarial review)
+  const seenLower = new Map<string, string>(); // lowercase key → original id
+  for (const p of rawPlans) {
+    const lower = p.id.toLowerCase();
+    const existing = seenLower.get(lower);
+    if (existing !== undefined) {
+      throw new GSDError(
+        `depends_on index collision in phase ${normalized}: plan IDs '${existing}' and '${p.id}' are identical when case-folded. Rename one file to avoid ambiguous dependency resolution.`,
+        ErrorClassification.Execution,
+      );
+    }
+    seenLower.set(lower, p.id);
+  }
+
   // Build a map from plan ID → RawPlan for fast lookup.
   // Deps that reference plans outside this phase are silently ignored (treated
   // as already-satisfied external deps — the plan becomes a source node).

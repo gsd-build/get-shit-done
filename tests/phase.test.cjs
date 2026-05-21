@@ -567,6 +567,76 @@ objective: Manual review needed
     const output = JSON.parse(result.output);
     assert.strictEqual(output.error, 'Phase not found', 'should report phase not found');
   });
+
+  // #3785 — case-insensitive depends_on resolution
+  test('#3785: depends_on reference with different case resolves to correct plan', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '20-case-insensitive');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // Plan A: filename uses uppercase suffix — plan ID becomes '20-01-Auth'
+    fs.writeFileSync(
+      path.join(phaseDir, '20-01-Auth-PLAN.md'),
+      `---\nwave: 1\nautonomous: true\ndepends_on: []\n---\n<objective>Plan A.</objective>\n`,
+    );
+    // Plan B: depends_on uses lowercase — must still resolve to Plan A
+    fs.writeFileSync(
+      path.join(phaseDir, '20-02-PLAN.md'),
+      `---\nwave: 2\nautonomous: true\ndepends_on:\n  - 20-01-auth\n---\n<objective>Plan B.</objective>\n`,
+    );
+
+    const result = runGsdTools('phase-plan-index 20', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    const waves = output.waves;
+
+    const wave01 = Object.keys(waves).find(w => waves[w].some(id => id.startsWith('20-01')));
+    const wave02 = Object.keys(waves).find(w => waves[w].some(id => id.startsWith('20-02')));
+    assert.ok(wave01 !== undefined, 'plan 20-01-Auth should appear in waves');
+    assert.ok(wave02 !== undefined, 'plan 20-02 should appear in waves');
+    assert.ok(
+      Number(wave01) < Number(wave02),
+      `20-02 must be in a later wave than 20-01 (got wave01=${wave01}, wave02=${wave02}) — DAG edge dropped (case mismatch)`,
+    );
+    // No unresolved-dep warning
+    const warnings = output.warnings ?? [];
+    assert.ok(
+      !warnings.some(w => /unresolved/i.test(w)),
+      `Unexpected unresolved-dep warning: ${JSON.stringify(warnings)}`,
+    );
+  });
+
+  // #3785 adversarial: two plan IDs that are identical when case-folded must
+  // fail fast with a clear error instead of silently routing edges to the wrong plan.
+  // This test can only run on Linux where the filesystem is case-sensitive.
+  // On macOS/Windows (case-insensitive FS), writing both files silently collapses
+  // them to one file, so the collision scenario cannot be triggered via disk.
+  test('#3785 adversarial: two plan IDs differing only by case produce a collision error', {
+    skip: process.platform !== 'linux' ? 'case-insensitive filesystem — collision test requires Linux' : false,
+  }, () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '21-collision');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // '21-01-auth-PLAN.md' → id '21-01-auth'
+    // '21-01-Auth-PLAN.md' → id '21-01-Auth'
+    // Both lowercase to '21-01-auth' — collision.
+    fs.writeFileSync(
+      path.join(phaseDir, '21-01-auth-PLAN.md'),
+      `---\nautonomous: true\ndepends_on: []\n---\n<objective>lowercase.</objective>\n`,
+    );
+    fs.writeFileSync(
+      path.join(phaseDir, '21-01-Auth-PLAN.md'),
+      `---\nautonomous: true\ndepends_on: []\n---\n<objective>uppercase.</objective>\n`,
+    );
+
+    const result = runGsdTools('phase-plan-index 21', tmpDir);
+    // The command must exit with an error (non-success) naming the collision.
+    assert.ok(!result.success, 'phase-plan-index must fail when two plan IDs collide under case-folding');
+    assert.ok(
+      /collision/i.test(result.error ?? result.output ?? ''),
+      `Error output must mention 'collision', got: ${result.error ?? result.output}`,
+    );
+  });
 });
 
 
