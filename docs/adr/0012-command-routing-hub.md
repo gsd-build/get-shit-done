@@ -37,6 +37,14 @@ The router adapter's responsibilities shrink to: determine mode from env, build 
 - **Constraint**: adding a new `errorKind` value requires updating `ERROR_KINDS` in `command-routing-hub.cjs` AND amending this ADR. The closed enum is the drift-prevention property; the amendment requirement makes scope of impact explicit.
 - **Constraint**: each adapter must compute mode before hub construction (no lazy re-evaluation). This is intentional — mode ambiguity at dispatch time is a prior source of subtle test flakiness.
 
+## Known limitation: SDK-incomplete subcommands
+
+The hub's mode is fixed at construction (`'sdk'` or `'cjs'`). This works cleanly only when every subcommand in a family has an implementation in the active mode. Today some phase subcommands — notably `phase.mvp-mode` — exist only in CJS; the SDK has no equivalent entry. When `mode === 'sdk'` and the SDK lacks the subcommand, the hub returns `SdkDispatchFailed`, which is not the desired behavior. The pre-migration code transparently reached through to CJS for these subcommands without surfacing any error.
+
+The proof-of-concept adapter (`phase-command-router.cjs`) handles this with an early-return bypass: `mvp-mode` is intercepted before the dispatch call so it never reaches the hub. This preserves observable behavior but introduces a hub-level abstraction leak — the adapter now carries per-subcommand routing policy that the hub was meant to own.
+
+Future direction (deferred): the hub should consult `manifest` to detect per-subcommand SDK coverage and route to CJS automatically for subcommands not present in the SDK manifest. That refinement stays inside the global-mode decision — the mode still applies to the family as a whole — and avoids the per-command policy ladder that was explicitly rejected during design. This work is tracked alongside SDK-CJS migration #3524 closure.
+
 ## References
 
 - Extends ADR-0001 (Dispatch Policy Module) — the hub implements the no-throw + structured-result contract ADR-0001 established for the SDK query layer, applying it to the CJS adapter layer.
