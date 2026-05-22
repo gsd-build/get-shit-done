@@ -354,30 +354,21 @@ describe('bug-2075: worktree deletion safeguards', () => {
 
       const cleanupSection = content.slice(worktreeCleanupStart);
 
-      assert.ok(
-        cleanupSection.includes('--diff-filter=D'),
-        'execute-phase.md worktree cleanup must use --diff-filter=D to block deletion-introducing merges'
+      // After #3797 architectural fix: deletion check is handled by SDK worktree.cleanup-wave.
+      // Accept either (a) --diff-filter=D inline OR (b) SDK delegation with deletion mention.
+      const hasInlineDiffFilterCheck = cleanupSection.includes('--diff-filter=D');
+      const hasSdkDelegationWithDeletionMention = (
+        cleanupSection.includes('worktree.cleanup-wave') &&
+        (cleanupSection.includes('deletion') || cleanupSection.includes('BLOCKED'))
       );
-
-      // Deletion check must appear before git merge
-      const deletionCheckIdx = cleanupSection.indexOf('--diff-filter=D');
-      const gitMergeIdx = cleanupSection.indexOf('git merge');
       assert.ok(
-        deletionCheckIdx < gitMergeIdx,
-        '--diff-filter=D deletion check must appear before git merge in the worktree cleanup section'
-      );
-
-      assert.ok(
-        cleanupSection.includes('BLOCKED') || cleanupSection.includes('deletion'),
-        'execute-phase.md must block or warn when the worktree branch contains file deletions'
+        hasInlineDiffFilterCheck || hasSdkDelegationWithDeletionMention,
+        'execute-phase.md cleanup section must either include --diff-filter=D or delegate to SDK (worktree.cleanup-wave) with documented deletion-diff validation (#2384/#3797)',
       );
     });
 
     test('quick.md worktree merge section has pre-merge deletion check', () => {
       const content = fs.readFileSync(QUICK_PATH, 'utf-8');
-
-      const mergeIdx = content.indexOf('git merge');
-      assert.ok(mergeIdx > -1, 'quick.md must contain a git merge operation');
 
       // Find the worktree cleanup block (starts after "Worktree cleanup")
       const worktreeCleanupStart = content.indexOf('Worktree cleanup');
@@ -388,9 +379,18 @@ describe('bug-2075: worktree deletion safeguards', () => {
 
       const cleanupSection = content.slice(worktreeCleanupStart);
 
+      // After #3797 architectural fix: deletion check is handled by SDK worktree.cleanup-wave.
+      // Accept either (a) --diff-filter=D / diff-filter inline OR (b) SDK delegation with deletion mention.
+      const hasInlineDiffFilterCheck = (
+        cleanupSection.includes('--diff-filter=D') || cleanupSection.includes('diff-filter')
+      );
+      const hasSdkDelegationWithDeletionMention = (
+        cleanupSection.includes('worktree.cleanup-wave') &&
+        (cleanupSection.includes('deletion') || cleanupSection.includes('BLOCKED'))
+      );
       assert.ok(
-        cleanupSection.includes('--diff-filter=D') || cleanupSection.includes('diff-filter'),
-        'quick.md worktree cleanup must check for file deletions before merging'
+        hasInlineDiffFilterCheck || hasSdkDelegationWithDeletionMention,
+        'quick.md cleanup section must either check for file deletions inline or delegate to SDK (worktree.cleanup-wave) with documented deletion-diff validation (#2384/#3797)',
       );
     });
   });
@@ -422,9 +422,14 @@ describe('bug-2431: worktree teardown must surface locked-worktree errors', () =
 
   test('quick.md: has lock-aware detection block', () => {
     const content = fs.readFileSync(QUICK_PATH, 'utf-8');
+    // After #3797 architectural fix: quick.md delegates entirely to SDK worktree.cleanup-wave,
+    // which handles lock detection internally. Accept either inline .git/worktrees/.../locked
+    // check OR SDK delegation (the SDK documents locked-worktree handling).
+    const hasInlineLockCheck = content.includes('.git/worktrees/') && content.includes('locked');
+    const hasSdkDelegation = content.includes('worktree.cleanup-wave');
     assert.ok(
-      content.includes('.git/worktrees/') && content.includes('locked'),
-      'quick.md: must include lock-aware detection (.git/worktrees/.../locked check)'
+      hasInlineLockCheck || hasSdkDelegation,
+      'quick.md: must include lock-aware detection (.git/worktrees/.../locked check) or delegate to SDK worktree.cleanup-wave (#2431/#3797)'
     );
   });
 
@@ -438,7 +443,14 @@ describe('bug-2431: worktree teardown must surface locked-worktree errors', () =
 
   test('quick.md: has git worktree unlock retry', () => {
     const content = fs.readFileSync(QUICK_PATH, 'utf-8');
-    assert.ok(content.includes('git worktree unlock'), 'quick.md: must include "git worktree unlock" retry attempt');
+    // After #3797 architectural fix: quick.md delegates entirely to SDK worktree.cleanup-wave.
+    // Accept either inline "git worktree unlock" OR SDK delegation.
+    const hasInlineUnlock = content.includes('git worktree unlock');
+    const hasSdkDelegation = content.includes('worktree.cleanup-wave');
+    assert.ok(
+      hasInlineUnlock || hasSdkDelegation,
+      'quick.md: must include "git worktree unlock" retry attempt or delegate to SDK worktree.cleanup-wave (#2431/#3797)'
+    );
   });
 
   test('execute-phase.md: has git worktree unlock retry', () => {
@@ -448,9 +460,14 @@ describe('bug-2431: worktree teardown must surface locked-worktree errors', () =
 
   test('quick.md: has user-visible warning on residual worktree', () => {
     const content = fs.readFileSync(QUICK_PATH, 'utf-8');
+    // After #3797 architectural fix: quick.md delegates entirely to SDK worktree.cleanup-wave,
+    // which surfaces residual worktree warnings internally. Accept either inline warning
+    // OR SDK delegation.
+    const hasInlineWarning = content.includes('Residual worktree') || content.includes('manual cleanup');
+    const hasSdkDelegation = content.includes('worktree.cleanup-wave');
     assert.ok(
-      content.includes('Residual worktree') || content.includes('manual cleanup'),
-      'quick.md: must include user-visible warning when worktree removal fails'
+      hasInlineWarning || hasSdkDelegation,
+      'quick.md: must include user-visible warning when worktree removal fails, or delegate to SDK worktree.cleanup-wave (#2431/#3797)'
     );
   });
 
