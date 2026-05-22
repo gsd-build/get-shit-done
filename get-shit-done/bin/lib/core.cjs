@@ -1517,24 +1517,39 @@ function extractOneLinerFromBody(content) {
   const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Strip frontmatter first
   const body = normalized.replace(/^---\n[\s\S]*?\n---\n*/, '');
-  // Find the first **...** span on a line after a # heading.
-  // Two supported template forms:
-  //   1) Labeled:  **One-liner:** Real prose here.   (bug #2660 — new template)
-  //   2) Bare:     **Real prose here.**              (legacy template)
-  // For (1), the first bold span ends in a colon and the prose that follows
-  // on the same line is the one-liner. For (2), the bold span itself is the
-  // one-liner.
-  const match = body.match(/^#[^\n]*\n+\*\*([^*\n]+)\*\*([^\n]*)/m);
-  if (!match) return null;
-  const boldInner = match[1].trim();
-  const afterBold = match[2];
-  // Labeled form: bold span is a "Label:" prefix — capture prose after it.
-  if (/:\s*$/.test(boldInner)) {
-    const prose = afterBold.trim();
-    return prose.length > 0 ? prose : null;
+  // Anchor strictly to the FIRST h1 heading (single `#`). The previous
+  // pattern `^#[^\n]*` matched any heading level, so when a SUMMARY's title
+  // was not immediately followed by a `**bold**` paragraph (e.g. an intro
+  // blockquote sat between, or `## Objective` came next with prose), the
+  // regex would walk down to a later sub-heading like
+  // `### Deviation 1 — ...` and grab the bold span from the deviation body
+  // (e.g. `**Found during:** Task 3 ...`) — leaking deviation fragments into
+  // milestone accomplishments.
+  //
+  // Three supported template forms:
+  //   1) Labeled bold:  **One-liner:** Real prose here.
+  //   2) Bare bold:     **Real prose here.**
+  //   3) Blockquote:    > Real prose here.            (new — common in some templates)
+  const h1Match = body.match(/^#\s+[^\n]*\n+([^\n]*)/m);
+  if (!h1Match) return null;
+  const firstLine = h1Match[1].trim();
+  // Forms 1 + 2: bold span on the first non-blank line after the h1 title.
+  const boldMatch = firstLine.match(/^\*\*([^*\n]+)\*\*([^\n]*)/);
+  if (boldMatch) {
+    const boldInner = boldMatch[1].trim();
+    const afterBold = boldMatch[2];
+    if (/:\s*$/.test(boldInner)) {
+      const prose = afterBold.trim();
+      return prose.length > 0 ? prose : null;
+    }
+    return boldInner.length > 0 ? boldInner : null;
   }
-  // Bare form: the bold content itself is the one-liner.
-  return boldInner.length > 0 ? boldInner : null;
+  // Form 3: blockquote one-liner.
+  const quoteMatch = firstLine.match(/^>\s+(.+)$/);
+  if (quoteMatch) {
+    return quoteMatch[1].trim().replace(/^\*\*|\*\*$/g, '') || null;
+  }
+  return null;
 }
 
 // ─── Misc utilities ───────────────────────────────────────────────────────────
@@ -1743,10 +1758,19 @@ function getMilestonePhaseFilter(cwd, versionOverride) {
       }
     }
 
-    // Match both numeric phases (Phase 1:) and custom IDs (Phase PROJ-42:)
-    const phasePattern = /#{2,4}\s*Phase\s+([\w][\w.-]*)\s*:/gi;
+    // Match phase declarations in BOTH heading form (### Phase N:) and
+    // checkbox-bullet form (- [ ] **Phase N: title**). Without the bullet
+    // path, ROADMAPs whose milestone-active section lists phases as bullets
+    // (a common convention) produce an empty milestonePhaseNums set, which
+    // trips the passAll fallback below and counts every phase dir on disk
+    // as in-scope for the milestone (range-leakage bug).
+    const phaseHeadingPattern = /^#{2,4}\s*Phase\s+([\w][\w.-]*)\s*:/gim;
+    const phaseBulletPattern  = /^[-*]\s*\[[ xX]\]\s*\*\*\s*Phase\s+([\w][\w.-]*)\s*:/gim;
     let m;
-    while ((m = phasePattern.exec(roadmap)) !== null) {
+    while ((m = phaseHeadingPattern.exec(roadmap)) !== null) {
+      milestonePhaseNums.add(m[1]);
+    }
+    while ((m = phaseBulletPattern.exec(roadmap)) !== null) {
       milestonePhaseNums.add(m[1]);
     }
   } catch { /* intentionally empty */ }

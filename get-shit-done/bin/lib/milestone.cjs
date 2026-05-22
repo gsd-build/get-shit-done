@@ -176,9 +176,13 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
     fs.renameSync(auditFile, path.join(archiveDir, `${version}-MILESTONE-AUDIT.md`));
   }
 
-  // Create/append MILESTONES.md entry
+  // Create/append MILESTONES.md entry.
+  // When `options.name` is absent, `milestoneName` falls back to `version`
+  // (see line ~104), which produced duplicated headers like `## v5.0 v5.0`.
+  // Render the name suffix only when it differs from version.
   const accomplishmentsList = accomplishments.map(a => `- ${a}`).join('\n');
-  const milestoneEntry = `## ${version} ${milestoneName} (Shipped: ${today})\n\n**Phases completed:** ${phaseCount} phases, ${totalPlans} plans, ${totalTasks} tasks\n\n**Key accomplishments:**\n${accomplishmentsList || '- (none recorded)'}\n\n---\n\n`;
+  const headingSuffix = (milestoneName && milestoneName !== version) ? ` ${milestoneName}` : '';
+  const milestoneEntry = `## ${version}${headingSuffix} (Shipped: ${today})\n\n**Phases completed:** ${phaseCount} phases, ${totalPlans} plans, ${totalTasks} tasks\n\n**Key accomplishments:**\n${accomplishmentsList || '- (none recorded)'}\n\n---\n\n`;
 
   if (fs.existsSync(milestonesPath)) {
     const existing = fs.readFileSync(milestonesPath, 'utf-8');
