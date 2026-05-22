@@ -541,9 +541,7 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
 
     const phaseStart = phaseMatch.index;
     const restAfterHeader = content.slice(phaseStart);
-    // #3691 Bug 2: `\d` only matches a single digit, missing decimal phase headings
-    // like `### Phase 02.3:`. Use `\d[\d.]*` to match integers and decimals alike.
-    const nextPhaseOffset = restAfterHeader.slice(1).search(/\n#{2,4}\s+Phase\s+\d[\d.]*/i);
+    const nextPhaseOffset = restAfterHeader.slice(1).search(/\n#{2,4}\s+Phase\s+\d/i);
     const phaseEnd = nextPhaseOffset >= 0 ? phaseStart + 1 + nextPhaseOffset : content.length;
     const phaseSection = content.slice(phaseStart, phaseEnd);
 
@@ -562,7 +560,10 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
     // line with no immediately-following checklist items (e.g. a summary line above a
     // separate bare `Plans:` block) does not consume the match and prevent the actual
     // list from being found.
-    const plansBlockMatch = phaseSection.match(/(\*{0,2}Plans\*{0,2}:[^\n]*\n)((?:\s*-\s*\[[ x]\][^\n]*\n?)+)/i);
+    // Review fix (F2): `(?:^|\n)` anchors the match to start-of-line so mid-line
+    // occurrences like `***Plans:***` embedded in a sentence or `OpenPlans: foo`
+    // do not trigger a false match. Groups 1 and 2 retain the same semantics.
+    const plansBlockMatch = phaseSection.match(/(?:^|\n)(\*{0,2}Plans\*{0,2}:[^\n]*\n)((?:\s*-\s*\[[ x]\][^\n]*\n?)+)/i);
     if (!plansBlockMatch) return;
 
     const plansHeader = plansBlockMatch[1];
@@ -580,6 +581,11 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
       // terminating alternation (`-PLAN.md|.md|:|\s—`) as the boundary anchor.
       const idMatch = line.match(/\[\s*[x ]\s*\]\s*([\w.-]+?)(?:-PLAN\.md|\.md|:|\s—)/i);
       const planId = idMatch ? idMatch[1] : null;
+      // Review fix (F3): reject malformed IDs that start with `.`, contain consecutive
+      // dots, or otherwise violate the `^\w[\w.-]*$` contract. A leading-dot ID
+      // (e.g. `.invalid-PLAN.md`) would silently default to wave 1 — defensively
+      // skip the line instead so corrupted ROADMAP entries don't corrupt wave layout.
+      if (planId && !/^\w[\w.-]*$/.test(planId)) continue;
       const planEntry = planId ? planData.find(p => p.planId === planId) : null;
       const wave = planEntry ? planEntry.wave : 1;
       if (!linesByWave.has(wave)) linesByWave.set(wave, []);
