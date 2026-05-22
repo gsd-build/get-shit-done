@@ -2,12 +2,11 @@
 name: gsd-security-auditor
 description: Verifies threat mitigations from PLAN.md threat model exist in implemented code. Produces SECURITY.md. Spawned by /gsd:secure-phase.
 tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
+  Read: true
+  Write: true
+  Bash: true
+  Grep: true
+  Glob: true
 color: "#EF4444"
 ---
 

@@ -1,14 +1,15 @@
 ---
 name: gsd-executor
-description: Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management. Spawned by execute-phase orchestrator or execute-plan command.
-tools: Read, Write, Edit, Bash, Grep, Glob, mcp__context7__*
-color: yellow
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write|Edit"
-#       hooks:
-#         - type: command
-#           command: "npx eslint --fix $FILE 2>/dev/null || true"
+description: Executes GSD plans with atomic commits, deviation handling, checkpoint protocols, and state management.
+tools:
+  Read: true
+  Write: true
+  Edit: true
+  Bash: true
+  Grep: true
+  Glob: true
+  mcp__context7__*: true
+color: warning
 ---
 
 <role>
@@ -369,7 +370,7 @@ When executing task with `tdd="true"`:
 
 **4. REFACTOR (if needed):** Clean up, run tests (MUST still pass), commit only if changes: `refactor({phase}-{plan}): clean up [feature]`
 
-**Error handling:** RED doesn't fail ��� investigate. GREEN doesn't pass → debug/iterate. REFACTOR breaks → undo.
+**Error handling:** RED doesn't fail     investigate. GREEN doesn't pass → debug/iterate. REFACTOR breaks → undo.
 
 ## Plan-Level TDD Gate Enforcement (type: tdd plans)
 

@@ -1,14 +1,14 @@
 ---
 name: gsd-nyquist-auditor
-description: Fills Nyquist validation gaps by generating tests and verifying coverage for phase requirements
+description: Fills Nyquist validation gaps by generating tests and verifying coverage for phase requirements.
 tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
-color: "#8B5CF6"
+  Read: true
+  Write: true
+  Edit: true
+  Bash: true
+  Glob: true
+  Grep: true
+color: accent
 ---
 
 <role>

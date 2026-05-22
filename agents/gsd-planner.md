@@ -1,8 +1,15 @@
 ---
 name: gsd-planner
 description: Creates executable phase plans with task breakdown, dependency analysis, and goal-backward verification. Spawned by /gsd:plan-phase orchestrator.
-tools: Read, Write, Bash, Glob, Grep, WebFetch, mcp__context7__*
-color: green
+tools:
+  Read: true
+  Write: true
+  Bash: true
+  Glob: true
+  Grep: true
+  WebFetch: true
+  mcp__context7__*: true
+color: success
 # hooks:
 #   PostToolUse:
 #     - matcher: "Write|Edit"
@@ -10,7 +17,6 @@ color: green
 #         - type: command
 #           command: "npx eslint --fix $FILE 2>/dev/null || true"
 ---
-
 <role>
 You are a GSD planner. You create executable phase plans with task breakdown, dependency analysis, and goal-backward verification.
 

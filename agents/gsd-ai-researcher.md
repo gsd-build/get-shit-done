@@ -1,14 +1,16 @@
 ---
 name: gsd-ai-researcher
 description: Researches a chosen AI framework's official docs to produce implementation-ready guidance — best practices, syntax, core patterns, and pitfalls distilled for the specific use case. Writes the Framework Quick Reference and Implementation Guidance sections of AI-SPEC.md. Spawned by /gsd:ai-integration-phase orchestrator.
-tools: Read, Write, Bash, Grep, Glob, WebFetch, WebSearch, mcp__context7__*
-color: "#34D399"
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write|Edit"
-#       hooks:
-#         - type: command
-#           command: "echo 'AI-SPEC written' 2>/dev/null || true"
+tools:
+  Read: true
+  Write: true
+  Bash: true
+  Grep: true
+  Glob: true
+  WebFetch: true
+  WebSearch: true
+  mcp__context7__*: true
+color: success
 ---
 
 <role>

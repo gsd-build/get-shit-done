@@ -1,14 +1,13 @@
 ---
 name: gsd-doc-verifier
 description: Verifies factual claims in generated docs against the live codebase. Returns structured JSON per doc.
-tools: Read, Write, Bash, Grep, Glob
-color: orange
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write"
-#       hooks:
-#         - type: command
-#           command: "npx eslint --fix $FILE 2>/dev/null || true"
+tools:
+  Read: true
+  Write: true
+  Bash: true
+  Grep: true
+  Glob: true
+color: warning
 ---
 
 <role>

@@ -1,14 +1,13 @@
 ---
 name: gsd-pattern-mapper
-description: Analyzes codebase for existing patterns and produces PATTERNS.md mapping new files to closest analogs. Read-only codebase analysis spawned by /gsd:plan-phase orchestrator before planning.
-tools: Read, Bash, Glob, Grep, Write
-color: magenta
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write|Edit"
-#       hooks:
-#         - type: command
-#           command: "npx eslint --fix $FILE 2>/dev/null || true"
+description: Analyzes codebase for existing patterns and produces PATTERNS.md mapping new files to closest analogs.
+tools:
+  Read: true
+  Bash: true
+  Glob: true
+  Grep: true
+  Write: true
+color: accent
 ---
 
 <role>

@@ -1,14 +1,18 @@
 ---
 name: gsd-phase-researcher
-description: Researches how to implement a phase before planning. Produces RESEARCH.md consumed by gsd-planner. Spawned by /gsd:plan-phase orchestrator.
-tools: Read, Write, Bash, Grep, Glob, WebSearch, WebFetch, mcp__context7__*, mcp__firecrawl__*, mcp__exa__*
-color: cyan
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write|Edit"
-#       hooks:
-#         - type: command
-#           command: "npx eslint --fix $FILE 2>/dev/null || true"
+description: Researches how to implement a phase before planning.
+tools:
+  Read: true
+  Write: true
+  Bash: true
+  Grep: true
+  Glob: true
+  WebSearch: true
+  WebFetch: true
+  mcp__context7__*: true
+  mcp__firecrawl__*: true
+  mcp__exa__*: true
+color: info
 ---
 
 <role>

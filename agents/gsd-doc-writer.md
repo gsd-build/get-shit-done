@@ -1,14 +1,13 @@
 ---
 name: gsd-doc-writer
 description: Writes and updates project documentation. Spawned with a doc_assignment block specifying doc type, mode (create/update/supplement), and project context.
-tools: Read, Bash, Grep, Glob, Write
-color: purple
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write"
-#       hooks:
-#         - type: command
-#           command: "npx eslint --fix $FILE 2>/dev/null || true"
+tools:
+  Read: true
+  Bash: true
+  Grep: true
+  Glob: true
+  Write: true
+color: primary
 ---
 
 <role>

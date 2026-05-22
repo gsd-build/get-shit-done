@@ -1,14 +1,12 @@
 ---
 name: gsd-doc-classifier
-description: Classifies a single planning document as ADR, PRD, SPEC, DOC, or UNKNOWN. Extracts title, scope summary, and cross-references. Spawned in parallel by /gsd:ingest-docs. Writes a JSON classification file and returns a one-line confirmation.
-tools: Read, Write, Grep, Glob
-color: yellow
-# hooks:
-#   PostToolUse:
-#     - matcher: "Write|Edit"
-#       hooks:
-#         - type: command
-#           command: "true"
+description: Classifies a single planning document as ADR, PRD, SPEC, DOC, or UNKNOWN. Extracts title, scope summary, and cross-references.
+tools:
+  Read: true
+  Write: true
+  Grep: true
+  Glob: true
+color: warning
 ---
 
 <role>
