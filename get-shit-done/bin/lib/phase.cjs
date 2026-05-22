@@ -607,7 +607,7 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
       let m;
       while ((m = phasePattern.exec(content)) !== null) {
         const num = parseInt(m[1], 10);
-        if (num >= 999) continue; // backlog phases use 999.x numbering
+        if (num === 999) continue; // backlog phases use 999.x numbering
         if (num > maxPhase) maxPhase = num;
       }
 
@@ -621,7 +621,7 @@ function cmdPhaseAdd(cwd, description, raw, customId) {
           const match = entry.match(dirNumPattern);
           if (!match) continue;
           const num = parseInt(match[1], 10);
-          if (num >= 999) continue; // skip backlog orphans
+          if (num === 999) continue; // skip backlog orphans
           if (num > maxPhase) maxPhase = num;
         }
       }
@@ -685,7 +685,7 @@ function cmdPhaseAddBatch(cwd, descriptions, raw) {
       let m;
       while ((m = phasePattern.exec(content)) !== null) {
         const num = parseInt(m[1], 10);
-        if (num >= 999) continue;
+        if (num === 999) continue;
         if (num > maxPhase) maxPhase = num;
       }
       const phasesOnDisk = path.join(planningDir(cwd), 'phases');
@@ -695,7 +695,7 @@ function cmdPhaseAddBatch(cwd, descriptions, raw) {
           const match = entry.match(dirNumPattern);
           if (!match) continue;
           const num = parseInt(match[1], 10);
-          if (num >= 999) continue;
+          if (num === 999) continue;
           if (num > maxPhase) maxPhase = num;
         }
       }

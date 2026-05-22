@@ -60,7 +60,7 @@ export function extractOneLinerFromBody(content: string): string | null {
 
 /**
  * Scan highest sequential phase number in milestone content.
- * Skips backlog lanes (`999.x`).
+ * Skips exactly the backlog sentinel (`999`); phases 1000+ are valid canonical IDs.
  */
 export function scanSequentialMaxPhaseFromMilestone(milestoneContent: string): number {
   const phasePattern = /(?:^|\n)\s*(?:[-*]\s*(?:\[[x ]\]\s*)?|#{2,4}\s*|\*{1,2}\s*)Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
@@ -68,7 +68,7 @@ export function scanSequentialMaxPhaseFromMilestone(milestoneContent: string): n
   let m: RegExpExecArray | null;
   while ((m = phasePattern.exec(milestoneContent)) !== null) {
     const num = parseInt(m[1], 10);
-    if (num >= 999) continue;
+    if (num === 999) continue;
     if (num > maxPhase) maxPhase = num;
   }
   return maxPhase;
@@ -85,7 +85,7 @@ export function scanSequentialMaxPhaseFromDirs(dirNames: string[]): number {
     const match = dirNumPattern.exec(dirName);
     if (!match) continue;
     const num = parseInt(match[1], 10);
-    if (num >= 999) continue;
+    if (num === 999) continue;
     if (num > maxPhase) maxPhase = num;
   }
   return maxPhase;
