@@ -372,28 +372,48 @@ Exit.
 <step name="show_changes_and_confirm">
 **If update available**, fetch and show what's new BEFORE updating:
 
-1. Fetch changelog from GitHub raw URL
-2. Extract entries between installed and latest versions
-3. Display preview and ask for confirmation:
+1. Fetch changelog from GitHub raw URL and save to a temp file, e.g. `/tmp/gsd-changelog-$$.md`.
+2. Extract entries between installed and latest versions using the deterministic range helper (fix for #3496 — do NOT use ad-hoc grep/awk extraction which silently skips intermediate versions):
+
+```bash
+CHANGELOG_TMP="/tmp/gsd-changelog-$$.md"
+curl -fsSL "https://raw.githubusercontent.com/gsd-build/get-shit-done/main/CHANGELOG.md" -o "$CHANGELOG_TMP" 2>/dev/null \
+  || wget -qO "$CHANGELOG_TMP" "https://raw.githubusercontent.com/gsd-build/get-shit-done/main/CHANGELOG.md" 2>/dev/null
+
+EXTRACT_JSON=$(node "$GSD_DIR/get-shit-done/scripts/changeset/cli.cjs" extract \
+  --from "$INSTALLED_VERSION" \
+  --to "$LATEST_VERSION" \
+  --changelog "$CHANGELOG_TMP" \
+  --json 2>/dev/null)
+EXTRACT_EXIT=$?
+rm -f "$CHANGELOG_TMP"
+
+if [ "$EXTRACT_EXIT" -eq 2 ]; then
+  # Exit 2 = no releases in range (e.g. versions are equal or changelog is sparse)
+  CHANGELOG_PREVIEW="No changelog updates between v${INSTALLED_VERSION} and v${LATEST_VERSION}."
+elif [ "$EXTRACT_EXIT" -ne 0 ] || [ -z "$EXTRACT_JSON" ]; then
+  CHANGELOG_PREVIEW="(Could not extract changelog — update will still proceed)"
+else
+  # Re-run without --json to get the human-readable markdown for display
+  CHANGELOG_PREVIEW=$(node "$GSD_DIR/get-shit-done/scripts/changeset/cli.cjs" extract \
+    --from "$INSTALLED_VERSION" \
+    --to "$LATEST_VERSION" \
+    --changelog "$CHANGELOG_TMP" 2>/dev/null || echo "(changelog unavailable)")
+fi
+```
+
+3. Display preview and ask for confirmation, using `$CHANGELOG_PREVIEW` from the extract step above:
 
 ```
 ## GSD Update Available
 
-**Installed:** 1.5.10
-**Latest:** 1.5.15
+**Installed:** {INSTALLED_VERSION}
+**Latest:** {LATEST_VERSION}
 
 ### What's New
 ────────────────────────────────────────────────────────────
 
-## [1.5.15] - 2026-01-20
-
-### Added
-- Feature X
-
-## [1.5.14] - 2026-01-18
-
-### Fixed
-- Bug fix Y
+{CHANGELOG_PREVIEW}
 
 ────────────────────────────────────────────────────────────
 

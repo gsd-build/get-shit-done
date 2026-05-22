@@ -78,10 +78,17 @@ function parseChangelog(text) {
   }
 
   for (const line of lines) {
-    const releaseMatch = line.match(/^##\s+\[([^\]]+)\](?:\s*-\s*(\S+))?/);
+    // F3: match linked headers: ## [1.42.1](url) - 2026-05-15
+    //     The (?:\([^)]*\))? group skips an optional (url) after the closing ]
+    //     before looking for the optional date suffix.
+    // F6: strip a leading `v` from the captured version so `## [v1.0.0]`
+    //     parses as version "1.0.0" instead of "v1.0.0".
+    const releaseMatch = line.match(/^##\s+\[([^\]]+)\](?:\([^)]*\))?\s*(?:-\s*(\S+))?/);
     if (releaseMatch) {
       flushBullet();
-      cur = { version: releaseMatch[1], date: releaseMatch[2] || null, sections: [] };
+      const rawVersion = releaseMatch[1];
+      const version = rawVersion.replace(/^v/, '');
+      cur = { version, date: releaseMatch[2] || null, sections: [] };
       curSection = null;
       releases.push(cur);
       continue;
@@ -104,13 +111,15 @@ function parseChangelog(text) {
       continue;
     }
 
-    // Continuation line: indented with at least two spaces (or a tab).
-    if (bulletLines !== null && /^[ \t]{2}/.test(line)) {
+    // Continuation line: any indentation (F7: relaxed from /^[ \t]{2}/ so that
+    // 1-space-indented continuations also fold) BUT NOT a nested bullet marker
+    // (F4: `  - nested item` terminates the current bullet rather than folding).
+    if (bulletLines !== null && /^\s+/.test(line) && !/^\s+-\s/.test(line)) {
       bulletLines.push(line.trim());
       continue;
     }
 
-    // Any other line (blank, heading, etc.) terminates a pending bullet.
+    // Any other line (blank, heading, nested bullet, etc.) terminates a pending bullet.
     flushBullet();
   }
   flushBullet();

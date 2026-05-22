@@ -255,6 +255,14 @@ function cmdExtract(opts) {
 
   const matched = releases.filter((rel) => {
     if (rel.version === 'Unreleased') return false;
+    // Skip pre-release entries (e.g. 1.0.0-rc.1, 1.0.0-beta.2) — they cannot
+    // be range-compared via numeric tuples without implementing full pre-release
+    // ordering (semver §11).  Exclude them silently for now; a consolidation
+    // issue (#F8) will address pre-release ordering across all comparators.
+    if (!SEMVER_RE.test(rel.version)) {
+      process.stderr.write(`[extract] skipping pre-release/non-semver entry: ${rel.version}\n`);
+      return false;
+    }
     // from is exclusive: cmp > 0 means rel.version > from
     const afterFrom = semverCmp(rel.version, from) > 0;
     // to is inclusive: cmp <= 0 means rel.version <= to
@@ -350,7 +358,7 @@ function main() {
   const { opts } = parsed;
   if (opts.cmd !== 'render' && opts.cmd !== 'github-release-notes' && opts.cmd !== 'extract') {
     process.stderr.write(usage());
-    process.exit(2);
+    process.exit(1);
   }
   if (opts.cmd === 'render' && (!opts.version || !opts.date)) {
     process.stderr.write('--version and --date are required for render\n');
@@ -372,6 +380,8 @@ function main() {
       process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     } else if (textOutput) {
       process.stdout.write(textOutput + '\n');
+    } else if (exitCode === 2) {
+      process.stderr.write(`no releases found in range (from=${report.from}, to=${report.to})\n`);
     }
     process.exit(exitCode);
   }
