@@ -320,7 +320,9 @@ describe('changeset cli extract: version-range changelog extraction (#3496)', ()
     assert.ok(!versions.includes('1.0.0.1'), '1.0.0.1 (4-part) must be excluded from range');
   });
 
-  // F1: workflows/update.md must reference the extract subcommand invocation
+  // F1: workflows/update.md must reference the extract subcommand invocation.
+  // allow-test-rule: reads a product workflow .md file (not CJS source) to verify
+  // the user-facing instruction was wired; there is no behavioural runtime to invoke.
   test('F1: workflows/update.md contains concrete extract subcommand invocation', (t) => {
     const workflowPath = path.join(ROOT, 'get-shit-done', 'workflows', 'update.md');
     const workflowText = fs.readFileSync(workflowPath, 'utf8');
