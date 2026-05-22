@@ -69,6 +69,83 @@ import {
 
 export { readModifyWriteRoadmapMd, replaceInCurrentMilestone };
 
+// ─── Milestone-scoped directory helpers (#3816) ───────────────────────────
+
+/**
+ * Read the current milestone identifier from STATE.md.
+ * Returns null on any error (absent, unreadable, or no `milestone:` field).
+ */
+async function readCurrentMilestoneFromState(
+  projectDir: string,
+  workstream?: string,
+): Promise<string | null> {
+  try {
+    const statePath = planningPaths(projectDir, workstream).state;
+    const content = await readFile(statePath, 'utf-8');
+    const m = content.match(/^milestone:\s*(.+)$/m);
+    if (!m) return null;
+    return m[1].trim().replace(/^["']|["']$/g, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the phases directory for a `phase.add` / `phase.add-batch` write.
+ *
+ * When the project uses a milestone-scoped layout (`.planning/milestones/
+ * <milestone>-phases/` already exists on disk), return that path so newly
+ * created phase directories land in the correct location alongside existing
+ * phases (#3816 fix for Symptom 3a).
+ *
+ * Falls back to the flat `.planning/phases/` path for all other projects.
+ */
+async function resolveWritePhasesDir(
+  projectDir: string,
+  workstream?: string,
+): Promise<string> {
+  const flatPhasesDir = planningPaths(projectDir, workstream).phases;
+  try {
+    const milestone = await readCurrentMilestoneFromState(projectDir, workstream);
+    if (!milestone) return flatPhasesDir;
+    const milestoneScopedDir = join(projectDir, '.planning', 'milestones', `${milestone}-phases`);
+    if (existsSync(milestoneScopedDir)) {
+      return milestoneScopedDir;
+    }
+  } catch { /* fall through to flat layout */ }
+  return flatPhasesDir;
+}
+
+/**
+ * Find the insertion point for a new phase entry in the ROADMAP.md content.
+ *
+ * #3816 fix for Symptom 3b: the previous implementation used
+ * `lastIndexOf('\n---')` which would place a new phase AFTER the Backlog
+ * section when Backlog precedes the trailing `---`. The new implementation
+ * inserts at the end of the active milestone section (just before the next
+ * `## Backlog` / `## Planned` / etc. heading, or before the trailing `---`).
+ *
+ * Returns the index at which the new phase entry should be inserted.
+ */
+function findPhaseInsertionPoint(rawContent: string): number {
+  // Look for the next top-level (## or ###) section that marks the end of the
+  // active phases list: Backlog, Planned milestones, or similar.
+  // Matches lines starting with ## or ### that are NOT the trailing `---`.
+  // We insert BEFORE this heading.
+  const backlogBoundaryRe = /\n(#{2,3}\s+(?:Backlog|Planned|Shipped|Archived)\b[^\n]*)/i;
+  const boundaryMatch = rawContent.match(backlogBoundaryRe);
+  if (boundaryMatch && boundaryMatch.index !== undefined) {
+    return boundaryMatch.index;
+  }
+
+  // Fallback: insert before the last `\n---` separator (original behaviour for
+  // ROADMAPs without a Backlog section).
+  const lastSeparator = rawContent.lastIndexOf('\n---');
+  if (lastSeparator > 0) return lastSeparator;
+
+  return rawContent.length;
+}
+
 // ─── phaseAdd handler ───────────────────────────────────────────────────
 
 /**
@@ -151,7 +228,8 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
   // there is no race condition to guard against).
   const computePhaseFields = async (rawRoadmapContent: string) => {
     const milestoneContent = await extractCurrentMilestone(rawRoadmapContent, projectDir);
-    const phasesDir = planningPaths(projectDir, workstream).phases;
+    // #3816: use milestone-scoped directory if it exists, otherwise flat layout
+    const phasesDir = await resolveWritePhasesDir(projectDir, workstream);
     const dirNames = await listDirectories(phasesDir);
 
     const nextSequentialPhaseId = computeNextSequentialPhaseId(milestoneContent, dirNames);
@@ -201,17 +279,16 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
       dirName = resolvedDirName;
       computedPhaseEntry = resolvedEntry;
 
-      const dirPath = join(planningPaths(projectDir, workstream).phases, dirName);
+      // #3816: resolve to milestone-scoped dir if it exists
+      const phasesWriteDir = await resolveWritePhasesDir(projectDir, workstream);
+      const dirPath = join(phasesWriteDir, dirName);
 
       // Create directory with .gitkeep so git tracks empty folders
       await ensureDirectoryWithGitkeep(dirPath);
 
-      // Find insertion point: before last "---" or at end
-      const lastSeparator = roadmapRaw.lastIndexOf('\n---');
-      if (lastSeparator > 0) {
-        return roadmapRaw.slice(0, lastSeparator) + computedPhaseEntry + roadmapRaw.slice(lastSeparator);
-      }
-      return roadmapRaw + computedPhaseEntry;
+      // #3816: insert before Backlog/Planned boundary, not after last `---`
+      const insertIdx = findPhaseInsertionPoint(roadmapRaw);
+      return roadmapRaw.slice(0, insertIdx) + computedPhaseEntry + roadmapRaw.slice(insertIdx);
     }, workstream);
   }
 
@@ -220,7 +297,8 @@ export const phaseAdd: QueryHandler = async (args, projectDir, workstream) => {
     padded: typeof newPhaseId === 'number' ? String(newPhaseId).padStart(2, '0') : String(newPhaseId),
     name: description,
     slug,
-    directory: toPosixPath(relative(projectDir, join(planningPaths(projectDir, workstream).phases, dirName))),
+    // #3816: result.directory must reflect the actual write location
+    directory: toPosixPath(relative(projectDir, join(await resolveWritePhasesDir(projectDir, workstream), dirName))),
     naming_mode: config.phase_naming || 'sequential',
   };
 
@@ -307,9 +385,11 @@ export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) 
     const content = await extractCurrentMilestone(rawContent, projectDir);
     let maxPhase = 0;
 
+    // #3816: resolve to milestone-scoped dir if it exists for the whole batch
+    const phasesWriteDir = await resolveWritePhasesDir(projectDir, workstream);
+
     if (config.phase_naming !== 'custom') {
-      const phasesOnDisk = planningPaths(projectDir, workstream).phases;
-      const dirNames = await listDirectories(phasesOnDisk);
+      const dirNames = await listDirectories(phasesWriteDir);
       maxPhase = computeNextSequentialPhaseId(content, dirNames) - 1;
     }
 
@@ -329,24 +409,24 @@ export const phaseAddBatch: QueryHandler = async (args, projectDir, workstream) 
       }
 
       assertSafePhaseDirName(dirName);
-      const dirPath = join(planningPaths(projectDir, workstream).phases, dirName);
+      // #3816: use resolved milestone-scoped dir for directory creation
+      const dirPath = join(phasesWriteDir, dirName);
       await ensureDirectoryWithGitkeep(dirPath);
 
       const phaseEntry =
         buildPhaseRoadmapEntry(newPhaseId, description, config.phase_naming);
 
-      const lastSeparator = rawContent.lastIndexOf('\n---');
-      rawContent =
-        lastSeparator > 0
-          ? rawContent.slice(0, lastSeparator) + phaseEntry + rawContent.slice(lastSeparator)
-          : rawContent + phaseEntry;
+      // #3816: insert before Backlog/Planned boundary, not after last `---`
+      const insertIdx = findPhaseInsertionPoint(rawContent);
+      rawContent = rawContent.slice(0, insertIdx) + phaseEntry + rawContent.slice(insertIdx);
 
       added.push({
         phase_number: typeof newPhaseId === 'number' ? newPhaseId : String(newPhaseId),
         padded: typeof newPhaseId === 'number' ? String(newPhaseId).padStart(2, '0') : String(newPhaseId),
         name: description,
         slug,
-        directory: toPosixPath(relative(projectDir, join(planningPaths(projectDir, workstream).phases, dirName))),
+        // #3816: result.directory reflects the actual write location
+        directory: toPosixPath(relative(projectDir, join(phasesWriteDir, dirName))),
         naming_mode: config.phase_naming || 'sequential',
       });
     }

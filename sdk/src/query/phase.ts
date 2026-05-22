@@ -32,6 +32,70 @@ import {
 import { relPlanningPath } from '../workstream-utils.js';
 import type { QueryHandler } from './utils.js';
 
+// ─── Milestone-scoped directory helpers (#3816) ───────────────────────────
+
+/**
+ * Pattern matching any milestone archive directory (ends in `-phases`).
+ * Accepts both the canonical `vX.Y-phases` form AND prefixed variants like
+ * `aimpf-v1.1-phases` that emerged from projects forking milestone names.
+ *
+ * Previous pattern `/^v[\d.]+-phases$/` silently skipped all prefixed dirs,
+ * causing `findPhase` to miss active phases and return stale archive matches.
+ */
+const MILESTONE_PHASES_DIR_RE = /-phases$/;
+
+/**
+ * Read the current milestone identifier from STATE.md so the archive scan
+ * can prefer the active-milestone archive over older archived dirs when two
+ * milestone archives both contain a phase with the same number.
+ *
+ * Returns null on any error (STATE.md absent, unreadable, or no `milestone:`
+ * front-matter field) — callers fall through to the standard sort order.
+ */
+async function readCurrentMilestone(projectDir: string, workstream?: string): Promise<string | null> {
+  try {
+    const statePath = planningPaths(projectDir, workstream).state;
+    const stateContent = await readFile(statePath, 'utf-8');
+    const m = stateContent.match(/^milestone:\s*(.+)$/m);
+    if (!m) return null;
+    return m[1].trim().replace(/^["']|["']$/g, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return the sorted list of milestone archive directory names from
+ * `.planning/milestones/`, placing the current-milestone dir first.
+ *
+ * Expansion of the previous `/^v[\d.]+-phases$/` filter: now accepts any
+ * directory ending in `-phases` so prefixed milestone names (e.g.
+ * `aimpf-v1.1-phases`) are included in the scan (#3816 fix).
+ */
+async function sortedMilestoneArchiveDirs(
+  milestonesDir: string,
+  currentMilestone: string | null,
+): Promise<string[]> {
+  const entries = await readdir(milestonesDir, { withFileTypes: true });
+  const names = entries
+    .filter(e => e.isDirectory() && MILESTONE_PHASES_DIR_RE.test(e.name))
+    .map(e => e.name);
+
+  // Build expected name for the current-milestone archive dir so it sorts first.
+  const currentArchiveName = currentMilestone ? `${currentMilestone}-phases` : null;
+
+  return names.sort((a, b) => {
+    // Current-milestone dir always first.
+    if (currentArchiveName) {
+      if (a === currentArchiveName) return -1;
+      if (b === currentArchiveName) return 1;
+    }
+    // Remaining dirs in descending lexicographic order (newest version last
+    // in name → largest string first, same as the previous .reverse() logic).
+    return b.localeCompare(a, undefined, { numeric: true });
+  });
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 interface PhaseInfo {
@@ -241,16 +305,17 @@ export async function findPhaseByNumber(
 
   const milestonesDir = join(projectDir, '.planning', 'milestones');
   try {
-    const milestoneEntries = await readdir(milestonesDir, { withFileTypes: true });
-    const archiveDirs = milestoneEntries
-      .filter(e => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name))
-      .map(e => e.name)
-      .sort()
-      .reverse();
+    // #3816: read current milestone so its archive dir is searched first,
+    // preventing a stale archive from shadowing the active phase when two
+    // milestone archives share the same phase number.
+    const currentMilestone = await readCurrentMilestone(projectDir, workstream);
+    const archiveDirs = await sortedMilestoneArchiveDirs(milestonesDir, currentMilestone);
 
     for (const archiveName of archiveDirs) {
-      const versionMatch = archiveName.match(/^(v[\d.]+)-phases$/);
-      const version = versionMatch ? versionMatch[1] : archiveName;
+      // Extract version: strip the trailing `-phases` suffix.
+      // Matches both canonical `v1.1-phases` → `v1.1` and prefixed
+      // `aimpf-v1.1-phases` → `aimpf-v1.1` (#3816).
+      const version = archiveName.replace(/-phases$/, '');
       const archivePath = join(milestonesDir, archiveName);
       const relBase = '.planning/milestones/' + archiveName;
       const result = await searchPhaseInDir(archivePath, relBase, normalized);
@@ -301,19 +366,18 @@ export const findPhase: QueryHandler = async (args, projectDir, workstream) => {
   const current = await searchPhaseInDir(phasesDir, relPhasesDir, normalized);
   if (current) return { data: current };
 
-  // Search archived milestone phases (newest first)
+  // Search archived milestone phases — current-milestone dir first (#3816)
   const milestonesDir = join(projectDir, '.planning', 'milestones');
   try {
-    const milestoneEntries = await readdir(milestonesDir, { withFileTypes: true });
-    const archiveDirs = milestoneEntries
-      .filter(e => e.isDirectory() && /^v[\d.]+-phases$/.test(e.name))
-      .map(e => e.name)
-      .sort()
-      .reverse();
+    // #3816: include prefixed milestone dirs (e.g. aimpf-v1.1-phases) and
+    // sort the current-milestone archive to the front of the search order.
+    const currentMilestone = await readCurrentMilestone(projectDir, workstream);
+    const archiveDirs = await sortedMilestoneArchiveDirs(milestonesDir, currentMilestone);
 
     for (const archiveName of archiveDirs) {
-      const versionMatch = archiveName.match(/^(v[\d.]+)-phases$/);
-      const version = versionMatch ? versionMatch[1] : archiveName;
+      // Strip trailing `-phases` to derive the version label (#3816: works for
+      // both `v1.1-phases` and prefixed `aimpf-v1.1-phases`).
+      const version = archiveName.replace(/-phases$/, '');
       const archivePath = join(milestonesDir, archiveName);
       const relBase = '.planning/milestones/' + archiveName;
       searchedDirectories.push(relBase);

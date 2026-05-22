@@ -208,6 +208,48 @@ describe('findPhase', () => {
     expect(data.found).toBe(true);
     expect(data.archived).toBe('v1.0');
   });
+
+  // ── #3816: prefixed-milestone archive dirs (aimpf-v1.1-phases) ─────────
+
+  it('#3816: findPhase finds phase in prefixed-milestone archive dir (aimpf-v1.1-phases)', async () => {
+    // Non-standard milestone prefix: aimpf-v1.1-phases (not matching ^v[\d.]+-phases$)
+    const PREFIXED_MILESTONE_PHASES_DIR = '.planning/milestones/aimpf-v1.1-phases';
+    const archiveDir = join(tmpDir, PREFIXED_MILESTONE_PHASES_DIR, '07-branch-rename');
+    await mkdir(archiveDir, { recursive: true });
+    await writeFile(join(archiveDir, '07-01-PLAN.md'), '---\nphase: 07\nplan: 01\n---\nPlan');
+
+    const result = await findPhase(['7'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.found).toBe(true);
+    expect(data.directory).toBe(`${PREFIXED_MILESTONE_PHASES_DIR}/07-branch-rename`);
+  });
+
+  it('#3816: findPhase prefers current-milestone archive dir over stale archives with same phase number', async () => {
+    // Stale archive from a different milestone (v1.1-phases) has Phase 7 "dependency-audit" (Complete)
+    const staleArchiveDir = join(tmpDir, '.planning', 'milestones', 'v1.1-phases', '07-dependency-audit');
+    await mkdir(staleArchiveDir, { recursive: true });
+    await writeFile(join(staleArchiveDir, '07-01-PLAN.md'), '---\nphase: 07\nplan: 01\n---\nStale plan');
+    await writeFile(join(staleArchiveDir, '07-01-SUMMARY.md'), 'Done');
+
+    // Active milestone (aimpf-v1.1-phases) has Phase 7 "branch-rename" (active)
+    const activeArchiveDir = join(tmpDir, '.planning', 'milestones', 'aimpf-v1.1-phases', '07-branch-rename');
+    await mkdir(activeArchiveDir, { recursive: true });
+    await writeFile(join(activeArchiveDir, '07-01-PLAN.md'), '---\nphase: 07\nplan: 01\n---\nActive plan');
+
+    // STATE.md identifies current milestone as aimpf-v1.1
+    await writeFile(
+      join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: aimpf-v1.1\nstatus: executing\n---\n\n# State\n',
+    );
+
+    const result = await findPhase(['7'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.found).toBe(true);
+    // Must return the active milestone's Phase 7, not the stale one
+    expect(data.directory).toBe('.planning/milestones/aimpf-v1.1-phases/07-branch-rename');
+  });
 });
 
 // ─── phasePlanIndex ────────────────────────────────────────────────────────

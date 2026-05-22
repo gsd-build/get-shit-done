@@ -592,8 +592,9 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
   const headerMatch = content.match(phasePattern);
 
   if (!headerMatch) {
-    // Fallback: check if phase exists in summary list but missing detail section.
-    // Same canonical-token capture: surface the as-written checklist form.
+    // Fallback 1: bold-wrapped checklist entry `- [ ] **Phase N: name**`.
+    // Reports malformed_roadmap when a bold checklist entry exists without a
+    // companion `### Phase N:` detail heading (original fallback contract).
     const checklistPattern = new RegExp(
       `-\\s*\\[[ x]\\]\\s*\\*\\*Phase\\s+(${escapedPhase}):\\s*([^*]+)\\*\\*`,
       'i'
@@ -608,6 +609,32 @@ function searchPhaseInContent(content: string, escapedPhase: string, phaseNum: s
         phase_name: checklistMatch[2].trim(),
         error: 'malformed_roadmap',
         message: `Phase ${canonicalChecklistPhase} exists in summary list but missing "### Phase ${canonicalChecklistPhase}:" detail section. ROADMAP.md needs both formats.`,
+      };
+    }
+
+    // Fallback 2 (#3816): plain (non-bold) bullet entry `- [ ] Phase N: name`
+    // used by milestone-scoped ROADMAPs where phases are listed as bullets
+    // under a `### 🚧 <milestone>` heading, not as separate `### Phase N:` headings.
+    // Returns `found: true` — the bullet IS the authoritative phase record for
+    // these layouts, not just a malformed summary list entry.
+    const plainBulletPattern = new RegExp(
+      `-\\s*\\[[ x]\\]\\s*Phase\\s+(${escapedPhase}):\\s*([^\\n]+)`,
+      'i'
+    );
+    const plainBulletMatch = content.match(plainBulletPattern);
+
+    if (plainBulletMatch) {
+      // Strip trailing annotations like `— pending /gsd:spec-phase 7`
+      const rawName = plainBulletMatch[2].trim();
+      const phaseName = rawName.replace(/\s*[-—].*$/, '').trim() || rawName;
+      return {
+        found: true,
+        phase_number: plainBulletMatch[1],
+        phase_name: phaseName,
+        section: plainBulletMatch[0],
+        goal: null,
+        mode: null,
+        success_criteria: [],
       };
     }
 
@@ -770,11 +797,19 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir, workstream
     return { data: { error: 'ROADMAP.md not found', milestones: [], phases: [], current_phase: null } };
   }
 
-  const content = await extractCurrentMilestone(rawContent, projectDir, workstream);
+  const rawMilestoneContent = await extractCurrentMilestone(rawContent, projectDir, workstream);
+  // #3816: exclude phases in the Backlog / Planned / Archived sections that
+  // may bleed into the active-milestone slice when those sections use plain
+  // headings (no version/emoji) that the boundary scanner does not stop at.
+  const backlogBoundaryIdx = rawMilestoneContent.search(/\n#{2,3}\s+(?:Backlog|Planned|Shipped|Archived)\b/i);
+  const content = backlogBoundaryIdx >= 0 ? rawMilestoneContent.slice(0, backlogBoundaryIdx) : rawMilestoneContent;
   const phasesDir = planningPaths(projectDir, workstream).phases;
 
   // IMPORTANT: Create regex INSIDE the function to avoid /g lastIndex persistence
+  // Heading-format phases: "### Phase N: Name"
   const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  // #3816: plain-bullet phases "- [ ] Phase N: Name" used by milestone-scoped layouts
+  const bulletPhasePattern = /^[-*]\s*\[[ x]\]\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gim;
   const phases: Array<Record<string, unknown>> = [];
   let match: RegExpExecArray | null;
 
@@ -846,6 +881,67 @@ export const roadmapAnalyze: QueryHandler = async (_args, projectDir, workstream
       goal,
       depends_on,
       mode,
+      plan_count: planCount,
+      summary_count: summaryCount,
+      has_context: hasContext,
+      has_research: hasResearch,
+      disk_status: diskStatus,
+      roadmap_complete: roadmapComplete,
+    });
+  }
+
+  // #3816: second pass — plain-bullet phases not captured by the heading scan.
+  // Milestone-scoped ROADMAPs list phases as `- [ ] Phase N: Name` bullets under
+  // a milestone heading without companion `### Phase N:` detail headings.
+  // Only add phases not already discovered by the heading scan.
+  const headingPhaseNums = new Set(phases.map(p => p.number as string));
+  while ((match = bulletPhasePattern.exec(content)) !== null) {
+    const phaseNum = match[1];
+    if (headingPhaseNums.has(phaseNum)) continue; // already captured above
+
+    const rawName = match[2].replace(/\(INSERTED\)/i, '').trim();
+    const phaseName = rawName.replace(/\s*[-—].*$/, '').trim() || rawName;
+
+    const normalized = normalizePhaseName(phaseNum);
+    let diskStatus = 'no_directory';
+    let planCount = 0;
+    let summaryCount = 0;
+    let hasContext = false;
+    let hasResearch = false;
+
+    try {
+      const entries = await readdir(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      const dirMatch = dirs.find(d => phaseTokenMatches(d, normalized));
+
+      if (dirMatch) {
+        const counts = await countPhasePlansAndSummaries(join(phasesDir, dirMatch));
+        planCount = counts.planCount;
+        summaryCount = counts.summaryCount;
+        hasContext = counts.hasContext;
+        hasResearch = counts.hasResearch;
+
+        if (summaryCount >= planCount && planCount > 0) diskStatus = 'complete';
+        else if (summaryCount > 0) diskStatus = 'partial';
+        else if (planCount > 0) diskStatus = 'planned';
+        else if (hasResearch) diskStatus = 'researched';
+        else if (hasContext) diskStatus = 'discussed';
+        else diskStatus = 'empty';
+      }
+    } catch { /* intentionally empty */ }
+
+    // Check ROADMAP checkbox status from the bullet itself
+    const checkboxMatch = match[0].match(/\[(x| )\]/i);
+    const roadmapComplete = checkboxMatch ? checkboxMatch[1].toLowerCase() === 'x' : false;
+    if (roadmapComplete && diskStatus !== 'complete') diskStatus = 'complete';
+
+    headingPhaseNums.add(phaseNum);
+    phases.push({
+      number: phaseNum,
+      name: phaseName,
+      goal: null,
+      depends_on: null,
+      mode: null,
       plan_count: planCount,
       summary_count: summaryCount,
       has_context: hasContext,

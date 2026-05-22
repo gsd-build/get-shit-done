@@ -10,6 +10,7 @@ import { mkdtemp, writeFile, readFile, rm, mkdir, readdir } from 'node:fs/promis
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
+import { createRegistry } from './registry-assembly.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -358,6 +359,104 @@ describe('phaseAdd', () => {
     const sepIdx = roadmap.lastIndexOf('\n---');
     expect(phaseIdx).toBeLessThan(sepIdx);
     expect(phaseIdx).toBeGreaterThan(0);
+  });
+
+  // ── Bug #3816: phase.add inserts into active milestone section, not Backlog ─
+
+  it('#3816: phase.add inserts new phase within active milestone section (before Backlog)', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    // ROADMAP structure: active milestone section followed by ## Backlog section
+    const roadmapWithBacklog = [
+      '# Roadmap',
+      '',
+      '### 🚧 aimpf-v1.1 Branch Rename + V1.0 Debt Closure (active)',
+      '',
+      '- [x] Phase 7: Branch Rename',
+      '',
+      '## Backlog',
+      '',
+      '### Phase 999.1: PycartaContext — backlog item',
+      '**Goal:** Parked idea.',
+      '',
+      '---',
+      '*Last updated: 2026-05-21*',
+    ].join('\n');
+
+    const stateWithPrefixedMilestone = [
+      '---',
+      'gsd_state_version: 1.0',
+      'milestone: aimpf-v1.1',
+      'milestone_name: Branch Rename',
+      'status: executing',
+      '---',
+      '',
+      '# Project State',
+    ].join('\n');
+
+    await setupTestProject(tmpDir, {
+      roadmap: roadmapWithBacklog,
+      state: stateWithPrefixedMilestone,
+      phases: ['07-branch-rename'],
+    });
+
+    await phaseAdd(['Rehearse Fix'], tmpDir);
+    const roadmap = await readFile(join(tmpDir, '.planning', 'ROADMAP.md'), 'utf-8');
+
+    // New phase 8 entry must exist
+    expect(roadmap).toContain('Phase 8: Rehearse Fix');
+
+    // Phase 8 must appear BEFORE the Backlog section
+    const phase8Idx = roadmap.indexOf('Phase 8: Rehearse Fix');
+    const backlogIdx = roadmap.indexOf('## Backlog');
+    expect(phase8Idx).toBeGreaterThan(0);
+    expect(backlogIdx).toBeGreaterThan(0);
+    expect(phase8Idx).toBeLessThan(backlogIdx);
+  });
+
+  it('#3816: phase.add creates directory in milestone-scoped path when current milestone dir exists', async () => {
+    const { phaseAdd } = await import('./phase-lifecycle.js');
+
+    const roadmapWithBacklog = [
+      '# Roadmap',
+      '',
+      '### 🚧 aimpf-v1.1 Branch Rename (active)',
+      '',
+      '- [x] Phase 7: Branch Rename',
+      '',
+      '---',
+      '*Last updated: 2026-05-21*',
+    ].join('\n');
+
+    const stateWithPrefixedMilestone = [
+      '---',
+      'gsd_state_version: 1.0',
+      'milestone: aimpf-v1.1',
+      'milestone_name: Branch Rename',
+      'status: executing',
+      '---',
+      '',
+      '# Project State',
+    ].join('\n');
+
+    await setupTestProject(tmpDir, {
+      roadmap: roadmapWithBacklog,
+      state: stateWithPrefixedMilestone,
+    });
+
+    // Create the milestone-scoped phases directory (signals milestone-scoped layout)
+    const milestonePhasesDir = join(tmpDir, '.planning', 'milestones', 'aimpf-v1.1-phases');
+    await mkdir(milestonePhasesDir, { recursive: true });
+    await mkdir(join(milestonePhasesDir, '07-branch-rename'), { recursive: true });
+
+    await phaseAdd(['Rehearse Fix'], tmpDir);
+    const data = (await phaseAdd(['Another Phase', '--dry-run'], tmpDir)).data as Record<string, unknown>;
+
+    // The directory must be created under the milestone-scoped path
+    const phasesDir = join(tmpDir, '.planning', 'milestones', 'aimpf-v1.1-phases');
+    const entries = await readdir(phasesDir, { withFileTypes: true });
+    const newPhaseDir = entries.find(e => e.isDirectory() && e.name.includes('-rehearse-fix'));
+    expect(newPhaseDir).toBeTruthy();
   });
 
   it('detects max phase from bullet checklist format (regression #2726)', async () => {
@@ -1599,8 +1698,11 @@ describe('milestoneComplete help-flag defense', () => {
 // ─── Registry integration ──────────────────────────────────────────────────
 
 describe('lifecycle handlers in registry', () => {
-  it('registers all 7 lifecycle handlers with dot notation', async () => {
-    const { createRegistry } = await import('./index.js');
+  it('registers all 7 lifecycle handlers with dot notation', () => {
+    // Uses static import of createRegistry from registry-assembly at top of
+    // file — avoids dynamic import inside an async function which deadlocks
+    // in the phase-lifecycle.test.ts context due to ESM circular reference
+    // between command-family-handlers.js → phase-lifecycle.js.
     const registry = createRegistry();
 
     const commands = [
@@ -1614,8 +1716,7 @@ describe('lifecycle handlers in registry', () => {
     }
   });
 
-  it('registers space-delimited aliases', async () => {
-    const { createRegistry } = await import('./index.js');
+  it('registers space-delimited aliases', () => {
     const registry = createRegistry();
 
     const commands = [

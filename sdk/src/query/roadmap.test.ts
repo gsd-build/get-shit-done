@@ -1082,6 +1082,75 @@ describe('roadmapAnalyze', () => {
     expect(phases.some(p => p.number === '1')).toBe(true);
     expect(phases.some(p => p.number === '3')).toBe(true);
   });
+
+  // ─── Bug #3816: bullet-list phases under prefixed-milestone heading ─────
+
+  it('#3816: roadmapAnalyze finds phases listed as bullets under prefixed-milestone heading', async () => {
+    // Project uses "aimpf-v1.1" milestone (non-standard prefix).
+    // ROADMAP uses bullet-format phases (- [ ] Phase N:) under the active
+    // milestone heading, not heading-format (### Phase N:).
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '### 🚧 aimpf-v1.1 Branch Rename + V1.0 Debt Closure (active)',
+      '',
+      '- [x] Phase 7: Branch Rename — pending /gsd:spec-phase 7',
+      '',
+      '## Backlog',
+      '',
+      '### Phase 999.1: PycartaContext — backlog item',
+      '**Goal:** Parked idea.',
+      '',
+      '---',
+      '*Last updated: 2026-05-21*',
+    ].join('\n');
+    const state = '---\nmilestone: aimpf-v1.1\nstatus: executing\n---\n\n# State\n';
+
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await roadmapAnalyze([], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const phases = data.phases as Array<Record<string, unknown>>;
+
+    // Phase 7 must be discovered — it is in the active milestone section
+    expect(phases.some(p => p.number === '7')).toBe(true);
+    // Backlog phase 999.1 must NOT appear in the phases list
+    expect(phases.every(p => p.number !== '999.1')).toBe(true);
+    // phase_count must reflect active phases only
+    const activePhases = phases.filter(p => {
+      const num = parseFloat(String(p.number));
+      return num < 999;
+    });
+    expect(activePhases.length).toBeGreaterThan(0);
+  });
+
+  it('#3816: roadmapGetPhase finds phase listed as bullet under prefixed-milestone heading', async () => {
+    // Same ROADMAP structure as above, but using roadmapGetPhase
+    const roadmap = [
+      '# Roadmap',
+      '',
+      '### 🚧 aimpf-v1.1 Branch Rename + V1.0 Debt Closure (active)',
+      '',
+      '- [ ] Phase 7: Branch Rename',
+      '',
+      '## Backlog',
+      '',
+      '---',
+      '*Last updated: 2026-05-21*',
+    ].join('\n');
+    const state = '---\nmilestone: aimpf-v1.1\nstatus: executing\n---\n\n# State\n';
+
+    await writeFile(join(tmpDir, '.planning', 'STATE.md'), state);
+    await writeFile(join(tmpDir, '.planning', 'ROADMAP.md'), roadmap);
+
+    const result = await roadmapGetPhase(['7'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+
+    expect(data.found).toBe(true);
+    expect(data.phase_number).toBe('7');
+    expect(data.phase_name).toBe('Branch Rename');
+  });
 });
 
 // ─── extractPhasesFromSection + extractNextMilestoneSection (#2497) ──────
