@@ -402,6 +402,57 @@ function stageSkillsForRuntimeAsSkills(srcCommandsDir, resolvedProfile, converte
   return stageDir;
 }
 
+function stageAgentsForRuntimeAsAgents(srcAgentsDir, resolvedProfile, converter, prefix) {
+  if (!fs.existsSync(srcAgentsDir)) return srcAgentsDir;
+
+  const stageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-profile-runtime-agents-'));
+  try {
+    const entries = fs.readdirSync(srcAgentsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.md')) continue;
+      const stem = entry.name.slice(0, -3);
+      if (resolvedProfile.skills !== '*' && !resolvedProfile.agents.has(stem)) continue;
+      const content = fs.readFileSync(path.join(srcAgentsDir, entry.name), 'utf8');
+      const agentName = (prefix && stem.startsWith(prefix)) ? stem : `${prefix}${stem}`;
+      const converted = converter(content);
+      fs.writeFileSync(path.join(stageDir, `${agentName}.md`), converted);
+    }
+  } catch (err) {
+    try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch {}
+    throw err;
+  }
+  STAGED_DIRS.add(stageDir);
+  ensureExitCleanup();
+  return stageDir;
+}
+
+function stageCommandsForRuntimeAsCommands(srcCommandsDir, resolvedProfile, converter, prefix) {
+  if (!fs.existsSync(srcCommandsDir)) return srcCommandsDir;
+
+  const stageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-profile-runtime-commands-'));
+  try {
+    const entries = fs.readdirSync(srcCommandsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.md')) continue;
+      const stem = entry.name.slice(0, -3);
+      if (resolvedProfile.skills !== '*' && !resolvedProfile.skills.has(stem)) continue;
+      const content = fs.readFileSync(path.join(srcCommandsDir, entry.name), 'utf8');
+      const cmdName = `${prefix}${stem}`;
+      const converted = converter(content);
+      fs.writeFileSync(path.join(stageDir, `${cmdName}.md`), converted);
+    }
+  } catch (err) {
+    try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch {}
+    throw err;
+  }
+  STAGED_DIRS.add(stageDir);
+  ensureExitCleanup();
+  return stageDir;
+}
+
+
 // ---------------------------------------------------------------------------
 // Profile marker persistence
 // ---------------------------------------------------------------------------
@@ -590,6 +641,8 @@ module.exports = {
   stageSkillsForProfile,
   stageAgentsForProfile,
   stageSkillsForRuntimeAsSkills,
+  stageAgentsForRuntimeAsAgents,
+  stageCommandsForRuntimeAsCommands,
   STAGED_DIRS,
   readActiveProfile,
   writeActiveProfile,

@@ -79,6 +79,12 @@ function getGlobalConfigDir(runtime) {
         ? expandTilde(env.ANTIGRAVITY_CONFIG_DIR)
         : path.join(home, '.gemini', 'antigravity');
 
+    // ── Antigravity CLI (agy) ────────────────────────────────────────────────
+    case 'agy':
+      return env.AGY_CONFIG_DIR
+        ? expandTilde(env.AGY_CONFIG_DIR)
+        : path.join(home, '.gemini', 'antigravity-cli');
+
     // ── Windsurf ─────────────────────────────────────────────────────────────
     case 'windsurf':
       return env.WINDSURF_CONFIG_DIR

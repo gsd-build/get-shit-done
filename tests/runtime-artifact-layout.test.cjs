@@ -236,6 +236,24 @@ describe('resolveRuntimeArtifactLayout — kilo', () => {
   });
 });
 
+describe('resolveRuntimeArtifactLayout — agy', () => {
+  test('returns correct layout for agy', () => {
+    const layout = resolveRuntimeArtifactLayout('agy', FAKE_DIR);
+    assert.strictEqual(layout.runtime, 'agy');
+    assert.strictEqual(layout.configDir, FAKE_DIR);
+    assert.strictEqual(layout.kinds.length, 2);
+    assert.strictEqual(layout.kinds[0].kind, 'skills');
+    assert.strictEqual(layout.kinds[0].destSubpath, 'skills');
+    assert.strictEqual(layout.kinds[0].prefix, 'gsd-');
+    assert.strictEqual(typeof layout.kinds[0].stage, 'function');
+
+    assert.strictEqual(layout.kinds[1].kind, 'agents');
+    assert.strictEqual(layout.kinds[1].destSubpath, 'agents');
+    assert.strictEqual(layout.kinds[1].prefix, 'gsd-');
+    assert.strictEqual(typeof layout.kinds[1].stage, 'function');
+  });
+});
+
 // ─── resolveRuntimeArtifactLayout — edge-cases ──────────────────────────────
 
 describe('resolveRuntimeArtifactLayout edge-cases', () => {

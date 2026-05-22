@@ -16,6 +16,8 @@ const {
   stageSkillsForProfile,
   stageAgentsForProfile,
   stageSkillsForRuntimeAsSkills,
+  stageAgentsForRuntimeAsAgents,
+  stageCommandsForRuntimeAsCommands,
 } = require('./install-profiles.cjs');
 
 // ---------------------------------------------------------------------------
@@ -147,7 +149,7 @@ function findAgentsSourceRoot(runtimeConfigDir) {
 const ALLOWED_RUNTIMES = new Set([
   'claude', 'cursor', 'gemini', 'codex', 'copilot', 'antigravity',
   'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy',
-  'cline', 'opencode', 'kilo',
+  'cline', 'opencode', 'kilo', 'agy',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -195,6 +197,32 @@ function skillsKind(destSubpath, prefix, converterName, runtime, configDir) {
       const wrappedConverter = (content, skillName) =>
         realConverter(content, skillName, runtime, cmdNames);
       return stageSkillsForRuntimeAsSkills(findInstallSourceRoot(configDir), resolved, wrappedConverter, prefix);
+    },
+  };
+}
+
+function agyAgentsKind(destSubpath, prefix, configDir) {
+  return {
+    kind: 'agents',
+    destSubpath,
+    prefix,
+    stage: (resolved) => {
+      const installExports = getInstallExports();
+      const realConverter = installExports.convertClaudeAgentToAgyAgent;
+      return stageAgentsForRuntimeAsAgents(findAgentsSourceRoot(configDir), resolved, realConverter, prefix);
+    },
+  };
+}
+
+function agyCommandsKind(destSubpath, prefix, configDir) {
+  return {
+    kind: 'commands',
+    destSubpath,
+    prefix,
+    stage: (resolved) => {
+      const installExports = getInstallExports();
+      const realConverter = installExports.convertClaudeCommandToAgyCommand;
+      return stageCommandsForRuntimeAsCommands(findInstallSourceRoot(configDir), resolved, realConverter, prefix);
     },
   };
 }
@@ -289,6 +317,13 @@ function resolveRuntimeArtifactLayout(runtime, configDir, scope = 'global') {
 
     case 'kilo':
       kinds = [commandsKind('command', 'gsd-', configDir)];
+      break;
+
+    case 'agy':
+      kinds = [
+        skillsKind('skills', 'gsd-', 'convertClaudeCommandToAgySkill', 'agy', configDir),
+        agyAgentsKind('agents', 'gsd-', configDir)
+      ];
       break;
 
     default:

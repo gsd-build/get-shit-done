@@ -191,6 +191,7 @@ const hasQwen = args.includes('--qwen');
 const hasHermes = args.includes('--hermes');
 const hasCodebuddy = args.includes('--codebuddy');
 const hasCline = args.includes('--cline');
+const hasAgy = args.includes('--agy');
 const hasBoth = args.includes('--both'); // Legacy flag, keeps working
 const hasAll = args.includes('--all');
 const hasUninstall = args.includes('--uninstall') || args.includes('-u');
@@ -228,7 +229,7 @@ if (hasSdk && hasNoSdk) {
 // Runtime selection - can be set by flags or interactive prompt
 let selectedRuntimes = [];
 if (hasAll) {
-  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline'];
+  selectedRuntimes = ['claude', 'kilo', 'opencode', 'gemini', 'codex', 'copilot', 'antigravity', 'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'hermes', 'codebuddy', 'cline', 'agy'];
 } else if (hasBoth) {
   selectedRuntimes = ['claude', 'opencode'];
 } else {
@@ -247,6 +248,7 @@ if (hasAll) {
   if (hasHermes) selectedRuntimes.push('hermes');
   if (hasCodebuddy) selectedRuntimes.push('codebuddy');
   if (hasCline) selectedRuntimes.push('cline');
+  if (hasAgy) selectedRuntimes.push('agy');
 }
 
 // WSL + Windows Node.js detection
@@ -299,6 +301,7 @@ function getDirName(runtime) {
   if (runtime === 'hermes') return '.hermes';
   if (runtime === 'codebuddy') return '.codebuddy';
   if (runtime === 'cline') return '.cline';
+  if (runtime === 'agy') return '.agy';
   return '.claude';
 }
 
@@ -335,6 +338,10 @@ function getConfigDirFromHome(runtime, isGlobal) {
   if (runtime === 'hermes') return "'.hermes'";
   if (runtime === 'codebuddy') return "'.codebuddy'";
   if (runtime === 'cline') return "'.cline'";
+  if (runtime === 'agy') {
+    if (!isGlobal) return "'.agy'";
+    return "'.gemini', 'antigravity-cli'";
+  }
   return "'.claude'";
 }
 
@@ -540,6 +547,16 @@ function getGlobalDir(runtime, explicitDir = null) {
       return expandTilde(process.env.CLINE_CONFIG_DIR);
     }
     return path.join(os.homedir(), '.cline');
+  }
+
+  if (runtime === 'agy') {
+    if (explicitDir) {
+      return expandTilde(explicitDir);
+    }
+    if (process.env.AGY_CONFIG_DIR) {
+      return expandTilde(process.env.AGY_CONFIG_DIR);
+    }
+    return path.join(os.homedir(), '.gemini', 'antigravity-cli');
   }
 
   // Claude Code: --config-dir > CLAUDE_CONFIG_DIR > ~/.claude
@@ -1965,6 +1982,96 @@ function convertClaudeAgentToAntigravityAgent(content, isGlobal = false) {
   let fm = `---\nname: ${name}\ndescription: ${yamlQuote(description)}\ntools: ${mappedTools.join(', ')}\n`;
   if (color) fm += `color: ${color}\n`;
   fm += '---';
+
+  return `${fm}\n${body}`;
+}
+
+/**
+ * @param {string} content - Source content to convert
+ * @param {boolean} [isGlobal=false] - Whether this is a global install
+ */
+function convertClaudeToAgyContent(content, isGlobal = false) {
+  let c = content;
+  if (isGlobal) {
+    c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.gemini/antigravity-cli/');
+    c = c.replace(/~\/\.claude\//g, '~/.gemini/antigravity-cli/');
+    // Bare form (no trailing slash) — must come after slash form to avoid double-replace
+    c = c.replace(/\$HOME\/\.claude\b/g, '$HOME/.gemini/antigravity-cli');
+    c = c.replace(/~\/\.claude\b/g, '~/.gemini/antigravity-cli');
+  } else {
+    c = c.replace(/\$HOME\/\.claude\//g, '.agy/');
+    c = c.replace(/~\/\.claude\//g, '.agy/');
+    // Bare form (no trailing slash) — must come after slash form to avoid double-replace
+    c = c.replace(/\$HOME\/\.claude\b/g, '.agy');
+    c = c.replace(/~\/\.claude\b/g, '.agy');
+  }
+  c = c.replace(/\.\/\.claude\//g, './.agy/');
+  c = c.replace(/\.claude\//g, '.agy/');
+  // Command name conversion (all gsd: references → gsd-)
+  c = c.replace(/gsd:/g, 'gsd-');
+  // Runtime-neutral agent name replacement (#766)
+  c = neutralizeAgentReferences(c, 'GEMINI.md');
+  return c;
+}
+
+/**
+ * Convert a Claude command (.md) to an agy skill (SKILL.md).
+ */
+function convertClaudeCommandToAgySkill(content, skillName, isGlobal = false) {
+  const converted = convertClaudeToAgyContent(content, isGlobal);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = skillName || extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+
+  const fm = `---\nname: ${name}\ndescription: ${yamlQuote(description)}\n---`;
+  return `${fm}\n${body}`;
+}
+
+/**
+ * Convert a Claude agent (.md) to an agy agent.
+ */
+function convertClaudeAgentToAgyAgent(content, isGlobal = false) {
+  const converted = convertClaudeToAgyContent(content, isGlobal);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const name = extractFrontmatterField(frontmatter, 'name') || 'unknown';
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+  const toolsRaw = extractFrontmatterField(frontmatter, 'tools') || '';
+
+  const claudeTools = toolsRaw.split(',').map(t => t.trim()).filter(Boolean);
+  const mappedTools = claudeTools.map(t => convertGeminiToolName(t)).filter(Boolean);
+
+  const fm = `---\nname: ${name}\ndescription: ${yamlQuote(description)}\ntools: ${mappedTools.join(', ')}\n---`;
+  return `${fm}\n${body}`;
+}
+
+/**
+ * Convert a Claude command (.md) to an agy command.
+ */
+function convertClaudeCommandToAgyCommand(content, isGlobal = false) {
+  const converted = convertClaudeToAgyContent(content, isGlobal);
+  const { frontmatter, body } = extractFrontmatterAndBody(converted);
+  if (!frontmatter) return converted;
+
+  const description = extractFrontmatterField(frontmatter, 'description') || '';
+  const argumentHint = extractFrontmatterField(frontmatter, 'argument-hint');
+
+  const toolsMatch = frontmatter.match(/^allowed-tools:\s*\n((?:\s+-\s+.+\n?)*)/m);
+  let mappedTools = [];
+  if (toolsMatch) {
+    const tools = toolsMatch[1].match(/^\s+-\s+(.+)/gm);
+    if (tools) {
+      const rawTools = tools.map(t => t.replace(/^\s+-\s+/, '').trim());
+      mappedTools = rawTools.map(t => convertGeminiToolName(t)).filter(Boolean);
+    }
+  }
+
+  let fm = `---\ndescription: ${yamlQuote(description)}\n`;
+  if (argumentHint) fm += `argument-hint: ${yamlQuote(argumentHint)}\n`;
+  fm += `allowed-tools: [${mappedTools.join(', ')}]\n---`;
 
   return `${fm}\n${body}`;
 }
@@ -5950,6 +6057,11 @@ function _applyRuntimeRewrites(content, runtime, pathPrefix) {
       content = processAttribution(content, getCommitAttribution('antigravity'));
       break;
 
+    case 'agy':
+      // agy converter handles path rewrites; only attribution here
+      content = processAttribution(content, getCommitAttribution(runtime));
+      break;
+
     case 'claude':
       content = content.replace(/~\/\.claude\//g, pathPrefix);
       content = content.replace(/\$HOME\/\.claude\//g, pathPrefix);
@@ -6047,7 +6159,7 @@ function _copyStaged(stagedDir, destDir, kind) {
       destName = entry.name;
     } else {
       // Flat commands directory (e.g. command/ for opencode/kilo)
-      destName = `${kind.prefix}${stem}.md`;
+      destName = (kind.prefix && stem.startsWith(kind.prefix)) ? `${stem}.md` : `${kind.prefix}${stem}.md`;
     }
 
     fs.copyFileSync(path.join(stagedDir, entry.name), path.join(destDir, destName));
@@ -6335,6 +6447,7 @@ function uninstallRuntimeArtifacts(runtime, configDir, scope) {
     const dest = path.join(layout.configDir, kind.destSubpath);
     _removeGsdEntries(dest, kind);
   }
+
 
   // #2973 / Codex review (bd1f06c9): migrate dev-preferences.md to the
   // runtime-aware SKILL.md location after all layout-driven removal is
@@ -7835,6 +7948,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   const isHermes = runtime === 'hermes';
   const isCodebuddy = runtime === 'codebuddy';
   const isCline = runtime === 'cline';
+  const isAgy = runtime === 'agy';
   const dirName = getDirName(runtime);
   const src = path.join(__dirname, '..');
 
@@ -8005,6 +8119,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   if (isHermes) runtimeLabel = 'Hermes Agent';
   if (isCodebuddy) runtimeLabel = 'CodeBuddy';
   if (isCline) runtimeLabel = 'Cline';
+  if (isAgy) runtimeLabel = 'Antigravity CLI (agy)';
 
   console.log(`  Installing for ${cyan}${runtimeLabel}${reset} to ${cyan}${locationLabel}${reset}\n`);
 
@@ -8285,7 +8400,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
   // applyRuntimeContentRewritesInPlace (called inside installRuntimeArtifacts)
   // handles per-runtime path + branding rewrites, including Qwen/Hermes.
   const _isSkillsRuntime = isCodex || isCopilot || isAntigravity || isCursor || isWindsurf ||
-    isAugment || isTrae || isCodebuddy || isQwen || isHermes ||
+    isAugment || isTrae || isCodebuddy || isQwen || isHermes || isAgy ||
     (runtime === 'claude' && isGlobal);
 
   if (_isSkillsRuntime) {
@@ -8297,6 +8412,7 @@ function install(isGlobal, runtime = 'claude', options = {}) {
     if (isHermes) {
       writeHermesCategoryDescription(path.join(targetDir, 'skills', 'gsd'));
     }
+
 
     // Verify installed artifacts and report
     if (isHermes) {
@@ -9842,10 +9958,11 @@ const runtimeMap = {
   '12': 'opencode',
   '13': 'qwen',
   '14': 'trae',
-  '15': 'windsurf'
+  '15': 'windsurf',
+  '16': 'agy'
 };
-const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'hermes', 'kilo', 'opencode', 'qwen', 'trae', 'windsurf'];
-const ALL_RUNTIMES_OPTION = '16';
+const allRuntimes = ['claude', 'antigravity', 'augment', 'cline', 'codebuddy', 'codex', 'copilot', 'cursor', 'gemini', 'hermes', 'kilo', 'opencode', 'qwen', 'trae', 'windsurf', 'agy'];
+const ALL_RUNTIMES_OPTION = '17';
 
 /**
  * Build the runtime-selection prompt text shown by the interactive installer.
@@ -9868,7 +9985,8 @@ function buildRuntimePromptText() {
   ${cyan}13${reset}) Qwen Code    ${dim}(~/.qwen)${reset}
   ${cyan}14${reset}) Trae         ${dim}(~/.trae)${reset}
   ${cyan}15${reset}) Windsurf     ${dim}(~/.codeium/windsurf)${reset}
-  ${cyan}16${reset}) All
+  ${cyan}16${reset}) Antigravity CLI (agy) ${dim}(~/.gemini/antigravity-cli)${reset}
+  ${cyan}17${reset}) All
 
   ${dim}Select multiple: 1,2,6 or 1 2 6${reset}
 `;
@@ -11318,6 +11436,10 @@ module.exports = {
     readGsdCommandNames,
     installRuntimeArtifacts,
     uninstallRuntimeArtifacts,
+    convertClaudeToAgyContent,
+    convertClaudeCommandToAgySkill,
+    convertClaudeAgentToAgyAgent,
+    convertClaudeCommandToAgyCommand,
   };
 
 // Main logic — only run when not loaded as a module for testing
