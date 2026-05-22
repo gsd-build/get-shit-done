@@ -223,7 +223,9 @@ function cmdRoadmapAnalyze(cwd, raw) {
     // Extract goal from the section
     const sectionStart = match.index;
     const restOfContent = content.slice(sectionStart);
-    const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+\d/i);
+    // #3691: `\d` → `\d[\d.]*` so decimal phase headings (e.g. `### Phase 02.3:`) are
+    // recognised as section boundaries.
+    const nextHeader = restOfContent.match(/\n#{2,4}\s+Phase\s+\d[\d.]*/i);
     const sectionEnd = nextHeader ? sectionStart + nextHeader.index : content.length;
     const section = content.slice(sectionStart, sectionEnd);
 
@@ -549,8 +551,19 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
       /\*\*Cross-cutting constraints:\*\*/i.test(phaseSection)
     ) return;
 
-    // Find the Plans: section within the phase section
-    const plansBlockMatch = phaseSection.match(/(Plans:\s*\n)((?:\s*-\s*\[[ x]\][^\n]*\n?)*)/i);
+    // Find the Plans: section within the phase section.
+    // #3691 Bug 1: `Plans:\s*\n` required no text after the colon, missing variants like
+    // `Plans: 3 plans across 2 waves\n` or `**Plans:** 3 plans\n` (bold-wrapped).
+    // `\*{0,2}Plans\*{0,2}:[^\n]*\n` accepts any text (or none) after the colon
+    // and tolerates optional `**` markdown bold wrappers on either side.
+    // The checklist group uses `+` (not `*`) so that a bold `**Plans:**` description
+    // line with no immediately-following checklist items (e.g. a summary line above a
+    // separate bare `Plans:` block) does not consume the match and prevent the actual
+    // list from being found.
+    // Review fix (F2): `(?:^|\n)` anchors the match to start-of-line so mid-line
+    // occurrences like `***Plans:***` embedded in a sentence or `OpenPlans: foo`
+    // do not trigger a false match. Groups 1 and 2 retain the same semantics.
+    const plansBlockMatch = phaseSection.match(/(?:^|\n)(\*{0,2}Plans\*{0,2}:[^\n]*\n)((?:\s*-\s*\[[ x]\][^\n]*\n?)+)/i);
     if (!plansBlockMatch) return;
 
     const plansHeader = plansBlockMatch[1];
@@ -563,8 +576,16 @@ function cmdRoadmapAnnotateDependencies(cwd, phaseNum, raw) {
     const linesByWave = new Map();
     for (const line of listLines) {
       // Match plan ID from line: "- [ ] 01-01-PLAN.md — ..." or "- [ ] 01-01: ..."
-      const idMatch = line.match(/\[\s*[x ]\s*\]\s*([\w-]+?)(?:-PLAN\.md|\.md|:|\s—)/i);
+      // #3691 Bug 3: `[\w-]+?` excluded `.`, so decimal IDs like `02.3-01` were captured
+      // as `02` only and never matched planData entries. `[\w.-]+?` preserves the
+      // terminating alternation (`-PLAN.md|.md|:|\s—`) as the boundary anchor.
+      const idMatch = line.match(/\[\s*[x ]\s*\]\s*([\w.-]+?)(?:-PLAN\.md|\.md|:|\s—)/i);
       const planId = idMatch ? idMatch[1] : null;
+      // Review fix (F3): reject malformed IDs that start with `.`, contain consecutive
+      // dots, or otherwise violate the `^\w[\w.-]*$` contract. A leading-dot ID
+      // (e.g. `.invalid-PLAN.md`) would silently default to wave 1 — defensively
+      // skip the line instead so corrupted ROADMAP entries don't corrupt wave layout.
+      if (planId && !/^\w[\w.-]*$/.test(planId)) continue;
       const planEntry = planId ? planData.find(p => p.planId === planId) : null;
       const wave = planEntry ? planEntry.wave : 1;
       if (!linesByWave.has(wave)) linesByWave.set(wave, []);
