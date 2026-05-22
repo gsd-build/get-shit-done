@@ -1,5 +1,5 @@
 ---
 type: Changed
-pr: 1
+pr: 3828
 ---
 Consolidate command dispatch behind CommandRoutingHub (issue #3788)

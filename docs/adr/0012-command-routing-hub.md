@@ -39,7 +39,7 @@ The router adapter's responsibilities shrink to: determine mode from env, build 
 
 ## Known limitation: SDK-incomplete subcommands
 
-The hub's mode is fixed at construction (`'sdk'` or `'cjs'`). This works cleanly only when every subcommand in a family has an implementation in the active mode. Today some phase subcommands — notably `phase.mvp-mode` — exist only in CJS; the SDK has no equivalent entry. When `mode === 'sdk'` and the SDK lacks the subcommand, the hub returns `SdkDispatchFailed`, which is not the desired behavior. The pre-migration code transparently reached through to CJS for these subcommands without surfacing any error.
+The hub's mode is fixed at construction (`'sdk'` or `'cjs'`). This works cleanly only when every subcommand in a family has an implementation in the active mode. Today some phase subcommands have divergent CJS and SDK implementations. `phase.mvp-mode` is present in the SDK catalog (`command-static-catalog-domain.ts`) but its CJS-native implementation (`phase.cmdPhaseMvpMode`) differs in ROADMAP scan behaviour and error reason codes from the SDK query layer. Routing `mvp-mode` through the SDK hub would silently change observable CLI behaviour (exit codes, JSON error shape).
 
 The proof-of-concept adapter (`phase-command-router.cjs`) handles this with an early-return bypass: `mvp-mode` is intercepted before the dispatch call so it never reaches the hub. This preserves observable behavior but introduces a hub-level abstraction leak — the adapter now carries per-subcommand routing policy that the hub was meant to own.
 
