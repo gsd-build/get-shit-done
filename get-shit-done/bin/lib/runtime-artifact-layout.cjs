@@ -321,9 +321,8 @@ function resolveRuntimeArtifactLayout(runtime, configDir, scope = 'global') {
 
     case 'agy':
       kinds = [
-        skillsKind('plugins/get-shit-done/skills', 'gsd-', 'convertClaudeCommandToAgySkill', 'agy', configDir),
-        agyAgentsKind('plugins/get-shit-done/agents', 'gsd-', configDir),
-        agyCommandsKind('plugins/get-shit-done/commands', 'gsd-', configDir)
+        skillsKind('skills', 'gsd-', 'convertClaudeCommandToAgySkill', 'agy', configDir),
+        agyAgentsKind('agents', 'gsd-', configDir)
       ];
       break;
 

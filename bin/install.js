@@ -1993,11 +1993,11 @@ function convertClaudeAgentToAntigravityAgent(content, isGlobal = false) {
 function convertClaudeToAgyContent(content, isGlobal = false) {
   let c = content;
   if (isGlobal) {
-    c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.gemini/antigravity-cli/plugins/get-shit-done/');
-    c = c.replace(/~\/\.claude\//g, '~/.gemini/antigravity-cli/plugins/get-shit-done/');
+    c = c.replace(/\$HOME\/\.claude\//g, '$HOME/.gemini/antigravity-cli/');
+    c = c.replace(/~\/\.claude\//g, '~/.gemini/antigravity-cli/');
     // Bare form (no trailing slash) — must come after slash form to avoid double-replace
-    c = c.replace(/\$HOME\/\.claude\b/g, '$HOME/.gemini/antigravity-cli/plugins/get-shit-done');
-    c = c.replace(/~\/\.claude\b/g, '~/.gemini/antigravity-cli/plugins/get-shit-done');
+    c = c.replace(/\$HOME\/\.claude\b/g, '$HOME/.gemini/antigravity-cli');
+    c = c.replace(/~\/\.claude\b/g, '~/.gemini/antigravity-cli');
   } else {
     c = c.replace(/\$HOME\/\.claude\//g, '.agy/');
     c = c.replace(/~\/\.claude\//g, '.agy/');
@@ -6159,7 +6159,7 @@ function _copyStaged(stagedDir, destDir, kind) {
       destName = entry.name;
     } else {
       // Flat commands directory (e.g. command/ for opencode/kilo)
-      destName = `${kind.prefix}${stem}.md`;
+      destName = (kind.prefix && stem.startsWith(kind.prefix)) ? `${stem}.md` : `${kind.prefix}${stem}.md`;
     }
 
     fs.copyFileSync(path.join(stagedDir, entry.name), path.join(destDir, destName));
@@ -6448,16 +6448,6 @@ function uninstallRuntimeArtifacts(runtime, configDir, scope) {
     _removeGsdEntries(dest, kind);
   }
 
-  if (runtime === 'agy') {
-    const pluginRoot = path.join(configDir, 'plugins', 'get-shit-done');
-    if (fs.existsSync(pluginRoot)) {
-      try {
-        fs.rmSync(pluginRoot, { recursive: true, force: true });
-      } catch (err) {
-        // non-fatal
-      }
-    }
-  }
 
   // #2973 / Codex review (bd1f06c9): migrate dev-preferences.md to the
   // runtime-aware SKILL.md location after all layout-driven removal is
@@ -8423,21 +8413,6 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       writeHermesCategoryDescription(path.join(targetDir, 'skills', 'gsd'));
     }
 
-    if (isAgy) {
-      const pluginDir = path.join(targetDir, 'plugins', 'get-shit-done');
-      fs.mkdirSync(pluginDir, { recursive: true });
-      const pluginJson = {
-        name: 'get-shit-done',
-        version: pkg.version,
-        description: pkg.description,
-        author: { name: 'TÂCHES' }
-      };
-      fs.writeFileSync(
-        path.join(pluginDir, 'plugin.json'),
-        JSON.stringify(pluginJson, null, 2)
-      );
-      console.log(`  ${green}✓${reset} Wrote plugin.json for Antigravity CLI`);
-    }
 
     // Verify installed artifacts and report
     if (isHermes) {
@@ -8455,17 +8430,17 @@ function install(isGlobal, runtime = 'claude', options = {}) {
         failures.push('skills/gsd/*');
       }
     } else {
-      const skillsDir = isAgy ? path.join(targetDir, 'plugins', 'get-shit-done', 'skills') : path.join(targetDir, 'skills');
+      const skillsDir = path.join(targetDir, 'skills');
       if (fs.existsSync(skillsDir)) {
         const count = fs.readdirSync(skillsDir, { withFileTypes: true })
           .filter(e => e.isDirectory() && e.name.startsWith('gsd-')).length;
         if (count > 0) {
-          console.log(`  ${green}✓${reset} Installed ${count} skills to ${isAgy ? 'plugins/get-shit-done/skills/' : 'skills/'}`);
+          console.log(`  ${green}✓${reset} Installed ${count} skills to skills/`);
         } else {
-          failures.push(isAgy ? 'plugins/get-shit-done/skills/gsd-*' : 'skills/gsd-*');
+          failures.push('skills/gsd-*');
         }
       } else {
-        failures.push(isAgy ? 'plugins/get-shit-done/skills/gsd-*' : 'skills/gsd-*');
+        failures.push('skills/gsd-*');
       }
     }
   } else if (isOpencode || isKilo) {

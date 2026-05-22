@@ -241,21 +241,16 @@ describe('resolveRuntimeArtifactLayout — agy', () => {
     const layout = resolveRuntimeArtifactLayout('agy', FAKE_DIR);
     assert.strictEqual(layout.runtime, 'agy');
     assert.strictEqual(layout.configDir, FAKE_DIR);
-    assert.strictEqual(layout.kinds.length, 3);
+    assert.strictEqual(layout.kinds.length, 2);
     assert.strictEqual(layout.kinds[0].kind, 'skills');
-    assert.strictEqual(layout.kinds[0].destSubpath, 'plugins/get-shit-done/skills');
+    assert.strictEqual(layout.kinds[0].destSubpath, 'skills');
     assert.strictEqual(layout.kinds[0].prefix, 'gsd-');
     assert.strictEqual(typeof layout.kinds[0].stage, 'function');
 
     assert.strictEqual(layout.kinds[1].kind, 'agents');
-    assert.strictEqual(layout.kinds[1].destSubpath, 'plugins/get-shit-done/agents');
+    assert.strictEqual(layout.kinds[1].destSubpath, 'agents');
     assert.strictEqual(layout.kinds[1].prefix, 'gsd-');
     assert.strictEqual(typeof layout.kinds[1].stage, 'function');
-
-    assert.strictEqual(layout.kinds[2].kind, 'commands');
-    assert.strictEqual(layout.kinds[2].destSubpath, 'plugins/get-shit-done/commands');
-    assert.strictEqual(layout.kinds[2].prefix, 'gsd-');
-    assert.strictEqual(typeof layout.kinds[2].stage, 'function');
   });
 });
 

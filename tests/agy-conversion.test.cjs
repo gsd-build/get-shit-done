@@ -35,7 +35,7 @@ describe('convertClaudeToAgyContent', () => {
     const result = convertClaudeToAgyContent(input, true);
     assert.strictEqual(
       result,
-      'Check $HOME/.gemini/antigravity-cli/plugins/get-shit-done/commands/ and ~/.gemini/antigravity-cli/plugins/get-shit-done/agents/. Also ./.agy/skills/ and .agy/helpers. Finally bare $HOME/.gemini/antigravity-cli/plugins/get-shit-done or ~/.gemini/antigravity-cli/plugins/get-shit-done.'
+      'Check $HOME/.gemini/antigravity-cli/commands/ and ~/.gemini/antigravity-cli/agents/. Also ./.agy/skills/ and .agy/helpers. Finally bare $HOME/.gemini/antigravity-cli or ~/.gemini/antigravity-cli.'
     );
   });
 

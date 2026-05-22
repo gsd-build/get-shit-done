@@ -414,7 +414,7 @@ function stageAgentsForRuntimeAsAgents(srcAgentsDir, resolvedProfile, converter,
       const stem = entry.name.slice(0, -3);
       if (resolvedProfile.skills !== '*' && !resolvedProfile.agents.has(stem)) continue;
       const content = fs.readFileSync(path.join(srcAgentsDir, entry.name), 'utf8');
-      const agentName = `${prefix}${stem}`;
+      const agentName = (prefix && stem.startsWith(prefix)) ? stem : `${prefix}${stem}`;
       const converted = converter(content);
       fs.writeFileSync(path.join(stageDir, `${agentName}.md`), converted);
     }

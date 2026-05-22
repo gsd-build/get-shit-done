@@ -151,7 +151,6 @@ function getGlobalSkillsBase(runtime) {
   if (runtime === 'cline') return null;
   const configDir = getGlobalConfigDir(runtime);
   if (runtime === 'hermes') return path.join(configDir, 'skills', 'gsd');
-  if (runtime === 'agy') return path.join(configDir, 'plugins', 'get-shit-done', 'skills');
   return path.join(configDir, 'skills');
 }
 

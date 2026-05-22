@@ -53,12 +53,13 @@ const RUNTIME_META = {
   qwen:         { localDir: '.qwen',             globalSuffix: '.qwen' },
   trae:         { localDir: '.trae',             globalSuffix: '.trae' },
   windsurf:     { localDir: '.windsurf',         globalSuffix: path.join('.codeium', 'windsurf') },
+  agy:          { localDir: '.agy',              globalSuffix: path.join('.gemini', 'antigravity-cli') },
 };
 
 // Runtimes that emit per-skill files under skills/ (not rules-based or commands-based)
 const SKILL_RUNTIMES = [
   'claude', 'opencode', 'gemini', 'kilo', 'codex', 'copilot', 'antigravity',
-  'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'codebuddy',
+  'cursor', 'windsurf', 'augment', 'trae', 'qwen', 'codebuddy', 'agy',
 ];
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ function runMinimalInstall({ runtime, scope, extraArgs = [] }) {
       claude: '.claude', opencode: '.opencode', gemini: '.gemini', kilo: '.kilo',
       codex: '.codex', copilot: '.github', antigravity: '.agent', cursor: '.cursor',
       windsurf: '.windsurf', augment: '.augment', trae: '.trae', qwen: '.qwen',
-      codebuddy: '.codebuddy', cline: '.',
+      codebuddy: '.codebuddy', cline: '.', agy: '.agy',
     };
     let configDir;
     let cwd = process.cwd();
