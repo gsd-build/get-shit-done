@@ -7,7 +7,7 @@ const { output } = require('./core.cjs');
 const { tryLoadSdk, getExecuteForCjs } = require('./cjs-sdk-bridge.cjs');
 
 // ─── CommandRoutingHub (issue #3788) ──────────────────────────────────────────
-const { createHub } = require('./command-routing-hub.cjs');
+const { createHub, ERROR_KINDS } = require('./command-routing-hub.cjs');
 
 /**
  * Manifest-backed phase subcommand router.
@@ -47,9 +47,20 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
     return;
   }
 
+  // ── No subcommand → reject early with helpful error ────────────────────────
+  // Pre-#3788 code resolved unknown subcommands via routeCjsCommandFamily which
+  // fell through to error() when no handler matched (including undefined).
+  // Post-#3788 the hub's manifest check is skipped for falsy subcommand, so we
+  // must guard here to preserve the deterministic "Available: ..." error message.
+  if (!subcommand) {
+    const available = PHASE_SUBCOMMANDS.filter(s => !UNSUPPORTED[s]).join(', ');
+    error(`Unknown phase subcommand. Available: ${available}`);
+    return;
+  }
+
   // ── CJS-only subcommands (always bypass SDK path) ──────────────────────────
-  // `mvp-mode` was never registered in the SDK; the pre-#3788 code always
-  // dispatched it via the CJS handler even when `sdkAvailable` was true.
+  // `mvp-mode` has a CJS-native implementation in phase.cmdPhaseMvpMode that
+  // differs from the SDK query layer (different ROADMAP scan + error codes).
   // Dispatch it early so the SDK hub path is never reached for this subcommand,
   // preserving the pre-migration observable behaviour (correct exit code,
   // correct JSON error reason code, correct ROADMAP scan).
@@ -188,7 +199,7 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
 
   // ── Translate result → CLI output / error (adapter responsibility) ──────────
   if (!result.ok) {
-    if (result.errorKind === 'UnknownCommand') {
+    if (result.errorKind === ERROR_KINDS.UnknownCommand) {
       const available = availableSubcommands.join(', ');
       error(`Unknown phase subcommand. Available: ${available}`);
       return;
