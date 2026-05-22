@@ -543,6 +543,15 @@ describe('#1927 config.json: setConfigValue must hold planning lock', () => {
   });
 
   test('both concurrent config-set calls persist their values', async () => {
+    // Deterministic concurrency via file-barrier synchronization (mirrors the
+    // locking-bugs:180 and :235 redesigns).
+    //
+    // The old Promise.all([execAsync(A), execAsync(B)]) design is non-deterministic:
+    // on a loaded Docker runner one subprocess can complete before the other has
+    // even started, meaning there is no real lock contention — or the opposite:
+    // both race O_EXCL and one observes stale fs state, causing a lost write that
+    // fails the assertion.  A barrier file forces both to be alive simultaneously
+    // before either runs the actual config-set.
     writeConfig(tmpDir, {
       model_profile: 'balanced',
       workflow: {
@@ -551,14 +560,76 @@ describe('#1927 config.json: setConfigValue must hold planning lock', () => {
       },
     });
 
-    const nodeBin = process.execPath;
-    const cmdA = `"${nodeBin}" "${TOOLS_PATH}" config-set model_profile quality --cwd "${tmpDir}"`;
-    const cmdB = `"${nodeBin}" "${TOOLS_PATH}" config-set workflow.research false --cwd "${tmpDir}"`;
+    // ── Barrier infrastructure ────────────────────────────────────────────────
+    const barrierPath = path.join(tmpDir, '.barrier-1927');
+    const readyA     = path.join(tmpDir, '.ready-1927-a');
+    const readyB     = path.join(tmpDir, '.ready-1927-b');
+    fs.writeFileSync(barrierPath, '1');
+    if (fs.existsSync(readyA)) fs.unlinkSync(readyA);
+    if (fs.existsSync(readyB)) fs.unlinkSync(readyB);
 
-    await Promise.all([
-      execAsync(cmdA, { encoding: 'utf-8' }).catch(() => {}),
-      execAsync(cmdB, { encoding: 'utf-8' }).catch(() => {}),
-    ]);
+    // ── Wrapper script ────────────────────────────────────────────────────────
+    const wrapperPath = path.join(tmpDir, '.barrier-wrapper-config-set.cjs');
+    fs.writeFileSync(wrapperPath, [
+      "'use strict';",
+      'const fs   = require("fs");',
+      'const { execFileSync } = require("child_process");',
+      'const { TOOLS_PATH, BARRIER_FILE, READY_FILE, CONFIG_KEY, CONFIG_VAL, CWD_PATH } = process.env;',
+      '',
+      'fs.writeFileSync(READY_FILE, String(process.pid));',
+      '',
+      'const sab = new SharedArrayBuffer(4);',
+      'const sai = new Int32Array(sab);',
+      'const deadline = Date.now() + 10000;',
+      'while (fs.existsSync(BARRIER_FILE)) {',
+      '  if (Date.now() > deadline) { process.stderr.write("barrier timeout\\n"); process.exit(1); }',
+      '  Atomics.wait(sai, 0, 0, 10);',
+      '}',
+      '',
+      'execFileSync(process.execPath, [TOOLS_PATH, "config-set", CONFIG_KEY, CONFIG_VAL, "--cwd", CWD_PATH], {',
+      '  stdio: "pipe",',
+      '});',
+    ].join('\n'));
+
+    const nodeBin = process.execPath;
+
+    function spawnWrapper(configKey, configVal, readyFile) {
+      return new Promise((resolve, reject) => {
+        const child = spawn(nodeBin, [wrapperPath], {
+          env: {
+            ...process.env,
+            TOOLS_PATH,
+            BARRIER_FILE: barrierPath,
+            READY_FILE:   readyFile,
+            CONFIG_KEY:   configKey,
+            CONFIG_VAL:   configVal,
+            CWD_PATH:     tmpDir,
+          },
+          stdio: 'pipe',
+        });
+        let stderr = '';
+        child.stderr.on('data', (d) => { stderr += d.toString(); });
+        child.on('close', (code) => {
+          if (code !== 0) reject(new Error(`wrapper exited ${code}: ${stderr}`));
+          else resolve();
+        });
+      });
+    }
+
+    const promiseA = spawnWrapper('model_profile', 'quality', readyA);
+    const promiseB = spawnWrapper('workflow.research', 'false', readyB);
+
+    // ── Wait for both to reach barrier, then release ──────────────────────────
+    const sab2 = new SharedArrayBuffer(4);
+    const sai2 = new Int32Array(sab2);
+    const deadline2 = Date.now() + 10000;
+    while (!fs.existsSync(readyA) || !fs.existsSync(readyB)) {
+      if (Date.now() > deadline2) throw new Error('Timed out waiting for both config-set subprocesses to reach barrier');
+      Atomics.wait(sai2, 0, 0, 10);
+    }
+    fs.unlinkSync(barrierPath);
+
+    await Promise.all([promiseA, promiseB]);
 
     const config = readConfig(tmpDir);
     assert.strictEqual(
