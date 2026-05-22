@@ -66,11 +66,12 @@ If `--wave` is absent, preserve the current behavior of executing all incomplete
 Load all context in one call:
 
 ```bash
-GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
-if command -v gsd-sdk >/dev/null 2>&1; then
-  GSD_SDK="gsd-sdk"
-elif [ -f "$GSD_TOOLS" ]; then
+# SDK resolution: prefer local gsd-tools.cjs, fall back to global gsd-sdk (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/get-shit-done/bin/gsd-tools.cjs"
+if [ -f "$GSD_TOOLS" ]; then
   GSD_SDK="node $GSD_TOOLS"
+elif command -v gsd-sdk >/dev/null 2>&1; then
+  GSD_SDK="gsd-sdk"
 else
   echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
@@ -769,102 +770,8 @@ increases monotonically across waves. `{status}` is `complete` (success),
    ORCH_BRANCH=$(git rev-parse --abbrev-ref HEAD)
    [ -z "${EXPECTED_BRANCH:-}" ] || [ "$ORCH_BRANCH" = "$EXPECTED_BRANCH" ] || { echo "FATAL: orchestrator on '$ORCH_BRANCH' but expected '$EXPECTED_BRANCH' before worktree cleanup — refusing to merge (#3174-class drift)" >&2; exit 1; }
 
-   $GSD_SDK query worktree.cleanup-wave --manifest "$WAVE_WORKTREE_MANIFEST" || {
-     echo "WARN: worktree.cleanup-wave failed; using manifest-scoped shell fallback (#3384)." >&2
-   WT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/gsd-worktree-paths-XXXXXX")
-   node -e 'const fs=require("fs");const p=process.env.WAVE_WORKTREE_MANIFEST;try{if(!p)throw new Error("WAVE_WORKTREE_MANIFEST is unset");if(!fs.existsSync(p))throw new Error("manifest does not exist");const s=fs.readFileSync(p,"utf8");if(!s.trim())throw new Error("manifest is empty");const j=JSON.parse(s);for(const w of j.worktrees||[])if(w.worktree_path)console.log(w.worktree_path)}catch(e){console.error(`ERROR: cannot read worktree manifest ${p||"(unset)"}: ${e.message}`);process.exit(1)}' > "$WT_PATHS_FILE" || { echo "BLOCKED: cannot read WAVE_WORKTREE_MANIFEST; refusing cleanup (#3384)." >&2; exit 1; }
-   while IFS= read -r WT; do
-     [ -z "$WT" ] && continue
-     WT_BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)
-     if [ -n "$WT_BRANCH" ] && [ "$WT_BRANCH" != "HEAD" ]; then
-       CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-       STATE_BACKUP=$(mktemp)
-       ROADMAP_BACKUP=$(mktemp)
-       [ -f .planning/STATE.md ] && cp .planning/STATE.md "$STATE_BACKUP" || true
-       [ -f .planning/ROADMAP.md ] && cp .planning/ROADMAP.md "$ROADMAP_BACKUP" || true
-       DELETIONS=$(git diff --diff-filter=D --name-only HEAD..."$WT_BRANCH" 2>/dev/null || true)
-       if [ -n "$DELETIONS" ]; then
-         echo "BLOCKED: Worktree branch $WT_BRANCH contains file deletions: $DELETIONS"
-         echo "Review these deletions before merging. If intentional, remove this guard and re-run."
-         rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
-         continue
-       fi
-       git merge "$WT_BRANCH" --no-ff --no-edit -m "chore: merge executor worktree ($WT_BRANCH)" 2>&1 || {
-         echo "⚠ Merge conflict from worktree $WT_BRANCH — resolve manually"
-         echo "  STATE.md backup:   $STATE_BACKUP"
-         echo "  ROADMAP.md backup: $ROADMAP_BACKUP"
-         echo "  Restore with: cp \$STATE_BACKUP .planning/STATE.md && cp \$ROADMAP_BACKUP .planning/ROADMAP.md"
-         break
-       }
-       MERGE_DEL_COUNT=$(git diff --diff-filter=D --name-only HEAD~1 HEAD 2>/dev/null | grep -vc '^\.planning/' || true)
-       if [ "$MERGE_DEL_COUNT" -gt 5 ] && [ "${ALLOW_BULK_DELETE:-0}" != "1" ]; then
-         MERGE_DELETIONS=$(git diff --diff-filter=D --name-only HEAD~1 HEAD 2>/dev/null | grep -v '^\.planning/' || true)
-         echo "⚠ BLOCKED: Merge of $WT_BRANCH deleted $MERGE_DEL_COUNT files outside .planning/ — reverting to protect repository integrity (#2384)"
-         echo "$MERGE_DELETIONS"
-         echo "  If these deletions are intentional, re-run with ALLOW_BULK_DELETE=1"
-         git reset --hard HEAD~1 2>/dev/null || true
-         rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
-         continue
-       fi
-       if [ -s "$STATE_BACKUP" ]; then
-         cp "$STATE_BACKUP" .planning/STATE.md
-       fi
-       if [ -s "$ROADMAP_BACKUP" ]; then
-         cp "$ROADMAP_BACKUP" .planning/ROADMAP.md
-       fi
-       rm -f "$STATE_BACKUP" "$ROADMAP_BACKUP"
-       # Detect files deleted on main but re-added by worktree merge (#2501).
-       DELETED_FILES=$(git diff --diff-filter=A --name-only HEAD~1 -- .planning/ 2>/dev/null || true)
-       for RESURRECTED in $DELETED_FILES; do
-         WAS_DELETED=$(git log --follow --diff-filter=D --name-only --format="" HEAD~1 -- "$RESURRECTED" 2>/dev/null | grep -c . || true)
-         if [ "${WAS_DELETED:-0}" -gt 0 ]; then
-           git rm -f "$RESURRECTED" 2>/dev/null || true
-         fi
-       done
-       if ! git diff --quiet .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || \
-          [ -n "$DELETED_FILES" ]; then
-         COMMIT_DOCS=$($GSD_SDK query config-get commit_docs 2>/dev/null || echo "true")
-         if [ "$COMMIT_DOCS" != "false" ]; then
-           git add .planning/STATE.md .planning/ROADMAP.md 2>/dev/null || true
-           git commit --amend --no-edit 2>/dev/null || true
-         fi
-       fi
-       # Safety net: rescue uncommitted SUMMARY.md before worktree removal (#2070, #2838).
-       while IFS= read -r SUMMARY; do
-         [ -z "$SUMMARY" ] && continue
-         REL_PATH="${SUMMARY#$WT/}"
-         if [ ! -f "$REL_PATH" ] || ! cmp -s "$SUMMARY" "$REL_PATH"; then
-           mkdir -p "$(dirname "$REL_PATH")"
-           cp "$SUMMARY" "$REL_PATH"
-           echo "⚠ Rescued $REL_PATH from worktree before removal"
-         fi
-       done < <(find "$WT/.planning" -name "*SUMMARY.md" 2>/dev/null)
-       REMOVE_OK=false
-       if git worktree remove "$WT" --force; then
-         REMOVE_OK=true
-       else
-         WT_NAME=$(basename "$WT")
-         if [ -f ".git/worktrees/${WT_NAME}/locked" ]; then
-           echo "⚠ Worktree $WT is locked — attempting to unlock and retry"
-           git worktree unlock "$WT" 2>/dev/null || true
-           if git worktree remove "$WT" --force; then
-             REMOVE_OK=true
-           else
-             echo "⚠ Residual worktree at $WT — manual cleanup required after session exits:"
-             echo "    git worktree unlock \"$WT\" && git worktree remove \"$WT\" --force && git branch -D \"$WT_BRANCH\""
-           fi
-         else
-           echo "⚠ Residual worktree at $WT (remove failed) — investigate manually"
-         fi
-       fi
-       if [ "$REMOVE_OK" = "true" ]; then
-         git branch -D "$WT_BRANCH" 2>/dev/null || true
-       else
-         echo "⚠ Keeping branch $WT_BRANCH because worktree removal failed (#3384)"
-       fi
-     fi
-   done < "$WT_PATHS_FILE"
-   }
+   # Fail closed: SDK refusal (safety guard #3174/#3384) must surface — do not swallow exit 1.
+   $GSD_SDK query worktree.cleanup-wave --manifest "$WAVE_WORKTREE_MANIFEST" || exit 1
    ```
 
    **Cleanup-tail snippet (use after any wave whose merges did not flow through the templated path above):**

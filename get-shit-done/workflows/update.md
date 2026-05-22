@@ -463,10 +463,10 @@ Otherwise run `detect-custom-files` (prefer SDK when available):
 ```bash
 GSD_TOOLS="$RUNTIME_DIR/get-shit-done/bin/gsd-tools.cjs"
 CUSTOM_JSON=''
-if [ -n "$RUNTIME_DIR" ] && command -v gsd-sdk >/dev/null 2>&1; then
-  CUSTOM_JSON=$(gsd-sdk query detect-custom-files --config-dir "$RUNTIME_DIR" 2>/dev/null)
-elif [ -f "$GSD_TOOLS" ] && [ -n "$RUNTIME_DIR" ]; then
+if [ -f "$GSD_TOOLS" ] && [ -n "$RUNTIME_DIR" ]; then
   CUSTOM_JSON=$(node "$GSD_TOOLS" detect-custom-files --config-dir "$RUNTIME_DIR" 2>/dev/null)
+elif [ -n "$RUNTIME_DIR" ] && command -v gsd-sdk >/dev/null 2>&1; then
+  CUSTOM_JSON=$(gsd-sdk query detect-custom-files --config-dir "$RUNTIME_DIR" 2>/dev/null)
 fi
 if [ -z "$CUSTOM_JSON" ]; then
   CUSTOM_JSON='{"custom_files":[],"custom_count":0}'

@@ -8,6 +8,12 @@
  * previously tracked on main, deliberately deleted, and then re-introduced by
  * a worktree merge. Detecting that requires a git history check, not just a
  * pre-merge tree membership check.
+ *
+ * After #3797: execute-phase.md delegates worktree cleanup to the SDK's
+ * worktree.cleanup-wave command. Resurrection detection is handled internally
+ * by the SDK. The inline WAS_DELETED shell check has been removed from the
+ * workflow — it was part of the SDK-absence fallback which is no longer needed
+ * since the preflight block exits if neither local nor global SDK is available.
  */
 
 'use strict';
@@ -30,61 +36,27 @@ describe('execute-phase.md — resurrection-detection guard (#2501)', () => {
     assert.ok(content.length > 0, 'execute-phase.md must not be empty');
   });
 
-  test('resurrection block checks git history for a prior deletion event', () => {
+  test('cleanup delegates to SDK (handles resurrection detection internally)', () => {
     if (!content) content = fs.readFileSync(EXECUTE_PHASE, 'utf-8');
-    // Scope check to the resurrection block only (up to 1200 chars from its heading).
-    const resurrectionStart = content.indexOf('# Detect files deleted on main');
-    assert.ok(resurrectionStart !== -1, 'resurrection comment must exist');
-    const window = content.slice(resurrectionStart, resurrectionStart + 1200);
-
-    // The fix must add a git log --diff-filter=D check inside this block so that
-    // only files with a deletion event in the main branch ancestry are removed.
-    const hasHistoryCheck =
-      window.includes('--diff-filter=D') &&
-      window.includes('git log');
+    // After #3797: execute-phase.md delegates to worktree.cleanup-wave, which
+    // handles pre-merge deletion checks internally. The SDK checks diff --diff-filter=D
+    // before merging, blocking branches that contain file deletions (#2384/#2501).
     assert.ok(
-      hasHistoryCheck,
-      'execute-phase.md resurrection block must use "git log ... --diff-filter=D" to verify a file was previously deleted before removing it'
+      content.includes('worktree.cleanup-wave'),
+      'execute-phase.md must delegate to worktree.cleanup-wave (#2501/#3797)',
     );
   });
 
-  test('resurrection block does not delete files solely because they are absent from PRE_MERGE_FILES', () => {
+  test('execute-phase does not use the buggy PRE_MERGE_FILES form', () => {
     if (!content) content = fs.readFileSync(EXECUTE_PHASE, 'utf-8');
-    // Extract the resurrection section (between the "Detect files deleted on main"
-    // comment and the next empty line / next major comment block).
-    const resurrectionStart = content.indexOf('# Detect files deleted on main');
+    // The buggy pattern from before #2501 — deletion conditioned on absence
+    // from PRE_MERGE_FILES snapshot. Must remain absent.
+    const hasBuggyGuard =
+      content.includes('PRE_MERGE_FILES') &&
+      /if\s*!\s*echo\s*"\$PRE_MERGE_FILES"\s*\|\s*grep\s+-qxF\s*"\$RESURRECTED"/.test(content);
     assert.ok(
-      resurrectionStart !== -1,
-      'execute-phase.md must contain the resurrection-detection comment block'
-    );
-
-    // Grab a window of text around the resurrection block (up to 1200 chars).
-    const window = content.slice(resurrectionStart, resurrectionStart + 1200);
-
-    // The ONLY deletion guard should be the history check.
-    // The buggy pattern: `if ! echo "$PRE_MERGE_FILES" | grep -qxF "$RESURRECTED"`
-    // with NO accompanying history check. After the fix the sole condition
-    // determining deletion must involve a git-log history lookup.
-    const hasBuggyStandaloneGuard =
-      /if\s*!\s*echo\s*"\$PRE_MERGE_FILES"\s*\|\s*grep\s+-qxF\s*"\$RESURRECTED"/.test(window) &&
-      !/git log/.test(window);
-
-    assert.ok(
-      !hasBuggyStandaloneGuard,
-      'resurrection block must NOT delete files based solely on absence from PRE_MERGE_FILES without a git-history check'
-    );
-  });
-
-  test('resurrection block still removes files that have a deletion history on main', () => {
-    if (!content) content = fs.readFileSync(EXECUTE_PHASE, 'utf-8');
-    // The fix must still call `git rm` for genuine resurrections.
-    const resurrectionStart = content.indexOf('# Detect files deleted on main');
-    assert.ok(resurrectionStart !== -1, 'resurrection comment must exist');
-
-    const window = content.slice(resurrectionStart, resurrectionStart + 1200);
-    assert.ok(
-      window.includes('git rm'),
-      'resurrection block must still call git rm to remove genuinely resurrected files'
+      !hasBuggyGuard,
+      'execute-phase.md must NOT delete files based on the PRE_MERGE_FILES snapshot grep (inverted guard bug #2501)',
     );
   });
 });

@@ -34,12 +34,12 @@ GSD_WS=""
 echo "$ARGUMENTS" | grep -qE -- '--ws[[:space:]]+[^[:space:]]+' && GSD_WS=$(echo "$ARGUMENTS" | grep -oE -- '--ws[[:space:]]+[^[:space:]]+')
 PHASE_ARG=$(echo "$ARGUMENTS" | sed -E 's/--ws[[:space:]]+[^[:space:]]+//g' | xargs)
 
-# SDK resolution: prefer global gsd-sdk, fall back to local gsd-tools.cjs (#3668)
-GSD_TOOLS="${RUNTIME_DIR:-$(dirname "${CLAUDE_FILE_PATHS%%:*}" 2>/dev/null)}/get-shit-done/bin/gsd-tools.cjs"
-if command -v gsd-sdk >/dev/null 2>&1; then
+# SDK resolution: prefer local gsd-tools.cjs, fall back to global gsd-sdk (#3668)
+GSD_TOOLS="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/get-shit-done/bin/gsd-tools.cjs"
+if [ -f "$GSD_TOOLS" ]; then
+  GSD_SDK="node $GSD_TOOLS"
+elif command -v gsd-sdk >/dev/null 2>&1; then
   GSD_SDK="gsd-sdk"
-elif [ -f "$GSD_TOOLS" ]; then
-  GSD_SDK="node "$GSD_TOOLS""
 else
   echo "ERROR: gsd-sdk not found on PATH and $GSD_TOOLS does not exist." >&2
   echo "Run: npx get-shit-done-cc@latest --claude --local" >&2
@@ -114,8 +114,8 @@ Continue to `create_uat_file`.
 Before running manual UAT, check whether this phase has a UI component and whether
 `mcp__playwright__*` or `mcp__puppeteer__*` tools are available in the current session.
 
-```
-UI_PHASE_FLAG=$(gsd-sdk query config-get workflow.ui_phase --raw 2>/dev/null || echo "true")
+```bash
+UI_PHASE_FLAG=$($GSD_SDK query config-get workflow.ui_phase --raw 2>/dev/null || echo "true")
 UI_SPEC_FILE=$(ls "${PHASE_DIR}"/*-UI-SPEC.md 2>/dev/null | head -1)
 ```
 

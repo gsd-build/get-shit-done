@@ -1,11 +1,16 @@
 /**
  * Drift-guard for bug #3195: quick.md and execute-phase.md must both use
- * the git-history-based resurrection guard (WAS_DELETED check), not the
- * inverted PRE_MERGE_FILES grep form that deletes brand-new files.
+ * the same resurrection-detection approach so they stay in sync.
  *
- * The PRE_MERGE_FILES form was fixed in execute-phase.md by PR #2510 but
- * the same bug remained in quick.md. This test ensures both workflows stay
- * in sync going forward.
+ * After #3797: both workflows delegate worktree cleanup to the SDK's
+ * worktree.cleanup-wave command, which implements resurrection detection
+ * (diff --diff-filter=D history checks) internally. The inline WAS_DELETED
+ * shell variable form has been removed from both workflows — it was part of
+ * the SDK-absence fallback which is now dead code since preflight exits if
+ * neither local nor global SDK is available.
+ *
+ * This test ensures both workflows continue to use the same cleanup
+ * mechanism (SDK delegation), not one inline and one delegated.
  */
 
 'use strict';
@@ -33,19 +38,36 @@ describe('resurrection guard drift check — quick.md vs execute-phase.md (#3195
     assert.ok(executePhaseContent.length > 0, 'execute-phase.md must not be empty');
   });
 
-  test('quick.md uses WAS_DELETED (history-check form) in the resurrection block', () => {
+  test('quick.md delegates resurrection detection to SDK (worktree.cleanup-wave)', () => {
     if (!quickContent) quickContent = fs.readFileSync(QUICK_MD, 'utf-8');
+    // After #3797: quick.md delegates to worktree.cleanup-wave, which handles
+    // resurrection detection (diff --diff-filter=D) internally. The inline
+    // WAS_DELETED form has been removed — it was part of the SDK-absence fallback.
     assert.ok(
-      quickContent.includes('WAS_DELETED'),
-      'quick.md must use WAS_DELETED (git log --diff-filter=D history check) in the resurrection guard'
+      quickContent.includes('worktree.cleanup-wave'),
+      'quick.md must delegate to worktree.cleanup-wave for resurrection detection (#3195/#3797)'
     );
   });
 
-  test('execute-phase.md uses WAS_DELETED (history-check form) in the resurrection block', () => {
+  test('execute-phase.md delegates resurrection detection to SDK (worktree.cleanup-wave)', () => {
     if (!executePhaseContent) executePhaseContent = fs.readFileSync(EXECUTE_PHASE_MD, 'utf-8');
+    // After #3797: execute-phase.md delegates to worktree.cleanup-wave, which handles
+    // resurrection detection (diff --diff-filter=D) internally.
     assert.ok(
-      executePhaseContent.includes('WAS_DELETED'),
-      'execute-phase.md must use WAS_DELETED (git log --diff-filter=D history check) in the resurrection guard'
+      executePhaseContent.includes('worktree.cleanup-wave'),
+      'execute-phase.md must delegate to worktree.cleanup-wave for resurrection detection (#3195/#3797)'
+    );
+  });
+
+  test('both workflows use the same cleanup mechanism (SDK delegation parity)', () => {
+    if (!quickContent) quickContent = fs.readFileSync(QUICK_MD, 'utf-8');
+    if (!executePhaseContent) executePhaseContent = fs.readFileSync(EXECUTE_PHASE_MD, 'utf-8');
+    const quickDelegates = quickContent.includes('worktree.cleanup-wave');
+    const executeDelegates = executePhaseContent.includes('worktree.cleanup-wave');
+    assert.strictEqual(
+      quickDelegates,
+      executeDelegates,
+      'quick.md and execute-phase.md must both use the same cleanup mechanism (SDK delegation parity, #3195)'
     );
   });
 

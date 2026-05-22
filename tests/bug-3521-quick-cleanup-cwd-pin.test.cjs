@@ -1,7 +1,13 @@
 // allow-test-rule: source-text-is-the-product
 // quick.md is the shipped orchestration contract for /gsd-quick; this
-// regression test locks the CWD-safety guard that prevents orchestrator-leaked
-// CWD from targeting the wrong worktree/branch in the post-merge cleanup loop.
+// regression test previously locked the CWD-safety guard in the manual shell
+// cleanup loop. After #3797, quick.md delegates cleanup entirely to the SDK's
+// worktree.cleanup-wave command, which encapsulates CWD-pinning, STATE.md/
+// ROADMAP.md backup/restore, and deletion guards internally.
+//
+// This test file now verifies the delegation contract: quick.md calls
+// worktree.cleanup-wave with || exit 1 (fail-closed), which enforces the
+// safety semantics that were previously implemented inline in the shell loop.
 
 'use strict';
 
@@ -16,182 +22,48 @@ function readQuickMd() {
   return fs.readFileSync(QUICK_MD, 'utf8');
 }
 
-// Locate the shell-fallback cleanup loop in quick.md.
-// The loop is the `while IFS= read -r WT; do … done < "$WT_PATHS_FILE"` block
-// inside the `else` branch of the gsd-sdk availability check.
-function extractCleanupLoop(content) {
-  const loopStart = content.indexOf('while IFS= read -r WT; do');
-  assert.ok(loopStart !== -1, 'quick.md must contain the cleanup while-loop');
-  const loopEnd = content.indexOf('done < "$WT_PATHS_FILE"', loopStart);
-  assert.ok(loopEnd !== -1, 'quick.md cleanup while-loop must end with done < "$WT_PATHS_FILE"');
-  return content.slice(loopStart, loopEnd + 'done < "$WT_PATHS_FILE"'.length);
-}
-
-describe('bug #3521 — quick.md post-merge cleanup CWD safety', () => {
+describe('bug #3521 — quick.md post-merge cleanup CWD safety (via SDK delegation, #3797)', () => {
 
   test('quick.md is readable', () => {
     const content = readQuickMd();
     assert.ok(content.length > 0, 'quick.md must not be empty');
   });
 
-  test('cleanup loop resolves PROJECT_ROOT via git -C before any bare git command (#3521)', () => {
+  test('quick.md cleanup delegates CWD-safe worktree cleanup to SDK (worktree.cleanup-wave)', () => {
     const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    // The fix must recover the project root from the worktree path using git -C.
-    // Acceptable forms:
-    //   git -C "$WT" rev-parse --git-common-dir
-    //   git -C "$WT" rev-parse --show-toplevel
-    const hasRootResolution =
-      /git -C "\$WT" rev-parse --git-common-dir/.test(loop) ||
-      /git -C "\$WT" rev-parse --show-toplevel/.test(loop);
-
+    // After #3797: quick.md delegates to $GSD_SDK query worktree.cleanup-wave
+    // which handles CWD pinning, STATE.md backup, deletion guards, and branch
+    // cleanup internally. The manual shell loop has been removed.
     assert.ok(
-      hasRootResolution,
-      [
-        'quick.md cleanup loop must resolve PROJECT_ROOT via',
-        '`git -C "$WT" rev-parse --git-common-dir` (or --show-toplevel)',
-        'before any bare git command (#3521)',
-      ].join(' ')
+      content.includes('worktree.cleanup-wave'),
+      'quick.md must delegate cleanup to $GSD_SDK query worktree.cleanup-wave (#3797)',
     );
   });
 
-  test('cleanup loop pins CWD to PROJECT_ROOT before bare git commands (#3521)', () => {
+  test('quick.md cleanup-wave call uses || exit 1 to enforce fail-closed safety (#3521 contract)', () => {
     const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    // The fix must cd to the resolved root at the top of the iteration body.
-    const hasCdPin =
-      /cd "\$PROJECT_ROOT"/.test(loop) ||
-      /cd "\${PROJECT_ROOT}"/.test(loop);
-
-    assert.ok(
-      hasCdPin,
-      [
-        'quick.md cleanup loop must pin CWD to PROJECT_ROOT with',
-        '`cd "$PROJECT_ROOT"` at the top of each iteration (#3521)',
-      ].join(' ')
+    // The || exit 1 enforces fail-closed: SDK safety refusals (e.g. branch
+    // drift detection from #3174) surface immediately rather than being swallowed.
+    // This is the equivalent of the pre-#3797 `gsd-sdk query ... || exit 1` in the
+    // `if command -v gsd-sdk` branch.
+    assert.match(
+      content,
+      /\$GSD_SDK query worktree\.cleanup-wave.*\|\| exit 1/,
+      'quick.md cleanup-wave must use || exit 1 — fail-closed for safety refusals (#3521/#3797)',
     );
   });
 
-  test('cleanup loop skips and continues when PROJECT_ROOT cannot be resolved (#3521)', () => {
+  test('quick.md manifest guard still blocks broad cleanup when manifest is missing (#3384)', () => {
     const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    // The fix must guard against a resolution failure and emit a clear skip message.
-    const hasSkipGuard =
-      /if.*PROJECT_ROOT.*then[\s\S]*?continue/.test(loop) ||
-      /\|\|.*\{[\s\S]*?continue[\s\S]*?\}/.test(loop) ||
-      /PROJECT_ROOT.*2>\/dev\/null.*\n.*if.*-z.*PROJECT_ROOT/.test(loop) ||
-      // Broader: must have both a log/echo and a continue inside the loop
-      (loop.includes('continue') && /skip|cannot|SKIP|WARN|unresolvable|unresolveable|could not|failed/i.test(loop));
-
+    // The manifest guard must still be present before the cleanup-wave call
+    // to prevent broad worktree cleanup when the manifest file is absent.
     assert.ok(
-      hasSkipGuard,
-      [
-        'quick.md cleanup loop must log a skip message and `continue`',
-        'when PROJECT_ROOT cannot be resolved from the worktree (#3521)',
-      ].join(' ')
-    );
-  });
-
-  test('PROJECT_ROOT resolution appears before the first bare git command in the loop body (#3521)', () => {
-    const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    const rootResolutionIdx = loop.indexOf('git -C "$WT" rev-parse');
-    // The first bare git command that would be affected by CWD drift is
-    // the pre-merge deletion diff or the merge itself.
-    const firstBareGitIdx = loop.indexOf('git diff');
-    const firstMergeIdx = loop.indexOf('git merge');
-    const firstBareIdx = Math.min(
-      firstBareGitIdx !== -1 ? firstBareGitIdx : Infinity,
-      firstMergeIdx !== -1 ? firstMergeIdx : Infinity,
-    );
-
-    assert.ok(
-      rootResolutionIdx !== -1,
-      'quick.md cleanup loop must contain git -C "$WT" rev-parse for root resolution (#3521)'
-    );
-
-    assert.ok(
-      firstBareIdx !== Infinity,
-      'quick.md cleanup loop must contain bare git diff or git merge commands'
-    );
-
-    // The `git -C "$WT" rev-parse --abbrev-ref HEAD` that reads WT_BRANCH is
-    // already using -C so it is safe; the root resolution must appear before
-    // the first root-relative bare command (git diff / git merge).
-    assert.ok(
-      rootResolutionIdx < firstBareGitIdx || rootResolutionIdx < firstMergeIdx,
-      [
-        'PROJECT_ROOT resolution (git -C "$WT" rev-parse) must appear before the first',
-        'bare `git diff` or `git merge` in the cleanup loop body (#3521)',
-      ].join(' ')
-    );
-  });
-
-  test('existing pre-merge deletion guard (#1756) is still present after the CWD pin (#3521)', () => {
-    const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    // The guard checks for file deletions before merging.
-    assert.ok(
-      loop.includes('--diff-filter=D'),
-      'quick.md cleanup loop must retain the pre-merge deletion guard (--diff-filter=D) from #1756 after the CWD pin is added (#3521)'
-    );
-
-    // And it must appear before git merge.
-    const deletionCheckIdx = loop.indexOf('--diff-filter=D');
-    const mergeIdx = loop.indexOf('git merge');
-    assert.ok(
-      deletionCheckIdx < mergeIdx,
-      '--diff-filter=D deletion guard must appear before git merge in the cleanup loop (#3521/#1756)'
-    );
-  });
-
-  test('STATE.md and ROADMAP.md backup/restore is still present after the CWD pin (#3521)', () => {
-    const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    assert.ok(
-      loop.includes('STATE_BACKUP'),
-      'quick.md cleanup loop must retain STATE.md backup variable (STATE_BACKUP) after the CWD pin (#3521)'
+      content.includes('QUICK_WORKTREE_MANIFEST') || content.includes('WAVE_WORKTREE_MANIFEST'),
+      'quick.md must still guard cleanup behind QUICK_WORKTREE_MANIFEST (#3384)',
     );
     assert.ok(
-      loop.includes('ROADMAP_BACKUP'),
-      'quick.md cleanup loop must retain ROADMAP.md backup variable (ROADMAP_BACKUP) after the CWD pin (#3521)'
-    );
-
-    // Backup must precede the merge.
-    const backupIdx = loop.indexOf('STATE_BACKUP');
-    const mergeIdx = loop.indexOf('git merge');
-    assert.ok(
-      backupIdx < mergeIdx,
-      'STATE.md/ROADMAP.md backup must happen before git merge in the cleanup loop (#3521)'
-    );
-  });
-
-  test('cd to PROJECT_ROOT appears before STATE.md backup (which uses relative paths) (#3521)', () => {
-    const content = readQuickMd();
-    const loop = extractCleanupLoop(content);
-
-    // The backup uses a relative path `.planning/STATE.md` so the cd pin must
-    // happen before the backup assignment.
-    const cdIdx =
-      loop.indexOf('cd "$PROJECT_ROOT"') !== -1
-        ? loop.indexOf('cd "$PROJECT_ROOT"')
-        : loop.indexOf('cd "${PROJECT_ROOT}"');
-    const backupIdx = loop.indexOf('STATE_BACKUP=$(mktemp)');
-
-    if (cdIdx === -1) {
-      // If cd form is not used, skip this ordering check (alternate fix form).
-      return;
-    }
-
-    assert.ok(
-      cdIdx < backupIdx,
-      '`cd "$PROJECT_ROOT"` must appear before `STATE_BACKUP=$(mktemp)` so relative-path backup/restore works correctly (#3521)'
+      content.includes('refusing broad worktree cleanup') || content.includes('missing QUICK_WORKTREE_MANIFEST'),
+      'quick.md must emit a blocked message when the manifest is missing (#3384)',
     );
   });
 
