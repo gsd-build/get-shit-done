@@ -446,7 +446,9 @@ function rescueSummaryArtifacts(worktreePath, repoRoot, deps) {
 
   for (const absPath of summaryPaths) {
     // relPath is the path relative to the worktree root (e.g. ".planning/q1-SUMMARY.md")
-    const relPath = absPath.slice(worktreePath.length).replace(/^[/\\]/, '');
+    // Normalize to forward slashes so the Set comparison against `git status --porcelain`
+    // output works on Windows too (git always emits forward slashes in porcelain output).
+    const relPath = absPath.slice(worktreePath.length).replace(/^[/\\]/, '').replace(/\\/g, '/');
     rescuedRelPaths.add(relPath);
 
     const dest = path.join(repoRoot, relPath);

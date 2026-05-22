@@ -716,7 +716,8 @@ describe('executeWorktreeWaveCleanupPlan', () => {
     // SUMMARY was rescued into the main tree
     assert.equal(rescued.length, 1, 'SUMMARY.md must be rescued (copied) to main tree');
     assert.equal(rescued[0].src, '/repo/.claude/worktrees/agent-a1/.planning/q1-SUMMARY.md');
-    assert.equal(rescued[0].dest, '/repo/main/.planning/q1-SUMMARY.md');
+    // Normalize to forward slashes for cross-platform assertion (path.join uses \ on Windows)
+    assert.equal(rescued[0].dest.replace(/\\/g, '/'), '/repo/main/.planning/q1-SUMMARY.md');
 
     // Cleanup succeeded — SUMMARY-only dirty state must not block
     assert.equal(result.ok, true, 'cleanup must succeed when only SUMMARY.md is dirty');
