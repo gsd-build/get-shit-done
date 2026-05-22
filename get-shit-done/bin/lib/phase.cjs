@@ -444,12 +444,44 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
 
   // ── Pass 2: topological level assignment via depends_on DAG ──────────────
 
+  // Guard: detect case-insensitive key collisions before building dependency
+  // maps. Two plan IDs that differ only by case would silently overwrite each
+  // other in planMap, routing depends_on edges to whichever plan survived last.
+  // This is a configuration error — fail fast with the conflicting IDs. (#3785)
+  //
+  // This guard catches case-fold collisions on full plan IDs.
+  // Shared-numeric-prefix collisions (e.g. '20-01-Auth' and '20-01' both
+  // producing canonical '20-01') are resolved by first-write-wins ordering
+  // from sorted planFiles — not explicitly guarded here.
+  // seenLower is intentionally separate from planMap — it exists only to detect
+  // collisions before planMap is built, so the error fires before any Map
+  // entry silently overwrites another.
+  const seenLower = new Map(); // lowercase key → original id
+  for (const p of rawPlans) {
+    // ASCII plan IDs only — toLowerCase() is correct and locale-safe here.
+    const lower = p.id.toLowerCase();
+    const existing = seenLower.get(lower);
+    if (existing !== undefined) {
+      error(`depends_on index collision in phase ${normalized}: plan IDs '${existing}' and '${p.id}' are identical when case-folded. Rename one file to avoid ambiguous dependency resolution.`);
+      return;
+    }
+    seenLower.set(lower, p.id);
+  }
+
   // Build a map from plan ID → raw plan for fast lookup.
   // Deps that reference plans outside this phase are treated as external and ignored.
-  const planMap = new Map(rawPlans.map(p => [p.id, p]));
+  // Keys are lowercased so that depends_on refs with different casing still
+  // resolve to the correct plan (#3785: case-insensitive identifier resolution).
+  const planMap = new Map(rawPlans.map(p => [p.id.toLowerCase(), p]));
   // Secondary index: canonical prefix → full plan ID, so depends_on: ['03-01'] resolves
   // to '03-01-auth-hardening-PLAN.md'-derived ID '03-01-auth-hardening' (k015).
-  const canonicalToId = new Map(rawPlans.map(p => [extractCanonicalPlanId(p.id), p.id]));
+  // Keyed lowercase for the same case-insensitive reason (#3785).
+  const canonicalToId = new Map(rawPlans.map(p => [extractCanonicalPlanId(p.id).toLowerCase(), p.id]));
+
+  // KNOWN GAP: CJS resolver has only two tiers (planMap + canonicalToId);
+  // the SDK has an additional shortFormToId for same-phase short-form refs
+  // like '01' or '01A'. Adding the third tier here is tracked as a parity
+  // gap and is out of scope for #3785 / PR #3798.
 
   // Kahn's algorithm — compute in-degree and adjacency for in-phase deps only.
   const level = new Map();
@@ -461,7 +493,9 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     if (!adj.has(p.id)) adj.set(p.id, []);
     for (const dep of p.dependsOn) {
       // Accept both full-stem ('03-01-auth-hardening') and canonical-prefix ('03-01') forms.
-      const resolvedDep = planMap.has(dep) ? dep : canonicalToId.get(dep);
+      // All lookups are lowercased so mixed-case depends_on refs resolve correctly (#3785).
+      const depLower = dep.toLowerCase();
+      const resolvedDep = planMap.has(depLower) ? planMap.get(depLower).id : canonicalToId.get(depLower);
       if (!resolvedDep) continue; // external dep — ignore
       if (!adj.has(resolvedDep)) adj.set(resolvedDep, []);
       adj.get(resolvedDep).push(p.id);
@@ -537,7 +571,13 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
     const plan = {
       id: raw.id,
       wave: effectiveWave,
-      depends_on: raw.dependsOn,
+      // Resolve each user-typed dep to its canonical plan ID (preserving on-disk casing)
+      // so the output never reflects the user's case typo. Unresolved deps (external
+      // phase refs) are kept as-is since planMap only contains plans in this phase.
+      depends_on: raw.dependsOn.map(dep => {
+        const lower = String(dep).toLowerCase();
+        return planMap.has(lower) ? planMap.get(lower).id : dep;
+      }),
       autonomous: raw.autonomous,
       objective: raw.objective,
       files_modified: raw.filesModified,

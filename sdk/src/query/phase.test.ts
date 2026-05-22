@@ -648,4 +648,95 @@ describe('phasePlanIndex', () => {
     // A clear, dedicated warning naming the unresolved reference must surface.
     expect(warnings.some(w => /unresolved/i.test(w) && w.includes('does-not-exist'))).toBe(true);
   });
+
+  it('#3785: depends_on resolution is case-insensitive — mixed-case plan ID resolves correctly', async () => {
+    // Regression: planMap / canonicalToId / shortFormToId used strict Map.has() with no
+    // case normalization. A depends_on ref in lowercase against an uppercase-suffix plan
+    // ID dropped the DAG edge, causing the dependent plan to land in wave 1 instead of
+    // wave 2 (wrong ordering).
+    const phase20 = join(tmpDir, '.planning', 'phases', '20-case-insensitive');
+    await mkdir(phase20, { recursive: true });
+    // Plan A: filename uses uppercase suffix (e.g. user named it "Phase-2-FOO")
+    await writeFile(join(phase20, '20-01-Auth-PLAN.md'), [
+      '---',
+      'phase: 20',
+      'plan: 01',
+      'wave: 1',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan A — uppercase suffix in filename.</objective>',
+    ].join('\n'));
+    // Plan B: depends_on references Plan A using a different case than the plan ID
+    await writeFile(join(phase20, '20-02-PLAN.md'), [
+      '---',
+      'phase: 20',
+      'plan: 02',
+      'wave: 2',
+      'autonomous: true',
+      'depends_on:',
+      '  - 20-01-auth',
+      '---',
+      '<objective>Plan B — lowercase dep ref to mixed-case plan A.</objective>',
+    ].join('\n'));
+
+    const result = await phasePlanIndex(['20'], tmpDir);
+    const data = result.data as Record<string, unknown>;
+    const plans = data.plans as Array<Record<string, unknown>>;
+    const waves = data.waves as Record<string, string[]>;
+    const warnings = (data.warnings as string[] | undefined) ?? [];
+
+    const planA = plans.find(p => (p.id as string).startsWith('20-01'));
+    const planB = plans.find(p => p.id === '20-02');
+    expect(planA).toBeDefined();
+    expect(planB).toBeDefined();
+
+    // Lock canonical casing: plan ID must be preserved as-is from the filename, not lowercased.
+    expect(planA!.id).toBe('20-01-Auth');
+
+    // The DAG edge must resolve: B must be in a later wave than A.
+    expect(planA!.wave).toBeLessThan(planB!.wave as number);
+    // Structurally: A in wave 1, B in wave 2.
+    expect(waves['1']).toBeDefined();
+    expect(waves['2']).toBeDefined();
+    expect((waves['1'] as string[]).some(id => (id as string).startsWith('20-01'))).toBe(true);
+    expect(waves['2']).toContain('20-02');
+    // depends_on output must use canonical plan ID, not the user-typed casing.
+    expect(planB!.depends_on).toEqual(['20-01-Auth']);
+    // No unresolved-dep warning should be emitted.
+    expect(warnings.some(w => /unresolved/i.test(w))).toBe(false);
+  });
+
+  // This test can only run on Linux where the filesystem is case-sensitive.
+  // On macOS/Windows (case-insensitive FS), writing both files silently collapses
+  // them to one file, so the collision scenario cannot be triggered via disk.
+  const itLinuxOnly = process.platform === 'linux' ? it : it.skip;
+  itLinuxOnly('#3785 adversarial: case-insensitive collision — two plan IDs that differ only by case throw a clear error', async () => {
+    // Regression guard: if two plan files produce IDs that are identical when
+    // lowercased, planMap would silently overwrite one entry and route depends_on
+    // edges to whichever plan survived. This must fail fast instead.
+    const phase21 = join(tmpDir, '.planning', 'phases', '21-collision');
+    await mkdir(phase21, { recursive: true });
+    // These two filenames produce IDs '21-01-auth' and '21-01-Auth' — same when lowercased.
+    await writeFile(join(phase21, '21-01-auth-PLAN.md'), [
+      '---',
+      'phase: 21',
+      'plan: 01',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan lowercase.</objective>',
+    ].join('\n'));
+    await writeFile(join(phase21, '21-01-Auth-PLAN.md'), [
+      '---',
+      'phase: 21',
+      'plan: 01',
+      'autonomous: true',
+      'depends_on: []',
+      '---',
+      '<objective>Plan uppercase.</objective>',
+    ].join('\n'));
+
+    await expect(phasePlanIndex(['21'], tmpDir)).rejects.toThrow(/collision/i);
+  });
 });

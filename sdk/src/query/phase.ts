@@ -498,24 +498,55 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
 
   // ── Pass 2: topological level assignment via depends_on DAG ──────────────
 
+  // Guard: detect case-insensitive key collisions before building dependency
+  // maps. Two plan IDs that differ only by case would silently overwrite each
+  // other in planMap, routing depends_on edges to whichever plan survived last.
+  // This is a configuration error — fail fast with the conflicting IDs so the
+  // author can rename one file. (#3785 follow-up from adversarial review)
+  //
+  // This guard catches case-fold collisions on full plan IDs.
+  // Shared-numeric-prefix collisions (e.g. '20-01-Auth' and '20-01' both
+  // producing canonical '20-01') are resolved by first-write-wins ordering
+  // from sorted planFiles — not explicitly guarded here.
+  // seenLower is intentionally separate from planMap — it exists only to detect
+  // collisions before planMap is built, so the error fires before any Map
+  // entry silently overwrites another.
+  const seenLower = new Map<string, string>(); // lowercase key → original id
+  for (const p of rawPlans) {
+    // ASCII plan IDs only — toLowerCase() is correct and locale-safe here.
+    const lower = p.id.toLowerCase();
+    const existing = seenLower.get(lower);
+    if (existing !== undefined) {
+      throw new GSDError(
+        `depends_on index collision in phase ${normalized}: plan IDs '${existing}' and '${p.id}' are identical when case-folded. Rename one file to avoid ambiguous dependency resolution.`,
+        ErrorClassification.Execution,
+      );
+    }
+    seenLower.set(lower, p.id);
+  }
+
   // Build a map from plan ID → RawPlan for fast lookup.
   // Deps that reference plans outside this phase are silently ignored (treated
   // as already-satisfied external deps — the plan becomes a source node).
-  const planMap = new Map<string, RawPlan>(rawPlans.map(p => [p.id, p]));
+  // Keys are lowercased so that depends_on refs with different casing still
+  // resolve to the correct plan (#3785: case-insensitive identifier resolution).
+  const planMap = new Map<string, RawPlan>(rawPlans.map(p => [p.id.toLowerCase(), p]));
   // Secondary index: canonical prefix → full plan ID, so depends_on: ['03-01'] resolves
   // to '03-01-auth-hardening-PLAN.md'-derived ID '03-01-auth-hardening' (k015).
-  const canonicalToId = new Map<string, string>(rawPlans.map(p => [extractCanonicalPlanId(p.id), p.id]));
+  // Keyed lowercase for the same case-insensitive reason (#3785).
+  const canonicalToId = new Map<string, string>(rawPlans.map(p => [extractCanonicalPlanId(p.id).toLowerCase(), p.id]));
   // Tertiary index: same-phase short-form ('01') → full plan ID, derived from each plan's
   // canonical '<phase>-<plan>' by splitting on the LAST '-'. The phase segment may
   // contain dots (e.g. '99.9') or letters (e.g. '02A'); only the trailing '-NN' is the
   // short form. Same-phase plans share a phase prefix so '01' is unambiguous within a
   // single phase-plan-index call. (#3488)
+  // Keyed lowercase for the same case-insensitive reason (#3785).
   const shortFormToId = new Map<string, string>();
   for (const p of rawPlans) {
     const canonical = extractCanonicalPlanId(p.id);
     const lastDash = canonical.lastIndexOf('-');
     if (lastDash > 0 && lastDash < canonical.length - 1) {
-      const shortForm = canonical.slice(lastDash + 1);
+      const shortForm = canonical.slice(lastDash + 1).toLowerCase();
       // First write wins — preserve deterministic ordering from sorted planFiles.
       if (!shortFormToId.has(shortForm)) {
         shortFormToId.set(shortForm, p.id);
@@ -537,13 +568,16 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
       // and same-phase short-form ('01') forms. The short-form lookup (#3488)
       // is keyed off the plan-id suffix so it works for integer ('99'), letter
       // ('02A'), and decimal ('99.9') phase IDs alike.
+      // All lookups are lowercased so mixed-case depends_on refs resolve
+      // correctly regardless of the case used in the plan filename (#3785).
+      const depLower = dep.toLowerCase();
       let resolvedDep: string | undefined;
-      if (planMap.has(dep)) {
-        resolvedDep = dep;
-      } else if (canonicalToId.has(dep)) {
-        resolvedDep = canonicalToId.get(dep);
-      } else if (shortFormToId.has(dep)) {
-        resolvedDep = shortFormToId.get(dep);
+      if (planMap.has(depLower)) {
+        resolvedDep = planMap.get(depLower)!.id;
+      } else if (canonicalToId.has(depLower)) {
+        resolvedDep = canonicalToId.get(depLower);
+      } else if (shortFormToId.has(depLower)) {
+        resolvedDep = shortFormToId.get(depLower);
       }
       if (!resolvedDep) {
         // Looks like an in-phase short-form / canonical reference that didn't resolve.
@@ -638,7 +672,13 @@ export const phasePlanIndex: QueryHandler = async (args, projectDir, workstream)
     const plan: Record<string, unknown> = {
       id: raw.id,
       wave: effectiveWave,
-      depends_on: raw.dependsOn,
+      // Resolve each user-typed dep to its canonical plan ID (preserving on-disk casing)
+      // so the output never reflects the user's case typo. Unresolved deps (external
+      // phase refs) are kept as-is since planMap only contains plans in this phase.
+      depends_on: raw.dependsOn.map(dep => {
+        const lower = String(dep).toLowerCase();
+        return planMap.get(lower)?.id ?? dep;
+      }),
       autonomous: raw.autonomous,
       objective: raw.objective,
       files_modified: raw.filesModified,
