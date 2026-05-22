@@ -5,7 +5,7 @@
 
 ## Context
 
-Eight `*-command-router.cjs` files (`phase`, `phases`, `roadmap`, `state`, `verify`, `validate`, `init`, `frontmatter`) each duplicate the same three-part dispatch pattern: (1) check `GSD_WORKSTREAM` + `tryLoadSdk()` to decide whether to use the SDK or CJS handler, (2) invoke the selected path, (3) map errors to the `error()` callback. The duplicated mode-selection logic means a policy change (e.g., adding a new fallback condition) must be applied in eight places. Tests for these routers are mock-heavy — they stub `tryLoadSdk`, stub `getExecuteForCjs`, and assert on internal call shapes rather than observable dispatch outcomes. The SDK-vs-CJS fallback decision is smeared across every router, making it impossible to reason about or test the policy in isolation.
+Seven `*-command-router.cjs` files (`phase`, `phases`, `roadmap`, `state`, `verify`, `validate`, `init`) each duplicate the same three-part dispatch pattern: (1) check `GSD_WORKSTREAM` + `tryLoadSdk()` to decide whether to use the SDK or CJS handler, (2) invoke the selected path, (3) map errors to the `error()` callback. The duplicated mode-selection logic means a policy change (e.g., adding a new fallback condition) must be applied in eight places. Tests for these routers are mock-heavy — they stub `tryLoadSdk`, stub `getExecuteForCjs`, and assert on internal call shapes rather than observable dispatch outcomes. The SDK-vs-CJS fallback decision is smeared across every router, making it impossible to reason about or test the policy in isolation.
 
 ## Decision
 
