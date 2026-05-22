@@ -263,11 +263,25 @@ describe('auto-update', () => {
     });
   }
 
+  // Shared 4-byte buffer used for Atomics.wait-based sleeps throughout the
+  // hook-test helpers.  Atomics.wait(sai, 0, 0, ms) yields the event loop for
+  // exactly `ms` milliseconds without spawning an external process.
+  const _sleepSab = new SharedArrayBuffer(4);
+  const _sleepSai = new Int32Array(_sleepSab);
+  function atomicSleep(ms) {
+    Atomics.wait(_sleepSai, 0, 0, ms);
+  }
+
   function cleanupHookRepo(tmpDir) {
     // The hook detaches a graphify-rebuild subprocess that may still be writing
-    // into tmpDir when the test body returns. Wait briefly for its lock file to
-    // disappear (rebuild process exit trap removes it), then retry rmSync to
+    // into tmpDir when the test body returns. Wait for the rebuild PID to exit
+    // (lock file disappears on subprocess EXIT trap), then retry rmSync to
     // absorb any remaining transient ENOTEMPTY race.
+    //
+    // Uses Atomics.wait instead of execFileSync('sleep', ...) so we yield the
+    // CPU without spawning an external process per iteration.  Budget: 4 s —
+    // the mock graphify binary completes in well under 1 s; if we hit the
+    // ceiling something else is broken.
     const lockPath = path.join(tmpDir, '.planning/graphs/.rebuild.lock');
     const lockDeadline = Date.now() + 4000;
     while (Date.now() < lockDeadline) {
@@ -279,7 +293,7 @@ describe('auto-update', () => {
       } catch {
         break; // PID dead → safe to clean up
       }
-      execFileSync('sleep', ['0.05']);
+      atomicSleep(50); // yield 50 ms, then re-check (replaces execFileSync('sleep'))
     }
     fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   }
@@ -423,11 +437,23 @@ describe('auto-update', () => {
         { pathPrepend: mockBin },
       );
 
-      // Wait up to 5s for the detached process to finish updating the status
+      // Wait for the detached rebuild process to write the final status file.
+      // The detached process exits after writing; we poll until the status
+      // transitions from "running" to a terminal value.
+      //
+      // Behavior-anchored wait (fix for #3803): the poll budget is derived from
+      // the mock's known sleepMs (200 ms) rather than a wall-clock constant.
+      // waitBudget = sleepMs + 2000 ms: the 2 s buffer covers two bash process
+      // startups (the hook script + the detached rebuild subprocess) plus
+      // filesystem write latency.  Mac bash startup: ~100-300 ms; Docker adds
+      // more.  2 s keeps the test honest under load without guessing an absolute
+      // wall-clock ceiling.  See PR #3793 for the reference fix pattern.
       const statusPath = path.join(tmpDir, '.planning/graphs/.last-build-status.json');
-      const deadline = Date.now() + 15000;
+      const _sleepMs_ok = 200; // mirrors makeMockGraphifyBin sleepMs above
+      const _waitBudget_ok = _sleepMs_ok + 2000; // 2 s: two bash spawn overheads
+      const _maxIter_ok = Math.ceil(_waitBudget_ok / 100); // 100 ms poll step
       let status;
-      while (Date.now() < deadline) {
+      for (let i = 0; i < _maxIter_ok; i++) {
         if (fs.existsSync(statusPath)) {
           try {
             status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
@@ -436,7 +462,7 @@ describe('auto-update', () => {
             // Detached writer can briefly expose a partial JSON write.
           }
         }
-        execFileSync('sleep', ['0.1']);
+        atomicSleep(100); // yield 100 ms, then re-check
       }
       assert.ok(status, 'status file must exist after dispatch');
       assert.strictEqual(status.status, 'ok', 'mock graphify exit=0 → status ok');
@@ -457,10 +483,19 @@ describe('auto-update', () => {
         { pathPrepend: mockBin },
       );
 
+      // Wait for the detached rebuild process to write the final status file.
+      //
+      // Behavior-anchored wait (fix for #3803): same pattern as the status=ok
+      // variant above.  Budget derived from mock sleepMs (100 ms) + 2 s overhead
+      // buffer (two bash spawns: hook script + detached rebuild subprocess).
+      // The 2 s absorbs startup latency without anchoring to an absolute
+      // wall-clock ceiling.
       const statusPath = path.join(tmpDir, '.planning/graphs/.last-build-status.json');
-      const deadline = Date.now() + 15000;
+      const _sleepMs_fail = 100; // mirrors makeMockGraphifyBin sleepMs above
+      const _waitBudget_fail = _sleepMs_fail + 2000; // 2 s: two bash spawn overheads
+      const _maxIter_fail = Math.ceil(_waitBudget_fail / 100); // 100 ms poll step
       let status;
-      while (Date.now() < deadline) {
+      for (let i = 0; i < _maxIter_fail; i++) {
         if (fs.existsSync(statusPath)) {
           try {
             status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
@@ -469,7 +504,7 @@ describe('auto-update', () => {
             // Detached writer can briefly expose a partial JSON write.
           }
         }
-        execFileSync('sleep', ['0.1']);
+        atomicSleep(100); // yield 100 ms, then re-check
       }
       assert.ok(status, 'status file must exist after dispatch');
       assert.strictEqual(status.status, 'failed', 'mock graphify exit=1 → status failed');
