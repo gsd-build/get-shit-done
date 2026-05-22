@@ -1145,8 +1145,17 @@ function buildHookCommand(configDir, hookName, opts) {
   // .js hooks still need the absolute node path because GUI-launched runtimes
   // start with a minimal PATH that may not include nvm/Homebrew/Volta node
   // binaries (#2979).
+  //
+  // On Windows, .sh hooks routed through Git Bash fail in Claude Code's
+  // SessionStart and PostToolUse hook runner — the runner duplicates the
+  // executable as argv[1], so bash.exe receives its own binary as the script
+  // file. Node.js hooks are unaffected, and the .sh scripts already delegate
+  // to `node -e` for their logic. Route them through resolveNodeRunner() and
+  // use the .js extension on win32.
   const nodeRunner = resolveNodeRunner();
-  const runner = hookName.endsWith('.sh') ? resolveBashRunner(opts) : nodeRunner;
+  const isWinShHook = (opts.platform || process.platform) === 'win32' && hookName.endsWith('.sh');
+  const runner = isWinShHook ? nodeRunner : (hookName.endsWith('.sh') ? resolveBashRunner(opts) : nodeRunner);
+  const effectiveHookName = isWinShHook ? hookName.replace(/\.sh$/, '.js') : hookName;
   // Runner resolvers return null when the executable path is unavailable.
   // Fall through with null so callers can skip registration with a warning
   // instead of emitting a command that recreates the original hook failure.
@@ -1159,14 +1168,14 @@ function buildHookCommand(configDir, hookName, opts) {
     });
     return projectManagedHookCommand({
       absoluteRunner: runner,
-      scriptPath: `${portableBaseDir}/hooks/${hookName}`,
+      scriptPath: `${portableBaseDir}/hooks/${effectiveHookName}`,
       runtime: opts.runtime || 'generic',
       platform: opts.platform || process.platform,
     });
   }
 
   // Default: absolute path with forward slashes (Windows-safe, fixes #2045/#2046).
-  const hooksPath = configDir.replace(/\\/g, '/') + '/hooks/' + hookName;
+  const hooksPath = configDir.replace(/\\/g, '/') + '/hooks/' + effectiveHookName;
   return projectManagedHookCommand({
     absoluteRunner: runner,
     scriptPath: hooksPath,
