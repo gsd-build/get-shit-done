@@ -63,14 +63,33 @@ Use conventional commit format: `fix:`, `feat:`, `docs:`, `chore:`, `refactor:` 
 </step>
 
 <step name="log_to_state">
-If `.planning/STATE.md` exists, append to the "Quick Tasks Completed" table.
-If the table doesn't exist, skip this step silently.
+If `.planning/STATE.md` exists and has a "Quick Tasks Completed" table, append a row
+that matches the existing table's schema. If no table exists, skip silently.
+If the table's schema is unrecognized, skip with a brief log rather than append a
+malformed row.
 
 ```bash
-# Check if STATE.md has quick tasks table
+# Detect whether STATE.md has a Quick Tasks Completed table
 if grep -q "Quick Tasks Completed" .planning/STATE.md 2>/dev/null; then
-  # Append entry — workflow handles the format
-  echo "| $(date +%Y-%m-%d) | fast | $TASK | ✅ |" >> .planning/STATE.md
+  # Read the table header line to determine the column schema.
+  # quick.md Step 7 creates a 5-column table:
+  #   | # | Description | Date | Commit | Directory |
+  # Count pipe characters in the header to determine column count.
+  HEADER_LINE=$(grep -A2 "Quick Tasks Completed" .planning/STATE.md 2>/dev/null | grep "^|" | head -1)
+  # Count columns: number of | separators minus 1 gives column count
+  COL_COUNT=$(echo "$HEADER_LINE" | awk -F'|' '{print NF-1}')
+
+  if [ "$COL_COUNT" -eq 5 ] && echo "$HEADER_LINE" | grep -qi "Description" && echo "$HEADER_LINE" | grep -qi "Commit" && echo "$HEADER_LINE" | grep -qi "Directory"; then
+    # 5-column schema from quick.md Step 7: | # | Description | Date | Commit | Directory |
+    # Determine the next row number by counting existing data rows (non-separator, non-header).
+    NEXT_NUM=$(awk '/Quick Tasks Completed/{found=1} found && /^\|/ && !/^[|][-: |]*[|]$/ && !/Description/{count++} END{print count+1}' .planning/STATE.md 2>/dev/null || echo "1")
+    # Get the latest commit hash (short)
+    COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "—")
+    echo "| $NEXT_NUM | $TASK | $(date +%Y-%m-%d) | $COMMIT_HASH | — |" >> .planning/STATE.md
+  else
+    # Unrecognized table schema — skip to avoid appending a malformed row.
+    echo "⚠ fast.md log_to_state: Quick Tasks Completed table has unrecognized schema (${COL_COUNT} columns); skipping STATE.md update."
+  fi
 fi
 ```
 </step>
