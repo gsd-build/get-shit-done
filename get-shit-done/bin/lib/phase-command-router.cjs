@@ -62,10 +62,6 @@ function routePhaseCommand({ phase, args, cwd, raw, error }) {
   // Each handler receives a ctx object from the hub and must return a HubResult.
   const cjsRegistry = {
     phase: {
-      'mvp-mode': (_ctx) => {
-        phase.cmdPhaseMvpMode(cwd, args.slice(2), raw);
-        return { ok: true, data: null };
-      },
       'next-decimal': (_ctx) => {
         phase.cmdPhaseNextDecimal(cwd, args[2], raw);
         return { ok: true, data: null };
