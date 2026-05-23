@@ -965,12 +965,35 @@ function extractCurrentMilestone(content, cwd) {
 
   // 3. Find the section matching this version
   // Match headings like: ## Roadmap v3.0: Name, ## v3.0 Name, etc.
+  //
+  // When STATE.md milestone field is a shared semver prefix (e.g. "v8.0") that
+  // appears in multiple ROADMAP.md headings — typically a closed sub-milestone
+  // (## v8.0 Overview — v8.0-F (CLOSED FAIL)) plus an active one
+  // (## v8.0-B Overview (STARTED)) — the first non-closed match is preferred.
+  // Without this skip, the active milestone section would be silently excluded
+  // and downstream phase.insert / phase.complete / init.phase-op queries would
+  // fail with "Phase N not found in current milestone" despite the phase row
+  // existing in the active sub-milestone block. See #NNNN.
   const escapedVersion = escapeRegex(version);
   const sectionPattern = new RegExp(
     `(^#{1,3}\\s+.*${escapedVersion}[^\\n]*)`,
-    'mi'
+    'gmi'
   );
-  const sectionMatch = content.match(sectionPattern);
+  const CLOSED_MILESTONE_MARKERS = /\b(?:CLOSED|ARCHIVED|ABANDONED|SHIPPED|FAIL(?:ED)?)\b|✅|🗄️/i;
+
+  let sectionMatch = null;
+  const allMatches = Array.from(content.matchAll(sectionPattern));
+  for (const m of allMatches) {
+    if (!CLOSED_MILESTONE_MARKERS.test(m[1])) {
+      sectionMatch = m;
+      break;
+    }
+  }
+  // Fallback: if every match contains a closed marker, return the first match
+  // to preserve legacy behavior (single closed milestone still loads its section).
+  if (!sectionMatch && allMatches.length > 0) {
+    sectionMatch = allMatches[0];
+  }
 
   if (!sectionMatch) return stripShippedMilestones(content);
 
@@ -1014,14 +1037,18 @@ function extractCurrentMilestone(content, cwd) {
     charOffset += line.length + 1;
   }
 
-  // Return everything before the current milestone section (non-milestone content
-  // like title, overview) plus the current milestone section
-  const beforeMilestones = content.slice(0, sectionStart);
+  // Return content before the FIRST milestone heading (title, overview, non-milestone
+  // preamble) plus the current milestone section. We compute `firstMilestoneStart`
+  // independently of `sectionStart` so that when an active milestone follows a
+  // closed sibling sharing the same semver prefix (skipped above), the closed
+  // milestone's content is NOT pulled into the preamble. Strip <details> blocks
+  // since they are definitely shipped content.
+  const firstMilestoneMatch = content.match(/^#{1,3}\s+.*v\d+\.\d+[^\n]*/m);
+  const firstMilestoneStart = firstMilestoneMatch ? firstMilestoneMatch.index : sectionStart;
+  const preamble = content
+    .slice(0, firstMilestoneStart)
+    .replace(/<details>[\s\S]*?<\/details>/gi, '');
   const currentSection = content.slice(sectionStart, sectionEnd);
-
-  // Also include any content before the first milestone heading (title, overview, etc.)
-  // but strip any <details> blocks in it (these are definitely shipped)
-  const preamble = beforeMilestones.replace(/<details>[\s\S]*?<\/details>/gi, '');
 
   return preamble + currentSection;
 }

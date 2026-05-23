@@ -1,0 +1,5 @@
+---
+type: Fixed
+issue: 3863
+---
+**`extractCurrentMilestone` no longer selects a CLOSED sub-milestone when STATE.md `milestone` is a shared semver prefix.** When a roadmap contains both a closed sub-milestone (e.g. `## v8.0 Overview — v8.0-F (CLOSED FAIL)`) and an active sub-milestone (e.g. `## v8.0-B Overview (STARTED)`) under the same semver prefix recorded in STATE.md (`milestone: v8.0`), the `'mi'` first-match regex in `get-shit-done/bin/lib/core.cjs:969-973` always returned the closed heading. Downstream `phase.insert`, `phase.complete`, `init.phase-op`, and `roadmap` queries then failed with "Phase N not found in current milestone" despite the active phase row plainly existing. The fix switches to `'gmi'` `matchAll` iteration, skips headings containing `CLOSED|ARCHIVED|ABANDONED|SHIPPED|FAIL(ED)?|✅|🗄️` markers, and falls back to the first match if every candidate is closed (preserves legacy single-closed-milestone behavior). Preamble boundary is now computed from the first milestone heading position independently of `sectionStart` so closed-sibling content does not leak into the returned slice when the matched section is later in the file. (#3863)
