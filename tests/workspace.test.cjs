@@ -330,7 +330,7 @@ describe('workspace command files', () => {
     const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
     assert.ok(fmMatch, `${path.basename(filePath)} must start with a YAML frontmatter block`);
     const fm = {};
-    for (const line of fmMatch[1].split('\n')) {
+    for (const line of fmMatch[1].split(/\r?\n/)) {
       const kv = line.match(/^([a-zA-Z_-]+):\s*(.*)$/);
       if (!kv) continue;
       const key = kv[1];
