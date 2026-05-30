@@ -845,7 +845,7 @@ export const validateHealth: QueryHandler = async (args, projectDir, workstream)
               model_profile: 'balanced',
               commit_docs: false,
               search_gitignored: false,
-              branching_strategy: 'none',
+              branching_strategy: 'phase',
               phase_branch_template: 'feat/phase-{phase}',
               milestone_branch_template: 'feat/{milestone}',
               quick_branch_template: 'fix/{slug}',

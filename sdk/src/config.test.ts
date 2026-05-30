@@ -207,7 +207,7 @@ describe('loadConfig', () => {
     });
 
     const config = await loadConfig(tmpDir);
-    expect(config.git.branching_strategy).toBe('none');
+    expect(config.git.branching_strategy).toBe('phase');
     expect(config.git.phase_branch_template).toBe('gsd/phase-{phase}-{slug}');
     expect(config.agent_skills).toEqual({});
   });

@@ -91,7 +91,7 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd-new
     "min_plans_for_parallel": 2
   },
   "git": {
-    "branching_strategy": "none",
+    "branching_strategy": "phase",
     "create_tag": true,
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
     "milestone_branch_template": "gsd/{milestone}-{slug}",
@@ -547,7 +547,7 @@ All four fields are **optional and additive** — STATE.md files without them ke
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `git.branching_strategy` | enum | `none` | `none`, `phase`, or `milestone` |
+| `git.branching_strategy` | enum | `phase` | `none`, `phase`, or `milestone` |
 | `git.base_branch` | string | `main` | The integration branch that phase/milestone branches are created from and merged back into. Override when your repo uses `master` or a release branch |
 | `git.create_tag` | boolean | `true` | Create a git tag (`v[X.Y]`) on milestone completion. Set to `false` for projects with their own release flow |
 | `git.phase_branch_template` | string | `gsd/phase-{phase}-{slug}` | Branch name template for phase strategy |

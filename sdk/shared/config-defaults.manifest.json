@@ -14,7 +14,7 @@
   "mode": "interactive",
   "claude_md_path": "./CLAUDE.md",
   "git": {
-    "branching_strategy": "none",
+    "branching_strategy": "phase",
     "create_tag": true,
     "base_branch": null,
     "phase_branch_template": "gsd/phase-{phase}-{slug}",

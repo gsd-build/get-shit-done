@@ -9,7 +9,7 @@ Configuration options for `.planning/` directory behavior.
   "search_gitignored": false
 },
 "git": {
-  "branching_strategy": "none",
+  "branching_strategy": "phase",
   "base_branch": null,
   "phase_branch_template": "gsd/phase-{phase}-{slug}",
   "milestone_branch_template": "gsd/{milestone}-{slug}",
@@ -28,7 +28,7 @@ Configuration options for `.planning/` directory behavior.
 |--------|---------|-------------|
 | `commit_docs` | `true` | Whether to commit planning artifacts to git |
 | `search_gitignored` | `false` | Add `--no-ignore` to broad rg searches |
-| `git.branching_strategy` | `"none"` | Git branching approach: `"none"`, `"phase"`, or `"milestone"` |
+| `git.branching_strategy` | `"phase"` | Git branching approach: `"none"`, `"phase"`, or `"milestone"` |
 | `git.base_branch` | `null` (auto-detect) | Target branch for PRs and merges (e.g. `"master"`, `"develop"`). When `null`, auto-detects from `git symbolic-ref refs/remotes/origin/HEAD`, falling back to `"main"`. |
 | `git.create_tag` | `true` | Create git tags on milestone completion |
 | `git.phase_branch_template` | `"gsd/phase-{phase}-{slug}"` | Branch template for phase strategy |
@@ -136,11 +136,11 @@ To use uncommitted mode:
 | `phase` | At `execute-phase` start | Single phase | User merges after phase |
 | `milestone` | At first `execute-phase` of milestone | Entire milestone | At `complete-milestone` |
 
-**When `git.branching_strategy: "none"` (default):**
+**When `git.branching_strategy: "none"`:**
 - All work commits to current branch
 - Standard GSD behavior
 
-**When `git.branching_strategy: "phase"`:**
+**When `git.branching_strategy: "phase"` (default):**
 - `execute-phase` creates/switches to a branch before execution
 - Branch name from `phase_branch_template` (e.g., `gsd/phase-03-authentication`)
 - All plan commits go to that branch
