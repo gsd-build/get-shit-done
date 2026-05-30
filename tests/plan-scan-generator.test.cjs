@@ -48,6 +48,7 @@ describe('plan-scan-generator parity: isRootPlanFile', async () => {
     { label: 'rejects -PLAN-OUTLINE.md', name: 'something-PLAN-OUTLINE.md', expected: false },
     { label: 'rejects .pre-bounce.md', name: 'PLAN.pre-bounce.md', expected: false },
     { label: 'rejects SUMMARY.md', name: 'SUMMARY.md', expected: false },
+    { label: 'rejects legacy -PLAN-NN-SUMMARY.md', name: '14-PLAN-01-SUMMARY.md', expected: false },
     { label: 'rejects unrelated file', name: 'README.md', expected: false },
   ];
 

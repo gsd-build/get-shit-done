@@ -629,6 +629,57 @@ milestone: v1.0
   });
 });
 
+describe('state planned-phase frontmatter progress preservation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('does not resync milestone progress.* counters on a plan-phase run', () => {
+    // A plan-phase run updates per-phase body fields (Total Plans in Phase,
+    // Status, Last Activity). It must leave the milestone-wide progress.*
+    // counters alone — resyncing them from a half-planned disk snapshot is the
+    // bug. Curated values use distinctive numbers that no disk scan of this
+    // (empty) project could coincidentally produce.
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      [
+        '---',
+        'milestone: v3.0',
+        'progress:',
+        '  total_phases: 7',
+        '  completed_phases: 6',
+        '  total_plans: 99',
+        '  completed_plans: 88',
+        '  percent: 90',
+        '---',
+        '',
+        '# Project State',
+        '',
+        '**Status:** In progress',
+        '**Total Plans in Phase:** 0',
+        '**Last Activity:** 2020-01-01',
+        '**Last Activity Description:** none',
+        '',
+      ].join('\n')
+    );
+
+    const result = runGsdTools('state planned-phase --phase 2 --name foo --plans 5', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('total_plans: 99'), 'curated total_plans preserved, not resynced from disk');
+    assert.ok(content.includes('completed_plans: 88'), 'curated completed_plans preserved, not resynced from disk');
+    // And the per-phase body field the command is actually responsible for is updated.
+    assert.ok(content.includes('**Total Plans in Phase:** 5'), 'per-phase plan count updated in body');
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // stateExtractField and stateReplaceField helpers
 // ─────────────────────────────────────────────────────────────────────────────

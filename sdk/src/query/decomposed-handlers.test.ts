@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -14,6 +14,7 @@ import { agentSkills } from './skills.js';
 import { roadmapUpdatePlanProgress } from './roadmap-update-plan-progress.js';
 import { requirementsMarkComplete } from './roadmap.js';
 import { statePlannedPhase } from './state-mutation.js';
+import { extractFrontmatter } from './frontmatter.js';
 import { verifySchemaDrift } from './verify.js';
 import { todoMatchPhase, statsJson, progressBar } from './progress.js';
 import { milestoneComplete } from './phase-lifecycle.js';
@@ -116,6 +117,48 @@ describe('statePlannedPhase', () => {
     const result = await statePlannedPhase([], tmpDir);
     const data = result.data as Record<string, unknown>;
     expect(data.error).toMatch(/phase required/);
+  });
+
+  it('preserves curated progress.* frontmatter on a plan-phase run (resync:false)', async () => {
+    // A plan-phase run updates per-phase body fields only. It must NOT resync
+    // the milestone-wide progress.* counters from disk — doing so clobbers
+    // curated values with a half-planned snapshot. Mirrors the #3242 precedent
+    // already applied to body-only state.update writes.
+    const statePath = join(tmpDir, '.planning', 'STATE.md');
+    await writeFile(statePath, [
+      '---',
+      'milestone: v3.0',
+      'progress:',
+      '  total_phases: 5',
+      '  completed_phases: 4',
+      '  total_plans: 41',
+      '  completed_plans: 41',
+      '  percent: 80',
+      '---',
+      '',
+      '# State',
+      '',
+      '## Current Position',
+      'Status: Executing',
+      'Total Plans in Phase: 0',
+      'Last Activity: 2020-01-01',
+      'Last Activity Description: none',
+      '',
+    ].join('\n'));
+
+    await statePlannedPhase(['--phase', '10', '--name', 'queries', '--plans', '2'], tmpDir);
+
+    const after = await readFile(statePath, 'utf-8');
+    const fm = extractFrontmatter(after) as { progress?: Record<string, unknown> };
+    const progress = fm.progress ?? {};
+    // Disk would recalc to total_plans: 2 / completed_plans: 1 (phases 09+10).
+    // The curated block must survive untouched. String() coercion keeps the
+    // assertion robust to the frontmatter parser's scalar typing.
+    expect(String(progress.total_phases)).toBe('5');
+    expect(String(progress.completed_phases)).toBe('4');
+    expect(String(progress.total_plans)).toBe('41');
+    expect(String(progress.completed_plans)).toBe('41');
+    expect(String(progress.percent)).toBe('80');
   });
 });
 

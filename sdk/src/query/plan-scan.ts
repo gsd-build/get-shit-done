@@ -16,6 +16,12 @@ export interface PhasePlanScan {
 export function isRootPlanFile(fileName: string): boolean {
   if (PLAN_OUTLINE_RE.test(fileName)) return false;
   if (PLAN_PRE_BOUNCE_RE.test(fileName)) return false;
+  // A summary file from the legacy <N>-PLAN-<NN> flat layout (e.g.
+  // 14-PLAN-01-SUMMARY.md) contains the substring "PLAN" and would otherwise
+  // be mis-classified as a plan by the broad /PLAN/i fallback below — inflating
+  // plan counts and pushing completed phases below their completion ratio.
+  // Reject summaries before that fallback.
+  if (isRootSummaryFile(fileName)) return false;
   if (fileName.endsWith('-PLAN.md') || fileName === 'PLAN.md') return true;
   return /\.md$/i.test(fileName) && /PLAN/i.test(fileName);
 }

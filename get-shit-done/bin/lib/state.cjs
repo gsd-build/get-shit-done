@@ -1318,37 +1318,39 @@ function cmdStatePlannedPhase(cwd, phaseNumber, planCount, raw) {
     return;
   }
 
-  let content = fs.readFileSync(statePath, 'utf-8');
   const today = new Date().toISOString().split('T')[0];
   const updated = [];
 
-  // Update Status
-  let result = stateReplaceField(content, 'Status', 'Ready to execute');
-  if (result) { content = result; updated.push('Status'); }
+  // resync:false — a plan-phase run updates per-phase body fields only and must
+  // not resync the milestone-wide progress.* counters from a half-planned disk
+  // snapshot (#3242 precedent; body-only writes preserve curated progress).
+  readModifyWriteStateMd(statePath, (content) => {
+    // Update Status
+    let result = stateReplaceField(content, 'Status', 'Ready to execute');
+    if (result) { content = result; updated.push('Status'); }
 
-  // Update Total Plans in Phase
-  if (planCount !== null && planCount !== undefined) {
-    result = stateReplaceField(content, 'Total Plans in Phase', String(planCount));
-    if (result) { content = result; updated.push('Total Plans in Phase'); }
-  }
+    // Update Total Plans in Phase
+    if (planCount !== null && planCount !== undefined) {
+      result = stateReplaceField(content, 'Total Plans in Phase', String(planCount));
+      if (result) { content = result; updated.push('Total Plans in Phase'); }
+    }
 
-  // Update Last Activity
-  result = stateReplaceField(content, 'Last Activity', today);
-  if (result) { content = result; updated.push('Last Activity'); }
+    // Update Last Activity
+    result = stateReplaceField(content, 'Last Activity', today);
+    if (result) { content = result; updated.push('Last Activity'); }
 
-  // Update Last Activity Description
-  result = stateReplaceField(content, 'Last Activity Description', `Phase ${phaseNumber} planning complete — ${planCount || '?'} plans ready`);
-  if (result) { content = result; updated.push('Last Activity Description'); }
+    // Update Last Activity Description
+    result = stateReplaceField(content, 'Last Activity Description', `Phase ${phaseNumber} planning complete — ${planCount || '?'} plans ready`);
+    if (result) { content = result; updated.push('Last Activity Description'); }
 
-  // Update Current Position section
-  content = updateCurrentPositionFields(content, {
-    status: 'Ready to execute',
-    lastActivity: `${today} -- Phase ${phaseNumber} planning complete`,
-  });
+    // Update Current Position section
+    content = updateCurrentPositionFields(content, {
+      status: 'Ready to execute',
+      lastActivity: `${today} -- Phase ${phaseNumber} planning complete`,
+    });
 
-  if (updated.length > 0) {
-    writeStateMd(statePath, content, cwd);
-  }
+    return content;
+  }, cwd, { resync: false });
 
   output({ updated, phase: phaseNumber, plan_count: planCount }, raw, updated.length > 0 ? 'true' : 'false');
 }

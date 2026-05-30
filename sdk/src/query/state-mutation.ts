@@ -1193,7 +1193,11 @@ export const statePlannedPhase: QueryHandler = async (args, projectDir, workstre
       lastActivity: `${today} -- Phase ${phaseLabel} planning complete`,
     });
     return content;
-  }, workstream);
+    // resync:false — a plan-phase run updates per-phase body fields only and
+    // must not resync the milestone-wide progress.* counters from a
+    // half-planned disk snapshot (#3242 precedent; body-only writes preserve
+    // curated progress).
+  }, workstream, { resync: false });
 
   return { data: { updated, phase: phaseNumber, plan_count: planCount } };
 };
