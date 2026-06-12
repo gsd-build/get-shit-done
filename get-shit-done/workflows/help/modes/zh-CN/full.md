@@ -118,7 +118,7 @@ npx get-shit-done-cc@latest
 
 - 按波次分组计划（来自 frontmatter），顺序执行波次
 - 每个波次中的计划通过任务工具并行运行
-- 可选 `--wave N` 标志仅执行波次 `N` 并在阶段现在完全完成时停止（除非已完全完成）
+- 可选 `--wave N` 标志仅执行波次 `N`，并在阶段全部完成后停止
 - 所有计划完成后验证阶段目标
 - 更新 REQUIREMENTS.md、ROADMAP.md、STATE.md
 
@@ -131,7 +131,7 @@ npx get-shit-done-cc@latest
 将自由文本自动路由到正确的 GSD 命令。
 
 - 分析自然语言输入以找到最佳匹配的 GSD 命令
-- 充当分发器 — 本身不做任何工作
+- 充当调度器 — 本身不执行任何工作
 - 通过让你在顶级匹配之间选择来解决歧义
 - 当你知道想要什么但不知道运行哪个 `/gsd-*` 命令时使用
 
@@ -189,7 +189,7 @@ npx get-shit-done-cc@latest
 用法：`/gsd:phase "添加管理仪表板"`
 
 **`/gsd:phase --insert <after> <description>`**
-在现有阶段之间插入紧急工作作为十进制阶段。
+在现有阶段之间插入紧急工作作为子阶段。
 
 - 创建中间阶段（例如，7 和 8 之间的 7.1）
 - 用于必须在里程碑中间进行的已发现工作
@@ -257,7 +257,7 @@ npx get-shit-done-cc@latest
 - **默认** — 进度报告 + 智能路由
 - **`--next`** — 自动前进到下一个逻辑步骤（使用 `--next --force` 绕过安全门）
 - **`--forensic`** — 在进度报告后附加 6 项完整性审计
-- **`--do "<text>"`** — 智能路由器：将自由意图分发到匹配的 `/gsd-*` 命令（见上方 *智能路由器*）
+- **`--do "<text>"`** — 智能路由器：将自由意图路由到匹配的 `/gsd-*` 命令（见上方 *智能路由器*）
 
 用法：`/gsd:progress`
 用法：`/gsd:progress --next`
@@ -266,7 +266,7 @@ npx get-shit-done-cc@latest
 ### 会话管理
 
 **`/gsd:resume-work`**
-从上一个会话恢复工作，具有完整上下文恢复。
+从上一个会话恢复工作，恢复完整上下文。
 
 - 从 STATE.md 读取项目上下文
 - 显示当前位置和近期进展
@@ -289,7 +289,7 @@ npx get-shit-done-cc@latest
 **`/gsd:debug [issue description] [--diagnose]`**
 跨上下文重置的系统化调试，具有持久状态。
 
-- `--diagnose` — 运行一次性诊断通过而不打开持久调试会话
+- `--diagnose` — 运行一次性诊断而不打开持久调试会话
 
 - 通过适应性提问收集症状
 - 创建 `.planning/debug/[slug].md` 以跟踪调查
@@ -366,7 +366,7 @@ npx get-shit-done-cc@latest
 用法：`/gsd:capture 添加认证令牌刷新`
 
 **`/gsd:capture --note <text>`**
-零摩擦笔记捕获 — 一个命令，即时保存，无问题。
+零摩擦笔记捕获 — 一个命令，即时保存，无需确认。
 
 - 将带时间戳的笔记保存到 `.planning/notes/`（或全局的 `~/.claude/notes/`）
 - 三个子命令：追加（默认）、列表、提升
@@ -445,17 +445,17 @@ npx get-shit-done-cc@latest
 **`/gsd:capture --seed [idea]`**
 捕获具有触发条件以自动浮现的前瞻性想法。
 
-- 种子保留为什么、何时浮现以及相关代码的面包屑
+- 种子保留原因、触发时机和相关代码线索
 - 在 `/gsd:new-milestone` 期间当触发条件匹配时自动浮现
-- 优于延迟项目 — 触发器被检查，而非被遗忘
+- 优于推迟项 — 触发器会被检查，而非被遗忘
 
 用法：`/gsd:capture --seed "在我们构建事件系统时添加实时通知"`
 
 **`/gsd:capture --backlog [description]`**
-将想法添加到未来里程碑的待办事项停放场。
+将想法添加到未来里程碑的待办事项暂存区。
 
 - 在 ROADMAP.md 中创建 999.x 编号下的待办事项条目
-- 在不承诺当前里程碑的情况下保留想法
+- 在不占用当前里程碑配额的情况下保留想法
 - 稍后通过 `/gsd:review-backlog` 浮现和提升
 
 用法：`/gsd:capture --backlog "事件发布后的实时通知"`
@@ -527,7 +527,7 @@ npx get-shit-done-cc@latest
 归档来自已完成里程碑的累积阶段目录。
 
 - 识别仍存在于 `.planning/phases/` 中的已完成里程碑的阶段
-- 在移动任何内容前显示干运行摘要
+- 在移动任何内容前显示模拟运行摘要
 - 将阶段目录移动到 `.planning/milestones/v{X.Y}-phases/`
 - 在多个里程碑后使用以减少 `.planning/phases/` 杂乱
 
@@ -570,7 +570,7 @@ npx get-shit-done-cc@latest
 
 ### 发现与规范
 
-- **`/gsd:explore`** — 苏格拉底式构思和想法路由。在提交到计划前思考想法。
+- **`/gsd:explore`** — 探索式构思和想法路由。在提交到计划前思考想法。
 - **`/gsd:spec-phase <phase> [--auto] [--text]`** — 通过模糊评分澄清阶段交付什么；在讨论阶段前生成 SPEC.md。
 - **`/gsd:ai-integration-phase [phase]`** — 为涉及构建 AI 系统的阶段生成 AI-SPEC.md 设计合同。
 - **`/gsd:ui-phase [phase]`** — 为前端阶段生成 UI 设计合同 (UI-SPEC.md)。
@@ -623,7 +623,7 @@ npx get-shit-done-cc@latest
 
 ### 命名空间路由器（面向模型的元技能）
 
-这六个技能主要存在是为了让模型执行跨 60+ 技能的两阶段分层路由。当你想交互式浏览类别时可以直接调用它们。
+这六个技能主要用于模型在 60+ 技能间执行两阶段分层路由。当你想交互式浏览类别时可以直接调用它们。
 
 - **`/gsd-context`** — 代码库智能路由（map、graphify、docs、learnings）。
 - **`/gsd-ideate`** — 探索/捕获路由（explore、sketch、spike、spec、capture）。
