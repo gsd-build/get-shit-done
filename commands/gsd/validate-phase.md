@@ -1,6 +1,6 @@
 ---
 name: gsd:validate-phase
-description: Retroactively audit and fill Nyquist validation gaps for a completed phase
+description: 事后审计并填补已完成阶段的 Nyquist 验证差距
 argument-hint: "[phase number]"
 allowed-tools:
   - Read

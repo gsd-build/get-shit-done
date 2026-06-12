@@ -1,6 +1,6 @@
 ---
 name: gsd:map-codebase
-description: Analyze codebase with parallel mapper agents to produce .planning/codebase/ documents
+description: 使用并行映射代理分析代码库，生成 .planning/codebase/ 文档
 argument-hint: "[--fast [--focus tech|arch|quality|concerns]] [--query <term>|status|diff|refresh] [area]"
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:plan-phase
-description: Create detailed phase plan (PLAN.md) with verification loop
+description: 创建详细阶段计划 (PLAN.md) 并带验证循环
 argument-hint: "[phase] [--auto] [--research] [--skip-research] [--research-phase <N>] [--view] [--gaps] [--skip-verify] [--prd <file>] [--ingest <path-or-glob>] [--ingest-format <auto|nygard|madr|narrative>] [--reviews] [--text] [--tdd] [--mvp]"
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:inbox
-description: Triage and review open GitHub issues and PRs against project templates and contribution guidelines.
+description: 根据项目模板和贡献指南对 GitHub 开放问题和 PR 进行分类和审查
 argument-hint: "[--issues] [--prs] [--label] [--close-incomplete] [--repo owner/repo]"
 allowed-tools:
   - Read

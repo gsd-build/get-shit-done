@@ -1,6 +1,6 @@
 ---
 name: gsd-project
-description: "project lifecycle | milestones audits summary"
+description: "项目生命周期 | 里程碑 审计 摘要"
 argument-hint: ""
 allowed-tools:
   - Read

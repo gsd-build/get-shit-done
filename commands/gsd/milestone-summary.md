@@ -1,7 +1,7 @@
 ---
 type: prompt
 name: gsd:milestone-summary
-description: Generate a comprehensive project summary from milestone artifacts for team onboarding and review
+description: 从里程碑工件生成综合项目摘要，用于团队入职和审查
 argument-hint: "[version]"
 allowed-tools:
   - Read

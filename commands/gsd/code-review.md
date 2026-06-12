@@ -1,6 +1,6 @@
 ---
 name: gsd:code-review
-description: Review source files changed during a phase for bugs, security issues, and code quality problems
+description: 审查阶段期间更改的源文件，检查错误、安全问题和代码质量
 argument-hint: "<phase-number> [--depth=quick|standard|deep] [--files file1,file2,...] [--fix [--all] [--auto]]"
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:manager
-description: Interactive command center for managing multiple phases from one terminal
+description: 从一个终端管理多个阶段的交互式命令中心
 argument-hint: "[--analyze-deps]"
 allowed-tools:
   - Read

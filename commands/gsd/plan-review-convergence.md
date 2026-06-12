@@ -1,6 +1,6 @@
 ---
 name: gsd:plan-review-convergence
-description: "Cross-AI plan convergence loop — replan with review feedback until no HIGH concerns remain."
+description: "跨 AI 计划收敛循环：使用审查反馈重新规划直到没有高关注度"
 argument-hint: "<phase> [--codex] [--gemini] [--claude] [--opencode] [--ollama] [--lm-studio] [--llama-cpp] [--text] [--ws <name>] [--all] [--max-cycles N]"
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:review
-description: Request cross-AI peer review of phase plans from external AI CLIs
+description: 从外部 AI CLI 请求跨 AI 同行审查阶段计划
 argument-hint: "--phase N [--gemini] [--claude] [--codex] [--opencode] [--qwen] [--cursor] [--all]"
 allowed-tools:
   - Read

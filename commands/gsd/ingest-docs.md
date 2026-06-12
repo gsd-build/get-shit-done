@@ -1,6 +1,6 @@
 ---
 name: gsd:ingest-docs
-description: Bootstrap or merge a .planning/ setup from existing ADRs, PRDs, SPECs, and docs in a repo.
+description: 从仓库中的现有 ADR、PRD、SPEC 和文档引导或合并 .planning/ 设置
 argument-hint: "[path] [--mode new|merge] [--manifest <file>] [--resolve auto|interactive]"
 allowed-tools:
   - Read

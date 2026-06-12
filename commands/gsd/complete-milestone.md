@@ -1,7 +1,7 @@
 ---
 type: prompt
 name: gsd:complete-milestone
-description: Archive completed milestone and prepare for next version
+description: 归档已完成里程碑并准备下一个版本
 argument-hint: <version>
 allowed-tools:
   - Read

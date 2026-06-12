@@ -1,6 +1,6 @@
 ---
 name: gsd:import
-description: Ingest external plans with conflict detection against project decisions before writing anything.
+description: 导入外部计划并在写入前进行与项目决策的冲突检测
 argument-hint: "--from <filepath> | --from-gsd2"
 allowed-tools:
   - Read

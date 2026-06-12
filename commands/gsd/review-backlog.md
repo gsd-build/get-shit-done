@@ -1,6 +1,6 @@
 ---
 name: gsd:review-backlog
-description: Review and promote backlog items to active milestone
+description: 审查并将积压项提升到活动里程碑
 allowed-tools:
   - Read
   - Write

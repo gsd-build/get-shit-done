@@ -1,6 +1,6 @@
 ---
 name: gsd:help
-description: Show available GSD commands and usage guide
+description: 显示可用的 GSD 命令和使用指南
 argument-hint: "[--brief | --full | <topic> | --brief <topic>]"
 allowed-tools:
   - Read

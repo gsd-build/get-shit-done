@@ -1,6 +1,6 @@
 ---
 name: gsd:resume-work
-description: Resume work from previous session with full context restoration
+description: 从上一个会话恢复工作，恢复完整上下文
 allowed-tools:
   - Read
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: gsd:debug
-description: Systematic debugging with persistent state across context resets
+description: 跨上下文重置的系统化调试，具有持久状态
 argument-hint: "[list | status <slug> | continue <slug> | --diagnose] [issue description]"
 allowed-tools:
   - Read

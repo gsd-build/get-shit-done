@@ -1,6 +1,6 @@
 ---
 name: gsd:new-project
-description: Initialize a new project with deep context gathering and PROJECT.md
+description: 通过深度上下文收集初始化新项目并创建 PROJECT.md
 argument-hint: "[--auto]"
 allowed-tools:
   - Read

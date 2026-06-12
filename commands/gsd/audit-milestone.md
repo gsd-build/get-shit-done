@@ -1,6 +1,6 @@
 ---
 name: gsd:audit-milestone
-description: Audit milestone completion against original intent before archiving
+description: 归档前审计里程碑完成情况与原始意图的一致性
 argument-hint: "[version]"
 allowed-tools:
   - Read

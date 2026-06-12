@@ -1,6 +1,6 @@
 ---
 name: gsd-ideate
-description: "exploration capture | explore sketch spike spec capture"
+description: "探索捕获 | 探索 草图 试验 规范 捕获"
 argument-hint: ""
 allowed-tools:
   - Read

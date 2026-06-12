@@ -1,6 +1,6 @@
 ---
 name: gsd:discuss-phase
-description: Gather phase context through adaptive questioning before planning.
+description: 规划前通过适应性提问收集阶段上下文
 argument-hint: "<phase> [--all] [--auto] [--chain] [--batch] [--analyze] [--text] [--power] [--assumptions]"
 allowed-tools:
   - Read

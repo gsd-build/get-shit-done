@@ -1,7 +1,7 @@
 ---
 type: prompt
 name: gsd:audit-fix
-description: Autonomous audit-to-fix pipeline — find issues, classify, fix, test, commit
+description: 自主审计到修复管道：发现问题、分类、修复、测试、提交
 argument-hint: "--source <audit-uat> [--severity <medium|high|all>] [--max N] [--dry-run]"
 allowed-tools:
   - Read

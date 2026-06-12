@@ -1,6 +1,6 @@
 ---
 name: gsd:workspace
-description: Manage GSD workspaces — create, list, or remove isolated workspace environments
+description: 管理 GSD 工作区：创建、列出或移除隔离工作区环境
 argument-hint: "[--new | --list | --remove] [name]"
 allowed-tools:
   - Read

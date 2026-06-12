@@ -1,6 +1,6 @@
 ---
 name: gsd:fast
-description: Execute a trivial task inline — no subagents, no planning overhead
+description: 内联执行简单任务——无子代理、无规划开销
 argument-hint: "[task description]"
 allowed-tools:
   - Read

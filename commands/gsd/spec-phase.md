@@ -1,6 +1,6 @@
 ---
 name: gsd:spec-phase
-description: Clarify WHAT a phase delivers with ambiguity scoring; produces a SPEC.md before discuss-phase.
+description: 通过模糊评分澄清阶段交付什么；在讨论阶段前生成 SPEC.md
 argument-hint: "<phase> [--auto] [--text]"
 allowed-tools:
   - Read

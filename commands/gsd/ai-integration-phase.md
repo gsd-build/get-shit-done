@@ -1,6 +1,6 @@
 ---
 name: gsd:ai-integration-phase
-description: Generate an AI-SPEC.md design contract for phases that involve building AI systems.
+description: 为涉及构建 AI 系统的阶段生成 AI-SPEC.md 设计合同
 argument-hint: "[phase number]"
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:sketch
-description: Sketch UI/design ideas with throwaway HTML mockups, or propose what to sketch next (frontier mode)
+description: 使用可丢弃 HTML 模型草图 UI/设计想法，或提议下一步草图内容
 argument-hint: "[design idea to explore] [--quick] [--text] [--wrap-up] or [frontier]"
 allowed-tools:
   - Read

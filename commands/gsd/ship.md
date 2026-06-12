@@ -1,6 +1,6 @@
 ---
 name: gsd:ship
-description: Create PR, run review, and prepare for merge after verification passes
+description: 创建 PR、运行审查，验证通过后准备合并
 argument-hint: "[phase number or milestone, e.g., '4' or 'v1.0']"
 allowed-tools:
   - Read

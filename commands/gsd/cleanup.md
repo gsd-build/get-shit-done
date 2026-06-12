@@ -1,6 +1,6 @@
 ---
 name: gsd:cleanup
-description: Archive accumulated phase directories from completed milestones
+description: 归档已完成里程碑中累积的阶段目录
 allowed-tools:
   - Read
   - Write

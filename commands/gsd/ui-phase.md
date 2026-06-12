@@ -1,6 +1,6 @@
 ---
 name: gsd:ui-phase
-description: Generate UI design contract (UI-SPEC.md) for frontend phases
+description: 为前端阶段生成 UI 设计合同 (UI-SPEC.md)
 argument-hint: "[phase]"
 allowed-tools:
   - Read

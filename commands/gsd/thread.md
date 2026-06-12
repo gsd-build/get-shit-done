@@ -1,6 +1,6 @@
 ---
 name: gsd:thread
-description: Manage persistent context threads for cross-session work
+description: 管理跨会话工作的持久上下文线程
 argument-hint: "[list [--open | --resolved] | close <slug> | status <slug> | name | description]"
 allowed-tools:
   - Read

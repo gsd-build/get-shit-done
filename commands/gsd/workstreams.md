@@ -1,6 +1,6 @@
 ---
 name: gsd:workstreams
-description: Manage parallel workstreams — list, create, switch, status, progress, complete, and resume
+description: 管理并行工作流：列出、创建、切换、状态、进度、完成和恢复
 allowed-tools:
   - Read
   - Bash

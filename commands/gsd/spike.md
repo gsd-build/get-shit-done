@@ -1,6 +1,6 @@
 ---
 name: gsd:spike
-description: Spike an idea through experiential exploration, or propose what to spike next (frontier mode)
+description: 通过体验式探索试验想法，或提议下一步试验内容
 argument-hint: "[idea to validate] [--quick] [--text] [--wrap-up] or [frontier]"
 allowed-tools:
   - Read

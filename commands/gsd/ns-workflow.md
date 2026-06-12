@@ -1,6 +1,6 @@
 ---
 name: gsd-workflow
-description: "workflow | discuss plan execute verify phase progress"
+description: "工作流 | 讨论 规划 执行 验证 阶段 进度"
 argument-hint: ""
 allowed-tools:
   - Read

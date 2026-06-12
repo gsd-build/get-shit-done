@@ -1,6 +1,6 @@
 ---
 name: gsd:pause-work
-description: Create context handoff when pausing work mid-phase
+description: 阶段中间暂停工作时创建上下文交接
 argument-hint: "[--report]"
 allowed-tools:
   - Read

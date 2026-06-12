@@ -1,6 +1,6 @@
 ---
 name: gsd:config
-description: Configure GSD settings — workflow toggles, advanced knobs, integrations, and model profile
+description: 配置 GSD 设置：工作流开关、高级选项、集成和模型配置
 argument-hint: "[--advanced | --integrations | --profile <name>]"
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:surface
-description: Toggle which skills are surfaced — apply a profile, list, or disable a cluster without reinstall
+description: 切换显示哪些技能：应用配置文件、列表或禁用集群而无需重新安装
 argument-hint: "[list|status|profile <name>|disable <cluster>|enable <cluster>|reset]"
 allowed-tools:
   - Read

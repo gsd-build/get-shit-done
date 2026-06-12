@@ -1,6 +1,6 @@
 ---
 name: gsd-quality
-description: "quality gates | code review debug audit security eval ui"
+description: "质量门 | 代码审查 调试 审计 安全 评估 UI"
 argument-hint: ""
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: gsd:stats
-description: Display project statistics — phases, plans, requirements, git metrics, and timeline
+description: 显示项目统计：阶段、计划、需求、git 指标和时间线
 allowed-tools:
   - Read
   - Bash

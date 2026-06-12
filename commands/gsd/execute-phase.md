@@ -1,6 +1,6 @@
 ---
 name: gsd:execute-phase
-description: Execute all plans in a phase with wave-based parallelization
+description: 以波次并行方式执行阶段中的所有计划
 argument-hint: "<phase-number> [--wave N] [--gaps-only] [--interactive] [--tdd]"
 allowed-tools:
   - Read

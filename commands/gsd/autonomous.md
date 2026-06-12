@@ -1,6 +1,6 @@
 ---
 name: gsd:autonomous
-description: Run all remaining phases autonomously — discuss→plan→execute per phase
+description: 自主运行所有剩余阶段：讨论、规划、执行每个阶段
 argument-hint: "[--from N] [--to N] [--only N] [--interactive]"
 allowed-tools:
   - Read

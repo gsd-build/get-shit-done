@@ -1,6 +1,6 @@
 ---
 name: gsd:profile-user
-description: Generate developer behavioral profile and create Claude-discoverable artifacts
+description: 生成开发者行为配置文件并创建 Claude 可发现的工件
 argument-hint: "[--questionnaire] [--refresh]"
 allowed-tools:
   - Read

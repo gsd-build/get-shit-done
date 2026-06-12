@@ -1,6 +1,6 @@
 ---
 name: gsd:quick
-description: Execute a quick task with GSD guarantees (atomic commits, state tracking) but skip optional agents
+description: 执行快速任务并保留 GSD 保障（原子提交、状态跟踪），跳过可选代理
 argument-hint: "[list | status <slug> | resume <slug> | --full] [--validate] [--discuss] [--research] [task description]"
 allowed-tools:
   - Read
